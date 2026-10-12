@@ -13,6 +13,7 @@ var shooter: Node3D
 var color: Color = Color.WHITE
 var life: float = 2.5
 var radius: float = 0.5
+var kind: String = "arrow" ## "arrow" (el escudo la anula) o "eikon" (el escudo deja pasar un 50 %)
 
 func _ready() -> void:
 	add_to_group("projectile")
@@ -42,7 +43,7 @@ func _physics_process(delta: float) -> void:
 			return
 	for t in MeshUtil.enemies_of(get_tree(), team):
 		if p.distance_to(t.get_hit_center()) < radius + t.hit_radius:
-			var res: String = t.take_hit(damage, shooter, "arrow")
+			var res: String = t.take_hit(damage, shooter, kind)
 			if res == "dodge":
 				continue
 			if res == "parry":

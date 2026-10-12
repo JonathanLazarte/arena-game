@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 eikon_name = "Gólem de Piedra"
-color = Color(0.5, 0.45, 0.4, 1)
+color = Color(0.62, 0.6, 0.56, 1)
 max_health = 120.0
 move_speed = 6.0
 attack_kind = 2

@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://brki07jfb1wyw"
-path="res://.godot/imported/goleling_evolved_quaternius.glb-7d6e6949dec73b11e968f2ef70d70000.scn"
+uid="uid://dbp1y3ravgvhy"
+path="res://.godot/imported/giant_quaternius.glb-52c21738ccc18a9a6428ba8a01449201.scn"
 
 [deps]
 
-source_file="res://assets/models/goleling_evolved_quaternius.glb"
-dest_files=["res://.godot/imported/goleling_evolved_quaternius.glb-7d6e6949dec73b11e968f2ef70d70000.scn"]
+source_file="res://assets/models/giant_quaternius.glb"
+dest_files=["res://.godot/imported/giant_quaternius.glb-52c21738ccc18a9a6428ba8a01449201.scn"]
 
 [params]
 

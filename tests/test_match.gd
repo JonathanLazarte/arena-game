@@ -21,8 +21,9 @@ func _run() -> void:
 		if int(t) % 20 == 0:
 			print("t=%ds ronda=%d marcador=%s vida J=%.0f R=%.0f eikons=%d" % [int(t * 4), arena.round_num, arena.wins, arena.player.health, arena.enemy.health, get_nodes_in_group("eikon").size()])
 	print("FIN state=%s marcador=%s panel=%s" % [arena.state, arena.wins, arena.hud.end_panel.visible])
-	if arena.state == "over":
+	var finished := arena.state == "over" # se guarda antes de reiniciar (el reinicio cambia el estado)
+	if finished:
 		arena.hud.restart_requested.emit()
 		await process_frame
 		print("Reinicio: ronda=%d marcador=%s panel=%s" % [arena.round_num, arena.wins, arena.hud.end_panel.visible])
-	quit(0 if arena.state == "over" else 1)
+	quit(0 if finished else 1)

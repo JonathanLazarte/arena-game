@@ -8,7 +8,10 @@ Todos los assets 3D de terceros son **CC0 1.0 (dominio público)**. No requieren
 | Horse (Ultimate Animated Animals) | Quaternius | https://poly.pizza/m/qvTrSG9pZF · https://quaternius.com/packs/ultimateanimatedanimals.html | CC0 1.0 | `assets/models/horse_quaternius.glb` |
 | Wolf (Ultimate Animated Animals) | Quaternius | https://poly.pizza/m/P1gU3Qkr9r | CC0 1.0 | `assets/models/wolf_quaternius.glb` |
 | Dragon (Ultimate Monsters), recoloreado como fénix | Quaternius | https://poly.pizza/m/3rUm1cN3yp · https://quaternius.com/packs/ultimatemonsters.html | CC0 1.0 | `assets/models/dragon_quaternius.glb` |
-| Goleling Evolved (Ultimate Monsters), marcador provisional del gólem | Quaternius | https://poly.pizza/m/iHEuXiH6Aj | CC0 1.0 | `assets/models/goleling_evolved_quaternius.glb` |
+| Giant (Ultimate Monsters), convertido en gólem de piedra (material de roca, ojos de lava y rocas en hombros, espalda y puños) | Quaternius | https://poly.pizza/m/BldaiPtyJa · https://quaternius.com/packs/ultimatemonsters.html | CC0 1.0 | `assets/models/giant_quaternius.glb` |
+| Rock Large (rocas del gólem) | Quaternius | https://poly.pizza/m/54jZKTAt5p | CC0 1.0 | `assets/models/rock_large_quaternius.glb` |
 | Castle Kit 2.0 (muros, pilares, torres, estandartes, puertas, balistas, rocas) | Kenney | https://kenney.nl/assets/castle-kit | CC0 1.0 (ver `assets/props/License.txt`) | `assets/props/*.glb`, `assets/props/Textures/colormap.png` |
+
+La postura de montar (a horcajadas) es un ajuste propio por código de los huesos de las piernas sobre `Sit_Chair_Pose` de KayKit (`scripts/visual/riding_pose.gd`).
 
 El arco del jugador, los efectos (arcos de espada, anillos, proyectiles) y la interfaz son primitivas generadas por código (propias).

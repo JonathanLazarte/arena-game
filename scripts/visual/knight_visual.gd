@@ -10,7 +10,7 @@ extends Node3D
 const SCENE := preload("res://assets/models/Knight.glb")
 const TEX := preload("res://assets/models/knight_texture.png")
 const SCALE := 0.85
-const MOUNT_Y := 0.5 ## altura extra del modelo sentado sobre la silla
+const MOUNT_Y := -0.36 ## baja el modelo para que la cadera (sentada) quede en el origen = punto de silla
 const CONTACT := 0.42 ## fracción del clip de ataque en la que la hoja impacta
 const UPPER := ["spine", "chest", "upperarm.l", "lowerarm.l", "wrist.l", "hand.l", "handslot.l",
 	"upperarm.r", "lowerarm.r", "wrist.r", "hand.r", "handslot.r", "head",
@@ -44,6 +44,8 @@ var oneshot: String = ""
 var oneshot_t: float = 0.0
 var _weight: float = 0.0
 var _last_attack_id: int = -1
+var riding: RidingPose
+var _mounted: bool = false
 
 func setup(c: Color) -> void:
 	tint = c
@@ -81,6 +83,10 @@ func setup(c: Color) -> void:
 	bow = MeshUtil.box(att, Vector3(0.1, 1.8, 0.14), Vector3.ZERO, Color(0.5, 0.3, 0.12))
 	MeshUtil.box(bow, Vector3(0.02, 1.7, 0.02), Vector3(0, 0, 0.25), Color(0.9, 0.9, 0.85)) # cuerda
 	bow.visible = false
+	# Postura a horcajadas sobre el AnimationTree (SkeletonModifier3D)
+	riding = RidingPose.new()
+	riding.name = "RidingPose"
+	sk.add_child(riding)
 	ap = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	AnimUtil.set_loops(ap, ["Idle", "Walking_A", "Walking_Backwards", "Running_A", "Running_Strafe_Left",
 		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose"])
@@ -154,6 +160,7 @@ func set_loadout(l: int) -> void:
 func set_mounted(m: bool, sword_scale: float) -> void:
 	tree.set("parameters/base/transition_request", "mounted" if m else "foot")
 	model.position.y = MOUNT_Y if m else 0.0
+	_mounted = m
 	sword.scale = Vector3(1.0, sword_scale, 1.0)
 
 ## Evento puntual: "hit", "block_hit", "shoot".
@@ -169,6 +176,7 @@ func _clip_len(s: String) -> float:
 
 func update(f: Fighter, delta: float) -> void:
 	oneshot_t = maxf(oneshot_t - delta, 0.0)
+	riding.amount = move_toward(riding.amount, 1.0 if _mounted and f.alive else 0.0, delta * 6.0)
 	var s := "none"
 	var upper: bool = f.mounted
 	if not f.alive:

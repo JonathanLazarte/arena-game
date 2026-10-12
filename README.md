@@ -73,7 +73,7 @@ Los presets "Android" (arm64, apaisado, sin compilación Gradle, firma de depura
 Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, cambio de objetivo con lock-on (mobs), más ataques por eikon, oleadas de mobs, sonido y efectos, y ajustar la dificultad de la IA.
 
 ## Arte (ronda 6)
-- Modelos CC0 (ver `CREDITS.md`): caballero KayKit para ambos luchadores (tinte azul/rojo en capa y escudo), caballo de Quaternius, lobo y dragón-fénix de Quaternius, Goleling como gólem provisional y el Castle Kit de Kenney para muros, pilares y decoración.
+- Modelos CC0 (ver `CREDITS.md`): caballero KayKit para ambos luchadores (tinte azul/rojo en capa y escudo), caballo de Quaternius, lobo y dragón-fénix de Quaternius, Goleling como gólem provisional (sustituido en la ronda 8) y el Castle Kit de Kenney para muros, pilares y decoración.
 - `scripts/visual/knight_visual.gd`: AnimationTree del jinete. La base es la locomoción (BlendSpace2D Idle/Walk/Run/Strafe/Back) a pie o `Sit_Chair_Pose` montado. Encima va una StateMachine de acciones mezclada con un Blend2 con máscara de tren superior (montado, bloqueo, arco y cambio de arma):
   - ataques ligeros (combo Slice Diagonal / Horizontal / Chop) con la velocidad ajustada por fase (windup, active, recovery) y ataque fuerte con 2H Chop;
   - bloqueo con Blocking y Block_Hit; parry con Block_Attack;
@@ -91,3 +91,10 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
   - Si te quedas sin aguante bajo el escudo, se **rompe la guardia**: tambaleo de 1 s y quedas expuesto.
 - **Dificultad de la IA:** se configura con el recurso `AIDifficulty` (`resources/ai/easy|normal|hard.tres`), con estos parámetros: pausas entre ataques, cadena máxima, agresividad (dash de entrada, aguante mínimo para atacar), probabilidad de castigar, esquivar, hacer parry y bloquear flechas, tiempo de reacción e intervalo de decisión.
   - El rival por defecto es el nivel 1 "easy". El perfil "normal" equivale al comportamiento anterior.
+
+## Ronda 8: jinete a horcajadas, gólem nuevo y escudo contra eikons
+- **Postura de montar:** el jinete se sienta a horcajadas. Parte de `Sit_Chair_Pose` y `RidingPose` (un `SkeletonModifier3D`, `scripts/visual/riding_pose.gd`) corrige las piernas después del AnimationTree: abre los muslos hacia los flancos, los baja y deja las espinillas colgando. La cadera se coloca cada frame en el **punto de silla** del caballo (`Mount.saddle_position()`, un BoneAttachment3D en el hueso `Torso`), así que sube y baja con el galope. Al desmontar la postura se quita poco a poco.
+- **Gólem de piedra:** usa el *Giant* de Quaternius (CC0, con Walk/Idle/Attack) con material de roca (ruido triplanar), ojos de lava y rocas de Quaternius en hombros, espalda y puños, que siguen a los huesos. Mide unos 3 m. Sustituye al Goleling.
+- **Escudo contra eikons:** un ataque de eikon bloqueado (bola de fuego del fénix, mordisco del lobo, onda del gólem) deja pasar el **50 %** del daño y cuesta **30** de aguante (`EIKON_BLOCK_PASS`, `COST_BLOCKED_EIKON`). Las flechas siguen anuladas del todo. Los proyectiles tienen ahora `kind` ("arrow" o "eikon"), y las bolas de fuego del fénix ya no se pueden devolver con parry (igual que el resto de ataques de eikon).
+- Pruebas nuevas: `tests/test_eikon_block.gd` y `tests/test_riding.gd`. Capturas: `tests/screenshot_mounted.gd -- <png> [still|gallop] [show|hide] [side|front]` y `tests/golem_preview.gd -- <png>` (necesitan pantalla, p. ej. `xvfb-run ... --rendering-driver opengl3`).
+- `test_match` devolvía código 1 aunque la partida terminara (comprobaba el estado después de reiniciar). Ya está corregido.

@@ -27,6 +27,9 @@ func _ready() -> void:
 
 const HORSE := preload("res://assets/models/horse_quaternius.glb")
 const HORSE_SCALE := 0.62
+const SADDLE_BONE := "Torso"
+const SADDLE_FALLBACK := Vector3(0, 1.3, 0)
+var saddle: BoneAttachment3D
 var model: Node3D
 var tree: AnimationTree
 var _last_pos: Vector3
@@ -42,6 +45,13 @@ func _build_model() -> void:
 		AnimUtil.tint_surfaces(model, data.color, 0.5)
 	var ap := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	AnimUtil.set_loops(ap, ["Idle", "Walk", "Gallop"])
+	# Punto de silla: sigue al hueso del lomo, así el jinete sube y baja con el galope
+	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if sk and sk.find_bone(SADDLE_BONE) >= 0:
+		saddle = BoneAttachment3D.new()
+		saddle.name = "Saddle"
+		saddle.bone_name = SADDLE_BONE
+		sk.add_child(saddle)
 	var bs := AnimationNodeBlendSpace1D.new()
 	bs.add_blend_point(AnimUtil.anim_node("Idle"), 0.0, -1, &"Idle")
 	bs.add_blend_point(AnimUtil.anim_node("Walk"), 0.3, -1, &"Walk")
@@ -62,6 +72,14 @@ func _update_anim(delta: float) -> void:
 	_last_pos = global_position
 	speed_now = lerpf(speed_now, d, clampf(delta * 8.0, 0.0, 1.0))
 	tree.set("parameters/blend_position", speed_now / maxf(data.speed, 0.1))
+
+## Punto de la silla en el mundo (lomo del caballo, con el balanceo de la animación).
+func saddle_position() -> Vector3:
+	if saddle and saddle.is_inside_tree():
+		return saddle.global_position + global_basis * SADDLE_OFFSET
+	return global_transform * SADDLE_FALLBACK
+
+const SADDLE_OFFSET := Vector3(0, 0.25, -0.4)
 
 func is_free() -> bool:
 	return rider == null

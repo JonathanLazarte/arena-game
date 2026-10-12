@@ -64,6 +64,8 @@ const COST_BLOCKED_HIT := 22.0 ## por golpe ligero bloqueado: ~4-5 golpes con la
 const COST_BLOCKED_HEAVY_MULT := 2.0
 const COST_BLOCKED_ARROW := 3.0 ## las flechas bloqueadas no hacen daño
 const GUARD_BREAK_STAGGER := 1.0
+const EIKON_BLOCK_PASS := 0.5 ## ataque de eikon bloqueado: pasa el 50 % del daño
+const COST_BLOCKED_EIKON := 30.0 ## y cuesta más aguante que un golpe ligero
 const DRAIN_BLOCK := 3.0 ## por segundo (mantener el escudo; poco para no romper el objetivo de 4-5 golpes)
 const DRAIN_SPRINT := 20.0 ## por segundo
 const REGEN := 18.0
@@ -402,6 +404,9 @@ func _physics_process(delta: float) -> void:
 	_rider_root.rotation.x = 0.0 # la voltereta la hace la animación Dodge_*
 	_rider_root.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.2 if stun > 0.0 else 0.0
 	_rider_root.position.y = sy
+	if mounted and mount_node:
+		# Sentado en la silla: la cadera sigue el punto de silla del caballo
+		_rider_root.position = to_local(mount_node.saddle_position())
 
 func _lock_valid() -> bool:
 	return is_instance_valid(face_target) and bool(face_target.get("alive"))
@@ -710,6 +715,14 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if blocking and frontal:
 		if _kind == "arrow":
 			spend_stamina(COST_BLOCKED_ARROW) # flecha anulada por completo
+			_kv.event("block_hit")
+			if stamina <= 0.0:
+				_guard_break()
+			return "block"
+		if _kind == "eikon":
+			_damage(amount * maxf(EIKON_BLOCK_PASS, EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else 0.0))
+			spend_stamina(COST_BLOCKED_EIKON)
+			add_meter(3.0)
 			_kv.event("block_hit")
 			if stamina <= 0.0:
 				_guard_break()
