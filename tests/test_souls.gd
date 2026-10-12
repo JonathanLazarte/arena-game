@@ -187,7 +187,7 @@ func _run() -> void:
 	await tap("swap_weapon")
 	await wait(2.2)
 	check(p.loadout == Fighter.Loadout.SWORD_SHIELD, "vuelta a espada + escudo")
-	# --- 8. Parry de 1 s ---
+	# --- 8. Parry dedicado (ventana 0,3 s + recuperación vulnerable) ---
 	await place(p, e, 3.0)
 	await wait(0.5)
 	var results: Array[String] = []
@@ -195,10 +195,12 @@ func _run() -> void:
 	e.landed_hit.connect(cb2)
 	e.attack_light()
 	await wait(0.25)
-	Input.action_press("block") # ~0,2 s antes del impacto: dentro de la ventana de 0,3 s
+	var st_p := p.stamina
+	await tap("parry") # ~0,2 s antes del impacto: dentro de la ventana de 0,3 s
+	check(st_p - p.stamina >= Fighter.COST_PARRY - 1.0, "parry gasta aguante")
 	await idle_atk(e)
-	Input.action_release("block")
-	check(results.size() > 0 and results[-1] == "parry", "escudo alzado ~0,2 s antes del golpe = parry (%s)" % str(results))
+	check(results.size() > 0 and results[-1] == "parry", "parry ~0,2 s antes del golpe = éxito (%s)" % str(results))
+	check(p.parry_state == Fighter.Parry.NONE, "parry con éxito no deja recuperación")
 	check(e.stun > 0.8 and e.riposte_t > 0.0, "parry aturde más al atacante (%.2f s)" % e.stun)
 	h0 = e.health
 	await physics_frame
@@ -212,12 +214,38 @@ func _run() -> void:
 	await wait(0.5)
 	await place(p, e, 3.0)
 	var n_res := results.size()
+	# El escudo ya no hace parry: alzarlo justo antes = bloqueo normal
+	e.attack_light()
+	await wait(0.3)
 	Input.action_press("block")
-	await wait(0.2)
-	e.attack_light() # golpe ~0,65 s después de alzar el escudo: fuera de la ventana
-	await idle(e)
+	await idle_atk(e)
 	Input.action_release("block")
-	check(results.size() > n_res and results[-1] == "block", "fuera de la ventana de 0,3 s = bloqueo normal (%s)" % results[-1])
+	check(results.size() > n_res and results[-1] == "block", "escudo alzado justo antes = solo bloqueo (%s)" % results[-1])
+	await idle(e)
+	await wait(0.3)
+	# Parry demasiado pronto: falla y queda expuesto (+25 % daño)
+	ph = p.health
+	await tap("parry")
+	await wait(0.2)
+	e.attack_light() # impacta ~0,65 s después del parry: ya en recuperación
+	await idle_atk(e)
+	var exposed_dmg := ph - p.health
+	check(results[-1] == "hit" and absf(exposed_dmg - Fighter.LIGHT["damage"] * Fighter.PARRY_EXPOSED_MULT) < 0.1, "parry fallido: expuesto, recibe +25%% (%.1f)" % exposed_dmg)
+	await idle(e)
+	await idle(p)
+	await tap("parry")
+	await wait(Fighter.PARRY_WINDOW + 0.05)
+	Input.action_press("block")
+	await physics_frame
+	await physics_frame
+	check(p.parry_state == Fighter.Parry.RECOVERY and not p.blocking and not p.attack_light() and not p.dash(), "recuperación de parry: sin bloqueo, ataque ni dash")
+	Input.action_release("block")
+	await wait(1.0)
+	await tap("swap_weapon")
+	await wait(2.2)
+	check(not p.parry(), "sin parry en modo arco")
+	await tap("swap_weapon")
+	await wait(2.2)
 	e.landed_hit.disconnect(cb2)
 	# --- 9. La IA lee ataques: esquiva y castiga; se compromete con los suyos ---
 	await wait(0.5)
@@ -237,6 +265,7 @@ func _run() -> void:
 			if e.in_recovery():
 				e_attacked_recovery = true
 	print("IA: esquivas=%d parries=%d castigos=%d" % [arena.ai.dodges, arena.ai.parries_tried, arena.ai.punish_hits])
+	check(arena.ai.dodges + arena.ai.parries_tried > 0, "la IA reacciona (esquiva o parry)")
 	check(arena.ai.dodges > 0, "la IA esquiva ataques telegrafiados (%d)" % arena.ai.dodges)
 	check(arena.ai.punish_hits > 0, "la IA castiga durante la recuperación (%d)" % arena.ai.punish_hits)
 	check(e_attacked_recovery, "la IA también queda en recuperación tras sus ataques (castigable)")

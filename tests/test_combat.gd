@@ -43,7 +43,7 @@ func _run() -> void:
 	check(e.health < h0, "espada daña al rival (%.0f -> %.0f)" % [h0, e.health])
 	check(p.meter > m0, "medidor eikon del jugador sube (%.0f -> %.0f)" % [m0, p.meter])
 	check(is_equal_approx(arena.hud.e_health.value, e.health), "HUD refleja vida del rival")
-	# Bloqueo (mantener > ventana de parry)
+	# Bloqueo (el escudo solo bloquea; el parry es otra acción)
 	Input.action_press("block")
 	await wait(1.3)
 	var ph := p.health
@@ -57,14 +57,13 @@ func _run() -> void:
 	await wait(0.8)
 	var unblocked := ph - p.health
 	check(unblocked > 0.0 and blocked < unblocked, "escudo reduce daño (bloq %.1f vs sin %.1f)" % [blocked, unblocked])
-	# Parry (bloqueo justo antes del golpe)
+	# Parry (acción dedicada, ~0,2 s antes del impacto)
 	await wait(1.0)
 	ph = p.health
 	e.sword()
-	await wait(0.25) # alzar el escudo ~0,2 s antes del impacto (ventana 0,3 s)
-	Input.action_press("block")
-	await wait(0.7)
-	Input.action_release("block")
+	await wait(0.25) # parry dedicado ~0,2 s antes del impacto (ventana 0,3 s)
+	await tap("parry")
+	await wait(0.6)
 	check(e.stun > 0.0 and is_equal_approx(ph, p.health), "parry aturde al rival sin daño (stun %.2f)" % e.stun)
 	# Arco
 	await wait(1.0)
@@ -75,7 +74,7 @@ func _run() -> void:
 	await tap("swap_weapon")
 	await wait(2.1)
 	check(p.loadout == Fighter.Loadout.BOW, "cambio a arco")
-	await tap("shoot_bow")
+	await tap("attack_sword") # en modo arco, Atacar dispara
 	await wait(1.0)
 	check(e.health < h0, "flecha daña al rival (%.0f -> %.0f)" % [h0, e.health])
 	await tap("swap_weapon")

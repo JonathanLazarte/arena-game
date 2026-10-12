@@ -85,9 +85,10 @@ func _physics_process(delta: float) -> void:
 			else:
 				_backstep_t = 0.5
 		elif sword_mode and me.atk_state == Fighter.Atk.NONE and r < difficulty * 0.7 + 0.15 and me.stamina > 15.0:
-			parries_tried += 1
-			_block_hold = 0.7 # escudo alzado dentro de la ventana -> parry
-			_punish_t = 2.5
+			# Parry dedicado con el mismo riesgo que el jugador (si falla queda expuesto)
+			if me.parry():
+				parries_tried += 1
+				_punish_t = 2.5
 	if _backstep_t > 0.0:
 		_backstep_t -= delta
 		me.want_block = false

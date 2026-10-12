@@ -43,7 +43,7 @@ func _physics_process(delta: float) -> void:
 	var atk_down := Input.is_action_pressed("attack_sword")
 	var atk_edge := _pressed_edge("attack_sword")
 	var swp := _pressed_edge("swap_weapon")
-	var bw := _pressed_edge("shoot_bow")
+	var pr := _pressed_edge("parry")
 	var sm := _pressed_edge("summon")
 	var ds := _pressed_edge("dash")
 	var mt := _pressed_edge("mount")
@@ -67,7 +67,7 @@ func _physics_process(delta: float) -> void:
 		if not _heavy_fired:
 			me.attack_light()
 		_atk_hold = -1.0
-	if bw: me.shoot()
+	if pr: me.parry()
 	if sm: me.summon()
 	if ds: me.dash()
 	if mt: me.toggle_mount()

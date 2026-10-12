@@ -6,10 +6,11 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 | Acción | Teclado | Táctil |
 |---|---|---|
 | Moverse (relativo a la cámara, o al rival con lock-on); atrás = marcha atrás sin girar | WASD / flechas | Joystick virtual (izquierda) |
-| Fijar objetivo (lock-on, activado por defecto) | Tab / Q | Botón *Fijar* |
-| Atacar: pulsar = ligero (combo de hasta 3), mantener 0,4 s = fuerte. Con arco, dispara | J (L también dispara con arco) | Botón *Atacar* |
+| Fijar objetivo (lock-on, activado por defecto) | Tab | Botón *Fijar* |
+| Atacar: pulsar = ligero (combo de hasta 3), mantener 0,4 s = fuerte. Con arco, dispara | J | Botón *Atacar* (único botón de ataque) |
 | Cambiar arma (espada+escudo ⇄ arco, 2 s) | R | Botón *Cambiar* |
-| Escudo (mantener; alzarlo como mucho 0,3 s antes del impacto = **parry**). Solo con espada+escudo | K | Botón *Escudo* |
+| Escudo: mantener para bloquear (solo bloquea) | K | Botón *Escudo* |
+| Parry (acción propia) | Q | Botón *Parry* |
 | Invocar eikon (medidor lleno) | E | Botón *Eikon* |
 | Montar / desmontar (cerca de una montura libre) | F | Botón *Montar* |
 | Galope / sprint (mantener; gasta aguante) | Shift | Botón *Galope* (mantener) |
@@ -23,9 +24,9 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
   - Fallar el golpe alarga la recuperación (+0,3 s).
 - **Poise:** cada golpe recibido gasta poise y, si se agota, quedas aturdido. Un golpe interrumpe el ataque ligero del rival, así que intercambiar golpes no sale gratis.
 - **Armas:** espada+escudo **o** arco, nunca ambos. Cambiar tarda 2 s (barra en el HUD) y en ese tiempo no puedes atacar ni bloquear. Con arco no hay escudo: solo dash o voltereta.
-- **Parry:** alza el escudo como mucho 0,3 s antes del impacto (`PARRY_WINDOW` en `fighter.gd`). No recibes daño, el atacante queda aturdido 1,6 s y tu siguiente golpe hace ×1,8 (riposte). Si llevas más tiempo con el escudo alzado, es un bloqueo normal.
+- **Parry (acción propia, no depende del escudo):** abre una ventana activa de 0,3 s (`PARRY_WINDOW`) y cuesta 15 de aguante. Si acierta: no recibes daño, el atacante queda aturdido 1,6 s y tu siguiente golpe hace ×1,8 (riposte). Si falla: 0,8 s de recuperación sin poder bloquear, atacar ni hacer dash, y recibes un +25 % de daño. No se puede usar con el arco. La IA también lo usa, con el mismo riesgo.
 - **IA:** lee tus anticipaciones y esquiva, retrocede o hace parry; luego castiga tu recuperación. Sus propios ataques también se telegrafían y se pueden castigar. Cambia de arma según la distancia, pagando el mismo coste de 2 s.
-- **Jinete y montura son entidades separadas.** Montado eres rápido y la espada (hoja larga) alcanza unos 3,4 m en un arco de ±100° (frente y lados). A pie vas más lento, giras más cerrado, la espada alcanza unos 2,2 m (±70°) y el dash se convierte en una voltereta rápida. La montura sin jinete se queda cerca paseando; acércate y pulsa *Montar*.
+- **Jinete y montura son entidades separadas.** Montado eres rápido y la espada (hoja larga) alcanza unos 3,4 m en un arco de ±100° (frente y lados). A pie (8,3 de velocidad) vas más lento, giras más cerrado, la espada alcanza unos 2,2 m (±70°) y el dash se convierte en una voltereta rápida. La montura sin jinete se queda cerca paseando; acércate y pulsa *Montar*.
 - **Derribo:** un dash que acierta (50 %) o un golpe fuerte de 14 o más de daño (30 %) puede tirarte de la montura.
 - **Aguante (barra amarilla):** lo gastan dash/voltereta, espada, arco, galope, mantener el escudo y bloquear golpes. Se recupera si no lo gastas, y más rápido si estás quieto o retrocediendo. Si llega a 0 quedas **agotado** unos 1,5 s: más lento, sin ataques ni dash y con un bloqueo más débil.
 - Al mejor de 3 rondas. Cada ronda dura 90 s; si se acaba el tiempo, gana quien tenga más vida (en %).

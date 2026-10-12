@@ -39,7 +39,12 @@ const RIPOSTE_MULT := 1.8
 enum Atk { NONE, WINDUP, ACTIVE, RECOVERY }
 enum Loadout { SWORD_SHIELD, BOW }
 const BOW_COOLDOWN := 1.0
-const PARRY_WINDOW := 0.3 ## escudo alzado como mucho este tiempo antes del golpe = parry
+## Parry = acción propia (no depende del escudo): ventana activa corta y luego recuperación vulnerable.
+const PARRY_WINDOW := 0.3
+const PARRY_RECOVERY := 0.8
+const PARRY_EXPOSED_MULT := 1.25 ## daño extra recibido durante la recuperación del parry
+const COST_PARRY := 15.0
+enum Parry { NONE, ACTIVE, RECOVERY }
 const BLOCK_REDUCTION := 0.2
 const EXHAUSTED_BLOCK_REDUCTION := 0.6
 const REVERSE_FACTOR := 0.5
@@ -98,6 +103,9 @@ var reversing: bool = false
 var sprinting: bool = false
 var blocking: bool = false
 var block_time: float = 0.0
+var parry_state: Parry = Parry.NONE
+var parry_t: float = 0.0
+var parries_landed: int = 0
 var stun: float = 0.0
 var atk_state: Atk = Atk.NONE
 var atk_heavy: bool = false
@@ -287,6 +295,7 @@ func _physics_process(delta: float) -> void:
 			_apply_loadout_visuals()
 			loadout_changed.emit(loadout)
 	_update_attack(delta)
+	_update_parry(delta)
 	bow_cd = maxf(bow_cd - delta, 0.0)
 	dash_cd = maxf(dash_cd - delta, 0.0)
 	dash_time = maxf(dash_time - delta, 0.0)
@@ -296,7 +305,7 @@ func _physics_process(delta: float) -> void:
 	var inp := move_input
 	if not alive or stun > 0.0:
 		inp = Vector3.ZERO
-	var wb := want_block and alive and stun <= 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE
+	var wb := want_block and alive and stun <= 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
 		block_time = 0.0
 	blocking = wb
@@ -367,8 +376,9 @@ func _physics_process(delta: float) -> void:
 		mount_node.global_transform = global_transform
 	# Visuales
 	var sy := _rider_root.position.y
-	_shield.position = Vector3(-0.25, 1.1, -0.55) if blocking else Vector3(-0.5, 1.0, 0.0)
-	_shield.rotation.y = -PI / 2.0 if blocking else 0.0
+	if parry_state != Parry.ACTIVE:
+		_shield.position = Vector3(-0.25, 1.1, -0.55) if blocking else Vector3(-0.5, 1.0, 0.0)
+		_shield.rotation.y = -PI / 2.0 if blocking else 0.0
 	if _flash > 0.0:
 		_flash -= delta
 	var bc := color
@@ -463,7 +473,7 @@ func _atk_data() -> Dictionary:
 	return HEAVY if atk_heavy else LIGHT
 
 func _request_attack(heavy: bool) -> bool:
-	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0:
+	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE:
 		return false
 	if atk_state != Atk.NONE:
 		# Búfer de entrada para encadenar ligeros
@@ -497,6 +507,33 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	_blade_mat.emission_enabled = true
 	_blade_mat.emission = Color(1.0, 0.45, 0.1) if heavy else Color(1.0, 0.9, 0.4)
 	_blade_mat.emission_energy_multiplier = 3.0
+
+## Parry dedicado (tecla Q / botón Parry). Solo con espada+escudo.
+func parry() -> bool:
+	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0:
+		return false
+	if atk_state != Atk.NONE or parry_state != Parry.NONE or stamina <= 0.0:
+		return false
+	parry_state = Parry.ACTIVE
+	parry_t = 0.0
+	blocking = false
+	spend_stamina(COST_PARRY)
+	_shield.position = Vector3(-0.1, 1.2, -0.8) # empujón de escudo
+	_shield.rotation.y = -PI / 2.0
+	return true
+
+func is_parrying() -> bool:
+	return parry_state == Parry.ACTIVE
+
+func _update_parry(delta: float) -> void:
+	if parry_state == Parry.NONE:
+		return
+	parry_t += delta
+	if parry_state == Parry.ACTIVE and parry_t >= PARRY_WINDOW:
+		parry_state = Parry.RECOVERY # parry fallido: expuesto
+		parry_t = 0.0
+	elif parry_state == Parry.RECOVERY and parry_t >= PARRY_RECOVERY:
+		parry_state = Parry.NONE
 
 func _cancel_attack() -> void:
 	atk_state = Atk.NONE
@@ -602,7 +639,7 @@ func shoot() -> bool:
 
 ## Dash montado / voltereta a pie.
 func dash() -> bool:
-	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0:
+	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE:
 		return false
 	if atk_state != Atk.NONE:
 		# Compromiso: solo se puede cancelar con voltereta al final de la recuperación
@@ -653,13 +690,18 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		var d := MeshUtil.flat(from.global_position - global_position)
 		if d.length() > 0.1:
 			frontal = facing.dot(d.normalized()) > 0.0
+	if parry_state == Parry.ACTIVE and frontal and _kind != "eikon":
+		if from is Fighter and _kind == "melee":
+			(from as Fighter).apply_stun(PARRY_STAGGER)
+			(from as Fighter).riposte_t = PARRY_STAGGER
+		add_meter(15.0)
+		parries_landed += 1
+		parry_state = Parry.NONE # éxito: sin recuperación
+		_shield.position = Vector3(-0.5, 1.0, 0.0)
+		return "parry"
+	if parry_state == Parry.RECOVERY:
+		amount *= PARRY_EXPOSED_MULT
 	if blocking and frontal:
-		if block_time <= PARRY_WINDOW and exhausted <= 0.0:
-			if from is Fighter and _kind == "melee":
-				(from as Fighter).apply_stun(PARRY_STAGGER)
-				(from as Fighter).riposte_t = PARRY_STAGGER
-			add_meter(15.0)
-			return "parry"
 		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else BLOCK_REDUCTION))
 		spend_stamina(COST_BLOCKED_HIT)
 		add_meter(3.0)
@@ -720,6 +762,7 @@ func reset_for_round(pos: Vector3, face: Vector3) -> void:
 	alive = true
 	stun = 0.0
 	_cancel_attack()
+	parry_state = Parry.NONE
 	poise = POISE_MAX
 	riposte_t = 0.0
 	if swap_t > 0.0 or loadout != Loadout.SWORD_SHIELD:
