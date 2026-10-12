@@ -18,6 +18,8 @@ var round_num: int = 1
 var wins: Array[int] = [0, 0]
 var state: String = "fight" ## fight / between / over
 var time_left: float = ROUND_TIME
+var shake: float = 0.0
+var lock_marker: MeshInstance3D
 
 func _ready() -> void:
 	_build_environment()
@@ -25,6 +27,8 @@ func _ready() -> void:
 	player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), "res://resources/mounts/horse.tres", EIKONS[0])
 	enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), "res://resources/mounts/horse.tres", EIKONS[1 + randi() % 2])
 	player.opponent = enemy
+	player.impact.connect(_on_impact)
+	enemy.impact.connect(func(_s: float) -> void: pass)
 	enemy.opponent = player
 	camera = Camera3D.new()
 	camera.fov = 70.0
@@ -42,7 +46,11 @@ func _ready() -> void:
 	ai = AIController.new()
 	ai.me = enemy
 	add_child(ai)
+	lock_marker = MeshUtil.sphere(self, 0.25, Vector3.ZERO, Color(1, 0.2, 0.2), true)
 	start_round()
+
+func _on_impact(strength: float) -> void:
+	shake = maxf(shake, 0.35 * strength)
 
 func _make_fighter(n: String, team: int, c: Color, mount_path: String, eikon_path: String) -> Fighter:
 	var f := Fighter.new()
@@ -137,12 +145,28 @@ func _physics_process(delta: float) -> void:
 			var pl := player.health / player.max_health
 			var en := enemy.health / enemy.max_health
 			_on_fighter_died(enemy if pl >= en else player)
-	var back := player.facing
-	var target := player.global_position - back * 9.0 + Vector3(0, 5.0, 0)
-	camera.global_position = camera.global_position.lerp(target, clampf(delta * 4.0, 0.0, 1.0))
-	var look := player.global_position + Vector3(0, 2.0, 0) + back * 4.0
+	var cam_target: Vector3
+	var look: Vector3
+	if player.face_target:
+		# Lock-on: la cámara encuadra a ambos luchadores
+		var d := MeshUtil.flat(player.face_target.global_position - player.global_position)
+		var dist := d.length()
+		var dn := d.normalized() if dist > 0.1 else player.facing
+		cam_target = player.global_position - dn * (8.0 + clampf(dist * 0.15, 0.0, 5.0)) + Vector3(0, 5.0 + clampf(dist * 0.1, 0.0, 3.0), 0)
+		look = player.global_position.lerp(player.face_target.global_position, 0.5) + Vector3(0, 1.5, 0)
+	else:
+		var back := player.facing
+		cam_target = player.global_position - back * 9.0 + Vector3(0, 5.0, 0)
+		look = player.global_position + Vector3(0, 2.0, 0) + back * 4.0
+	camera.global_position = camera.global_position.lerp(cam_target, clampf(delta * 4.0, 0.0, 1.0))
 	if camera.global_position.distance_to(look) > 0.5:
 		camera.look_at(look, Vector3.UP)
+	if shake > 0.0:
+		shake = maxf(shake - delta, 0.0)
+		camera.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * shake
+	lock_marker.visible = player.face_target != null
+	if lock_marker.visible:
+		lock_marker.global_position = player.face_target.global_position + Vector3(0, 3.9 + sin(Time.get_ticks_msec() * 0.006) * 0.1, 0)
 
 func start_round() -> void:
 	for n in get_tree().get_nodes_in_group("projectile"):

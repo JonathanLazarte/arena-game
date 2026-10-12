@@ -88,5 +88,47 @@ func _run() -> void:
 		var eh := eik.health
 		eik.take_hit(10.0, e, "arrow")
 		check(eik.health < eh, "eikon puede recibir daño")
+	# --- Dash: daño, empuje e invulnerabilidad ---
+	p.dismiss_eikon()
+	await wait(1.2)
+	e.global_position = p.global_position + p.facing * 6.0
+	e.facing = -p.facing
+	await wait(0.4)
+	h0 = e.health
+	var epos := e.global_position
+	var shakes: Array[float] = []
+	p.impact.connect(func(st: float) -> void: shakes.append(st))
+	await tap("dash")
+	var dodge: String = p.take_hit(5.0, e, "melee") if p.invuln > 0.0 else "none"
+	await wait(0.5)
+	check(dodge == "dodge", "dash da invulnerabilidad (i-frames)")
+	check(e.health < h0, "dash golpea al rival (%.0f -> %.0f)" % [h0, e.health])
+	check(e.global_position.distance_to(epos) > 1.5, "dash empuja al rival (%.1f m)" % e.global_position.distance_to(epos))
+	check(shakes.size() > 0, "impacto del dash dispara temblor de cámara")
+	# --- Lock-on ---
+	await wait(0.5)
+	var dist0 := MeshUtil.flat(e.global_position - p.global_position).length()
+	Input.action_press("move_right")
+	await wait(1.2)
+	Input.action_release("move_right")
+	var to_e := MeshUtil.flat(e.global_position - p.global_position)
+	check(p.face_target == e, "lock-on activo por defecto")
+	check(p.facing.dot(to_e.normalized()) > 0.9, "con lock-on el jugador mira al rival al rodearlo (dot %.2f)" % p.facing.dot(to_e.normalized()))
+	check(absf(to_e.length() - dist0) < 4.0, "strafe mantiene la distancia (%.1f -> %.1f)" % [dist0, to_e.length()])
+	await tap("lock_on")
+	await physics_frame
+	check(p.face_target == null, "Tab/Q desactiva el lock-on")
+	# --- Marcha atrás (sin lock-on) ---
+	e.global_position = p.global_position + p.facing * 15.0
+	await wait(0.6)
+	var f0 := p.facing
+	var pos0 := p.global_position
+	Input.action_press("move_back")
+	await wait(1.0)
+	Input.action_release("move_back")
+	var moved := MeshUtil.flat(p.global_position - pos0)
+	check(p.facing.dot(f0) > 0.95, "marcha atrás sin girar (dot %.2f)" % p.facing.dot(f0))
+	check(moved.length() > 1.5 and moved.normalized().dot(-f0) > 0.9, "retrocede %.1f m" % moved.length())
+	await tap("lock_on")
 	print("RESULT: %s (%d fallos)" % ["OK" if fails == 0 else "FALLO", fails])
 	quit(fails)

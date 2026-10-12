@@ -11,6 +11,7 @@ const ACTIONS := {
 	"shoot_bow": [KEY_L],
 	"summon": [KEY_E],
 	"dash": [KEY_SPACE],
+	"lock_on": [KEY_TAB, KEY_Q],
 }
 
 func _enter_tree() -> void:

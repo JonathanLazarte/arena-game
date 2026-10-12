@@ -9,6 +9,7 @@ signal health_changed(value: float, max_value: float)
 signal meter_changed(value: float)
 signal died(fighter: Fighter)
 signal summoned(eikon: Node3D)
+signal impact(strength: float)
 
 const METER_MAX := 100.0
 const GRAVITY := 20.0
@@ -19,6 +20,11 @@ const SWORD_WINDUP := 0.18
 const BOW_COOLDOWN := 1.0
 const PARRY_WINDOW := 0.25
 const BLOCK_REDUCTION := 0.2
+const REVERSE_FACTOR := 0.5
+const DASH_DAMAGE := 6.0
+const DASH_KNOCKBACK := 16.0
+const DASH_IFRAMES := 0.2
+const SEPARATION := 3.0
 
 @export var mount: MountData
 @export var eikon: EikonData
@@ -38,7 +44,13 @@ var move_input: Vector3 = Vector3.ZERO
 var want_block: bool = false
 
 var facing: Vector3 = Vector3.FORWARD
-var speed: float = 0.0
+var face_target: Node3D = null ## lock-on: si existe, el luchador siempre mira hacia él
+var planar_vel: Vector3 = Vector3.ZERO
+var dash_dir: Vector3 = Vector3.FORWARD
+var invuln: float = 0.0
+var knock: Vector3 = Vector3.ZERO
+var reversing: bool = false
+var _dash_hit: bool = false
 var blocking: bool = false
 var block_time: float = 0.0
 var stun: float = 0.0
@@ -103,18 +115,47 @@ func _physics_process(delta: float) -> void:
 		sword_windup -= delta
 		if sword_windup <= 0.0:
 			_sword_strike()
-	# Giro hacia la dirección deseada
+	invuln = maxf(invuln - delta, 0.0)
 	inp.y = 0.0
 	var amount := minf(inp.length(), 1.0)
-	if amount > 0.1:
-		var ang := facing.signed_angle_to(inp.normalized(), Vector3.UP)
-		var step := clampf(ang, -mount.turn_speed * delta, mount.turn_speed * delta)
-		facing = facing.rotated(Vector3.UP, step).normalized()
-	var target_speed := mount.speed * amount * (0.45 if blocking else 1.0)
-	speed = move_toward(speed, target_speed, mount.acceleration * delta)
-	var v := facing * speed
+	var target_vel := Vector3.ZERO
+	var turn := mount.turn_speed * delta
+	reversing = false
+	if _lock_valid():
+		var d := MeshUtil.flat(face_target.global_position - global_position)
+		if d.length() > 0.1:
+			facing = _turn_toward(facing, d.normalized(), turn * 1.8)
+		if amount > 0.05:
+			var dirn := inp.normalized()
+			var fdot := dirn.dot(facing)
+			var k := lerpf(0.8, 1.0, fdot) if fdot >= 0.0 else lerpf(0.8, REVERSE_FACTOR, -fdot)
+			reversing = fdot < -0.6
+			target_vel = dirn * mount.speed * amount * k
+	elif amount > 0.05:
+		var dirn := inp.normalized()
+		if dirn.dot(facing) < -0.6:
+			# Marcha atrás sin girar
+			reversing = true
+			target_vel = -facing * mount.speed * REVERSE_FACTOR * amount
+		else:
+			facing = _turn_toward(facing, dirn, turn)
+			target_vel = facing * mount.speed * amount
+	if blocking:
+		target_vel *= 0.45
+	planar_vel = planar_vel.move_toward(target_vel, mount.acceleration * delta)
+	var v := planar_vel
 	if dash_time > 0.0:
-		v = facing * mount.dash_speed
+		v = dash_dir * mount.dash_speed
+		_check_dash_hit()
+	v += knock
+	knock = knock.move_toward(Vector3.ZERO, 40.0 * delta)
+	# Separación: nunca solaparse con otro luchador
+	for n in get_tree().get_nodes_in_group("fighter"):
+		if n != self:
+			var sep := MeshUtil.flat(global_position - (n as Node3D).global_position)
+			var sl := sep.length()
+			if sl < SEPARATION:
+				v += (sep.normalized() if sl > 0.01 else facing.cross(Vector3.UP)) * (SEPARATION - sl) * 8.0
 	velocity.x = v.x
 	velocity.z = v.z
 	if is_on_floor():
@@ -133,6 +174,36 @@ func _physics_process(delta: float) -> void:
 		_rider.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.2
 	else:
 		_rider.rotation.z = 0.0
+
+func _lock_valid() -> bool:
+	return is_instance_valid(face_target) and bool(face_target.get("alive"))
+
+static func _turn_toward(from: Vector3, to: Vector3, max_step: float) -> Vector3:
+	var ang := from.signed_angle_to(to, Vector3.UP)
+	return from.rotated(Vector3.UP, clampf(ang, -max_step, max_step)).normalized()
+
+func _check_dash_hit() -> void:
+	if _dash_hit:
+		return
+	for t in MeshUtil.enemies_of(get_tree(), team):
+		var d := MeshUtil.flat(t.global_position - global_position)
+		if d.length() < 2.9 and (d.length() < 0.5 or dash_dir.dot(d.normalized()) > 0.3):
+			_dash_hit = true
+			var res: String = t.take_hit(DASH_DAMAGE, self, "dash")
+			if res == "hit" or res == "block":
+				if t.has_method("apply_knockback"):
+					t.apply_knockback(dash_dir * DASH_KNOCKBACK * (0.5 if res == "block" else 1.0), res == "hit")
+				if res == "hit":
+					add_meter(6.0)
+				impact.emit(1.0)
+				dash_time = minf(dash_time, 0.05)
+			return
+
+func apply_knockback(v: Vector3, stagger: bool = true) -> void:
+	knock = MeshUtil.flat(v)
+	if stagger:
+		apply_stun(0.25)
+	impact.emit(0.8)
 
 func is_attacking() -> bool:
 	return sword_windup > 0.0
@@ -153,7 +224,7 @@ func sword() -> bool:
 	sword_cd = SWORD_COOLDOWN
 	sword_windup = SWORD_WINDUP
 	# Apuntado suave hacia el enemigo cercano
-	var tgt := MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
 	if tgt and global_position.distance_to(tgt.global_position) < SWORD_RANGE + 1.5:
 		var d := MeshUtil.flat(tgt.global_position - global_position)
 		if d.length() > 0.1 and facing.dot(d.normalized()) > 0.0:
@@ -182,7 +253,7 @@ func shoot() -> bool:
 	bow_cd = BOW_COOLDOWN
 	var origin := global_position + Vector3(0, 2.4, 0) + facing * 1.4
 	var dir := facing
-	var tgt := MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
 	if tgt:
 		var d: Vector3 = tgt.get_hit_center() - origin
 		if MeshUtil.flat(d).normalized().dot(facing) > -0.2:
@@ -202,6 +273,10 @@ func dash() -> bool:
 		return false
 	dash_cd = mount.dash_cooldown
 	dash_time = mount.dash_duration
+	invuln = DASH_IFRAMES
+	_dash_hit = false
+	var mi := MeshUtil.flat(move_input)
+	dash_dir = mi.normalized() if mi.length() > 0.2 else facing
 	return true
 
 func summon() -> bool:
@@ -229,6 +304,8 @@ func apply_stun(t: float) -> void:
 func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if not alive:
 		return "none"
+	if invuln > 0.0:
+		return "dodge"
 	var frontal := true
 	if is_instance_valid(from):
 		var d := MeshUtil.flat(from.global_position - global_position)
@@ -245,6 +322,8 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		return "block"
 	_damage(amount)
 	add_meter(5.0)
+	if _kind == "melee":
+		impact.emit(0.5)
 	return "hit"
 
 func _damage(amount: float) -> void:
@@ -266,7 +345,10 @@ func reset_for_round(pos: Vector3, face: Vector3) -> void:
 	facing = face.normalized()
 	rotation.y = atan2(-facing.x, -facing.z)
 	velocity = Vector3.ZERO
-	speed = 0.0
+	planar_vel = Vector3.ZERO
+	knock = Vector3.ZERO
+	invuln = 0.0
+	dash_time = 0.0
 	health = max_health
 	meter = 0.0
 	alive = true

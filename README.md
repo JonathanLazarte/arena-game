@@ -5,17 +5,19 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 ## Controles
 | Acción | Teclado | Táctil |
 |---|---|---|
-| Moverse (relativo a la cámara) | WASD / flechas | Joystick virtual (izquierda) |
+| Moverse (relativo a la cámara, o al rival con lock-on); atrás = marcha atrás sin girar | WASD / flechas | Joystick virtual (izquierda) |
+| Fijar objetivo (lock-on, activado por defecto) | Tab / Q | Botón *Fijar* |
 | Espada | J | Botón *Espada* |
 | Escudo (mantener; pulsarlo justo antes del golpe = **parry**) | K | Botón *Escudo* |
 | Arco (apuntado automático) | L | Botón *Arco* |
 | Invocar eikon (medidor lleno) | E | Botón *Eikon* |
-| Dash / carga | Espacio | Botón *Dash* |
+| Dash / carga (en la dirección del movimiento; 0,2 s de invulnerabilidad; si choca, empuja al rival) | Espacio | Botón *Dash* |
 
 ## Reglas
 - Al mejor de 3 rondas. Cada ronda dura 90 s; si se acaba el tiempo, gana quien tenga más vida (en %).
 - El medidor de eikon se carga al golpear (espada +12, flecha +8), al recibir golpes (+5), al bloquear (+3) y al hacer parry (+15).
 - Bloquear de frente reduce el daño un 80 %. Un parry anula el golpe, aturde al atacante y devuelve las flechas.
+- **Lock-on:** el jugador mira siempre al rival, la cámara encuadra a ambos, la espada y el arco apuntan al rival y el movimiento pasa a ser un *strafe* alrededor de él.
 - El eikon lucha durante un tiempo limitado y también puede recibir ataques.
 
 ## Estructura
@@ -23,7 +25,7 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 - `scripts/combat/fighter.gd`: luchador montado (movimiento, espada, escudo/parry, arco, dash, invocación).
 - `scripts/combat/eikon.gd`: invocaciones (ataques cuerpo a cuerpo, a distancia o en área).
 - `scripts/combat/projectile.gd`: flechas y proyectiles.
-- `scripts/ai/ai_controller.gd`: IA rival (se acerca, rodea, ataca, bloquea, dispara e invoca).
+- `scripts/ai/ai_controller.gd`: IA rival por fases (rodear a media distancia por delante, comprometerse a atacar con espada o dash, retirarse). Evita quedarse a la espalda y nunca se solapa.
 - `scripts/player_controller.gd`: teclado y controles táctiles.
 - `scripts/ui/hud.gd`, `touch_stick.gd`: HUD, joystick y botones táctiles (multitáctil).
 - `scripts/data/mount_data.gd`, `eikon_data.gd`: Resources de datos.
@@ -39,6 +41,7 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 ```
 godot --headless --path . -s res://tests/test_combat.gd   # espada, bloqueo, parry, arco, eikon
 godot --headless --path . -s res://tests/test_match.gd    # partida IA contra IA completa
+godot --headless --path . -s res://tests/test_ai.gd -- 1  # la IA no se pega a la espalda ni se solapa (semilla opcional)
 ```
 
 ## Exportar
@@ -50,4 +53,4 @@ Los presets "Android" (arm64, apaisado, sin compilación Gradle, firma de depura
 `godot --headless --export-debug Android ../out/arena-game-debug.apk`
 
 ## Próximos pasos
-Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, lock-on manual, más ataques por eikon, oleadas de mobs, sonido y efectos, y ajustar la dificultad de la IA.
+Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, cambio de objetivo con lock-on (mobs), más ataques por eikon, oleadas de mobs, sonido y efectos, y ajustar la dificultad de la IA.

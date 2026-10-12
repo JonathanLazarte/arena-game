@@ -43,6 +43,8 @@ func _physics_process(delta: float) -> void:
 	for t in MeshUtil.enemies_of(get_tree(), team):
 		if p.distance_to(t.get_hit_center()) < radius + t.hit_radius:
 			var res: String = t.take_hit(damage, shooter, "arrow")
+			if res == "dodge":
+				continue
 			if res == "parry":
 				# Reflejo: la flecha cambia de bando
 				direction = -direction

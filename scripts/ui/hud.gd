@@ -43,6 +43,7 @@ func _ready() -> void:
 	_touch_button("Escudo", "block", Vector2(1030, 640), 52, Color(0.4, 0.5, 0.9))
 	_touch_button("Arco", "shoot_bow", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
 	_touch_button("Eikon", "summon", Vector2(1050, 500), 48, Color(1.0, 0.5, 0.1))
+	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
 	_touch_button("Dash", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
 	# Panel final
 	end_panel = PanelContainer.new()
