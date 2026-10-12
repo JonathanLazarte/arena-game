@@ -250,6 +250,7 @@ func _run() -> void:
 	# --- 9. La IA lee ataques: esquiva y castiga; se compromete con los suyos ---
 	await wait(0.5)
 	arena.ai.enabled = true
+	arena.ai.profile = load("res://resources/ai/normal.tres") # capacidades de lectura: perfil normal
 	var e_attacked_recovery := false
 	for i in 14:
 		p.health = p.max_health

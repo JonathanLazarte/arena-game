@@ -45,7 +45,7 @@ const PARRY_RECOVERY := 0.8
 const PARRY_EXPOSED_MULT := 1.25 ## daño extra recibido durante la recuperación del parry
 const COST_PARRY := 15.0
 enum Parry { NONE, ACTIVE, RECOVERY }
-const BLOCK_REDUCTION := 0.2
+const BLOCK_REDUCTION := 0.12 ## bloqueo de cuerpo a cuerpo: solo pasa un 12 % (chip)
 const EXHAUSTED_BLOCK_REDUCTION := 0.6
 const REVERSE_FACTOR := 0.5
 const DASH_DAMAGE := 6.0
@@ -60,8 +60,11 @@ const COST_DASH := 25.0
 const COST_ROLL := 18.0
 const COST_SWORD := 12.0
 const COST_BOW := 6.0
-const COST_BLOCKED_HIT := 10.0
-const DRAIN_BLOCK := 15.0 ## por segundo
+const COST_BLOCKED_HIT := 22.0 ## por golpe ligero bloqueado: ~4-5 golpes con la barra llena
+const COST_BLOCKED_HEAVY_MULT := 2.0
+const COST_BLOCKED_ARROW := 3.0 ## las flechas bloqueadas no hacen daño
+const GUARD_BREAK_STAGGER := 1.0
+const DRAIN_BLOCK := 3.0 ## por segundo (mantener el escudo; poco para no romper el objetivo de 4-5 golpes)
 const DRAIN_SPRINT := 20.0 ## por segundo
 const REGEN := 18.0
 const REGEN_IDLE := 32.0
@@ -106,6 +109,7 @@ var block_time: float = 0.0
 var parry_state: Parry = Parry.NONE
 var parry_t: float = 0.0
 var parries_landed: int = 0
+var guard_breaks: int = 0
 var stun: float = 0.0
 var atk_state: Atk = Atk.NONE
 var atk_heavy: bool = false
@@ -704,10 +708,18 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if parry_state == Parry.RECOVERY:
 		amount *= PARRY_EXPOSED_MULT
 	if blocking and frontal:
+		if _kind == "arrow":
+			spend_stamina(COST_BLOCKED_ARROW) # flecha anulada por completo
+			_kv.event("block_hit")
+			if stamina <= 0.0:
+				_guard_break()
+			return "block"
 		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else BLOCK_REDUCTION))
-		spend_stamina(COST_BLOCKED_HIT)
+		spend_stamina(COST_BLOCKED_HIT * (COST_BLOCKED_HEAVY_MULT if amount >= HEAVY_HIT else 1.0))
 		add_meter(3.0)
 		_kv.event("block_hit")
+		if stamina <= 0.0:
+			_guard_break()
 		return "block"
 	if riposte_t > 0.0 and _kind == "melee":
 		amount *= RIPOSTE_MULT # riposte tras parry
@@ -728,6 +740,13 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if mounted and alive and amount >= HEAVY_HIT and randf() < knockoff_chance_heavy:
 		dismount(true)
 	return "hit"
+
+## Sin aguante bajo el escudo: guardia rota, tambaleo y expuesto.
+func _guard_break() -> void:
+	guard_breaks += 1
+	blocking = false
+	apply_stun(GUARD_BREAK_STAGGER)
+	impact.emit(0.8)
 
 func _damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)

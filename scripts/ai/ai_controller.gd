@@ -8,7 +8,10 @@ enum Phase { CIRCLE, COMMIT, RETREAT, REST }
 
 var me: Fighter
 var enabled: bool = true
-var difficulty: float = 0.6 ## 0..1
+## Perfil de dificultad (por defecto el rival es nivel 1 "easy").
+var profile: AIDifficulty = preload("res://resources/ai/easy.tres")
+var _react_t: float = -1.0 ## reacción pendiente (retraso de reacción)
+var _react_r: float = -1.0
 var phase: Phase = Phase.CIRCLE
 var _phase_t: float = 2.0
 var _orbit: float = 0.0 ## ángulo respecto a la mirada del jugador (rad)
@@ -75,20 +78,27 @@ func _physics_process(delta: float) -> void:
 	if opp.atk_state == Fighter.Atk.WINDUP and opp.attacks_started != _reacted_id \
 			and dist < opp.sword_range() + 2.5 and opp.atk_dur - opp.atk_t < 0.3:
 		_reacted_id = opp.attacks_started
-		var r := randf()
-		if r < difficulty * 0.7:
+		_react_t = profile.reaction_time
+		_react_r = randf()
+	if _react_t >= 0.0:
+		_react_t -= delta
+	if _react_t < 0.0 and _react_r >= 0.0 and opp.atk_state == Fighter.Atk.WINDUP and opp.attacks_started == _reacted_id:
+		var r := _react_r
+		_react_r = -1.0
+		var punish := randf() < profile.punish_chance
+		if r < profile.dodge_chance:
 			dodges += 1
-			_punish_t = 2.0
+			_punish_t = 2.0 if punish else 0.0
 			if me.dash_cd <= 0.0 and me.stamina > 20.0 and me.atk_state == Fighter.Atk.NONE:
 				me.move_input = (-dir * 0.6 + side * 0.8).normalized()
 				me.dash()
 			else:
 				_backstep_t = 0.5
-		elif sword_mode and me.atk_state == Fighter.Atk.NONE and r < difficulty * 0.7 + 0.15 and me.stamina > 15.0:
+		elif sword_mode and me.atk_state == Fighter.Atk.NONE and r < profile.dodge_chance + profile.parry_chance and me.stamina > 15.0:
 			# Parry dedicado con el mismo riesgo que el jugador (si falla queda expuesto)
 			if me.parry():
 				parries_tried += 1
-				_punish_t = 2.5
+				_punish_t = 2.5 if punish else 0.0
 	if _backstep_t > 0.0:
 		_backstep_t -= delta
 		me.want_block = false
@@ -105,7 +115,7 @@ func _physics_process(delta: float) -> void:
 					me.attack_heavy()
 				else:
 					me.attack_light()
-			elif me.atk_state != Fighter.Atk.NONE and me.combo < 2:
+			elif me.atk_state != Fighter.Atk.NONE and me.combo < mini(2, profile.max_chain):
 				me.attack_light() # búfer: encadenar un segundo golpe
 			return
 	if _block_hold > 0.0:
@@ -116,8 +126,8 @@ func _physics_process(delta: float) -> void:
 	me.want_block = false
 	_think -= delta
 	if _think <= 0.0:
-		_think = 0.12
-		if sword_mode and _incoming_projectile() and me.stamina > 15.0 and randf() < difficulty * 0.5:
+		_think = profile.think_interval
+		if sword_mode and _incoming_projectile() and me.stamina > 15.0 and randf() < profile.block_arrow_chance:
 			_block_hold = 0.35
 			return
 		if me.meter >= Fighter.METER_MAX:
@@ -126,7 +136,8 @@ func _physics_process(delta: float) -> void:
 		if not me.is_swapping() and me.atk_state == Fighter.Atk.NONE and phase != Phase.COMMIT:
 			if sword_mode and dist > 17.0 and randf() < 0.05:
 				me.swap_loadout()
-			elif not sword_mode and dist < 10.0 and randf() < 0.3:
+			elif not sword_mode and (dist < 10.0 or _phase_t < -4.0) and randf() < 0.3:
+				# Con arco no se queda eternamente a distancia: vuelve a la espada para entrar
 				me.swap_loadout()
 		if not sword_mode and phase == Phase.CIRCLE and dist > 6.0 and me.stamina > 30.0 and randf() < 0.3:
 			me.shoot()
@@ -165,7 +176,7 @@ func _physics_process(delta: float) -> void:
 		return
 	match phase:
 		Phase.CIRCLE:
-			_orbit += _orbit_dir * delta * 0.7
+			_orbit += _orbit_dir * delta * profile.orbit_speed
 			if absf(_orbit) > MAX_ORBIT:
 				_orbit = clampf(_orbit, -MAX_ORBIT, MAX_ORBIT)
 				_orbit_dir = -_orbit_dir
@@ -181,12 +192,12 @@ func _physics_process(delta: float) -> void:
 			if not sword_mode or me.is_swapping():
 				_pref_dist = 13.0
 			me.want_sprint = dist > 14.0 and me.stamina > 60.0
-			if _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > 45.0 and sword_mode and not me.is_swapping():
+			if _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > profile.commit_min_stamina and sword_mode and not me.is_swapping():
 				phase = Phase.COMMIT
 				_phase_t = 2.5
-				_swings = 1 + randi() % 3
+				_swings = 1 + randi() % maxi(profile.max_chain, 1)
 				_started = false
-				_dash_in = dist > 4.5 and randf() < 0.5
+				_dash_in = dist > 4.5 and randf() < profile.dash_in_chance
 		Phase.COMMIT:
 			move = dir if dist > reach - 0.5 else side * 0.4
 			if _dash_in and me.mounted and dist < 9.0 and dist > 3.5 and me.facing.dot(dir) > 0.85:
@@ -198,7 +209,7 @@ func _physics_process(delta: float) -> void:
 				if _started:
 					_swings = 0
 				elif dist < reach and me.facing.dot(dir) > 0.6:
-					var ok := me.attack_heavy() if randf() < 0.25 else me.attack_light()
+					var ok := me.attack_heavy() if randf() < profile.heavy_chance else me.attack_light()
 					_started = ok
 			elif me.atk_state != Fighter.Atk.WINDUP and not me.atk_heavy and me.combo < _swings:
 				me.attack_light() # búfer para encadenar
@@ -211,7 +222,7 @@ func _physics_process(delta: float) -> void:
 			move = MeshUtil.flat(front - me.global_position).normalized() - dir * 0.5
 			if _phase_t <= 0.0:
 				phase = Phase.CIRCLE
-				_phase_t = 1.5 + randf() * 1.5
+				_phase_t = profile.engage_pause_min + randf() * profile.engage_pause_extra
 				_pref_dist = randf_range(6.0, 9.0)
 				_orbit = clampf(opp.facing.signed_angle_to(-dir, Vector3.UP), -MAX_ORBIT, MAX_ORBIT)
 				if randf() < 0.3:

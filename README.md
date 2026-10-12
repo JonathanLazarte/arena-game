@@ -82,3 +82,12 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
 - Caballo: BlendSpace1D Idle/Walk/Gallop según la velocidad real.
 - Las armas van en BoneAttachment3D (`handslot.r` / `handslot.l`). La detección de golpes no cambia: sigue siendo por arcos en `fighter.gd`. Los modelos son solo visuales.
 - La arena es un 40 % más grande: radio 42, pilares a 23,8 m y salida a ±19,6 m.
+
+## Escudo y dificultad (ronda 7)
+- **Escudo (arco frontal):**
+  - Las flechas bloqueadas no hacen daño y solo cuestan 3 de aguante.
+  - El cuerpo a cuerpo bloqueado deja pasar un 12 % del daño (chip). Cada golpe ligero bloqueado cuesta 22 de aguante y los fuertes el doble, así que la barra llena aguanta unos 4-5 ligeros.
+  - Mantener el escudo gasta 3 de aguante por segundo.
+  - Si te quedas sin aguante bajo el escudo, se **rompe la guardia**: tambaleo de 1 s y quedas expuesto.
+- **Dificultad de la IA:** se configura con el recurso `AIDifficulty` (`resources/ai/easy|normal|hard.tres`), con estos parámetros: pausas entre ataques, cadena máxima, agresividad (dash de entrada, aguante mínimo para atacar), probabilidad de castigar, esquivar, hacer parry y bloquear flechas, tiempo de reacción e intervalo de decisión.
+  - El rival por defecto es el nivel 1 "easy". El perfil "normal" equivale al comportamiento anterior.

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="AIDifficulty" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/ai_difficulty.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+profile_name = "easy"
+level = 1
+engage_pause_min = 4.5
+engage_pause_extra = 3.0
+orbit_speed = 0.9
+max_chain = 2
+heavy_chance = 0.15
+dash_in_chance = 0.2
+commit_min_stamina = 60.0
+punish_chance = 0.35
+dodge_chance = 0.25
+parry_chance = 0.07
+block_arrow_chance = 0.2
+reaction_time = 0.15
+think_interval = 0.25

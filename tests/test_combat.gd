@@ -248,7 +248,7 @@ func _run() -> void:
 	await wait(1.0)
 	Input.action_release("block")
 	var after_block := p.stamina
-	check(after_block < 92.0, "mantener escudo drena aguante (%.0f)" % after_block)
+	check(after_block < 99.5, "mantener escudo drena aguante (%.0f)" % after_block)
 	await wait(1.5)
 	check(p.stamina > after_block, "aguante se regenera (%.0f -> %.0f)" % [after_block, p.stamina])
 	p.stamina = 4.0
