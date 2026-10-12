@@ -199,6 +199,9 @@ func _run() -> void:
 	check(p.mounted and p.mount_node == pm, "F vuelve a montar cerca de la montura")
 	while e.stun > 0.0:
 		await physics_frame
+	if not e.mounted and e.owned_mount.is_free():
+		e.global_position = e.owned_mount.global_position + Vector3(1.0, 0, 0) # su caballo pasea: acercarlo de forma determinista
+		await physics_frame
 	check(e.toggle_mount(), "el rival vuelve a montar")
 	# --- Derribo con dash ---
 	await wait(0.5)

@@ -140,6 +140,8 @@ var _blade_mat: StandardMaterial3D
 var _shield: MeshInstance3D
 var _body: MeshInstance3D
 var _legs: Array[MeshInstance3D] = []
+var _kv: KnightVisual ## modelo animado (solo visual)
+var _prim: Node3D ## primitivas antiguas (ocultas; pivote de espada)
 var _col_shape: BoxShape3D
 var _col: CollisionShape3D
 var _flash: float = 0.0
@@ -171,19 +173,25 @@ func _build_visuals() -> void:
 	add_child(_col)
 	_rider_root = Node3D.new()
 	add_child(_rider_root)
-	_body = MeshUtil.box(_rider_root, Vector3(0.6, 1.0, 0.45), Vector3(0, 1.0, 0.1), color)
-	MeshUtil.sphere(_rider_root, 0.25, Vector3(0, 1.75, 0.1), Color(0.95, 0.8, 0.65))
+	_prim = Node3D.new()
+	_prim.visible = false
+	_rider_root.add_child(_prim)
+	_kv = KnightVisual.new()
+	_rider_root.add_child(_kv)
+	_kv.setup(color)
+	_body = MeshUtil.box(_prim, Vector3(0.6, 1.0, 0.45), Vector3(0, 1.0, 0.1), color)
+	MeshUtil.sphere(_prim, 0.25, Vector3(0, 1.75, 0.1), Color(0.95, 0.8, 0.65))
 	for x: float in [-0.15, 0.15]:
-		_legs.append(MeshUtil.box(_rider_root, Vector3(0.2, 0.55, 0.25), Vector3(x, 0.27, 0.1), color.darkened(0.4)))
+		_legs.append(MeshUtil.box(_prim, Vector3(0.2, 0.55, 0.25), Vector3(x, 0.27, 0.1), color.darkened(0.4)))
 	_sword_pivot = Node3D.new()
 	_sword_pivot.position = Vector3(0.45, 1.1, 0.0)
-	_rider_root.add_child(_sword_pivot)
+	_prim.add_child(_sword_pivot)
 	_blade = MeshUtil.box(_sword_pivot, Vector3(0.1, 0.1, 1.0), Vector3(0, 0, -0.5), Color(0.85, 0.85, 0.95))
 	MeshUtil.box(_sword_pivot, Vector3(0.4, 0.08, 0.08), Vector3(0, 0, 0), Color(0.6, 0.5, 0.2)) # guarda
 	_blade_mat = _blade.material_override as StandardMaterial3D
-	_bow = MeshUtil.box(_rider_root, Vector3(0.08, 1.5, 0.12), Vector3(-0.45, 1.15, -0.2), Color(0.5, 0.3, 0.12))
-	_bow.visible = false
-	_shield = MeshUtil.box(_rider_root, Vector3(0.1, 0.8, 0.8), Vector3(-0.5, 1.0, 0.0), color.darkened(0.3))
+	# Armas visibles: espada y escudo del KayKit (BoneAttachment3D handslot.r / handslot.l) y arco propio
+	_bow = _kv.bow
+	_shield = _kv.shield
 
 func _apply_mount_visuals() -> void:
 	_rider_root.position.y = 1.3 if mounted else 0.0
@@ -193,6 +201,7 @@ func _apply_mount_visuals() -> void:
 	var blade_len := 2.2 if mounted else 1.4
 	(_blade.mesh as BoxMesh).size = Vector3(0.1, 0.1, blade_len)
 	_blade.position = Vector3(0, 0, -blade_len * 0.5)
+	_kv.set_mounted(mounted, 1.5 if mounted else 1.0)
 	if mounted:
 		_col_shape.size = Vector3(1.2, 2.4, 2.4)
 		_col.position = Vector3(0, 1.2, 0)
@@ -376,9 +385,6 @@ func _physics_process(delta: float) -> void:
 		mount_node.global_transform = global_transform
 	# Visuales
 	var sy := _rider_root.position.y
-	if parry_state != Parry.ACTIVE:
-		_shield.position = Vector3(-0.25, 1.1, -0.55) if blocking else Vector3(-0.5, 1.0, 0.0)
-		_shield.rotation.y = -PI / 2.0 if blocking else 0.0
 	if _flash > 0.0:
 		_flash -= delta
 	var bc := color
@@ -387,10 +393,9 @@ func _physics_process(delta: float) -> void:
 	elif exhausted > 0.0:
 		bc = color.lerp(Color(0.5, 0.5, 0.5), 0.6)
 	(_body.material_override as StandardMaterial3D).albedo_color = bc
-	if dash_time > 0.0 and not mounted:
-		_rider_root.rotation.x = -TAU * (1.0 - dash_time / maxf(st.dash_duration, 0.01)) # voltereta
-	else:
-		_rider_root.rotation.x = 0.0
+	_kv.set_tint(bc, _flash > 0.0)
+	_kv.update(self, delta)
+	_rider_root.rotation.x = 0.0 # la voltereta la hace la animación Dodge_*
 	_rider_root.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.2 if stun > 0.0 else 0.0
 	_rider_root.position.y = sy
 
@@ -507,6 +512,7 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	_blade_mat.emission_enabled = true
 	_blade_mat.emission = Color(1.0, 0.45, 0.1) if heavy else Color(1.0, 0.9, 0.4)
 	_blade_mat.emission_energy_multiplier = 3.0
+	_kv.set_glow(true, _blade_mat.emission)
 
 ## Parry dedicado (tecla Q / botón Parry). Solo con espada+escudo.
 func parry() -> bool:
@@ -518,8 +524,6 @@ func parry() -> bool:
 	parry_t = 0.0
 	blocking = false
 	spend_stamina(COST_PARRY)
-	_shield.position = Vector3(-0.1, 1.2, -0.8) # empujón de escudo
-	_shield.rotation.y = -PI / 2.0
 	return true
 
 func is_parrying() -> bool:
@@ -540,6 +544,7 @@ func _cancel_attack() -> void:
 	combo = 0
 	_buffered = false
 	_blade_mat.emission_enabled = false
+	_kv.set_glow(false, Color.BLACK)
 	_sword_pivot.rotation = Vector3.ZERO
 
 func _update_attack(delta: float) -> void:
@@ -554,6 +559,7 @@ func _update_attack(delta: float) -> void:
 				atk_t = 0.0
 				atk_dur = d["active"]
 				_blade_mat.emission_enabled = false
+				_kv.set_glow(false, Color.BLACK)
 				var half := sword_half_arc()
 				var tw := create_tween()
 				tw.tween_property(_sword_pivot, "rotation", Vector3(0, -half, 0), atk_dur)
@@ -602,16 +608,12 @@ func swap_loadout() -> bool:
 		return false
 	swap_t = SWAP_TIME
 	blocking = false
-	_sword_pivot.visible = false
-	_shield.visible = false
-	_bow.visible = false
+	_kv.set_loadout(-1)
 	return true
 
 func _apply_loadout_visuals() -> void:
 	var sw := loadout == Loadout.SWORD_SHIELD
-	_sword_pivot.visible = sw
-	_shield.visible = sw
-	_bow.visible = not sw
+	_kv.set_loadout(0 if sw else 1)
 
 func shoot() -> bool:
 	if loadout != Loadout.BOW or swap_t > 0.0 or atk_state != Atk.NONE:
@@ -635,6 +637,7 @@ func shoot() -> bool:
 	p.color = Color(0.9, 0.8, 0.5)
 	get_parent().add_child(p)
 	p.global_position = origin
+	_kv.event("shoot")
 	return true
 
 ## Dash montado / voltereta a pie.
@@ -697,7 +700,6 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		add_meter(15.0)
 		parries_landed += 1
 		parry_state = Parry.NONE # éxito: sin recuperación
-		_shield.position = Vector3(-0.5, 1.0, 0.0)
 		return "parry"
 	if parry_state == Parry.RECOVERY:
 		amount *= PARRY_EXPOSED_MULT
@@ -705,12 +707,14 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else BLOCK_REDUCTION))
 		spend_stamina(COST_BLOCKED_HIT)
 		add_meter(3.0)
+		_kv.event("block_hit")
 		return "block"
 	if riposte_t > 0.0 and _kind == "melee":
 		amount *= RIPOSTE_MULT # riposte tras parry
 		riposte_t = 0.0
 	_damage(amount)
 	add_meter(5.0)
+	_kv.event("hit")
 	if _kind == "melee":
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis

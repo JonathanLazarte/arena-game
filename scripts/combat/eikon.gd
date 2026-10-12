@@ -30,20 +30,44 @@ func _ready() -> void:
 	_body = Node3D.new()
 	_body.scale = Vector3.ONE * data.size
 	add_child(_body)
-	var c := data.color
+	_build_model()
+
+## Modelos Quaternius (CC0): lobo, dragón recoloreado como fénix y Goleling
+## (marcador provisional del gólem: es un monstruo volador, sin clip de andar).
+const MODELS := {
+	EikonData.AttackKind.MELEE: ["res://assets/models/wolf_quaternius.glb", 0.55, "Gallop", "Idle", "Attack", 0.0],
+	EikonData.AttackKind.RANGED: ["res://assets/models/dragon_quaternius.glb", 0.8, "CharacterArmature|Fast_Flying", "CharacterArmature|Flying_Idle", "CharacterArmature|Headbutt", 0.0],
+}
+const GOLEM := ["res://assets/models/goleling_evolved_quaternius.glb", 1.1, "CharacterArmature|Fast_Flying", "CharacterArmature|Flying_Idle", "CharacterArmature|Punch", 0.3]
+var _ap: AnimationPlayer
+var _anims: Array = []
+var _attack_anim_t: float = 0.0
+
+func _build_model() -> void:
+	var cfg: Array = MODELS.get(data.attack_kind, GOLEM)
+	var m := (load(cfg[0]) as PackedScene).instantiate() as Node3D
+	m.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * float(cfg[1]))
+	m.position.y = cfg[5]
+	_body.add_child(m)
 	match data.attack_kind:
-		EikonData.AttackKind.RANGED: # ave de fuego
-			MeshUtil.sphere(_body, 0.6, Vector3(0, 1.0, 0), c, true)
-			MeshUtil.box(_body, Vector3(2.4, 0.08, 0.6), Vector3(0, 1.1, 0.1), c.lightened(0.2))
-			MeshUtil.box(_body, Vector3(0.2, 0.2, 0.8), Vector3(0, 1.2, -0.6), Color.YELLOW)
-		EikonData.AttackKind.MELEE: # lobo
-			MeshUtil.box(_body, Vector3(0.8, 0.8, 1.8), Vector3(0, 0.9, 0), c)
-			MeshUtil.box(_body, Vector3(0.6, 0.6, 0.7), Vector3(0, 1.3, -1.1), c.lightened(0.3))
-		_: # gólem
-			MeshUtil.box(_body, Vector3(1.4, 1.6, 1.0), Vector3(0, 1.4, 0), c)
-			MeshUtil.box(_body, Vector3(0.6, 0.6, 0.6), Vector3(0, 2.5, 0), c.darkened(0.2))
-			MeshUtil.box(_body, Vector3(0.5, 1.4, 0.5), Vector3(-1.0, 1.2, 0), c.darkened(0.1))
-			MeshUtil.box(_body, Vector3(0.5, 1.4, 0.5), Vector3(1.0, 1.2, 0), c.darkened(0.1))
+		EikonData.AttackKind.RANGED:
+			AnimUtil.tint_surfaces(m, data.color, 0.75, 1.2) # fénix: tonos de fuego emisivos
+		EikonData.AttackKind.MELEE:
+			AnimUtil.tint_surfaces(m, data.color, 0.55)
+		_:
+			AnimUtil.tint_surfaces(m, data.color, 0.7)
+	_ap = m.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	_anims = [cfg[2], cfg[3], cfg[4]]
+	AnimUtil.set_loops(_ap, [cfg[2], cfg[3]])
+	_ap.play(cfg[3])
+
+func _update_anim(delta: float, moving: bool) -> void:
+	_attack_anim_t -= delta
+	if _attack_anim_t > 0.0:
+		return
+	var want: String = _anims[0] if moving else _anims[1]
+	if _ap.current_animation != want:
+		_ap.play(want, 0.2)
 
 func get_hit_center() -> Vector3:
 	return global_position + Vector3(0, 1.0 * data.size, 0)
@@ -91,10 +115,13 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= 20.0 * delta
 	move_and_slide()
+	_update_anim(delta, v.length() > 0.5)
 	if _ring and is_instance_valid(_ring):
 		_ring.scale += Vector3.ONE * delta * 6.0
 
 func _attack(tgt: Node3D) -> void:
+	_ap.play(_anims[2], 0.1)
+	_attack_anim_t = minf(_ap.get_animation(_anims[2]).length, data.attack_cooldown)
 	match data.attack_kind:
 		EikonData.AttackKind.MELEE:
 			tgt.take_hit(data.attack_damage, self, "eikon")

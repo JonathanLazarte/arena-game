@@ -3,7 +3,7 @@ extends Node3D
 ## Proyectil simple (flecha, bola de fuego). Detección por distancia, sin física.
 
 static var obstacles: Array[Vector3] = [] ## centros de pilares (x, radio, z)
-static var arena_radius: float = 30.0
+static var arena_radius: float = 42.0
 
 var direction: Vector3 = Vector3.FORWARD
 var speed: float = 32.0

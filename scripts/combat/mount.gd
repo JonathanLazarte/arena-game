@@ -23,13 +23,45 @@ func _ready() -> void:
 	_col.shape = sh
 	_col.position = Vector3(0, 0.9, 0)
 	add_child(_col)
-	var mc := data.color
-	MeshUtil.box(self, Vector3(0.9, 0.9, 2.0), Vector3(0, 1.3, 0), mc)
-	MeshUtil.box(self, Vector3(0.5, 0.9, 0.6), Vector3(0, 1.9, -1.1), mc)
-	MeshUtil.box(self, Vector3(0.95, 0.15, 0.7), Vector3(0, 1.8, 0.1), Color(0.35, 0.15, 0.1)) # silla
-	for x: float in [-0.3, 0.3]:
-		for z: float in [-0.75, 0.75]:
-			MeshUtil.cylinder(self, 0.1, 1.0, Vector3(x, 0.5, z), mc.darkened(0.3))
+	_build_model()
+
+const HORSE := preload("res://assets/models/horse_quaternius.glb")
+const HORSE_SCALE := 0.62
+var model: Node3D
+var tree: AnimationTree
+var _last_pos: Vector3
+var speed_now: float = 0.0
+
+## Caballo Quaternius (CC0). AnimationTree: BlendSpace1D Idle/Walk/Gallop por velocidad.
+func _build_model() -> void:
+	model = HORSE.instantiate() as Node3D
+	# El glTF mira a +Z: lo giramos para que mire a -Z (frente del juego)
+	model.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * HORSE_SCALE)
+	add_child(model)
+	if data.mount_name != "Caballo":
+		AnimUtil.tint_surfaces(model, data.color, 0.5)
+	var ap := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	AnimUtil.set_loops(ap, ["Idle", "Walk", "Gallop"])
+	var bs := AnimationNodeBlendSpace1D.new()
+	bs.add_blend_point(AnimUtil.anim_node("Idle"), 0.0, -1, &"Idle")
+	bs.add_blend_point(AnimUtil.anim_node("Walk"), 0.3, -1, &"Walk")
+	bs.add_blend_point(AnimUtil.anim_node("Gallop"), 1.0, -1, &"Gallop")
+	bs.min_space = 0.0
+	bs.max_space = 1.3
+	tree = AnimationTree.new()
+	tree.tree_root = bs
+	model.add_child(tree)
+	tree.root_node = NodePath("..")
+	tree.anim_player = tree.get_path_to(ap)
+	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
+	tree.active = true
+	_last_pos = global_position
+
+func _update_anim(delta: float) -> void:
+	var d := MeshUtil.flat(global_position - _last_pos).length() / maxf(delta, 0.001)
+	_last_pos = global_position
+	speed_now = lerpf(speed_now, d, clampf(delta * 8.0, 0.0, 1.0))
+	tree.set("parameters/blend_position", speed_now / maxf(data.speed, 0.1))
 
 func is_free() -> bool:
 	return rider == null
@@ -42,6 +74,7 @@ func set_rider(r: Fighter) -> void:
 		_wander_t = 1.0
 
 func _physics_process(delta: float) -> void:
+	_update_anim(delta)
 	if rider != null:
 		return
 	_wander_t -= delta

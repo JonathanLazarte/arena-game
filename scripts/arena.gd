@@ -3,7 +3,10 @@ extends Node3D
 ## Escena principal: construye la arena, los luchadores, la cámara, el HUD
 ## y gestiona las rondas (al mejor de 3).
 
-const RADIUS := 30.0
+const RADIUS := 42.0 ## x1.4 respecto a la v1 (30)
+const PILLAR_RING := 23.8 ## 17 * 1.4
+const SPAWN_DIST := 19.6 ## 14 * 1.4
+const PROPS := "res://assets/props/"
 const WINS_NEEDED := 2
 const ROUND_TIME := 90.0
 const EIKONS := ["res://resources/eikons/phoenix.tres", "res://resources/eikons/ice_wolf.tres", "res://resources/eikons/stone_golem.tres"]
@@ -88,7 +91,33 @@ func _build_environment() -> void:
 	sun.light_energy = 1.1
 	add_child(sun)
 
-func _static_box(size: Vector3, pos: Vector3, c: Color, rot_y: float = 0.0) -> void:
+## Malla de un prop de Kenney Castle Kit (CC0); incluye la transformación del nodo.
+func _prop_mesh(file: String) -> Array:
+	var n := (load(PROPS + file) as PackedScene).instantiate()
+	var mi := n.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+	var out := [mi.mesh, mi.transform]
+	n.free()
+	return out
+
+## Muchas copias de un prop en un solo MultiMesh (barato en móvil).
+func _prop_multi(file: String, xforms: Array[Transform3D]) -> void:
+	var pm := _prop_mesh(file)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = pm[0]
+	mm.instance_count = xforms.size()
+	for i in xforms.size():
+		mm.set_instance_transform(i, xforms[i] * (pm[1] as Transform3D))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	add_child(mmi)
+
+func _prop(file: String, xf: Transform3D) -> void:
+	var n := (load(PROPS + file) as PackedScene).instantiate() as Node3D
+	n.transform = xf
+	add_child(n)
+
+func _static_box(size: Vector3, pos: Vector3, c: Color, rot_y: float = 0.0, visual: bool = true) -> void:
 	var sb := StaticBody3D.new()
 	sb.position = pos
 	sb.rotation.y = rot_y
@@ -97,7 +126,8 @@ func _static_box(size: Vector3, pos: Vector3, c: Color, rot_y: float = 0.0) -> v
 	sh.size = size
 	col.shape = sh
 	sb.add_child(col)
-	MeshUtil.box(sb, size, Vector3.ZERO, c)
+	if visual:
+		MeshUtil.box(sb, size, Vector3.ZERO, c)
 	add_child(sb)
 
 func _build_arena() -> void:
@@ -113,18 +143,46 @@ func _build_arena() -> void:
 	MeshUtil.cylinder(floor_body, 6.0, 0.22, Vector3(0, -0.09, 0), Color(0.5, 0.4, 0.3))
 	add_child(floor_body)
 	# Muro circular
-	var segs := 40
+	# Muro circular: colisión con cajas invisibles (igual que antes) y muro de Kenney en MultiMesh
+	var segs := 56
 	var seg_len := TAU * RADIUS / segs + 0.3
+	var walls: Array[Transform3D] = []
+	var studs: Array[Transform3D] = []
 	for i in segs:
 		var a := TAU * i / segs
 		var p := Vector3(sin(a), 0, cos(a)) * (RADIUS + 0.6)
-		_static_box(Vector3(seg_len, 4.0, 1.2), p + Vector3(0, 2.0, 0), Color(0.45, 0.42, 0.4) if i % 2 == 0 else Color(0.5, 0.47, 0.44), a)
+		_static_box(Vector3(seg_len, 4.0, 1.2), p + Vector3(0, 2.0, 0), Color.GRAY, a, false)
+		var b := Basis(Vector3.UP, a)
+		walls.append(Transform3D(b * Basis.from_scale(Vector3(seg_len, 3.2, 1.6)), p))
+		if i % 4 == 0:
+			var q := Vector3(sin(a + PI / segs), 0, cos(a + PI / segs)) * (RADIUS + 0.6)
+			studs.append(Transform3D(Basis(Vector3.UP, a + PI / segs) * Basis.from_scale(Vector3(2.2, 3.6, 2.2)), q))
+	_prop_multi("wall.glb", walls)
+	_prop_multi("wall-pillar.glb", studs)
+	# Decoración fuera del muro: estandartes, torres, balistas y rocas
+	for i in 8:
+		var a := TAU * i / 8 + PI / 8
+		var p := Vector3(sin(a), 0, cos(a)) * (RADIUS + 0.2)
+		_prop("flag-banner-long.glb", Transform3D(Basis(Vector3.UP, a + PI / 2) * Basis.from_scale(Vector3.ONE * 2.2), p + Vector3(0, 1.0, 0)))
+	for i in 4:
+		var a := TAU * i / 4 + PI / 4
+		var p := Vector3(sin(a), 0, cos(a)) * (RADIUS + 7.0)
+		_prop("tower-hexagon-base.glb", Transform3D(Basis.from_scale(Vector3.ONE * 6.0), p))
+		_prop("tower-hexagon-mid.glb", Transform3D(Basis.from_scale(Vector3.ONE * 6.0), p + Vector3(0, 7.86, 0)))
+		_prop("tower-hexagon-top.glb", Transform3D(Basis.from_scale(Vector3.ONE * 6.0), p + Vector3(0, 10.62, 0)))
+		_prop("flag.glb", Transform3D(Basis.from_scale(Vector3.ONE * 4.0), p + Vector3(0, 11.4, 0)))
+	for i in 6:
+		var a := TAU * i / 6
+		var p := Vector3(sin(a), 0, cos(a)) * (RADIUS + 4.0)
+		_prop("siege-ballista.glb" if i % 2 == 0 else "rocks-small.glb", Transform3D(Basis(Vector3.UP, a) * Basis.from_scale(Vector3.ONE * 2.5), p + Vector3(0, 0.5, 0)))
+	_prop("gate.glb", Transform3D(Basis(Vector3.UP, PI / 2) * Basis.from_scale(Vector3.ONE * 5.0), Vector3(0, 0, RADIUS + 1.4)))
+	_prop("gate.glb", Transform3D(Basis(Vector3.UP, PI / 2) * Basis.from_scale(Vector3.ONE * 5.0), Vector3(0, 0, -RADIUS - 1.4)))
 	# Pilares
 	Projectile.obstacles.clear()
 	Projectile.arena_radius = RADIUS
 	for i in 6:
 		var a := TAU * i / 6 + PI / 6
-		var p := Vector3(sin(a), 0, cos(a)) * 17.0
+		var p := Vector3(sin(a), 0, cos(a)) * PILLAR_RING
 		var sb := StaticBody3D.new()
 		sb.position = p
 		var col := CollisionShape3D.new()
@@ -134,10 +192,21 @@ func _build_arena() -> void:
 		col.shape = sh
 		col.position = Vector3(0, 3.5, 0)
 		sb.add_child(col)
-		MeshUtil.cylinder(sb, 1.3, 7.0, Vector3(0, 3.5, 0), Color(0.7, 0.68, 0.62))
-		MeshUtil.sphere(sb, 0.4, Vector3(0, 7.4, 0), Color(1.0, 0.6, 0.2), true)
+		# Pilar visual: torre hexagonal de Kenney (base + 2 tramos + remate); radio ~1.3 como la colisión
+		var k := 2.9
+		_prop_at(sb, "tower-hexagon-base.glb", Vector3.ZERO, k)
+		_prop_at(sb, "tower-hexagon-mid.glb", Vector3(0, 1.31 * k, 0), k)
+		_prop_at(sb, "tower-hexagon-mid.glb", Vector3(0, (1.31 + 0.46) * k, 0), k)
+		_prop_at(sb, "tower-hexagon-top.glb", Vector3(0, (1.31 + 0.92) * k, 0), k)
+		MeshUtil.sphere(sb, 0.4, Vector3(0, 7.0, 0), Color(1.0, 0.6, 0.2), true)
 		add_child(sb)
 		Projectile.obstacles.append(Vector3(p.x, 1.5, p.z))
+
+func _prop_at(parent: Node3D, file: String, pos: Vector3, k: float) -> void:
+	var n := (load(PROPS + file) as PackedScene).instantiate() as Node3D
+	n.position = pos
+	n.scale = Vector3.ONE * k
+	parent.add_child(n)
 
 func _physics_process(delta: float) -> void:
 	if camera == null or player == null:
@@ -176,8 +245,8 @@ func _physics_process(delta: float) -> void:
 func start_round() -> void:
 	for n in get_tree().get_nodes_in_group("projectile"):
 		n.queue_free()
-	player.reset_for_round(Vector3(0, 0.2, 14), Vector3.FORWARD)
-	enemy.reset_for_round(Vector3(0, 0.2, -14), Vector3.BACK)
+	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD)
+	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK)
 	camera.global_position = player.global_position + Vector3(0, 5, 9)
 	state = "fight"
 	time_left = ROUND_TIME

@@ -71,3 +71,14 @@ Los presets "Android" (arm64, apaisado, sin compilación Gradle, firma de depura
 
 ## Próximos pasos
 Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, cambio de objetivo con lock-on (mobs), más ataques por eikon, oleadas de mobs, sonido y efectos, y ajustar la dificultad de la IA.
+
+## Arte (ronda 6)
+- Modelos CC0 (ver `CREDITS.md`): caballero KayKit para ambos luchadores (tinte azul/rojo en capa y escudo), caballo de Quaternius, lobo y dragón-fénix de Quaternius, Goleling como gólem provisional y el Castle Kit de Kenney para muros, pilares y decoración.
+- `scripts/visual/knight_visual.gd`: AnimationTree del jinete. La base es la locomoción (BlendSpace2D Idle/Walk/Run/Strafe/Back) a pie o `Sit_Chair_Pose` montado. Encima va una StateMachine de acciones mezclada con un Blend2 con máscara de tren superior (montado, bloqueo, arco y cambio de arma):
+  - ataques ligeros (combo Slice Diagonal / Horizontal / Chop) con la velocidad ajustada por fase (windup, active, recovery) y ataque fuerte con 2H Chop;
+  - bloqueo con Blocking y Block_Hit; parry con Block_Attack;
+  - voltereta con Dodge_F/B/L/R; golpe con Hit_A, aturdimiento con Hit_B y muerte con Death_A;
+  - arco con 2H_Ranged_Aiming y Shoot; cambio de arma con Use_Item.
+- Caballo: BlendSpace1D Idle/Walk/Gallop según la velocidad real.
+- Las armas van en BoneAttachment3D (`handslot.r` / `handslot.l`). La detección de golpes no cambia: sigue siendo por arcos en `fighter.gd`. Los modelos son solo visuales.
+- La arena es un 40 % más grande: radio 42, pilares a 23,8 m y salida a ±19,6 m.
