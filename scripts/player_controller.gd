@@ -37,13 +37,16 @@ func _physics_process(_delta: float) -> void:
 	var right := fwd.cross(Vector3.UP)
 	me.move_input = (right * v.x + fwd * -v.y) if enabled else Vector3.ZERO
 	me.want_block = enabled and Input.is_action_pressed("block")
+	me.want_sprint = enabled and Input.is_action_pressed("sprint")
 	var sw := _pressed_edge("attack_sword")
 	var bw := _pressed_edge("shoot_bow")
 	var sm := _pressed_edge("summon")
 	var ds := _pressed_edge("dash")
+	var mt := _pressed_edge("mount")
 	if not enabled:
 		return
 	if sw: me.sword()
 	if bw: me.shoot()
 	if sm: me.summon()
 	if ds: me.dash()
+	if mt: me.toggle_mount()

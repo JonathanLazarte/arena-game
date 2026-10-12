@@ -59,7 +59,12 @@ func _make_fighter(n: String, team: int, c: Color, mount_path: String, eikon_pat
 	f.color = c
 	f.mount = load(mount_path)
 	f.eikon = load(eikon_path)
+	var m := Mount.new()
+	m.data = f.mount
+	add_child(m)
 	add_child(f)
+	f.owned_mount = m
+	f.mount_on(m)
 	f.died.connect(_on_fighter_died)
 	return f
 

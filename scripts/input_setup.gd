@@ -12,6 +12,8 @@ const ACTIONS := {
 	"summon": [KEY_E],
 	"dash": [KEY_SPACE],
 	"lock_on": [KEY_TAB, KEY_Q],
+	"mount": [KEY_F],
+	"sprint": [KEY_SHIFT],
 }
 
 func _enter_tree() -> void:

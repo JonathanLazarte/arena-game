@@ -4,7 +4,7 @@ extends Node
 ## mirándolo, se compromete a atacar en ventanas (espada o dash + espada) y luego
 ## se retira. Nunca se solapa ni se queda pegado a la espalda.
 
-enum Phase { CIRCLE, COMMIT, RETREAT }
+enum Phase { CIRCLE, COMMIT, RETREAT, REST }
 
 var me: Fighter
 var enabled: bool = true
@@ -20,6 +20,8 @@ var _think: float = 0.0
 var _block_hold: float = 0.0
 
 const MAX_ORBIT := 1.15
+var rest_time: float = 0.0 ## tiempo total descansando (para pruebas)
+var _flee: bool = false
 
 func _physics_process(delta: float) -> void:
 	if me == null:
@@ -35,6 +37,22 @@ func _physics_process(delta: float) -> void:
 	var dir := to.normalized() if dist > 0.01 else me.facing
 	var side := dir.cross(Vector3.UP) * _orbit_dir
 	_phase_t -= delta
+	me.want_sprint = false
+	# --- A pie: volver a montar cuando sea seguro, si no, luchar a pie ---
+	if not me.mounted:
+		var m := me.nearest_free_mount()
+		if m:
+			var md := me.global_position.distance_to(m.global_position)
+			if md <= Fighter.MOUNT_REACH - 0.3:
+				me.want_block = false
+				me.toggle_mount()
+				return
+			if dist > 6.0 or md < 6.0 or opp.is_exhausted():
+				me.face_target = null
+				me.want_block = false
+				me.want_sprint = me.stamina > 40.0
+				me.move_input = MeshUtil.flat(m.global_position - me.global_position).normalized()
+				return
 	if _block_hold > 0.0:
 		_block_hold -= delta
 		me.want_block = true
@@ -44,20 +62,38 @@ func _physics_process(delta: float) -> void:
 	_think -= delta
 	if _think <= 0.0:
 		_think = 0.12
-		if opp.is_attacking() and dist < 5.0 and randf() < difficulty * 0.6:
+		if opp.is_attacking() and dist < 5.0 and me.stamina > 15.0 and randf() < difficulty * 0.6:
 			_block_hold = 0.35
 			return
-		if _incoming_projectile() and randf() < difficulty * 0.5:
+		if _incoming_projectile() and me.stamina > 15.0 and randf() < difficulty * 0.5:
 			_block_hold = 0.35
 			return
 		if me.meter >= Fighter.METER_MAX:
 			me.summon()
-		if phase == Phase.CIRCLE and dist > 7.0 and randf() < 0.1:
+		if phase == Phase.CIRCLE and dist > 7.0 and me.stamina > 40.0 and randf() < 0.1:
 			me.shoot()
+		# Poco aguante: retirarse a recuperar (pausas naturales), a veces huir
+		if phase != Phase.REST and (me.stamina < 25.0 or me.is_exhausted()):
+			phase = Phase.REST
+			_phase_t = randf_range(1.5, 3.0)
+			_flee = randf() < 0.25
 	var move := Vector3.ZERO
 	# Ángulo de la IA respecto a la mirada del jugador (0 = justo delante)
 	var rel_n := -dir
 	var ang := opp.facing.signed_angle_to(rel_n, Vector3.UP)
+	var reach := me.sword_range()
+	if phase == Phase.REST:
+		rest_time += delta
+		if _flee:
+			move = -dir
+		else:
+			# Rodear despacio a distancia (cuenta como "parado" para regenerar rápido)
+			move = (side * 0.25 - dir * clampf((12.0 - dist) / 4.0, 0.0, 0.25))
+		if _phase_t <= 0.0 and me.stamina > 70.0:
+			phase = Phase.CIRCLE
+			_phase_t = 0.5 + randf()
+		me.move_input = move.limit_length(1.0)
+		return
 	if absf(ang) > 1.3 and phase != Phase.RETREAT:
 		# Detrás o muy lateral: rodear rápido hacia el frente manteniendo distancia
 		phase = Phase.CIRCLE
@@ -83,18 +119,21 @@ func _physics_process(delta: float) -> void:
 			# Rodear en vez de atravesar al jugador
 			if dist < _pref_dist * 0.8:
 				move += side * 0.6 - dir * 0.4
-			if _phase_t <= 0.0 and not _is_behind(opp):
+			if not me.mounted:
+				_pref_dist = minf(_pref_dist, 4.5)
+			me.want_sprint = dist > 14.0 and me.stamina > 60.0
+			if _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > 45.0:
 				phase = Phase.COMMIT
 				_phase_t = 2.5
 				_swings = 1 + randi() % 3
 				_dash_in = dist > 4.5 and randf() < 0.5
 		Phase.COMMIT:
-			move = dir if dist > 2.9 else side * 0.4
-			if _dash_in and dist < 9.0 and dist > 3.5 and me.facing.dot(dir) > 0.85:
+			move = dir if dist > reach - 0.5 else side * 0.4
+			if _dash_in and me.mounted and dist < 9.0 and dist > 3.5 and me.facing.dot(dir) > 0.85:
 				me.move_input = dir
 				me.dash()
 				_dash_in = false
-			if dist < Fighter.SWORD_RANGE and me.facing.dot(dir) > 0.6 and me.sword():
+			if dist < reach and me.facing.dot(dir) > 0.6 and me.sword():
 				_swings -= 1
 			if _swings <= 0 or _phase_t <= 0.0 or me.stun > 0.0:
 				phase = Phase.RETREAT
@@ -111,8 +150,9 @@ func _physics_process(delta: float) -> void:
 				if randf() < 0.3:
 					_orbit_dir = -_orbit_dir
 	# Separación extra fuera de la fase de ataque
-	if phase != Phase.COMMIT and dist < 3.5:
-		move -= dir * (3.5 - dist)
+	var keep := 3.5 if me.mounted else 2.0
+	if phase != Phase.COMMIT and dist < keep:
+		move -= dir * (keep - dist)
 	me.move_input = move.limit_length(1.0)
 
 func _clamp_arena(p: Vector3) -> Vector3:

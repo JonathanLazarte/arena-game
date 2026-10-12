@@ -63,3 +63,31 @@ static func nearest(from: Vector3, list: Array[Node3D]) -> Node3D:
 
 static func flat(v: Vector3) -> Vector3:
 	return Vector3(v.x, 0.0, v.z)
+
+## Abanico plano (arco de espada) centrado en -Z, de radio r y semiángulo half (rad).
+static func arc(parent: Node3D, r_in: float, r_out: float, half: float, y: float, c: Color) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := 16
+	for i in n:
+		var a0 := -half + 2.0 * half * i / n
+		var a1 := -half + 2.0 * half * (i + 1) / n
+		var p0 := Vector3(-sin(a0), 0, -cos(a0))
+		var p1 := Vector3(-sin(a1), 0, -cos(a1))
+		st.add_vertex(p0 * r_in + Vector3(0, y, 0))
+		st.add_vertex(p0 * r_out + Vector3(0, y, 0))
+		st.add_vertex(p1 * r_out + Vector3(0, y, 0))
+		st.add_vertex(p0 * r_in + Vector3(0, y, 0))
+		st.add_vertex(p1 * r_out + Vector3(0, y, 0))
+		st.add_vertex(p1 * r_in + Vector3(0, y, 0))
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(c, 0.45)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	return mi

@@ -130,5 +130,126 @@ func _run() -> void:
 	check(p.facing.dot(f0) > 0.95, "marcha atrás sin girar (dot %.2f)" % p.facing.dot(f0))
 	check(moved.length() > 1.5 and moved.normalized().dot(-f0) > 0.9, "retrocede %.1f m" % moved.length())
 	await tap("lock_on")
+	# ================= Ronda 3: alcance, montar/desmontar, aguante =================
+	var UP := Vector3.UP
+	arena.ai.enabled = false
+	arena.controller.lock_on = false
+	p.dismiss_eikon()
+	p.health = p.max_health
+	e.health = e.max_health
+	await wait(1.0)
+	# --- Alcance montado: 3.2 m en el lateral ---
+	e.global_position = p.global_position + p.facing.cross(UP) * 3.2
+	e.facing = -p.facing
+	await physics_frame
+	check(p.in_sword_arc(e), "montado: rival a 3.2 m en el lateral dentro del arco")
+	h0 = e.health
+	var st0 := p.stamina
+	await tap("attack_sword")
+	await wait(0.4)
+	check(e.health < h0, "espada montada alcanza 3.2 m lateral (%.0f -> %.0f)" % [h0, e.health])
+	check(p.stamina < st0, "espada gasta aguante (%.0f -> %.0f)" % [st0, p.stamina])
+	await wait(0.5)
+	e.global_position = p.global_position + p.facing * 4.8
+	await physics_frame
+	h0 = e.health
+	await tap("attack_sword")
+	await wait(0.4)
+	check(not p.in_sword_arc(e) and is_equal_approx(e.health, h0), "montado: 4.8 m queda fuera de alcance")
+	# --- Desmontar ---
+	await wait(0.5)
+	var spd_mounted := p.stats().speed
+	await tap("mount")
+	await physics_frame
+	var pm := p.owned_mount
+	check(not p.mounted and pm.is_free(), "F desmonta; la montura queda libre")
+	check(p.global_position.distance_to(pm.global_position) < Fighter.MOUNT_REACH, "la montura queda cerca")
+	check(p.stats().speed < spd_mounted and p.stats().turn_speed > 3.2, "a pie: más lento y gira más cerrado")
+	# --- Alcance a pie (rival también a pie) ---
+	e.dismount()
+	e.global_position = p.global_position + p.facing * 2.0
+	e.facing = -p.facing
+	await physics_frame
+	check(p.in_sword_arc(e), "a pie: 2.0 m dentro del alcance")
+	h0 = e.health
+	await tap("attack_sword")
+	await wait(0.4)
+	check(e.health < h0, "espada a pie golpea a 2.0 m")
+	e.global_position = p.global_position + p.facing * 3.2
+	await physics_frame
+	check(not p.in_sword_arc(e), "a pie: 3.2 m fuera de alcance")
+	# --- Voltereta a pie ---
+	await wait(0.6)
+	st0 = p.stamina
+	await tap("dash")
+	check(p.invuln > 0.0 and not p.mounted, "a pie el dash es una voltereta con invulnerabilidad")
+	check(st0 - p.stamina >= Fighter.COST_ROLL - 1.0, "voltereta gasta aguante")
+	# --- Volver a montar ---
+	await wait(0.5)
+	p.global_position = pm.global_position + Vector3(1.5, 0, 0)
+	await physics_frame
+	await tap("mount")
+	await physics_frame
+	check(p.mounted and p.mount_node == pm, "F vuelve a montar cerca de la montura")
+	check(e.toggle_mount(), "el rival vuelve a montar")
+	# --- Derribo con dash ---
+	await wait(0.5)
+	e.global_position = p.global_position + p.facing * 6.0
+	e.facing = -p.facing
+	e.knockoff_chance_dash = 1.0
+	p.stamina = Fighter.STAMINA_MAX
+	await wait(0.5)
+	await tap("dash")
+	await wait(0.5)
+	check(not e.mounted, "dash derriba al rival de su montura")
+	e.knockoff_chance_dash = 0.5
+	# --- La IA vuelve a montar ---
+	p.global_position = Vector3(0, 0.2, 20)
+	arena.ai.enabled = true
+	var t_rm := 0.0
+	while not e.mounted and t_rm < 6.0:
+		await wait(0.2)
+		t_rm += 0.2
+	check(e.mounted, "la IA desmontada vuelve a montar (%.1f s)" % t_rm)
+	# --- IA con poco aguante: pausa y luego vuelve ---
+	p.health = p.max_health
+	await wait(0.3)
+	e.stamina = 10.0
+	await wait(0.3)
+	check(arena.ai.phase == AIController.Phase.REST, "IA con poco aguante pasa a descansar")
+	var attacks := 0
+	for i in 60:
+		await physics_frame
+		if e.is_attacking():
+			attacks += 1
+	check(attacks == 0, "IA no ataca mientras descansa")
+	var t_back := 0.0
+	while arena.ai.phase == AIController.Phase.REST and t_back < 8.0:
+		await wait(0.2)
+		t_back += 0.2
+	check(arena.ai.phase != AIController.Phase.REST and e.stamina > 60.0, "IA recupera aguante y vuelve a luchar (%.1f s)" % t_back)
+	arena.ai.enabled = false
+	# --- Aguante: bloqueo drena, regenera, agotamiento ---
+	p.health = p.max_health
+	e.global_position = p.global_position + Vector3(0, 0, -15)
+	p.stamina = Fighter.STAMINA_MAX
+	Input.action_press("block")
+	await wait(1.0)
+	Input.action_release("block")
+	var after_block := p.stamina
+	check(after_block < 92.0, "mantener escudo drena aguante (%.0f)" % after_block)
+	await wait(1.5)
+	check(p.stamina > after_block, "aguante se regenera (%.0f -> %.0f)" % [after_block, p.stamina])
+	p.stamina = 4.0
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await wait(0.5)
+	Input.action_release("sprint")
+	Input.action_release("move_forward")
+	check(p.is_exhausted(), "galopar sin aguante -> agotado")
+	check(not p.sword() and not p.dash(), "agotado: no puede atacar ni hacer dash")
+	await wait(1.7)
+	check(not p.is_exhausted(), "el agotamiento termina (~1.5 s)")
+	arena.controller.lock_on = true
 	print("RESULT: %s (%d fallos)" % ["OK" if fails == 0 else "FALLO", fails])
 	quit(fails)

@@ -16,7 +16,10 @@ func _run() -> void:
 	arena.player.summon()
 	await create_timer(1.2).timeout
 	arena.player.shoot()
-	await create_timer(0.15).timeout
+	await create_timer(0.6).timeout
+	arena.enemy.global_position = arena.player.global_position + arena.player.facing * 3.2
+	arena.player.sword()
+	await create_timer(0.12).timeout
 	var path := "/workspace/out/arena-shot.png"
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:

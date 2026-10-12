@@ -9,6 +9,8 @@ var p_health: ProgressBar
 var p_meter: ProgressBar
 var e_health: ProgressBar
 var e_meter: ProgressBar
+var p_stamina: ProgressBar
+var e_stamina: ProgressBar
 var round_label: Label
 var timer_label: Label
 var message: Label
@@ -24,8 +26,10 @@ func _ready() -> void:
 	p_meter = _bar(root, Vector2(20, 52), Color(1.0, 0.6, 0.1), 14)
 	e_health = _bar(root, Vector2(1280 - 420, 20), Color(0.9, 0.2, 0.2))
 	e_meter = _bar(root, Vector2(1280 - 420, 52), Color(0.4, 0.8, 1.0), 14)
-	_label(root, "Jugador", Vector2(20, 70), 18)
-	_label(root, "Rival", Vector2(1280 - 420, 70), 18)
+	p_stamina = _bar(root, Vector2(20, 70), Color(0.95, 0.9, 0.3), 10)
+	e_stamina = _bar(root, Vector2(1280 - 420, 70), Color(0.95, 0.9, 0.3), 10)
+	_label(root, "Jugador", Vector2(20, 84), 18)
+	_label(root, "Rival", Vector2(1280 - 420, 84), 18)
 	round_label = _label(root, "Ronda 1   0 - 0", Vector2(540, 16), 24)
 	round_label.size = Vector2(200, 30)
 	round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -44,6 +48,8 @@ func _ready() -> void:
 	_touch_button("Arco", "shoot_bow", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
 	_touch_button("Eikon", "summon", Vector2(1050, 500), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
+	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
+	_touch_button("Galope", "sprint", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
 	_touch_button("Dash", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
 	# Panel final
 	end_panel = PanelContainer.new()
@@ -120,7 +126,7 @@ class _Circle extends Node2D:
 		draw_arc(Vector2.ZERO, r, 0, TAU, 40, Color(c, 0.8), 3.0)
 
 func bind(player: Fighter, enemy: Fighter) -> void:
-	for pair: Array in [[player, p_health, p_meter], [enemy, e_health, e_meter]]:
+	for pair: Array in [[player, p_health, p_meter, p_stamina], [enemy, e_health, e_meter, e_stamina]]:
 		var f: Fighter = pair[0]
 		var hb: ProgressBar = pair[1]
 		var mb: ProgressBar = pair[2]
@@ -132,6 +138,12 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 			hb.max_value = m
 			hb.value = v)
 		f.meter_changed.connect(func(v: float) -> void: mb.value = v)
+		var sb: ProgressBar = pair[3]
+		sb.max_value = Fighter.STAMINA_MAX
+		sb.value = f.stamina
+		f.stamina_changed.connect(func(v: float, ex: bool) -> void:
+			sb.value = v
+			sb.modulate = Color(1, 0.4, 0.4) if ex else Color.WHITE)
 
 func show_message(t: String, secs: float = 2.0) -> void:
 	message.text = t

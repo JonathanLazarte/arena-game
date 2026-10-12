@@ -11,9 +11,14 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 | Escudo (mantener; pulsarlo justo antes del golpe = **parry**) | K | Botón *Escudo* |
 | Arco (apuntado automático) | L | Botón *Arco* |
 | Invocar eikon (medidor lleno) | E | Botón *Eikon* |
-| Dash / carga (en la dirección del movimiento; 0,2 s de invulnerabilidad; si choca, empuja al rival) | Espacio | Botón *Dash* |
+| Montar / desmontar (cerca de una montura libre) | F | Botón *Montar* |
+| Galope / sprint (mantener; gasta aguante) | Shift | Botón *Galope* (mantener) |
+| Dash / carga (a pie: voltereta) (en la dirección del movimiento; 0,2 s de invulnerabilidad; si choca, empuja al rival) | Espacio | Botón *Dash* |
 
 ## Reglas
+- **Jinete y montura son entidades separadas.** Montado eres rápido y la espada (hoja larga) alcanza unos 3,4 m en un arco de ±100° (frente y lados). A pie vas más lento, giras más cerrado, la espada alcanza unos 2,2 m (±70°) y el dash se convierte en una voltereta rápida. La montura sin jinete se queda cerca paseando; acércate y pulsa *Montar*.
+- **Derribo:** un dash que acierta (50 %) o un golpe fuerte de 14 o más de daño (30 %) puede tirarte de la montura.
+- **Aguante (barra amarilla):** lo gastan dash/voltereta, espada, arco, galope, mantener el escudo y bloquear golpes. Se recupera si no lo gastas, y más rápido si estás quieto o retrocediendo. Si llega a 0 quedas **agotado** unos 1,5 s: más lento, sin ataques ni dash y con un bloqueo más débil.
 - Al mejor de 3 rondas. Cada ronda dura 90 s; si se acaba el tiempo, gana quien tenga más vida (en %).
 - El medidor de eikon se carga al golpear (espada +12, flecha +8), al recibir golpes (+5), al bloquear (+3) y al hacer parry (+15).
 - Bloquear de frente reduce el daño un 80 %. Un parry anula el golpe, aturde al atacante y devuelve las flechas.
@@ -22,14 +27,15 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 
 ## Estructura
 - `scenes/arena.tscn` + `scripts/arena.gd`: arena (muro circular y pilares), cámara, rondas y pantalla final.
-- `scripts/combat/fighter.gd`: luchador montado (movimiento, espada, escudo/parry, arco, dash, invocación).
+- `scripts/combat/fighter.gd`: jinete (movimiento montado o a pie, espada con arco de alcance, escudo/parry, arco, dash/voltereta, aguante, montar/desmontar, invocación).
+- `scripts/combat/mount.gd`: montura independiente (sigue al jinete; libre, pasea cerca). Cualquier jinete puede montar cualquier montura libre.
 - `scripts/combat/eikon.gd`: invocaciones (ataques cuerpo a cuerpo, a distancia o en área).
 - `scripts/combat/projectile.gd`: flechas y proyectiles.
-- `scripts/ai/ai_controller.gd`: IA rival por fases (rodear a media distancia por delante, comprometerse a atacar con espada o dash, retirarse). Evita quedarse a la espalda y nunca se solapa.
+- `scripts/ai/ai_controller.gd`: IA rival por fases (rodear a media distancia por delante, comprometerse a atacar con espada o dash, retirarse y descansar o huir cuando le falta aguante). Si la derriban, vuelve a montar cuando es seguro o lucha a pie. Evita quedarse a la espalda y nunca se solapa.
 - `scripts/player_controller.gd`: teclado y controles táctiles.
 - `scripts/ui/hud.gd`, `touch_stick.gd`: HUD, joystick y botones táctiles (multitáctil).
 - `scripts/data/mount_data.gd`, `eikon_data.gd`: Resources de datos.
-- `resources/mounts/*.tres`: caballo, unicornio, grifo. `resources/eikons/*.tres`: fénix, lobo de hielo, gólem.
+- `resources/mounts/*.tres`: caballo, unicornio, grifo y `on_foot.tres` (estadísticas a pie). `resources/eikons/*.tres`: fénix, lobo de hielo, gólem.
 - `tests/`: pruebas automáticas y captura de pantalla.
 
 ## Cómo ampliar

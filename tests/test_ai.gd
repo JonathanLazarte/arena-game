@@ -18,6 +18,8 @@ func _run() -> void:
 	arena.controller.enabled = false
 	arena.controller.lock_on = false
 	p.max_health = 100000.0
+	p.knockoff_chance_dash = 0.0
+	p.knockoff_chance_heavy = 0.0
 	p.health = p.max_health
 	Engine.time_scale = 3.0
 	var frames := 0

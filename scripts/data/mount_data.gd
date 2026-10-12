@@ -9,6 +9,9 @@ extends Resource
 @export var dash_speed: float = 30.0
 @export var dash_duration: float = 0.3
 @export var dash_cooldown: float = 1.5
+@export var dash_iframes: float = 0.2 ## invulnerabilidad del dash/rodar
+@export var sprint_multiplier: float = 1.45 ## galope (mantener Shift)
+@export var max_health: float = 0.0 ## 0 = la montura no recibe daño (opcional)
 @export var health_bonus: float = 0.0
 @export var jump_velocity: float = 8.0 ## reservado para futuras versiones
 @export var can_fly: bool = false ## reservado para futuras versiones
