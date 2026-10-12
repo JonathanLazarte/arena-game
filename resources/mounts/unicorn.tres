@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MountData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/mount_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mount_name = "Unicornio"
+speed = 15.0
+turn_speed = 3.6
+health_bonus = 20.0
+color = Color(0.95, 0.95, 1, 1)

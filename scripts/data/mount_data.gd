@@ -1,0 +1,15 @@
+class_name MountData
+extends Resource
+## Datos de una montura. Crea un nuevo .tres para añadir monturas (grifo, unicornio...).
+
+@export var mount_name: String = "Caballo"
+@export var speed: float = 14.0
+@export var acceleration: float = 18.0
+@export var turn_speed: float = 3.2 ## rad/s
+@export var dash_speed: float = 30.0
+@export var dash_duration: float = 0.3
+@export var dash_cooldown: float = 1.5
+@export var health_bonus: float = 0.0
+@export var jump_velocity: float = 8.0 ## reservado para futuras versiones
+@export var can_fly: bool = false ## reservado para futuras versiones
+@export var color: Color = Color(0.45, 0.3, 0.18)

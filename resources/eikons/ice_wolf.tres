@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EikonData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/eikon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+eikon_name = "Lobo de Hielo"
+color = Color(0.5, 0.85, 1, 1)
+max_health = 60.0
+move_speed = 16.0
+attack_kind = 0
+attack_damage = 7.0
+attack_range = 2.4
+attack_cooldown = 0.8

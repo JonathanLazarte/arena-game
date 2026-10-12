@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EikonData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/eikon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+eikon_name = "Fénix"
+color = Color(1, 0.4, 0.1, 1)
+max_health = 50.0
+move_speed = 12.0
+attack_kind = 1
+attack_damage = 6.0
+attack_range = 14.0
+attack_cooldown = 1.0
+flying = true
