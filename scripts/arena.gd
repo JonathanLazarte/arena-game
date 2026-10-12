@@ -152,7 +152,7 @@ func _physics_process(delta: float) -> void:
 		var d := MeshUtil.flat(player.face_target.global_position - player.global_position)
 		var dist := d.length()
 		var dn := d.normalized() if dist > 0.1 else player.facing
-		cam_target = player.global_position - dn * (8.0 + clampf(dist * 0.15, 0.0, 5.0)) + Vector3(0, 5.0 + clampf(dist * 0.1, 0.0, 3.0), 0)
+		cam_target = player.global_position - dn * (8.0 + clampf(dist * 0.15, 0.0, 5.0)) + Vector3(0, 5.0 + clampf(dist * 0.1, 0.0, 3.0), 0) + dn.cross(Vector3.UP) * 2.8 # sobre el hombro
 		look = player.global_position.lerp(player.face_target.global_position, 0.5) + Vector3(0, 1.5, 0)
 	else:
 		var back := player.facing
