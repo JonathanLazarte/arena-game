@@ -16,6 +16,9 @@ var timer_label: Label
 var message: Label
 var end_panel: PanelContainer
 var end_label: Label
+var swap_bar: ProgressBar
+var loadout_label: Label
+var _player: Fighter
 
 func _ready() -> void:
 	var root := Control.new()
@@ -30,6 +33,11 @@ func _ready() -> void:
 	e_stamina = _bar(root, Vector2(1280 - 420, 70), Color(0.95, 0.9, 0.3), 10)
 	_label(root, "Jugador", Vector2(20, 84), 18)
 	_label(root, "Rival", Vector2(1280 - 420, 84), 18)
+	loadout_label = _label(root, "Espada + Escudo", Vector2(120, 84), 18)
+	swap_bar = _bar(root, Vector2(20, 112), Color(0.8, 0.8, 1.0), 12)
+	swap_bar.size = Vector2(250, 12)
+	swap_bar.max_value = 1.0
+	swap_bar.visible = false
 	round_label = _label(root, "Ronda 1   0 - 0", Vector2(540, 16), 24)
 	round_label.size = Vector2(200, 30)
 	round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -43,9 +51,9 @@ func _ready() -> void:
 	joystick = TouchStick.new()
 	joystick.position = Vector2(150, 570)
 	add_child(joystick)
-	_touch_button("Espada", "attack_sword", Vector2(1160, 600), 62, Color(0.85, 0.85, 0.9))
+	_touch_button("Atacar", "attack_sword", Vector2(1160, 600), 62, Color(0.85, 0.85, 0.9))
 	_touch_button("Escudo", "block", Vector2(1030, 640), 52, Color(0.4, 0.5, 0.9))
-	_touch_button("Arco", "shoot_bow", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
+	_touch_button("Cambiar", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
 	_touch_button("Eikon", "summon", Vector2(1050, 500), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
@@ -125,7 +133,18 @@ class _Circle extends Node2D:
 		draw_circle(Vector2.ZERO, r, Color(c, 0.35))
 		draw_arc(Vector2.ZERO, r, 0, TAU, 40, Color(c, 0.8), 3.0)
 
+func _process(_d: float) -> void:
+	if _player == null:
+		return
+	swap_bar.visible = _player.is_swapping()
+	swap_bar.value = _player.swap_progress()
+	if _player.is_swapping():
+		loadout_label.text = "Cambiando de arma..."
+	else:
+		loadout_label.text = "Espada + Escudo" if _player.loadout == Fighter.Loadout.SWORD_SHIELD else "Arco"
+
 func bind(player: Fighter, enemy: Fighter) -> void:
+	_player = player
 	for pair: Array in [[player, p_health, p_meter, p_stamina], [enemy, e_health, e_meter, e_stamina]]:
 		var f: Fighter = pair[0]
 		var hb: ProgressBar = pair[1]

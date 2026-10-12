@@ -13,6 +13,8 @@ signal died(fighter: Fighter)
 signal summoned(eikon: Node3D)
 signal impact(strength: float)
 signal mount_changed(mounted: bool)
+signal loadout_changed(loadout: int)
+signal landed_hit(target: Node3D, result: String, target_was_open: bool)
 
 const METER_MAX := 100.0
 const GRAVITY := 20.0
@@ -21,10 +23,23 @@ const SWORD_RANGE_MOUNTED := 3.4
 const SWORD_RANGE_FOOT := 2.2
 const SWORD_HALF_ARC_MOUNTED := deg_to_rad(100.0) ## frente y lados
 const SWORD_HALF_ARC_FOOT := deg_to_rad(70.0)
-const SWORD_COOLDOWN := 0.7
-const SWORD_WINDUP := 0.18
+## Ataques estilo souls: anticipación (telegrafiada) -> frames activos -> recuperación vulnerable.
+const LIGHT := {"windup": 0.45, "chain_windup": 0.45, "active": 0.12, "recovery": 0.6, "whiff": 0.3, "damage": 12.0, "stamina": 14.0}
+const HEAVY := {"windup": 0.8, "chain_windup": 0.8, "active": 0.15, "recovery": 0.75, "whiff": 0.35, "damage": 26.0, "stamina": 28.0}
+const MAX_COMBO := 3
+const FINISHER_EXTRA_RECOVERY := 0.3 ## el último golpe del combo deja más expuesto
+const CHAIN_MIN_RECOVERY := 0.3 ## un encadenado no se salta toda la recuperación
+const ROLL_CANCEL_FRACTION := 0.5 ## voltereta/dash permitido en la 2.ª mitad de la recuperación
+const HEAVY_HOLD := 0.4 ## mantener ataque este tiempo = ataque fuerte
+const POISE_MAX := 50.0
+const POISE_REGEN := 25.0
+const SWAP_TIME := 2.0
+const PARRY_STAGGER := 1.6
+const RIPOSTE_MULT := 1.8
+enum Atk { NONE, WINDUP, ACTIVE, RECOVERY }
+enum Loadout { SWORD_SHIELD, BOW }
 const BOW_COOLDOWN := 1.0
-const PARRY_WINDOW := 0.25
+const PARRY_WINDOW := 0.3 ## escudo alzado como mucho este tiempo antes del golpe = parry
 const BLOCK_REDUCTION := 0.2
 const EXHAUSTED_BLOCK_REDUCTION := 0.6
 const REVERSE_FACTOR := 0.5
@@ -33,7 +48,7 @@ const DASH_KNOCKBACK := 16.0
 const SEPARATION := 3.0
 const SEPARATION_FOOT := 1.6
 const MOUNT_REACH := 3.5
-const HEAVY_HIT := 14.0
+const HEAVY_HIT := 14.0 ## golpes de este daño o más pueden derribar
 # Aguante (stamina)
 const STAMINA_MAX := 100.0
 const COST_DASH := 25.0
@@ -66,7 +81,7 @@ var alive: bool = true
 var hit_radius: float = 1.3
 ## Probabilidad de derribo al recibir un dash / golpe fuerte estando montado.
 var knockoff_chance_dash: float = 0.5
-var knockoff_chance_heavy: float = 0.3
+var knockoff_chance_heavy: float = 0.6
 
 # Entrada de los controladores
 var move_input: Vector3 = Vector3.ZERO
@@ -84,8 +99,20 @@ var sprinting: bool = false
 var blocking: bool = false
 var block_time: float = 0.0
 var stun: float = 0.0
-var sword_cd: float = 0.0
-var sword_windup: float = -1.0
+var atk_state: Atk = Atk.NONE
+var atk_heavy: bool = false
+var atk_t: float = 0.0
+var atk_dur: float = 0.0
+var combo: int = 0
+var attacks_started: int = 0
+var _atk_landed: bool = false
+var _atk_hit: Array[Node3D] = []
+var _buffered: bool = false
+var poise: float = POISE_MAX
+var _since_hit: float = 10.0
+var riposte_t: float = 0.0 ## tras sufrir un parry: recibe daño extra
+var loadout: Loadout = Loadout.SWORD_SHIELD
+var swap_t: float = 0.0
 var bow_cd: float = 0.0
 var dash_time: float = 0.0
 var dash_cd: float = 0.0
@@ -100,6 +127,8 @@ var _dash_hit: bool = false
 var _rider_root: Node3D
 var _sword_pivot: Node3D
 var _blade: MeshInstance3D
+var _bow: MeshInstance3D
+var _blade_mat: StandardMaterial3D
 var _shield: MeshInstance3D
 var _body: MeshInstance3D
 var _legs: Array[MeshInstance3D] = []
@@ -143,6 +172,9 @@ func _build_visuals() -> void:
 	_rider_root.add_child(_sword_pivot)
 	_blade = MeshUtil.box(_sword_pivot, Vector3(0.1, 0.1, 1.0), Vector3(0, 0, -0.5), Color(0.85, 0.85, 0.95))
 	MeshUtil.box(_sword_pivot, Vector3(0.4, 0.08, 0.08), Vector3(0, 0, 0), Color(0.6, 0.5, 0.2)) # guarda
+	_blade_mat = _blade.material_override as StandardMaterial3D
+	_bow = MeshUtil.box(_rider_root, Vector3(0.08, 1.5, 0.12), Vector3(-0.45, 1.15, -0.2), Color(0.5, 0.3, 0.12))
+	_bow.visible = false
 	_shield = MeshUtil.box(_rider_root, Vector3(0.1, 0.8, 0.8), Vector3(-0.5, 1.0, 0.0), color.darkened(0.3))
 
 func _apply_mount_visuals() -> void:
@@ -213,7 +245,7 @@ func can_remount() -> bool:
 
 ## Acción "Montar": monta si hay montura libre cerca, desmonta si va montado.
 func toggle_mount() -> bool:
-	if not alive or stun > 0.0:
+	if not alive or stun > 0.0 or atk_state != Atk.NONE or swap_t > 0.0:
 		return false
 	if mounted:
 		dismount(false)
@@ -243,7 +275,18 @@ func _update_stamina(delta: float, idle: bool) -> void:
 # ---------------- Bucle principal ----------------
 
 func _physics_process(delta: float) -> void:
-	sword_cd = maxf(sword_cd - delta, 0.0)
+	riposte_t = maxf(riposte_t - delta, 0.0)
+	_since_hit += delta
+	if _since_hit > 1.5:
+		poise = minf(poise + POISE_REGEN * delta, POISE_MAX)
+	if swap_t > 0.0:
+		swap_t -= delta
+		if swap_t <= 0.0:
+			swap_t = 0.0
+			loadout = Loadout.BOW if loadout == Loadout.SWORD_SHIELD else Loadout.SWORD_SHIELD
+			_apply_loadout_visuals()
+			loadout_changed.emit(loadout)
+	_update_attack(delta)
 	bow_cd = maxf(bow_cd - delta, 0.0)
 	dash_cd = maxf(dash_cd - delta, 0.0)
 	dash_time = maxf(dash_time - delta, 0.0)
@@ -253,17 +296,13 @@ func _physics_process(delta: float) -> void:
 	var inp := move_input
 	if not alive or stun > 0.0:
 		inp = Vector3.ZERO
-	var wb := want_block and alive and stun <= 0.0
+	var wb := want_block and alive and stun <= 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE
 	if wb and not blocking:
 		block_time = 0.0
 	blocking = wb
 	if blocking:
 		block_time += delta
 		spend_stamina(DRAIN_BLOCK * delta)
-	if sword_windup > 0.0:
-		sword_windup -= delta
-		if sword_windup <= 0.0:
-			_sword_strike()
 	inp.y = 0.0
 	var amount := minf(inp.length(), 1.0)
 	var target_vel := Vector3.ZERO
@@ -296,6 +335,8 @@ func _physics_process(delta: float) -> void:
 		target_vel *= 0.45
 	if exhausted > 0.0:
 		target_vel *= 0.6
+	if atk_state != Atk.NONE:
+		target_vel *= 0.55 if mounted else 0.3 # compromiso: casi no te mueves al atacar
 	_update_stamina(delta, amount < 0.3 or reversing)
 	planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta)
 	var v := planar_vel
@@ -375,8 +416,18 @@ func apply_knockback(v: Vector3, stagger: bool = true) -> void:
 		apply_stun(0.25)
 	impact.emit(0.8)
 
+## Telegrafía: true durante la anticipación de un ataque.
 func is_attacking() -> bool:
-	return sword_windup > 0.0
+	return atk_state == Atk.WINDUP
+
+func is_swapping() -> bool:
+	return swap_t > 0.0
+
+func swap_progress() -> float:
+	return 1.0 - swap_t / SWAP_TIME if swap_t > 0.0 else 0.0
+
+func in_recovery() -> bool:
+	return atk_state == Atk.RECOVERY
 
 func get_hit_center() -> Vector3:
 	return global_position + Vector3(0, 1.6 if mounted else 1.0, 0)
@@ -398,43 +449,137 @@ func in_sword_arc(t: Node3D) -> bool:
 		return true
 	return absf(facing.signed_angle_to(d.normalized(), Vector3.UP)) <= sword_half_arc()
 
+## Compatibilidad: sword() = ataque ligero.
 func sword() -> bool:
-	if not _can_act() or sword_cd > 0.0 or blocking or stamina <= 0.0:
+	return attack_light()
+
+func attack_light() -> bool:
+	return _request_attack(false)
+
+func attack_heavy() -> bool:
+	return _request_attack(true)
+
+func _atk_data() -> Dictionary:
+	return HEAVY if atk_heavy else LIGHT
+
+func _request_attack(heavy: bool) -> bool:
+	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0:
 		return false
-	sword_cd = SWORD_COOLDOWN
-	sword_windup = SWORD_WINDUP
-	spend_stamina(COST_SWORD)
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
-	if tgt and global_position.distance_to(tgt.global_position) < sword_range() + 1.5:
-		var d := MeshUtil.flat(tgt.global_position - global_position)
-		if d.length() > 0.1 and facing.dot(d.normalized()) > 0.0:
-			facing = d.normalized()
-	var half := sword_half_arc()
-	var tw := create_tween()
-	_sword_pivot.rotation = Vector3(0, half, 0)
-	tw.tween_property(_sword_pivot, "rotation", Vector3(0, -half, 0), SWORD_WINDUP + 0.1)
-	tw.tween_property(_sword_pivot, "rotation", Vector3.ZERO, 0.2)
-	# Arco visible del tajo
-	var arc := MeshUtil.arc(self, 0.6, sword_range(), half, _rider_root.position.y + 1.0, Color(1, 1, 0.85))
-	var tw2 := arc.create_tween()
-	tw2.tween_interval(SWORD_WINDUP)
-	tw2.tween_property(arc, "transparency", 1.0, 0.2)
-	tw2.tween_callback(arc.queue_free)
+	if atk_state != Atk.NONE:
+		# Búfer de entrada para encadenar ligeros
+		if not heavy and not atk_heavy and combo < MAX_COMBO and (atk_state != Atk.WINDUP or atk_t > atk_dur * 0.5):
+			_buffered = true
+		return false
+	if blocking or stamina <= 0.0:
+		return false
+	combo = 1
+	_start_attack(heavy, false)
 	return true
 
-func _sword_strike() -> void:
+func _start_attack(heavy: bool, chained: bool) -> void:
+	atk_heavy = heavy
+	var d := _atk_data()
+	atk_state = Atk.WINDUP
+	atk_t = 0.0
+	atk_dur = d["chain_windup"] if chained else d["windup"]
+	_atk_landed = false
+	_atk_hit.clear()
+	_buffered = false
+	attacks_started += 1
+	spend_stamina(d["stamina"])
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	if tgt and global_position.distance_to(tgt.global_position) < sword_range() + 1.5:
+		var dd := MeshUtil.flat(tgt.global_position - global_position)
+		if dd.length() > 0.1 and facing.dot(dd.normalized()) > 0.0:
+			facing = dd.normalized()
+	# Telegrafía: hoja alzada y brillante
+	_sword_pivot.rotation = Vector3(1.4 if heavy else 1.0, sword_half_arc(), 0)
+	_blade_mat.emission_enabled = true
+	_blade_mat.emission = Color(1.0, 0.45, 0.1) if heavy else Color(1.0, 0.9, 0.4)
+	_blade_mat.emission_energy_multiplier = 3.0
+
+func _cancel_attack() -> void:
+	atk_state = Atk.NONE
+	combo = 0
+	_buffered = false
+	_blade_mat.emission_enabled = false
+	_sword_pivot.rotation = Vector3.ZERO
+
+func _update_attack(delta: float) -> void:
+	if atk_state == Atk.NONE:
+		return
+	atk_t += delta
+	var d := _atk_data()
+	match atk_state:
+		Atk.WINDUP:
+			if atk_t >= atk_dur:
+				atk_state = Atk.ACTIVE
+				atk_t = 0.0
+				atk_dur = d["active"]
+				_blade_mat.emission_enabled = false
+				var half := sword_half_arc()
+				var tw := create_tween()
+				tw.tween_property(_sword_pivot, "rotation", Vector3(0, -half, 0), atk_dur)
+				var arc := MeshUtil.arc(self, 0.6, sword_range(), half, _rider_root.position.y + 1.0, Color(1, 0.6, 0.3) if atk_heavy else Color(1, 1, 0.85))
+				var tw2 := arc.create_tween()
+				tw2.tween_property(arc, "transparency", 1.0, 0.3)
+				tw2.tween_callback(arc.queue_free)
+				_strike_frame(d)
+		Atk.ACTIVE:
+			_strike_frame(d)
+			if atk_t >= atk_dur:
+				atk_state = Atk.RECOVERY
+				atk_t = 0.0
+				atk_dur = d["recovery"] + (0.0 if _atk_landed else d["whiff"])
+				if combo >= MAX_COMBO:
+					atk_dur += FINISHER_EXTRA_RECOVERY
+		Atk.RECOVERY:
+			if _buffered and combo < MAX_COMBO and atk_t >= CHAIN_MIN_RECOVERY and stamina > 0.0 and exhausted <= 0.0 and stun <= 0.0:
+				combo += 1
+				_start_attack(false, true)
+				return
+			if atk_t >= atk_dur:
+				_cancel_attack()
+
+func _strike_frame(d: Dictionary) -> void:
 	if not alive:
 		return
 	for t in MeshUtil.enemies_of(get_tree(), team):
-		if in_sword_arc(t):
-			var res: String = t.take_hit(SWORD_DAMAGE, self, "melee")
-			if res == "hit":
-				add_meter(12.0)
-			elif res == "block":
-				add_meter(3.0)
+		if t in _atk_hit or not in_sword_arc(t):
+			continue
+		_atk_hit.append(t)
+		var was_open: bool = t is Fighter and ((t as Fighter).in_recovery() or (t as Fighter).stun > 0.0)
+		var res: String = t.take_hit(d["damage"], self, "melee")
+		if res == "hit" or res == "block" or res == "parry":
+			_atk_landed = true
+		if res == "hit":
+			add_meter(18.0 if atk_heavy else 12.0)
+		elif res == "block":
+			add_meter(3.0)
+		landed_hit.emit(t, res, was_open)
+
+# ---------------- Armas: espada+escudo O arco ----------------
+
+func swap_loadout() -> bool:
+	if not alive or swap_t > 0.0 or atk_state != Atk.NONE or stun > 0.0:
+		return false
+	swap_t = SWAP_TIME
+	blocking = false
+	_sword_pivot.visible = false
+	_shield.visible = false
+	_bow.visible = false
+	return true
+
+func _apply_loadout_visuals() -> void:
+	var sw := loadout == Loadout.SWORD_SHIELD
+	_sword_pivot.visible = sw
+	_shield.visible = sw
+	_bow.visible = not sw
 
 func shoot() -> bool:
-	if not _can_act() or bow_cd > 0.0 or blocking or stamina <= 0.0:
+	if loadout != Loadout.BOW or swap_t > 0.0 or atk_state != Atk.NONE:
+		return false
+	if not _can_act() or bow_cd > 0.0 or stamina <= 0.0:
 		return false
 	bow_cd = BOW_COOLDOWN
 	spend_stamina(COST_BOW)
@@ -459,6 +604,12 @@ func shoot() -> bool:
 func dash() -> bool:
 	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0:
 		return false
+	if atk_state != Atk.NONE:
+		# Compromiso: solo se puede cancelar con voltereta al final de la recuperación
+		if atk_state == Atk.RECOVERY and atk_t >= atk_dur * ROLL_CANCEL_FRACTION:
+			_cancel_attack()
+		else:
+			return false
 	var st := stats()
 	dash_cd = st.dash_cooldown
 	dash_time = st.dash_duration
@@ -488,7 +639,8 @@ func summon() -> bool:
 
 func apply_stun(t: float) -> void:
 	stun = maxf(stun, t)
-	sword_windup = -1.0
+	if atk_state != Atk.NONE:
+		_cancel_attack()
 
 ## Devuelve "hit", "block", "parry", "dodge" o "none".
 func take_hit(amount: float, from: Node3D, _kind: String) -> String:
@@ -504,17 +656,29 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if blocking and frontal:
 		if block_time <= PARRY_WINDOW and exhausted <= 0.0:
 			if from is Fighter and _kind == "melee":
-				(from as Fighter).apply_stun(1.0)
+				(from as Fighter).apply_stun(PARRY_STAGGER)
+				(from as Fighter).riposte_t = PARRY_STAGGER
 			add_meter(15.0)
 			return "parry"
 		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else BLOCK_REDUCTION))
 		spend_stamina(COST_BLOCKED_HIT)
 		add_meter(3.0)
 		return "block"
+	if riposte_t > 0.0 and _kind == "melee":
+		amount *= RIPOSTE_MULT # riposte tras parry
+		riposte_t = 0.0
 	_damage(amount)
 	add_meter(5.0)
 	if _kind == "melee":
 		impact.emit(0.5)
+	# Poise / hit-stun: intercambiar golpes no sale gratis
+	_since_hit = 0.0
+	poise -= amount * 2.0
+	if poise <= 0.0:
+		poise = POISE_MAX
+		apply_stun(0.6 + (0.3 if amount >= HEAVY_HIT else 0.0))
+	elif atk_state == Atk.WINDUP and not atk_heavy:
+		apply_stun(0.2) # los ligeros se interrumpen; el fuerte tiene súper-armadura
 	if mounted and alive and amount >= HEAVY_HIT and randf() < knockoff_chance_heavy:
 		dismount(true)
 	return "hit"
@@ -555,8 +719,14 @@ func reset_for_round(pos: Vector3, face: Vector3) -> void:
 	exhausted = 0.0
 	alive = true
 	stun = 0.0
-	sword_windup = -1.0
-	sword_cd = 0.0
+	_cancel_attack()
+	poise = POISE_MAX
+	riposte_t = 0.0
+	if swap_t > 0.0 or loadout != Loadout.SWORD_SHIELD:
+		swap_t = 0.0
+		loadout = Loadout.SWORD_SHIELD
+		_apply_loadout_visuals()
+		loadout_changed.emit(loadout)
 	bow_cd = 0.0
 	dash_cd = 0.0
 	health_changed.emit(health, max_health)

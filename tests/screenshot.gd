@@ -15,11 +15,11 @@ func _run() -> void:
 	arena.player.meter = 100.0
 	arena.player.summon()
 	await create_timer(1.2).timeout
-	arena.player.shoot()
 	await create_timer(0.6).timeout
 	arena.enemy.global_position = arena.player.global_position + arena.player.facing * 3.2
-	arena.player.sword()
-	await create_timer(0.12).timeout
+	arena.ai.enabled = false
+	arena.enemy.attack_heavy() # telegrafía: hoja alzada y brillante
+	await create_timer(0.5).timeout
 	var path := "/workspace/out/arena-shot.png"
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:

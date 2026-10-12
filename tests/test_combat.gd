@@ -27,6 +27,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene as Arena
+	arena.time_left = 1.0e9 # sin límite de tiempo de ronda durante la prueba
 	var p: Fighter = arena.player
 	var e: Fighter = arena.enemy
 	arena.ai.enabled = false
@@ -38,31 +39,31 @@ func _run() -> void:
 	var h0 := e.health
 	var m0 := p.meter
 	await tap("attack_sword")
-	await wait(0.5)
+	await wait(0.8)
 	check(e.health < h0, "espada daña al rival (%.0f -> %.0f)" % [h0, e.health])
 	check(p.meter > m0, "medidor eikon del jugador sube (%.0f -> %.0f)" % [m0, p.meter])
 	check(is_equal_approx(arena.hud.e_health.value, e.health), "HUD refleja vida del rival")
 	# Bloqueo (mantener > ventana de parry)
 	Input.action_press("block")
-	await wait(0.5)
+	await wait(1.3)
 	var ph := p.health
 	e.sword()
-	await wait(0.4)
+	await wait(0.8)
 	var blocked := ph - p.health
 	Input.action_release("block")
-	await wait(0.8)
+	await wait(1.0)
 	ph = p.health
 	e.sword()
-	await wait(0.4)
+	await wait(0.8)
 	var unblocked := ph - p.health
 	check(unblocked > 0.0 and blocked < unblocked, "escudo reduce daño (bloq %.1f vs sin %.1f)" % [blocked, unblocked])
 	# Parry (bloqueo justo antes del golpe)
-	await wait(0.8)
+	await wait(1.0)
 	ph = p.health
 	e.sword()
-	await physics_frame
+	await wait(0.25) # alzar el escudo ~0,2 s antes del impacto (ventana 0,3 s)
 	Input.action_press("block")
-	await wait(0.35)
+	await wait(0.7)
 	Input.action_release("block")
 	check(e.stun > 0.0 and is_equal_approx(ph, p.health), "parry aturde al rival sin daño (stun %.2f)" % e.stun)
 	# Arco
@@ -70,9 +71,15 @@ func _run() -> void:
 	e.global_position = p.global_position + p.facing * 12.0
 	await wait(0.3)
 	h0 = e.health
+	check(not p.shoot(), "con espada+escudo no se puede disparar")
+	await tap("swap_weapon")
+	await wait(2.1)
+	check(p.loadout == Fighter.Loadout.BOW, "cambio a arco")
 	await tap("shoot_bow")
 	await wait(1.0)
 	check(e.health < h0, "flecha daña al rival (%.0f -> %.0f)" % [h0, e.health])
+	await tap("swap_weapon")
+	await wait(2.1)
 	# Invocación
 	p.meter = Fighter.METER_MAX
 	await tap("summon")
@@ -146,18 +153,18 @@ func _run() -> void:
 	h0 = e.health
 	var st0 := p.stamina
 	await tap("attack_sword")
-	await wait(0.4)
+	await wait(0.8)
 	check(e.health < h0, "espada montada alcanza 3.2 m lateral (%.0f -> %.0f)" % [h0, e.health])
 	check(p.stamina < st0, "espada gasta aguante (%.0f -> %.0f)" % [st0, p.stamina])
-	await wait(0.5)
+	await wait(1.0)
 	e.global_position = p.global_position + p.facing * 4.8
 	await physics_frame
 	h0 = e.health
 	await tap("attack_sword")
-	await wait(0.4)
+	await wait(0.8)
 	check(not p.in_sword_arc(e) and is_equal_approx(e.health, h0), "montado: 4.8 m queda fuera de alcance")
 	# --- Desmontar ---
-	await wait(0.5)
+	await wait(1.0)
 	var spd_mounted := p.stats().speed
 	await tap("mount")
 	await physics_frame
@@ -173,7 +180,7 @@ func _run() -> void:
 	check(p.in_sword_arc(e), "a pie: 2.0 m dentro del alcance")
 	h0 = e.health
 	await tap("attack_sword")
-	await wait(0.4)
+	await wait(0.8)
 	check(e.health < h0, "espada a pie golpea a 2.0 m")
 	e.global_position = p.global_position + p.facing * 3.2
 	await physics_frame
@@ -191,6 +198,8 @@ func _run() -> void:
 	await tap("mount")
 	await physics_frame
 	check(p.mounted and p.mount_node == pm, "F vuelve a montar cerca de la montura")
+	while e.stun > 0.0:
+		await physics_frame
 	check(e.toggle_mount(), "el rival vuelve a montar")
 	# --- Derribo con dash ---
 	await wait(0.5)
