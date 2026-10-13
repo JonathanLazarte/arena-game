@@ -15,7 +15,8 @@ const ACTIONS := {
 	"lock_on": [KEY_TAB],
 	"parry": [KEY_Q],
 	"mount": [KEY_F],
-	"sprint": [KEY_SHIFT],
+	"sprint": [KEY_SHIFT], ## mantener: correr a pie / galope montado
+	"run_toggle": [KEY_V, KEY_CAPSLOCK], ## Ronda 15: alternar correr a pie (táctil: «Correr»)
 	"swap_weapon": [KEY_R],
 }
 

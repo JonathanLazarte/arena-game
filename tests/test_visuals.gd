@@ -90,9 +90,9 @@ func _run() -> void:
 	await wait(1.2)
 	# Arco: apuntar y cambiar
 	p.swap_loadout()
-	await physics_frame
-	await physics_frame
-	check(kv.state == "swap" and not kv.sword.visible and not kv.bow.visible, "cambio de arma -> Use_Item, manos vacías")
+	for i in 6: # ~0,1 s del cambio (0,42 s)
+		await physics_frame
+	check(kv.state == "swap" and kv.sword.visible and not kv.bow.visible and kv._swap_k < 0.95, "cambio de arma -> Use_Item, la espada se enfunda (encoge %.2f)" % kv._swap_k)
 	await wait(2.2)
 	check(kv.state == "aim" and kv.bow.visible, "modo arco -> 2H_Ranged_Aiming")
 	# Locomoción a pie

@@ -23,6 +23,9 @@ var results_box: VBoxContainer
 
 var level_up_label: Label
 var swap_bar: ProgressBar
+var _run_btn: TouchScreenButton
+var _run_label: Label
+var controller: PlayerController
 var loadout_label: Label
 var _player: Fighter
 var _meter_full: bool = false
@@ -68,7 +71,8 @@ func _ready() -> void:
 	_touch_button("Eikon", "summon", Vector2(1050, 500), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
-	_touch_button("Galope", "sprint", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
+	# Ronda 15: a pie es «Correr» (alternar); montado vuelve a ser «Galope» (mantener)
+	_touch_button("Correr", "run_toggle", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
 	_touch_button("Parry", "parry", Vector2(925, 530), 40, Color(0.3, 0.9, 1.0))
 	_touch_button("Dash", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
 	# Ronda 14: salto y habilidad del personaje
@@ -160,6 +164,8 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 		tb.modulate = Color(1, 1, 1, 0.55)
 	if action == "special":
 		_special_btn = tb
+	if action == "run_toggle":
+		_run_btn = tb
 	var shape := CircleShape2D.new()
 	shape.radius = r
 	tb.shape = shape
@@ -181,6 +187,8 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 	tb.add_child(l)
 	if action == "summon":
 		_summon_label = l
+	if action == "run_toggle":
+		_run_label = l
 
 class _Circle extends Node2D:
 	var r: float = 40.0
@@ -206,6 +214,11 @@ func _process(_d: float) -> void:
 		_summon_label.text = "Especial" if riding_eikon else "Eikon"
 		if riding_eikon:
 			_summon_btn.modulate = Color(1.6, 1.4, 1.0) if _player.mount_node.special_cd <= 0.0 else Color(1, 1, 1, 0.55)
+	if _run_btn:
+		var on: bool = controller != null and controller.run_toggled
+		_run_btn.action = "sprint" if _player.mounted else "run_toggle"
+		_run_label.text = "Galope" if _player.mounted else ("Correr ✔" if on else "Correr")
+		_run_btn.modulate = Color(1.5, 1.4, 0.9) if (on or _player.sprinting) else Color.WHITE
 	if _special_btn:
 		_special_btn.visible = _player.has_special() and joystick.visible
 		_special_btn.modulate = Color.WHITE if _player.special_cd <= 0.0 else Color(1, 1, 1, 0.45)

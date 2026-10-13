@@ -264,3 +264,25 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
   - Un rival Berserker usa el golpe sísmico de cerca.
   - Usa el especial de su eikon montado según la distancia.
 - **Pruebas nuevas:** `test_eikon_mount`, `test_projectile_dodge`, `test_dash_strike`, `test_jump_aoe` y la migración v2→v3 en `test_migration`.
+
+## Ronda 15 — personaje fijo, cambio de arma rápido y correr estilo souls
+
+- **Personaje fijo.** Se elige en la primera partida y se conserva. Ya no hay compra ni cambio de
+  personajes: la pestaña **Personaje** muestra el tuyo (estadísticas, pasiva y nodos del árbol, que
+  llevan a Habilidades). Gancho futuro: objeto de tienda **«Cambio de personaje»** (`Progression.CHARACTER_CHANGE_ITEM`,
+  `GameState.change_character()`), hoy deshabilitado y mostrado como **Próximamente**.
+- **Guardado v4 por ranuras.** Los datos del personaje (id, arma, XP, habilidades) van en `[slot_0]`
+  (`meta/active_slot`, `GameState.MAX_SLOTS = 1`); un futuro selector multi-ranura solo tiene que
+  subir `MAX_SLOTS`, fijar `active_slot` y recargar. Migración v2/v3 → v4: se conserva el personaje
+  seleccionado (con su XP y habilidades) y se devuelve el oro de **todos** los personajes extra al
+  precio antiguo (`LEGACY_CHARACTER_PRICE`); las armas compradas se conservan.
+- **Cambio de arma** arco ↔ cuerpo a cuerpo en **0,42 s** (antes 2 s), para jugador e IA. El
+  movimiento nunca se bloquea; solo atacar/disparar/bloquear. Transición suave: animación de tren
+  superior (Use_Item ajustada al tiempo, fundido 0,14 s) y el arma saliente encoge mientras la nueva
+  crece (cambio de malla a mitad, sin «pop»).
+- **Correr a pie**: mantener **Mayús**, o alternar con **V / Bloq Mayús** o el botón táctil
+  **«Correr»** (montado vuelve a ser **«Galope»** de mantener, sin cambios). Con fijado, correr
+  **no gira** al personaje: sigue encarado y corre de espaldas (×0,8) o en diagonal/lateral. Sin
+  fijar, correr gira normalmente. Gasta aguante; al agotarse se detiene y el modo alternado se apaga.
+  Locomoción direccional: puntos extra en el BlendSpace2D con clips KayKit acelerados/ralentizados
+  (carrera atrás = Walking_Backwards ×1,9; strafe caminando = Running_Strafe ×0,6; carrera lateral ×1,2).

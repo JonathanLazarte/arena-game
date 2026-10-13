@@ -166,7 +166,7 @@ func _run() -> void:
 	var hud_ok := false
 	var tt := 0.0
 	Input.action_press("block")
-	while tt < 1.85:
+	while tt < Fighter.SWAP_TIME - 0.05:
 		await physics_frame
 		tt += 1.0 / 60.0
 		if p.attack_light() or p.shoot() or p.blocking:
@@ -174,10 +174,10 @@ func _run() -> void:
 		if arena.hud.swap_bar.visible and arena.hud.swap_bar.value > 0.3:
 			hud_ok = true
 	Input.action_release("block")
-	check(swap_ok and p.is_swapping(), "durante el cambio (2 s) no se ataca, dispara ni bloquea")
+	check(swap_ok and p.is_swapping(), "durante el cambio (~0,4 s) no se ataca, dispara ni bloquea")
 	check(hud_ok, "HUD muestra progreso del cambio")
 	await wait(0.3)
-	check(p.loadout == Fighter.Loadout.BOW and p._bow.visible and not p._shield.visible, "tras 2 s: arco equipado (malla cambiada)")
+	check(p.loadout == Fighter.Loadout.BOW and p._bow.visible and not p._shield.visible, "tras el cambio: arco equipado (malla cambiada)")
 	# --- 7. Modo arco: sin escudo ---
 	Input.action_press("block")
 	await wait(0.3)
@@ -187,7 +187,7 @@ func _run() -> void:
 	check(not blk and res == "hit", "en modo arco no hay bloqueo con escudo")
 	check(not p.attack_light(), "en modo arco no hay espada")
 	await tap("swap_weapon")
-	await wait(2.2)
+	await wait(Fighter.SWAP_TIME + 0.2)
 	check(p.loadout == Fighter.Loadout.SWORD_SHIELD, "vuelta a espada + escudo")
 	# --- 8. Parry dedicado (ventana 0,3 s + recuperación vulnerable) ---
 	await place(p, e, 3.0)
@@ -244,10 +244,10 @@ func _run() -> void:
 	Input.action_release("block")
 	await wait(1.0)
 	await tap("swap_weapon")
-	await wait(2.2)
+	await wait(Fighter.SWAP_TIME + 0.2)
 	check(not p.parry(), "sin parry en modo arco")
 	await tap("swap_weapon")
-	await wait(2.2)
+	await wait(Fighter.SWAP_TIME + 0.2)
 	e.landed_hit.disconnect(cb2)
 	# --- 9. La IA lee ataques: esquiva y castiga; se compromete con los suyos ---
 	await wait(0.5)

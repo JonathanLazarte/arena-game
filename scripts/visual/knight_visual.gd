@@ -34,6 +34,16 @@ const DASH_STRIKE_ANIM := "Dash_Strike"
 const DASH_STRIKE_LEN := 0.8
 const DASH_STRIKE_SLICE := 0.75 ## fracción del tajo usada
 const DS_CONTACT := CONTACT / DASH_STRIKE_SLICE ## momento del impacto dentro de Dash_Strike
+## Puntos extra de locomoción: nombre -> [clip, posición (lateral, adelante), velocidad del clip].
+## La posición es la velocidad relativa a la mirada / velocidad base (correr = ~1,3).
+const LOCO_SPEEDS := {
+	"Run_Fwd": ["Running_A", Vector2(0, 1.35), 1.15],
+	"Run_Back": ["Walking_Backwards", Vector2(0, -1.1), 1.9],
+	"Walk_Strafe_L": ["Running_Strafe_Left", Vector2(-0.45, 0), 0.6],
+	"Walk_Strafe_R": ["Running_Strafe_Right", Vector2(0.45, 0), 0.6],
+	"Run_Strafe_L": ["Running_Strafe_Left", Vector2(-1.35, 0), 1.2],
+	"Run_Strafe_R": ["Running_Strafe_Right", Vector2(1.35, 0), 1.2],
+}
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
 const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap"]
 
@@ -235,11 +245,15 @@ func _build_tree() -> void:
 	loco.add_blend_point(AnimUtil.anim_node("Idle"), Vector2(0, 0), -1, &"Idle")
 	loco.add_blend_point(AnimUtil.anim_node("Walking_A"), Vector2(0, 0.45), -1, &"Walking_A")
 	loco.add_blend_point(AnimUtil.anim_node("Running_A"), Vector2(0, 1.0), -1, &"Running_A")
-	loco.add_blend_point(AnimUtil.anim_node("Walking_Backwards"), Vector2(0, -0.6), -1, &"Walking_Backwards")
+	loco.add_blend_point(AnimUtil.anim_node("Walking_Backwards"), Vector2(0, -0.45), -1, &"Walking_Backwards")
 	loco.add_blend_point(AnimUtil.anim_node("Running_Strafe_Left"), Vector2(-1, 0), -1, &"Running_Strafe_Left")
 	loco.add_blend_point(AnimUtil.anim_node("Running_Strafe_Right"), Vector2(1, 0), -1, &"Running_Strafe_Right")
-	loco.min_space = Vector2(-1, -1)
-	loco.max_space = Vector2(1, 1.3)
+	# Ronda 15: locomoción direccional para correr fijado (souls). KayKit no trae carrera hacia
+	# atrás ni strafe caminando: se reutilizan clips acelerados/ralentizados (ver LOCO_SPEEDS).
+	for nm: String in LOCO_SPEEDS:
+		loco.add_blend_point(AnimUtil.scaled_anim(LOCO_SPEEDS[nm][0]), LOCO_SPEEDS[nm][1], -1, StringName(nm))
+	loco.min_space = Vector2(-1.4, -1.4)
+	loco.max_space = Vector2(1.4, 1.4)
 	root.add_node("loco", loco)
 	root.add_node("sit", AnimUtil.anim_node("Sit_Chair_Pose"))
 	var base := AnimationNodeTransition.new()
@@ -256,7 +270,7 @@ func _build_tree() -> void:
 		for b: String in STATES:
 			if a != b:
 				var tr := AnimationNodeStateMachineTransition.new()
-				tr.xfade_time = 0.08
+				tr.xfade_time = 0.14 if "swap" in [a, b] else 0.08
 				act.add_transition(a, b, tr)
 	act.add_transition("Start", "none", AnimationNodeStateMachineTransition.new())
 	root.add_node("act", act)
@@ -274,6 +288,8 @@ func _build_tree() -> void:
 	tree.anim_player = tree.get_path_to(ap)
 	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	tree.active = true
+	for nm: String in LOCO_SPEEDS:
+		tree.set("parameters/loco/%s/ts/scale" % nm, LOCO_SPEEDS[nm][2])
 	playback = tree.get("parameters/act/playback") as AnimationNodeStateMachinePlayback
 	playback.start("none")
 
@@ -289,6 +305,26 @@ func set_glow(on: bool, c: Color) -> void:
 	glow_mat.albedo_color = c * 0.8 if on else Color.BLACK
 
 ## loadout: 0 espada+escudo, 1 arco, -1 cambiando (manos vacías)
+var _base_scales: Dictionary = {}
+var _swap_k: float = 1.0
+
+## Ronda 15: desenfunda/enfunda suave. La primera mitad encoge el arma saliente; a mitad
+## se cambian las mallas y la nueva crece (sin «pop» brusco). p = progreso 0..1.
+func swap_visual(from_l: int, p: float) -> void:
+	var to_l := 1 - from_l
+	set_loadout(from_l if p < 0.5 else to_l)
+	_swap_k = smoothstep(0.0, 1.0, absf(p - 0.5) * 2.0)
+	_apply_weapon_scale()
+
+func _apply_weapon_scale() -> void:
+	for m: MeshInstance3D in [sword, sword_l, shield, bow]:
+		if m == null:
+			continue
+		if not _base_scales.has(m):
+			_base_scales[m] = m.scale
+		var b: Vector3 = _base_scales[m]
+		m.scale = Vector3(b.x, b.y, b.z) * maxf(_swap_k, 0.02)
+
 func set_loadout(l: int) -> void:
 	sword.visible = l == 0
 	if sword_l:
@@ -301,6 +337,7 @@ func set_mounted(m: bool, sword_scale: float) -> void:
 	model.position.y = MOUNT_Y if m else 0.0
 	_mounted = m
 	sword.scale = Vector3(1.0, sword_scale, 1.0)
+	_base_scales[sword] = sword.scale
 
 ## Evento puntual: "hit", "block_hit", "shoot".
 func event(e: String) -> void:
@@ -384,6 +421,11 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/%s/ts/scale" % s, sc)
 	elif s == "swap":
 		tree.set("parameters/act/swap/ts/scale", _clip_len("swap") / Fighter.SWAP_TIME)
+	if f.swap_t > 0.0:
+		swap_visual(f.swap_from, f.swap_progress())
+	elif _swap_k < 1.0:
+		_swap_k = 1.0
+		_apply_weapon_scale()
 	elif s.begins_with("dodge"):
 		# La voltereta (Dodge_* de KayKit) dura exactamente ROLL_TOTAL (24 frames a 30 fps)
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) / Fighter.ROLL_TOTAL)

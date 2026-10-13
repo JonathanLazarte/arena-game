@@ -1,10 +1,14 @@
 extends Node
 ## Autoload "GameState": perfil local (jugador, oro, progresión, desbloqueos) y equipamiento,
 ## guardado en user:// con versión (v1 = ronda 10, v2 = ronda 11 con progresión,
-## v3 = ronda 14: sin monturas; los eikons son las monturas).
+## v3 = ronda 14: sin monturas; los eikons son las monturas,
+## v4 = ronda 15: un único personaje por ranura; sin compra/cambio de personajes).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 3
+const SAVE_VERSION := 4
+## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
+## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
+const MAX_SLOTS := 1
 var save_path: String = SAVE_PATH ## las pruebas usan otra ruta
 var player_name: String = "Jugador"
 var oro: int = Progression.START_GOLD
@@ -18,7 +22,9 @@ var first_run_done: bool = false ## ya eligió su primer personaje
 var account_xp: int = 0
 var char_xp: Dictionary = {} ## id -> XP total del personaje
 var skills: Dictionary = {} ## id personaje -> Array de ids de habilidad
-var unlocked_chars: Array = []
+var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
+var active_slot: int = 0
+var char_migration: Dictionary = {} ## ronda 15: personajes extra reembolsados al migrar
 var owned_weapons: Array = []
 var owned_eikons: Array = ["fenix"]
 ## Ronda 14: resumen de la migración de monturas (eikons concedidos y oro devuelto).
@@ -61,6 +67,8 @@ func is_unlocked(kind: String, id: String) -> bool:
 func can_buy(kind: String, id: String) -> String:
 	if is_unlocked(kind, id):
 		return "ya"
+	if kind == "character":
+		return "no_venta" # ronda 15: los personajes no se compran
 	var r := Progression.req(kind, id)
 	if account_level() < int(r[0]):
 		return "nivel"
@@ -117,14 +125,33 @@ func learn_skill(sid: String) -> String:
 	return "ok"
 
 ## Elige personaje (si está desbloqueado) y, si el arma no es compatible o no es suya, su arma por defecto.
+## Ronda 15: tras la primera elección el personaje queda fijo (ver change_character).
 func set_character(id: String) -> bool:
-	if first_run_done and not id in unlocked_chars:
+	if first_run_done and id != character_id:
 		return false
 	character_id = id
 	var c := Catalog.character(id)
 	if not c.allows(weapon_id) or (first_run_done and not weapon_id in owned_weapons):
 		weapon_id = c.default_weapon
 	return true
+
+## Gancho para el futuro objeto de tienda «Cambio de personaje». Hoy devuelve "proximamente".
+func change_character(id: String) -> String:
+	if not Progression.CHARACTER_CHANGE_ENABLED:
+		return "proximamente"
+	if id == character_id:
+		return "ya"
+	unlocked_chars = []
+	_unlock_char(id)
+	character_id = id
+	weapon_id = Catalog.character(id).default_weapon
+	save_loadout()
+	return "ok"
+
+## Datos de la ranura activa (lo que se guarda por personaje).
+func slot_data() -> Dictionary:
+	return {"character_id": character_id, "weapon_id": weapon_id,
+		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills()}
 
 func set_weapon(id: String) -> bool:
 	if not Catalog.character(character_id).allows(id) or (first_run_done and not id in owned_weapons):
@@ -158,13 +185,14 @@ func save_loadout() -> void:
 	cfg.set_value("jugador", "nombre", player_name)
 	cfg.set_value("jugador", "oro", oro)
 	cfg.set_value("jugador", "gemas", gemas)
-	for k: String in ["character_id", "weapon_id", "eikon_id", "difficulty"]:
+	for k: String in ["eikon_id", "difficulty"]:
 		cfg.set_value("loadout", k, get(k))
+	cfg.set_value("meta", "active_slot", active_slot)
+	var sd := slot_data()
+	for k: String in sd:
+		cfg.set_value("slot_%d" % active_slot, k, sd[k])
 	cfg.set_value("progreso", "first_run_done", first_run_done)
 	cfg.set_value("progreso", "account_xp", account_xp)
-	cfg.set_value("progreso", "char_xp", char_xp)
-	cfg.set_value("progreso", "skills", skills)
-	cfg.set_value("progreso", "unlocked_chars", unlocked_chars)
 	cfg.set_value("progreso", "owned_weapons", owned_weapons)
 	cfg.set_value("progreso", "owned_eikons", owned_eikons)
 	cfg.save(save_path)
@@ -180,6 +208,12 @@ func load_loadout() -> void:
 	gemas = cfg.get_value("jugador", "gemas", 50)
 	for k: String in ["character_id", "weapon_id", "eikon_id", "difficulty"]:
 		set(k, cfg.get_value("loadout", k, get(k)))
+	active_slot = clampi(int(cfg.get_value("meta", "active_slot", 0)), 0, MAX_SLOTS - 1)
+	var sec := "slot_%d" % active_slot
+	if ver >= 4:
+		character_id = cfg.get_value(sec, "character_id", character_id)
+		weapon_id = cfg.get_value(sec, "weapon_id", weapon_id)
+	char_migration = {}
 	if not Catalog.EIKONS.has(eikon_id): eikon_id = "fenix"
 	var old_mounts: Array = []
 	mount_migration = {}
@@ -191,21 +225,30 @@ func load_loadout() -> void:
 	else:
 		first_run_done = cfg.get_value("progreso", "first_run_done", false)
 		account_xp = cfg.get_value("progreso", "account_xp", 0)
-		char_xp = cfg.get_value("progreso", "char_xp", {})
-		skills = cfg.get_value("progreso", "skills", {})
-		unlocked_chars = cfg.get_value("progreso", "unlocked_chars", [])
+		if ver >= 4:
+			char_xp = {character_id: int(cfg.get_value(sec, "xp", 0))}
+			skills = {character_id: cfg.get_value(sec, "skills", [])}
+			unlocked_chars = [character_id] if first_run_done else []
+		else:
+			char_xp = cfg.get_value("progreso", "char_xp", {})
+			skills = cfg.get_value("progreso", "skills", {})
+			unlocked_chars = cfg.get_value("progreso", "unlocked_chars", [])
 		owned_weapons = cfg.get_value("progreso", "owned_weapons", [])
 		owned_eikons = cfg.get_value("progreso", "owned_eikons", ["fenix"])
 		if ver < 3:
 			migrated_from = ver
 			old_mounts = cfg.get_value("progreso", "owned_mounts", ["caballo"])
 			old_mounts.append(String(cfg.get_value("loadout", "mount_id", "caballo")))
-	if migrated_from > 0:
+		if ver < 4 and migrated_from == 0:
+			migrated_from = ver
+	if migrated_from > 0 and migrated_from < 3:
 		_migrate_mounts(old_mounts)
 	if first_run_done and unlocked_chars.is_empty():
 		_unlock_char(character_id)
 	if first_run_done and not character_id in unlocked_chars:
 		character_id = String(unlocked_chars[0])
+	if migrated_from > 0 and ver < 4:
+		_migrate_characters()
 	set_character(character_id)
 	if first_run_done and not eikon_id in owned_eikons: eikon_id = "fenix"
 	if migrated_from > 0:
@@ -250,6 +293,25 @@ func _migrate_mounts(old: Array) -> void:
 	oro += refund
 	mount_migration = {"eikons": given, "refund": refund, "from": seen}
 
+## v2/v3 -> v4: se conserva solo el personaje seleccionado (con su XP y habilidades);
+## se devuelve el oro de los personajes extra comprados. El primero fue gratis, así que
+## el seleccionado nunca se reembolsa (aunque no fuera el primero elegido).
+func _migrate_characters() -> void:
+	var extra: Array = []
+	var refund := 0
+	for c in unlocked_chars:
+		var id := String(c)
+		if id != character_id and not id in extra:
+			extra.append(id)
+	# Se reembolsan todos los extra (no se guardaba cuál fue gratis; lo más justo para el jugador).
+	for id: String in extra:
+		refund += int(Progression.LEGACY_CHARACTER_PRICE.get(id, 0))
+	oro += refund
+	unlocked_chars = [character_id] if first_run_done else []
+	char_xp = {character_id: int(char_xp.get(character_id, 0))} if first_run_done else {}
+	skills = {character_id: skills.get(character_id, [])} if first_run_done else {}
+	char_migration = {"removed": extra, "refund": refund}
+
 func reset_defaults() -> void:
 	player_name = "Jugador"
 	oro = Progression.START_GOLD
@@ -266,6 +328,8 @@ func reset_defaults() -> void:
 	owned_weapons = []
 	owned_eikons = ["fenix"]
 	mount_migration = {}
+	char_migration = {}
+	active_slot = 0
 	last_result = {}
 
 ## Equipamiento aleatorio coherente para el rival.

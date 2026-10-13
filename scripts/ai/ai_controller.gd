@@ -145,7 +145,7 @@ func _physics_process(delta: float) -> void:
 		if me.meter >= Fighter.METER_MAX and me.atk_state == Fighter.Atk.NONE:
 			me.summon()
 		_try_specials(dist, dir)
-		# Cambio de armas por distancia (cuesta 2 s, igual que al jugador)
+		# Cambio de armas por distancia (~0,4 s, igual que al jugador; se sigue moviendo)
 		if not me.is_swapping() and me.atk_state == Fighter.Atk.NONE and phase != Phase.COMMIT:
 			if sword_mode and dist > 17.0 and randf() < 0.05:
 				me.swap_loadout()

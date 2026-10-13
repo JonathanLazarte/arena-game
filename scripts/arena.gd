@@ -64,6 +64,7 @@ func _ready() -> void:
 	controller.camera = camera
 	controller.joystick = hud.joystick
 	add_child(controller)
+	hud.controller = controller
 	ai = AIController.new()
 	ai.me = enemy
 	if gs and gs.from_lobby:

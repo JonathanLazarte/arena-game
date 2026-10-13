@@ -49,14 +49,13 @@ func _run() -> void:
 	gs.reset_defaults()
 	gs.load_loadout()
 	check(gs.first_run_done and gs.unlocked_chars == ["berserker"], "se recupera al reabrir")
-	# La pestaña muestra bloqueados con precio
-	lobby.set_tab("Personajes")
+	lobby.set_tab("Personaje")
 	await process_frame
 	var locked := 0
 	for b in lobby.list_box.get_children():
-		if (b as Button).text.contains("oro"):
+		if (b as Button).text.contains("oro") or (b as Button).text.contains("Paladín"):
 			locked += 1
-	check(locked == 4, "4 personajes bloqueados con precio en el lobby (%d)" % locked)
+	check(locked == 0, "ya no se listan otros personajes a la venta (%d)" % locked)
 	change_scene_to_file("res://scenes/lobby.tscn")
 	await process_frame
 	await process_frame

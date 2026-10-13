@@ -73,7 +73,11 @@ const SLAM_COOLDOWN := 8.0
 const COST_SLAM := 25.0
 const POISE_MAX := 50.0
 const POISE_REGEN := 25.0
-const SWAP_TIME := 2.0
+## Ronda 15: cambio arco<->cuerpo a cuerpo rápido (antes 2 s). Nunca bloquea el movimiento;
+## solo atacar/disparar/bloquear quedan fuera durante el cambio.
+const SWAP_TIME := 0.42
+## Correr a pie fijado: hacia atrás se corre algo más lento que de frente (estilo souls).
+const RUN_BACK_FACTOR := 0.8
 const PARRY_STAGGER := 1.6
 const RIPOSTE_MULT := 1.8
 enum Atk { NONE, WINDUP, ACTIVE, RECOVERY }
@@ -179,6 +183,7 @@ var _since_hit: float = 10.0
 var riposte_t: float = 0.0 ## tras sufrir un parry: recibe daño extra
 var loadout: Loadout = Loadout.SWORD_SHIELD
 var swap_t: float = 0.0
+var swap_from: int = Loadout.SWORD_SHIELD ## arma que se enfunda durante el cambio
 var bow_cd: float = 0.0
 var dash_time: float = 0.0
 var dash_cd: float = 0.0
@@ -496,6 +501,7 @@ func _physics_process(delta: float) -> void:
 	var target_vel := Vector3.ZERO
 	var turn := st.turn_speed * delta
 	reversing = false
+	var run_req := want_sprint and amount > 0.3 and exhausted <= 0.0 and not blocking and stamina > 0.0
 	if _lock_valid():
 		var d := MeshUtil.flat(face_target.global_position - global_position)
 		if d.length() > 0.1:
@@ -505,17 +511,22 @@ func _physics_process(delta: float) -> void:
 			var fdot := dirn.dot(facing)
 			var k := lerpf(0.8, 1.0, fdot) if fdot >= 0.0 else lerpf(0.8, REVERSE_FACTOR, -fdot)
 			reversing = fdot < -0.6
+			if run_req and not mounted:
+				# Ronda 15: corriendo fijado NO se da la vuelta: sigue mirando al rival y
+				# corre de espaldas o en diagonal/lateral (strafe).
+				k = lerpf(0.9, 1.0, fdot) if fdot >= 0.0 else lerpf(0.9, RUN_BACK_FACTOR, -fdot)
 			target_vel = dirn * st.speed * speed_mult() * amount * k
 	elif amount > 0.05:
 		var dirn := inp.normalized()
-		if dirn.dot(facing) < -0.6:
+		if dirn.dot(facing) < -0.6 and not (run_req and not mounted):
 			reversing = true
 			target_vel = -facing * st.speed * speed_mult() * REVERSE_FACTOR * amount
 		else:
-			facing = _turn_toward(facing, dirn, turn)
+			# Sin fijar, correr gira al personaje con normalidad.
+			facing = _turn_toward(facing, dirn, turn * (1.4 if run_req and not mounted else 1.0))
 			target_vel = facing * st.speed * speed_mult() * amount
-	# Galope / sprint
-	sprinting = want_sprint and not reversing and amount > 0.3 and exhausted <= 0.0 and not blocking and stamina > 0.0
+	# Galope (montado, igual que antes) / correr a pie (también de espaldas si va fijado)
+	sprinting = run_req and (not reversing or (not mounted and _lock_valid()))
 	if sprinting:
 		target_vel *= st.sprint_multiplier
 		spend_stamina(DRAIN_SPRINT * delta)
@@ -841,7 +852,7 @@ func swap_loadout() -> bool:
 		return false
 	swap_t = SWAP_TIME
 	blocking = false
-	_kv.set_loadout(-1)
+	swap_from = loadout
 	return true
 
 func _apply_loadout_visuals() -> void:

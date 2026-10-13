@@ -29,8 +29,8 @@ func _run() -> void:
 	# Archivo corrupto/viejo: valores inválidos se corrigen
 	var cfg := ConfigFile.new()
 	cfg.load(gs.save_path)
-	cfg.set_value("loadout", "character_id", "arquero")
-	cfg.set_value("loadout", "weapon_id", "hacha_2m")
+	cfg.set_value("slot_0", "character_id", "arquero") # v4: datos del personaje en la ranura
+	cfg.set_value("slot_0", "weapon_id", "hacha_2m")
 	cfg.set_value("loadout", "eikon_id", "dragon")
 	cfg.save(gs.save_path)
 	gs.load_loadout()

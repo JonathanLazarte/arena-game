@@ -40,6 +40,36 @@ func _run() -> void:
 		cam.look_at_from_position(pp + ar.player.facing.cross(Vector3.UP) * 4.0 + Vector3(0, 2, 0) + ar.player.facing * 1.5, pp + ar.player.facing * 1.5 + Vector3(0, 1, 0))
 		cam.current = true
 		await create_timer(0.3).timeout
+	elif mode == "run_back":
+		# Ronda 15: correr hacia atrás fijado (sigue mirando al rival)
+		gs.choose_first_character("caballero")
+		gs.from_lobby = true
+		gs.random_rival = false
+		change_scene_to_file("res://scenes/arena.tscn")
+		await process_frame
+		await process_frame
+		var ar: Arena = current_scene
+		ar.ai.enabled = false
+		ar.controller.set_physics_process(false)
+		ar.time_left = 76.0
+		var p := ar.player
+		var e := ar.enemy
+		await create_timer(0.8).timeout
+		p.global_position = Vector3(0, 0, 3)
+		p.facing = Vector3.FORWARD
+		e.global_position = Vector3(0, 0, -1)
+		e.facing = Vector3.BACK
+		p.face_target = e
+		p.move_input = (Vector3.BACK + Vector3.RIGHT * 0.25).normalized()
+		p.want_sprint = true
+		await create_timer(0.75).timeout
+		var cam := Camera3D.new()
+		ar.add_child(cam)
+		var pp := p.global_position
+		cam.look_at_from_position(pp + Vector3(5.5, 2.4, 2.5), pp + Vector3(0, 1.0, -2.2))
+		cam.current = true
+		await process_frame
+		print("mirando al rival: ", p.facing.dot(MeshUtil.flat(e.global_position - p.global_position).normalized()), " sprint ", p.sprinting)
 	elif mode in ["dash_strike", "jump_aoe", "mounted"]:
 		# Ronda 14
 		gs.choose_first_character("caballero" if mode != "jump_aoe" else "berserker")
@@ -135,7 +165,7 @@ func _run() -> void:
 		if args.size() > 4:
 			gs.owned_eikons.append(args[4])
 			gs.eikon_id = args[4]
-		if args.size() > 3 and args[3] == "Habilidades":
+		if args.size() > 3 and args[3] in ["Habilidades", "Personaje"]:
 			gs.learn_skill(Progression.tree(cid)[0]["id"])
 			gs.learn_skill(Progression.tree(cid)[1]["id"])
 		change_scene_to_file("res://scenes/lobby.tscn")

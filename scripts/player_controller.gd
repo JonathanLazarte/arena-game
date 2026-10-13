@@ -11,6 +11,8 @@ var lock_on: bool = true
 var _prev: Dictionary = {}
 var _atk_hold: float = -1.0
 var _heavy_fired: bool = false
+## Ronda 15: correr a pie alternado (V / Bloq Mayús / botón táctil «Correr»). Mantener Mayús también corre.
+var run_toggled: bool = false
 
 func _pressed_edge(action: String) -> bool:
 	var now := Input.is_action_pressed(action)
@@ -39,7 +41,11 @@ func _physics_process(delta: float) -> void:
 	var right := fwd.cross(Vector3.UP)
 	me.move_input = (right * v.x + fwd * -v.y) if enabled else Vector3.ZERO
 	me.want_block = enabled and Input.is_action_pressed("block")
-	me.want_sprint = enabled and Input.is_action_pressed("sprint")
+	if _pressed_edge("run_toggle") and not me.mounted:
+		run_toggled = not run_toggled
+	if me.exhausted > 0.0 or me.mounted:
+		run_toggled = false # agotado: deja de correr (hay que volver a activarlo)
+	me.want_sprint = enabled and (Input.is_action_pressed("sprint") or run_toggled)
 	var atk_down := Input.is_action_pressed("attack_sword")
 	var atk_edge := _pressed_edge("attack_sword")
 	var swp := _pressed_edge("swap_weapon")
