@@ -39,14 +39,14 @@ func build(char_id: String, learned: Array, points: int) -> void:
 			var avail: bool = not have and (s["req"] == "" or s["req"] in learned)
 			if have:
 				UIKit.button_styles(b, UIKit.ORANGE, 25)
-				b.text = "★ " + s["name"]
+				b.text = s["name"]
 			elif avail:
 				UIKit.button_styles(b, UIKit.GREEN if points >= int(s["cost"]) else UIKit.BLUE, 25)
 				b.text = "%s (%d)" % [s["name"], s["cost"]]
 				if points < int(s["cost"]):
 					b.add_theme_color_override("font_color", UIKit.MUTED)
 			else:
-				UIKit.button_styles(b, Color(0.3, 0.36, 0.48), 25)
+				UIKit.button_styles(b, Color(0.3, 0.36, 0.48), 4)
 				b.add_theme_color_override("font_color", UIKit.MUTED)
 			b.pressed.connect(func() -> void: node_pressed.emit(s["id"]))
 			add_child(b)
@@ -64,6 +64,5 @@ func _draw() -> void:
 		var b: Button = nodes[l[1]]
 		var pa := a.position + Vector2(89, 50)
 		var pb := b.position + Vector2(89, 0)
-		draw_line(pa, pb, Color(1, 1, 1, 0.85), 5.0)
-		draw_line(pa, pb, UIKit.CYAN, 2.5)
-		draw_circle(pb, 5.0, UIKit.YELLOW)
+		draw_line(pa, pb, Color(UIKit.ORANGE, 0.7), 1.5, true)
+		draw_colored_polygon(PackedVector2Array([pb + Vector2(0, -6), pb + Vector2(4, 0), pb + Vector2(0, 6), pb + Vector2(-4, 0)]), UIKit.CYAN)

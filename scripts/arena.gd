@@ -96,24 +96,33 @@ func _build_environment() -> void:
 	e.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
-	# Ronda 12: día soleado y legible (niebla muy ligera)
-	sm.sky_top_color = Color(0.22, 0.48, 0.92)
-	sm.sky_horizon_color = Color(0.72, 0.86, 1.0)
-	sm.ground_horizon_color = Color(0.68, 0.8, 0.9)
+	# Ronda 13: luz natural y legible. El sol queda alto y lateral, y una luz de relleno
+	# opuesta (sin sombras) evita que los luchadores se vean negros a contraluz.
+	sm.sky_top_color = Color(0.25, 0.45, 0.8)
+	sm.sky_horizon_color = Color(0.7, 0.78, 0.88)
+	sm.ground_horizon_color = Color(0.55, 0.6, 0.62)
 	sky.sky_material = sm
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	e.ambient_light_energy = 0.6
+	e.ambient_light_energy = 0.7
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	e.fog_enabled = true
-	e.fog_light_color = Color(0.75, 0.85, 1.0)
-	e.fog_density = 0.002
+	e.fog_light_color = Color(0.7, 0.78, 0.9)
+	e.fog_density = 0.0025
 	env.environment = e
 	add_child(env)
+	var fill := DirectionalLight3D.new()
+	fill.name = "FillLight"
+	fill.rotation_degrees = Vector3(-25, 150, 0)
+	fill.light_color = Color(0.75, 0.82, 1.0)
+	fill.light_energy = 0.45
+	fill.shadow_enabled = false
+	add_child(fill)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50, -30, 0)
+	sun.rotation_degrees = Vector3(-62, -40, 0)
 	sun.shadow_enabled = true
-	sun.light_color = Color(1.0, 0.97, 0.9)
-	sun.light_energy = 1.1
+	sun.light_color = Color(1.0, 0.95, 0.86)
+	sun.light_energy = 1.05
 	add_child(sun)
 
 ## Malla de un prop de Kenney Castle Kit (CC0); incluye la transformación del nodo.
@@ -164,8 +173,8 @@ func _build_arena() -> void:
 	fc.shape = fs
 	fc.position = Vector3(0, -0.5, 0)
 	floor_body.add_child(fc)
-	MeshUtil.cylinder(floor_body, RADIUS + 1.0, 0.2, Vector3(0, -0.1, 0), Color(0.62, 0.52, 0.38))
-	MeshUtil.cylinder(floor_body, 6.0, 0.22, Vector3(0, -0.09, 0), Color(0.5, 0.4, 0.3))
+	MeshUtil.cylinder(floor_body, RADIUS + 1.0, 0.2, Vector3(0, -0.1, 0), Color(0.34, 0.28, 0.21)) # tierra compactada (menos pálida)
+	MeshUtil.cylinder(floor_body, 6.0, 0.22, Vector3(0, -0.09, 0), Color(0.28, 0.23, 0.17))
 	add_child(floor_body)
 	# Muro circular
 	# Muro circular: colisión con cajas invisibles (igual que antes) y muro de Kenney en MultiMesh

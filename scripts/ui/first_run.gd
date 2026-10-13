@@ -32,15 +32,19 @@ func _build_ui() -> void:
 	add_child(ui)
 	root_ui = Control.new()
 	root_ui.theme = UIKit.theme()
+	ui.move_child(UIKit.crystal_shards(ui, 26), 0)
 	root_ui.size = Vector2(1280, 720)
 	ui.add_child(root_ui)
-	var t := UIKit.title("ELIGE TU HÉROE", 60, UIKit.YELLOW)
+	var t := UIKit.title("ELIGE TU DESTINO", 56, UIKit.YELLOW)
 	t.position = Vector2(0, 18)
 	t.size = Vector2(1280, 70)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ui.add_child(t)
-	var sub := UIKit.label("¡Elige tu primer personaje gratis! Los demás se desbloquean con oro.", 22, UIKit.TEXT)
-	sub.position = Vector2(0, 88)
+	var orn := UIKit.ornament_line(520)
+	orn.position = Vector2(380, 80)
+	root_ui.add_child(orn)
+	var sub := UIKit.label("Solo un héroe responderá a tu llamada. Los demás podrán unirse a cambio de oro.", 20, UIKit.MUTED)
+	sub.position = Vector2(0, 98)
 	sub.size = Vector2(1280, 30)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ui.add_child(sub)
@@ -78,7 +82,7 @@ func _build_ui() -> void:
 	nxt.pressed.connect(func() -> void: select(index + 1))
 	root_ui.add_child(nxt)
 	var row := HBoxContainer.new()
-	row.position = Vector2(30, 600)
+	row.position = Vector2(40, 610)
 	row.add_theme_constant_override("separation", 10)
 	root_ui.add_child(row)
 	for i in chars.size():
@@ -89,7 +93,7 @@ func _build_ui() -> void:
 		b.pressed.connect(select.bind(i))
 		row.add_child(b)
 		role_buttons.append(b)
-	confirm_button = UIKit.big_button("¡ELEGIR!", 40)
+	confirm_button = UIKit.big_button("Elegir", 36)
 	confirm_button.name = "Confirmar"
 	confirm_button.position = Vector2(900, 586)
 	confirm_button.size = Vector2(350, 92)
@@ -102,7 +106,7 @@ func _build_ui() -> void:
 	modal.visible = false
 	root_ui.add_child(modal)
 	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.06, 0.18, 0.6)
+	dim.color = Color(0.0, 0.02, 0.08, 0.65)
 	dim.size = Vector2(1280, 720)
 	modal.add_child(dim)
 	var mp := UIKit.panel()
@@ -114,7 +118,7 @@ func _build_ui() -> void:
 	mv.alignment = BoxContainer.ALIGNMENT_CENTER
 	mv.add_theme_constant_override("separation", 16)
 	mp.add_child(mv)
-	var mt := UIKit.title("¿Confirmar personaje?", 32, UIKit.YELLOW)
+	var mt := UIKit.title("¿Confirmar elección?", 30, UIKit.YELLOW)
 	mt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mv.add_child(mt)
 	modal_text = UIKit.label("", 19)
@@ -126,12 +130,12 @@ func _build_ui() -> void:
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_theme_constant_override("separation", 20)
 	mv.add_child(h)
-	accept_button = UIKit.big_button("¡Confirmar!", 22, UIKit.GREEN)
+	accept_button = UIKit.big_button("Confirmar", 22)
 	accept_button.name = "Aceptar"
 	accept_button.custom_minimum_size = Vector2(220, 54)
 	accept_button.pressed.connect(accept)
 	h.add_child(accept_button)
-	var back := UIKit.button("Volver", 20, Color(0.4, 0.45, 0.55))
+	var back := UIKit.button("Volver", 20)
 	back.name = "Volver"
 	back.custom_minimum_size = Vector2(160, 54)
 	back.pressed.connect(func() -> void: modal.visible = false)
@@ -144,7 +148,7 @@ func select(i: int) -> void:
 	stage.pedestal.rotation.y = 0.0
 	name_label.text = c.display_name
 	role_label.text = c.role
-	desc.text = "%s\n\n[color=#ffd84a]Pasiva · %s:[/color] %s\n[color=#9fd8ff]Arma: %s[/color]" % [c.description, c.passive_name, c.passive_desc, Catalog.weapon(c.default_weapon).display_name]
+	desc.text = "%s\n\n[color=#f2dc99]Pasiva · %s:[/color] %s\n[color=#a8ccff]Arma: %s[/color]" % [c.description, c.passive_name, c.passive_desc, Catalog.weapon(c.default_weapon).display_name]
 	for ch in stats_box.get_children():
 		ch.queue_free()
 	stats_box.add_child(UIKit.stat_row("Vida", c.vida, 140.0, str(int(c.vida)), 170, UIKit.GREEN))

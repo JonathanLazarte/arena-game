@@ -17,12 +17,13 @@ La postura de montar (a horcajadas) es un ajuste propio por código de los hueso
 
 El arco del jugador, los efectos (arcos de espada, anillos, proyectiles) y la interfaz son primitivas generadas por código (propias).
 
-## Interfaz (ronda 11-12)
+## Interfaz (ronda 13)
 
 | Recurso | Autor | Fuente | Licencia | Archivos |
 |---|---|---|---|---|
-| Lilita One (fuente de la interfaz) | Juan Montoreano | https://github.com/google/fonts/tree/main/ofl/lilitaone | SIL Open Font License 1.1 | `assets/fonts/LilitaOne-Regular.ttf` (licencia en `assets/fonts/OFL-LilitaOne.txt`) |
+| Cinzel (títulos) | The Cinzel Project Authors (Natanael Gama) | https://github.com/NDISCOVER/Cinzel · https://github.com/google/fonts/tree/main/ofl/cinzel | SIL Open Font License 1.1 | `assets/fonts/Cinzel.ttf` (licencia en `assets/fonts/OFL-Cinzel.txt`) |
+| Lato (texto y botones) | Łukasz Dziedzic (tyPoland) | https://github.com/google/fonts/tree/main/ofl/lato | SIL Open Font License 1.1 | `assets/fonts/Lato-Regular.ttf`, `assets/fonts/Lato-Bold.ttf` (licencia en `assets/fonts/OFL-Lato.txt`) |
 | UI Audio (click3, rollover2, switch7, switch33) | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | `assets/sfx/*.ogg` (licencia en `assets/sfx/License.txt`) |
 
-Botones brillantes, iconos de moneda/gema/estrella, insignia de nivel, rayos de luz y destellos están hechos por código, sin recursos externos. (Las fuentes Cinzel e IM FELL de la ronda 11 se retiraron en la ronda 12.)
+El panel con degradado y filos, el cursor de cristal, los iconos de moneda y cristal, la insignia de nivel, el cielo con estrellas y aurora, el cristal flotante y las esquirlas están hechos por código, sin recursos externos. (Lilita One, de la ronda 12, se retiró en la ronda 13.)
 

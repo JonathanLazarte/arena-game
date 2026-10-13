@@ -64,10 +64,10 @@ func _run() -> void:
 	a.wins = [1, 0]
 	a._on_fighter_died(a.enemy)
 	await process_frame
-	check(a.state == "over" and a.hud.end_panel.visible and a.hud.end_label.text == "¡VICTORIA!", "pantalla de resultados al ganar")
+	check(a.state == "over" and a.hud.end_panel.visible and a.hud.end_label.text == "VICTORIA", "pantalla de resultados al ganar")
 	check(gs.account_xp > xp0 and a.match_result["xp"] == gs.account_xp - xp0, "XP sumada (%d)" % a.match_result.get("xp", 0))
 	var total := a.hud.results_box.find_child("Total", true, false) as Label
-	check(total != null and total.text.contains("XP") and total.text.contains("oro"), "muestra XP y oro ganados")
+	check(total != null and total.text.contains("EXP") and total.text.contains("Oro"), "muestra XP y oro ganados")
 	check(not a.hud.joystick.visible, "oculta los controles táctiles")
 	gs.from_lobby = false
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(gs.save_path))

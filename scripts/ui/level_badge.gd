@@ -1,6 +1,6 @@
 class_name LevelBadge
 extends Control
-## Insignia de nivel: hexágono naranja con borde blanco y el número.
+## Insignia de nivel: anillo plateado con filo dorado, "Nv" y el número en Cinzel.
 
 var level: int = 1
 
@@ -10,19 +10,14 @@ func _ready() -> void:
 func _draw() -> void:
 	var c := size * 0.5
 	var r := minf(size.x, size.y) * 0.5
-	var pts := PackedVector2Array()
-	for i in 6:
-		var a := PI / 6 + i * TAU / 6
-		pts.append(c + Vector2(cos(a), sin(a)) * r)
-	draw_colored_polygon(pts, Color.WHITE)
-	var inner := PackedVector2Array()
-	for p in pts:
-		inner.append(c + (p - c) * 0.84)
-	draw_colored_polygon(inner, UIKit.ORANGE)
-	draw_colored_polygon(PackedVector2Array([inner[4], inner[5], c + Vector2(r * 0.7, -r * 0.05), c + Vector2(-r * 0.7, -r * 0.05)]), Color(1, 1, 1, 0.2))
+	draw_circle(c, r, Color(0.02, 0.05, 0.15, 0.85))
+	draw_arc(c, r - 1.0, 0, TAU, 40, Color(UIKit.ORANGE, 0.9), 1.5, true)
+	draw_arc(c, r - 4.0, 0, TAU, 40, Color(UIKit.SILVER, 0.45), 1.0, true)
 	var f := UIKit.display_font()
 	var txt := str(level)
-	var fs := int(r * 0.95)
-	var w := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
-	draw_string_outline(f, c + Vector2(-w * 0.5, fs * 0.36), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, UIKit.OUTLINE)
-	draw_string(f, c + Vector2(-w * 0.5, fs * 0.36), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+	var fs := int(r * 0.85)
+	var w := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_string(f, c + Vector2(-w * 0.5, fs * 0.55), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.YELLOW)
+	var sf := UIKit.body_font()
+	var sw := sf.get_string_size("NV", HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(sf, c + Vector2(-sw * 0.5, -r * 0.35), "NV", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UIKit.MUTED)

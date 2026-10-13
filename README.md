@@ -179,3 +179,19 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
 - Resultados tipo recompensa: 1-3 estrellas (2-0 = 3, 2-1 = 2, derrota con alguna ronda = 1) y una lluvia de monedas que vuela al contador de oro.
 - Arena de día con niebla muy ligera; se quitan los braseros, la viñeta y las brasas.
 - Se mantienen la elección inicial, la progresión, los árboles, las compras, los resultados y el guardado v2 (con `gemas` añadido sin cambiar la versión).
+
+## Ronda 13 — Estilo inspirado en Final Fantasy (sustituye al estilo móvil)
+
+- Interfaz sobria y épica:
+  - Paneles azul medianoche translúcidos con degradado suave, filo plateado, línea dorada interior y cristales en las esquinas.
+  - Menús limpios en los que el elemento seleccionado lleva una barra degradada azul y un cursor de cristal que oscila apenas.
+  - Títulos en **Cinzel** con halo azul y texto en **Lato** (ambas OFL).
+  - Sin rebotes: entradas con fundido y deslizamiento, y fundido entre escenas.
+- Barra superior: insignia de nivel (anillo dorado), barra de EXP, oro (moneda grabada) y **Cristales** (moneda de muestra, solo se muestra).
+- Novedades marcadas con un cristal azul que brilla.
+- Escenario del lobby:
+  - Cielo crepuscular con estrellas (un MultiMesh) y aurora (cintas aditivas).
+  - Castillo en silueta y pedestal de piedra con runas.
+  - **Cristal flotante** con luz azul, esquirlas de cristal 3D y 2D, y luz principal cálida desde delante para que el personaje se lea bien.
+- Resultados al estilo FF: estandarte **VICTORIA** entre filos dorados, tabla de conceptos con columnas EXP/Oro, "EXP obtenida / Oro obtenido", barra de nivel con "Siguiente" y avisos de nivel.
+- Arena: luz natural (sol alto y lateral más luz de relleno opuesta sin sombras, para que los luchadores no se vean oscuros a contraluz), cielo diurno suave, niebla mínima y suelo de tierra menos pálido.

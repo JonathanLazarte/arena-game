@@ -20,9 +20,7 @@ var message: Label
 var end_panel: PanelContainer
 var end_label: Label
 var results_box: VBoxContainer
-var stars_box: HBoxContainer
-var stars: int = 0 ## estrellas de la última partida (0-3)
-var coins_burst: int = 0 ## monedas lanzadas en la animación (pruebas)
+
 var level_up_label: Label
 var swap_bar: ProgressBar
 var loadout_label: Label
@@ -75,7 +73,7 @@ func _ready() -> void:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
 		l.add_theme_color_override("font_outline_color", UIKit.OUTLINE)
-		l.add_theme_constant_override("outline_size", 8)
+		l.add_theme_constant_override("outline_size", 4)
 	# Panel final / pantalla de resultados
 	end_panel = UIKit.panel()
 	end_panel.name = "Results"
@@ -87,14 +85,15 @@ func _ready() -> void:
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_theme_constant_override("separation", 8)
 	end_panel.add_child(vb)
-	end_label = UIKit.title("", 54)
+	var o1 := UIKit.ornament_line(460)
+	o1.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(o1)
+	end_label = UIKit.title("", 58)
 	end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(end_label)
-	stars_box = HBoxContainer.new()
-	stars_box.name = "Stars"
-	stars_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	stars_box.add_theme_constant_override("separation", 10)
-	vb.add_child(stars_box)
+	var o2 := UIKit.ornament_line(460)
+	o2.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(o2)
 	results_box = VBoxContainer.new()
 	results_box.name = "ResultsBox"
 	results_box.add_theme_constant_override("separation", 4)
@@ -103,11 +102,11 @@ func _ready() -> void:
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
 	hb.add_theme_constant_override("separation", 16)
 	vb.add_child(hb)
-	var btn := UIKit.button("Revancha", 24, UIKit.BLUE)
+	var btn := UIKit.button("Revancha", 21)
 	btn.custom_minimum_size = Vector2(190, 56)
 	btn.pressed.connect(func() -> void: restart_requested.emit())
 	hb.add_child(btn)
-	var lb := UIKit.big_button("Volver al lobby", 24, UIKit.YELLOW)
+	var lb := UIKit.big_button("Volver al lobby", 22)
 	lb.name = "LobbyButton"
 	lb.custom_minimum_size = Vector2(230, 56)
 	lb.pressed.connect(func() -> void: lobby_requested.emit())
@@ -119,11 +118,10 @@ func _bar(parent: Control, pos: Vector2, c: Color, h: float = 26) -> ProgressBar
 	b.position = pos
 	b.size = Vector2(400, h)
 	b.show_percentage = false
-	var fill := UIKit.box(c, Color(0, 0, 0, 0), 0, 8, 0)
+	var fill := UIKit.box(c, Color(0, 0, 0, 0), 0, 2, 0)
 	fill.content_margin_top = 0
 	fill.content_margin_bottom = 0
-	var bg := UIKit.box(Color(0.02, 0.08, 0.2, 0.75), Color(1, 1, 1, 0.8), 2, 8, 4)
-	bg.border_width_bottom = 2
+	var bg := UIKit.box(Color(0.0, 0.03, 0.1, 0.6), Color(UIKit.SILVER, 0.7), 1, 2, 4)
 	bg.content_margin_top = 0
 	bg.content_margin_bottom = 0
 	b.add_theme_stylebox_override("fill", fill)
@@ -243,101 +241,75 @@ func show_message(t: String, secs: float = 2.0) -> void:
 
 ## Pantalla de resultados: desglose de XP y oro, barra de nivel y subidas de nivel.
 func show_results(won: bool, res: Dictionary) -> void:
-	end_label.text = "¡VICTORIA!" if won else "DERROTA"
+	# Pantalla de victoria al estilo Final Fantasy: estandarte "VICTORIA" y filas EXP / Oro
+	end_label.text = "VICTORIA" if won else "DERROTA"
 	end_label.add_theme_color_override("font_color", UIKit.YELLOW if won else UIKit.MUTED)
-	# Estrellas: victoria 2-0 = 3, victoria 2-1 = 2, derrota con alguna ronda = 1, si no 0
-	var rounds: int = 0
-	if not res.is_empty():
-		for l: Array in res["lines"]:
-			if String(l[0]).begins_with("Rondas"):
-				rounds = int(String(l[0]).get_slice("×", 1))
-	stars = (3 if rounds >= 2 and res.get("perfect", false) else 2) if won else (1 if rounds > 0 else 0)
-	if won and res.is_empty():
-		stars = 2
-	for c in stars_box.get_children():
-		c.queue_free()
-	for i in 3:
-		var st := CurrencyIcon.new()
-		st.kind = "star"
-		st.filled = i < stars
-		st.custom_minimum_size = Vector2(64, 64) if i == 1 else Vector2(52, 52)
-		stars_box.add_child(st)
-		UIKit.pop_in(st, 0.3 + i * 0.2, 0.2)
 	for c in results_box.get_children():
 		c.queue_free()
 	level_up_label = null
 	if not res.is_empty():
+		results_box.add_child(_row("", "EXP", "Oro", UIKit.MUTED, 15))
 		for l: Array in res["lines"]:
-			var h := HBoxContainer.new()
-			var a := UIKit.label(l[0], 19, UIKit.TEXT)
-			a.custom_minimum_size = Vector2(230, 0)
-			h.add_child(a)
-			h.add_child(UIKit.label("+%d XP" % l[1], 19, UIKit.ORANGE))
-			var g := UIKit.label("   +%d oro" % l[2] if l[2] > 0 else "", 19, UIKit.YELLOW)
-			h.add_child(g)
-			results_box.add_child(h)
+			results_box.add_child(_row(l[0], "+%d" % l[1], ("+%d" % l[2]) if l[2] > 0 else "—", UIKit.TEXT, 18))
 		if absf(float(res["mult"]) - 1.0) > 0.01:
-			results_box.add_child(UIKit.label("Dificultad ×%.1f" % res["mult"], 17, UIKit.MUTED))
+			results_box.add_child(_row("Dificultad", "×%.1f" % res["mult"], "×%.1f" % res["mult"], UIKit.MUTED, 16))
 		if int(res["level_bonus"]) > 0:
-			results_box.add_child(UIKit.label("Bonus por subir de nivel: +%d oro" % res["level_bonus"], 17, UIKit.YELLOW))
-		var tot := UIKit.title("Total: +%d XP · +%d oro" % [res["xp"], res["gold"]], 26, UIKit.YELLOW)
+			results_box.add_child(_row("Bonificación de nivel", "", "+%d" % res["level_bonus"], UIKit.MUTED, 16))
+		var sep := UIKit.ornament_line(440)
+		sep.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		results_box.add_child(sep)
+		var tot := UIKit.title("EXP obtenida  %d      Oro obtenido  %d" % [res["xp"], res["gold"]], 22, UIKit.YELLOW)
 		tot.name = "Total"
 		tot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		results_box.add_child(tot)
 		var lp := Progression.level_progress(int(res["account_xp"]))
+		var lvl := _row("Nivel %d" % res["account_after"], "", "Siguiente: %d" % (lp.y - lp.x), UIKit.TEXT, 16)
+		results_box.add_child(lvl)
 		var bar := ProgressBar.new()
 		bar.name = "XPBar"
 		bar.show_percentage = false
-		bar.custom_minimum_size = Vector2(440, 14)
+		bar.custom_minimum_size = Vector2(440, 8)
 		bar.max_value = lp.y
 		var lp0 := Progression.level_progress(int(res["account_xp_before"]))
 		bar.value = lp0.x if res["account_before"] == res["account_after"] else 0
 		results_box.add_child(bar)
-		bar.create_tween().tween_property(bar, "value", float(lp.x), 1.2).set_delay(0.3)
-		results_box.add_child(UIKit.label("Nivel de cuenta %d · %d/%d XP" % [res["account_after"], lp.x, lp.y], 17, UIKit.MUTED))
+		bar.create_tween().tween_property(bar, "value", float(lp.x), 1.4).set_delay(0.6).set_trans(Tween.TRANS_SINE)
 		var ups: Array[String] = []
 		if res["account_after"] > res["account_before"]:
-			ups.append("¡Cuenta nivel %d!" % res["account_after"])
+			ups.append("Nivel de cuenta %d alcanzado" % res["account_after"])
 		if res["char_after"] > res["char_before"]:
-			ups.append("¡%s nivel %d! +%d punto(s) de habilidad" % [Catalog.character(res["character"]).display_name, res["char_after"], res["char_after"] - res["char_before"]])
+			ups.append("%s · nivel %d · +%d habilidad" % [Catalog.character(res["character"]).display_name, res["char_after"], res["char_after"] - res["char_before"]])
 		if not ups.is_empty():
-			level_up_label = UIKit.title(" · ".join(ups), 22, UIKit.GREEN)
+			level_up_label = UIKit.title("\n".join(ups), 19, UIKit.CYAN)
 			level_up_label.name = "LevelUp"
 			level_up_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			level_up_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			level_up_label.custom_minimum_size = Vector2(460, 0)
 			results_box.add_child(level_up_label)
-			var tw := level_up_label.create_tween().set_loops(4)
-			tw.tween_property(level_up_label, "modulate", Color(1.4, 1.2, 0.8), 0.35)
-			tw.tween_property(level_up_label, "modulate", Color.WHITE, 0.35)
 			UIKit.sfx("levelup")
 	end_panel.visible = true
 	set_touch_visible(false)
-	end_panel.size = Vector2(520, 0)
+	end_panel.size = Vector2(540, 0)
 	end_panel.reset_size()
 	await get_tree().process_frame
 	end_panel.reset_size()
 	end_panel.position = Vector2((1280 - end_panel.size.x) * 0.5, maxf((720 - end_panel.size.y) * 0.5, 10))
-	UIKit.pop_in(end_panel, 0.0, 0.7)
-	if not res.is_empty() and int(res["gold"]) > 0:
-		_coin_burst(end_panel.position + end_panel.size * Vector2(0.5, 0.45), mini(8 + int(res["gold"]) / 20, 24))
+	UIKit.pop_in(end_panel, 0.0)
+	if won:
+		var sh := UIKit.crystal_shards(self, 30, Rect2(end_panel.position.x, end_panel.position.y + end_panel.size.y, end_panel.size.x, 10))
+		sh.name = "VictoryShards"
 
-## Lluvia de monedas que salen del centro y vuelan hacia el contador (arriba a la derecha).
-func _coin_burst(from: Vector2, n: int) -> void:
-	coins_burst = n
-	for i in n:
-		var c := CurrencyIcon.new()
-		c.kind = "oro"
-		c.size = Vector2(30, 30)
-		c.position = from
-		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(c)
-		var a := randf() * TAU
-		var mid := from + Vector2(cos(a), sin(a)) * randf_range(80, 200)
-		var tw := c.create_tween()
-		tw.tween_property(c, "position", mid, 0.4).set_delay(0.5 + i * 0.03).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tw.tween_property(c, "position", Vector2(1180, 10), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.tween_callback(c.queue_free)
-		if i % 4 == 0:
-			tw.tween_callback(func() -> void: UIKit.sfx("click"))
+## Fila de la tabla de resultados: concepto a la izquierda, EXP y oro alineados a la derecha.
+func _row(a: String, xp: String, gold: String, c: Color, fs: int) -> HBoxContainer:
+	var h := HBoxContainer.new()
+	var la := UIKit.label(a, fs, c)
+	la.custom_minimum_size = Vector2(250, 0)
+	h.add_child(la)
+	for t: String in [xp, gold]:
+		var l := UIKit.label(t, fs, c if t != "" and c == UIKit.TEXT else c)
+		l.custom_minimum_size = Vector2(95, 0)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		h.add_child(l)
+	return h
+
 
