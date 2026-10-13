@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "espada_escudo"
+display_name = "Espada y escudo"
+description = "Equilibrada. Permite escudo: bloqueo sólido (pasa un 12 %)."
+allows_shield = true

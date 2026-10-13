@@ -3,6 +3,9 @@ extends CanvasLayer
 ## HUD: barras de vida y eikon de ambos, rondas, mensajes, botones táctiles y pantalla final.
 
 signal restart_requested
+signal lobby_requested
+var name_p: Label
+var name_e: Label
 
 var joystick: TouchStick
 var p_health: ProgressBar
@@ -33,9 +36,9 @@ func _ready() -> void:
 	e_meter = _bar(root, Vector2(1280 - 420, 52), Color(0.4, 0.8, 1.0), 14)
 	p_stamina = _bar(root, Vector2(20, 70), Color(0.95, 0.9, 0.3), 10)
 	e_stamina = _bar(root, Vector2(1280 - 420, 70), Color(0.95, 0.9, 0.3), 10)
-	_label(root, "Jugador", Vector2(20, 84), 18)
-	_label(root, "Rival", Vector2(1280 - 420, 84), 18)
-	loadout_label = _label(root, "Espada + Escudo", Vector2(120, 84), 18)
+	name_p = _label(root, "Jugador", Vector2(20, 84), 18)
+	name_e = _label(root, "Rival", Vector2(1280 - 420, 84), 18)
+	loadout_label = _label(root, "Espada y escudo", Vector2(20, 108), 18)
 	swap_bar = _bar(root, Vector2(20, 112), Color(0.8, 0.8, 1.0), 12)
 	swap_bar.size = Vector2(250, 12)
 	swap_bar.max_value = 1.0
@@ -79,6 +82,12 @@ func _ready() -> void:
 	btn.add_theme_font_size_override("font_size", 28)
 	btn.pressed.connect(func() -> void: restart_requested.emit())
 	vb.add_child(btn)
+	var lb := Button.new()
+	lb.name = "LobbyButton"
+	lb.text = "Volver al lobby"
+	lb.add_theme_font_size_override("font_size", 28)
+	lb.pressed.connect(func() -> void: lobby_requested.emit())
+	vb.add_child(lb)
 	end_panel.visible = false
 
 func _bar(parent: Control, pos: Vector2, c: Color, h: float = 26) -> ProgressBar:
@@ -147,10 +156,12 @@ func _process(_d: float) -> void:
 	if _player.is_swapping():
 		loadout_label.text = "Cambiando de arma..."
 	else:
-		loadout_label.text = "Espada + Escudo" if _player.loadout == Fighter.Loadout.SWORD_SHIELD else "Arco"
+		loadout_label.text = _player.melee().display_name if _player.loadout == Fighter.Loadout.SWORD_SHIELD else "Arco"
 
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
+	name_p.text = player.display_name
+	name_e.text = enemy.display_name
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
 	player.summon_failed.connect(_on_summon_failed)
 	player.summoned.connect(func(e: Node3D) -> void:

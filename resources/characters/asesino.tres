@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "asesino"
+display_name = "Asesino"
+role = "Ágil"
+description = "Pícaro de las sombras con dagas dobles. Muy rápido y con mejor voltereta, pero frágil."
+vida = 85.0
+estamina = 105.0
+velocidad = 1.15
+poise = 30.0
+dano = 1.0
+roll_iframe_bonus = 3
+roll_cost_mult = 0.75
+passive_id = "sombra"
+passive_name = "Sombra"
+passive_desc = "Voltereta con +3 i-frames (15) y un 25 % más barata."
+weapons = PackedStringArray("dagas", "espada_larga", "arco")
+default_weapon = "dagas"
+model_path = "res://assets/models/Rogue.glb"
+texture_path = "res://assets/models/rogue_texture.png"
+body_prefix = "Rogue_"
+shield_mesh = ""

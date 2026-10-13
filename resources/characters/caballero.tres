@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "caballero"
+display_name = "Caballero"
+role = "Equilibrado"
+description = "Soldado veterano con espada y escudo. Fácil de usar y sin puntos débiles."
+passive_id = "guardia_firme"
+passive_name = "Guardia firme"
+passive_desc = "Bloquear golpes cuesta un 20 % menos de aguante."
+weapons = PackedStringArray("espada_escudo", "espada_larga", "lanza")
+default_weapon = "espada_escudo"

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "arquero"
+display_name = "Arquero"
+role = "A distancia"
+description = "Explorador encapuchado: rápido y letal de lejos, frágil de cerca."
+vida = 80.0
+estamina = 110.0
+velocidad = 1.12
+poise = 35.0
+dano = 0.9
+passive_id = "ojo_de_halcon"
+passive_name = "Ojo de halcón"
+passive_desc = "Las flechas hacen un 30 % más de daño."
+weapons = PackedStringArray("arco", "dagas")
+default_weapon = "arco"
+model_path = "res://assets/models/Rogue_Hooded.glb"
+texture_path = "res://assets/models/rogue_texture.png"
+body_prefix = "Rogue_"
+shield_mesh = ""

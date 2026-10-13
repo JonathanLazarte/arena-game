@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "berserker"
+display_name = "Berserker"
+role = "Daño pesado"
+description = "Bárbaro de las montañas. Golpea muy fuerte y aguanta castigo, pero es lento."
+vida = 120.0
+estamina = 95.0
+velocidad = 0.9
+poise = 80.0
+dano = 1.15
+passive_id = "furia"
+passive_name = "Furia"
+passive_desc = "Por debajo del 40 % de vida hace un 25 % más de daño."
+weapons = PackedStringArray("hacha_2m", "espada_larga")
+default_weapon = "hacha_2m"
+model_path = "res://assets/models/Barbarian.glb"
+texture_path = "res://assets/models/barbarian_texture.png"
+body_prefix = "Barbarian_"
+shield_mesh = "Barbarian_Round_Shield"
+shield_source = "res://assets/models/Barbarian.glb"

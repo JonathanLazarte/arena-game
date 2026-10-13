@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "lanza"
+display_name = "Lanza"
+description = "Gran alcance en un arco estrecho. A caballo hace un 25 % más de daño."
+allows_shield = true
+reach_foot = 2.9
+reach_mounted = 4.6
+half_arc_foot_deg = 35.0
+half_arc_mounted_deg = 55.0
+light_damage = 13.0
+heavy_damage = 27.0
+light_windup = 0.5
+heavy_windup = 0.85
+light_recovery = 0.6
+heavy_recovery = 0.8
+light_stamina = 15.0
+heavy_stamina = 30.0
+mounted_damage_mult = 1.25
+anim_light = PackedStringArray("1H_Melee_Attack_Stab", "1H_Melee_Attack_Stab", "2H_Melee_Attack_Stab")
+anim_heavy = "2H_Melee_Attack_Stab"
+mesh_right = ""
+procedural = "lanza"

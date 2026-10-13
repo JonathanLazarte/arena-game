@@ -47,27 +47,55 @@ var _last_attack_id: int = -1
 var riding: RidingPose
 var _mounted: bool = false
 
-func setup(c: Color) -> void:
+var cdef: CharacterDef
+var wdef: WeaponDef
+var sword_l: MeshInstance3D ## segunda arma (dagas)
+var states: Dictionary = STATES.duplicate()
+var _char_tint: Color = Color.WHITE
+
+## c: color de equipo. cd/wd: personaje y arma (null = Caballero con espada y escudo).
+func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
+	cdef = cd if cd else load("res://resources/characters/caballero.tres") as CharacterDef
+	wdef = wd if wd else load("res://resources/weapons/espada_escudo.tres") as WeaponDef
+	var melee_w := wdef
+	if wdef.ranged:
+		melee_w = load("res://resources/weapons/dagas.tres") as WeaponDef
+	for i in 3:
+		states["light%d" % i] = melee_w.anim_light[i % melee_w.anim_light.size()]
+	states["heavy"] = melee_w.anim_heavy
 	tint = c
-	model = SCENE.instantiate() as Node3D
+	_char_tint = cdef.tint
+	model = (load(cdef.model_path) as PackedScene).instantiate() as Node3D
 	model.rotation.y = PI # KayKit mira a +Z; el juego usa -Z como frente
 	model.scale = Vector3.ONE * SCALE
 	add_child(model)
 	body_mat = StandardMaterial3D.new()
-	body_mat.albedo_texture = TEX
+	body_mat.albedo_texture = load(cdef.texture_path)
 	accent_mat = body_mat.duplicate() as StandardMaterial3D
 	set_tint(c, false)
+	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
+	var own_shield := melee_w.allows_shield and cdef.shield_mesh != ""
 	for mi in AnimUtil.meshes(model):
-		match String(mi.name):
-			"1H_Sword_Offhand", "Badge_Shield", "Rectangle_Shield", "Spike_Shield", "2H_Sword":
-				mi.visible = false
-			"Knight_Cape", "Round_Shield":
-				mi.material_override = accent_mat
-			_:
-				mi.material_override = body_mat
+		var n := String(mi.name)
+		if not n.begins_with(cdef.body_prefix) or n.contains("Shield"):
+			mi.visible = false
+		mi.material_override = accent_mat if n.ends_with("Cape") else body_mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	sword = model.find_child("1H_Sword", true, false) as MeshInstance3D
-	shield = model.find_child("Round_Shield", true, false) as MeshInstance3D
+	if melee_w.procedural == "lanza":
+		sword = _make_lance(sk)
+	else:
+		sword = _weapon_mesh(sk, melee_w.mesh_source, melee_w.mesh_right)
+	if melee_w.mesh_left != "":
+		sword_l = _weapon_mesh(sk, melee_w.mesh_source, melee_w.mesh_left)
+	if own_shield:
+		shield = _weapon_mesh(sk, cdef.shield_source, cdef.shield_mesh)
+		shield.material_override = accent_mat
+	else:
+		# Escudo invisible de relleno (así el resto del código no tiene casos nulos)
+		shield = MeshInstance3D.new()
+		shield.name = "NoShield"
+		sk.add_child(shield)
+	sword.material_override = body_mat if sword.material_override == null else sword.material_override
 	glow_mat = StandardMaterial3D.new()
 	glow_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	glow_mat.albedo_color = Color.BLACK
@@ -75,7 +103,6 @@ func setup(c: Color) -> void:
 	glow_mat.metallic_specular = 0.0
 	sword.material_overlay = glow_mat
 	# Arco: arma propia enganchada a la mano izquierda con BoneAttachment3D
-	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
 	var att := BoneAttachment3D.new()
 	att.name = "bow_slot"
 	att.bone_name = "handslot.l"
@@ -91,6 +118,50 @@ func setup(c: Color) -> void:
 	AnimUtil.set_loops(ap, ["Idle", "Walking_A", "Walking_Backwards", "Running_A", "Running_Strafe_Left",
 		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose"])
 	_build_tree()
+
+## Malla de arma: la del propio modelo si existe, o copiada de otro .glb KayKit
+## (mismo hueso handslot y misma transformación local).
+func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String) -> MeshInstance3D:
+	var own := model.find_child(mesh_name, true, false) as MeshInstance3D
+	if own:
+		own.visible = true
+		return own
+	var src := (load(source) as PackedScene).instantiate() as Node3D
+	var smi := src.find_child(mesh_name, true, false) as MeshInstance3D
+	var bone := "handslot.l" if mesh_name.contains("Offhand") or mesh_name.contains("Shield") else "handslot.r"
+	if smi and smi.get_parent() is BoneAttachment3D:
+		bone = (smi.get_parent() as BoneAttachment3D).bone_name
+	var att := BoneAttachment3D.new()
+	att.name = mesh_name + "_slot"
+	att.bone_name = bone
+	sk.add_child(att)
+	var mi := MeshInstance3D.new()
+	mi.name = mesh_name
+	if smi:
+		mi.mesh = smi.mesh
+		mi.transform = smi.transform
+		var tex := (smi.get_active_material(0) as BaseMaterial3D)
+		var m := StandardMaterial3D.new()
+		m.albedo_texture = tex.albedo_texture if tex else null
+		mi.material_override = m
+	else:
+		mi.mesh = BoxMesh.new()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	att.add_child(mi)
+	src.free()
+	return mi
+
+## Lanza procedimental: asta larga de madera y punta metálica.
+func _make_lance(sk: Skeleton3D) -> MeshInstance3D:
+	var att := BoneAttachment3D.new()
+	att.name = "lance_slot"
+	att.bone_name = "handslot.r"
+	sk.add_child(att)
+	var shaft := MeshUtil.box(att, Vector3(0.07, 2.6, 0.07), Vector3(0, 0.7, 0), Color(0.45, 0.3, 0.15))
+	shaft.name = "Lanza"
+	var tip := MeshUtil.box(shaft, Vector3(0.14, 0.4, 0.05), Vector3(0, 1.45, 0), Color(0.8, 0.82, 0.9))
+	tip.rotation.y = PI / 4
+	return shaft
 
 func _build_tree() -> void:
 	var root := AnimationNodeBlendTree.new()
@@ -114,7 +185,7 @@ func _build_tree() -> void:
 	root.connect_node("base", 1, "sit")
 	var act := AnimationNodeStateMachine.new()
 	for s: String in STATES:
-		act.add_node(s, AnimUtil.scaled_anim(STATES[s]) if s in SCALED else AnimUtil.anim_node(STATES[s]))
+		act.add_node(s, AnimUtil.scaled_anim(states[s]) if s in SCALED else AnimUtil.anim_node(states[s]))
 	for a: String in STATES:
 		for b: String in STATES:
 			if a != b:
@@ -141,8 +212,8 @@ func _build_tree() -> void:
 	playback.start("none")
 
 func set_tint(c: Color, flash: bool) -> void:
-	body_mat.albedo_color = Color.WHITE.lerp(c, 0.25)
-	accent_mat.albedo_color = Color.WHITE.lerp(c, 0.9)
+	body_mat.albedo_color = Color.WHITE.lerp(c, 0.25) * _char_tint
+	accent_mat.albedo_color = Color.WHITE.lerp(c, 0.9) * _char_tint
 	for m: StandardMaterial3D in [body_mat, accent_mat]:
 		m.emission_enabled = flash
 		m.emission = Color.WHITE
@@ -154,6 +225,8 @@ func set_glow(on: bool, c: Color) -> void:
 ## loadout: 0 espada+escudo, 1 arco, -1 cambiando (manos vacías)
 func set_loadout(l: int) -> void:
 	sword.visible = l == 0
+	if sword_l:
+		sword_l.visible = l == 0
 	shield.visible = l == 0
 	bow.visible = l == 1
 
@@ -172,7 +245,7 @@ func event(e: String) -> void:
 		playback.start(e, true)
 
 func _clip_len(s: String) -> float:
-	return ap.get_animation(STATES[s]).length
+	return ap.get_animation(states[s]).length
 
 func update(f: Fighter, delta: float) -> void:
 	oneshot_t = maxf(oneshot_t - delta, 0.0)

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "espada_larga"
+display_name = "Espada larga"
+description = "A dos manos: más alcance y daño, sin escudo."
+allows_shield = false
+reach_foot = 2.6
+reach_mounted = 3.8
+half_arc_foot_deg = 75.0
+light_damage = 15.0
+heavy_damage = 30.0
+light_windup = 0.5
+heavy_windup = 0.9
+light_recovery = 0.65
+heavy_recovery = 0.8
+light_stamina = 17.0
+heavy_stamina = 32.0
+poise_damage_mult = 1.2
+guard_break_mult = 1.2
+no_shield_block_chip = 0.4
+anim_light = PackedStringArray("2H_Melee_Attack_Slice", "2H_Melee_Attack_Chop", "2H_Melee_Attack_Spin")
+anim_heavy = "2H_Melee_Attack_Chop"
+anim_idle = "2H_Melee_Idle"
+mesh_right = "2H_Sword"

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "paladin"
+display_name = "Paladín"
+role = "Tanque"
+description = "Guerrero sagrado de armadura dorada. Mucha vida, guardia firme y se cura poco a poco."
+vida = 130.0
+estamina = 105.0
+velocidad = 0.92
+poise = 65.0
+dano = 0.95
+guardia = 0.75
+passive_id = "luz_sanadora"
+passive_name = "Luz sanadora"
+passive_desc = "Si no recibe golpes durante 3 s, recupera 2 de vida por segundo."
+weapons = PackedStringArray("espada_escudo", "lanza", "hacha_2m")
+default_weapon = "espada_escudo"
+shield_mesh = "Badge_Shield"
+tint = Color(1, 0.85, 0.45, 1)

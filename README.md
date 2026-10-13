@@ -124,3 +124,14 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
   - Ahora se invoca hacia los 40 s y varias veces por partida.
 - **Dash montado + ataque:** puedes empezar la anticipación (ligero, o el fuerte cargado al mantener el botón) antes o durante el dash montado. La anticipación sigue cargándose durante el dash, el caballo frena justo delante del rival (sin embestida) y el golpe sale al acabar el dash (o en cuanto lleve 0,12 s de anticipación). El dash montado sin ataque es igual que antes.
 - Pruebas nuevas: `test_roll`, `test_dash_attack`, `test_eikon_summon` y `test_ai_breather`.
+
+## Ronda 10 — Lobby, personajes, armas y equipamiento
+
+- **Lobby** (`scenes/lobby.tscn`, escena principal): personaje en un pedestal giratorio (se arrastra para girarlo) delante de murallas de castillo; barra superior con nombre editable, nivel y **oro** (de muestra, solo local); pestañas **Personajes, Armas, Eikons, Monturas, Inventario**; dificultad **Fácil / Normal / Difícil**; botón **JUGAR**. Teclado: Q/E pestañas, 1-3 dificultad, Enter jugar.
+- **Datos:** `CharacterDef` (`resources/characters/*.tres`) y `WeaponDef` (`resources/weapons/*.tres`), listados en `scripts/data/catalog.gd`.
+- **Equipamiento** (`GameState`, autoload): personaje, arma (filtrada por rol), eikon, montura y dificultad. Se guarda en `user://loadout.cfg`. El rival recibe un equipamiento aleatorio coherente (siempre cuerpo a cuerpo).
+- **Armas en combate:** alcance, arco de golpe, daño, anticipación/activo/recuperación, coste de aguante, combo máximo, escudo o no (sin escudo el bloqueo deja pasar más daño y cuesta x1,5), rompeguardias, daño al equilibrio, bonus de la lanza montado. El arquero empieza con arco y lucha con dagas.
+- **Pasivas:** Guardia firme (−20 % de aguante al bloquear), Ojo de halcón (+30 % flechas), Furia (+25 % de daño con menos del 40 % de vida), Luz sanadora (2 de vida/s tras 3 s sin recibir golpes), Sombra (+3 frames de invulnerabilidad en la voltereta y −25 % de coste).
+- Al acabar la partida: **Volver al lobby** (o Reiniciar).
+- Si se abre `arena.tscn` directamente (pruebas), se usa el luchador neutro clásico con espada y escudo, sin pasiva.
+- Pruebas nuevas: `test_defs`, `test_loadout`, `test_weapons`. Captura: `godot --path . --rendering-driver opengl3 -s res://tests/screenshot_lobby.gd -- out.png [personaje] [pestaña]`.

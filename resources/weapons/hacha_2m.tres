@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "hacha_2m"
+display_name = "Hacha a dos manos"
+description = "Lenta y devastadora. Rompe guardias: bloquearla cuesta el doble de aguante."
+allows_shield = false
+reach_foot = 2.5
+reach_mounted = 3.6
+half_arc_foot_deg = 80.0
+light_damage = 20.0
+heavy_damage = 40.0
+light_windup = 0.65
+heavy_windup = 1.1
+light_active = 0.14
+heavy_active = 0.18
+light_recovery = 0.8
+heavy_recovery = 1.0
+light_stamina = 22.0
+heavy_stamina = 38.0
+max_combo = 2
+guard_break_mult = 2.0
+poise_damage_mult = 1.8
+no_shield_block_chip = 0.35
+anim_light = PackedStringArray("2H_Melee_Attack_Chop", "2H_Melee_Attack_Slice", "2H_Melee_Attack_Chop")
+anim_heavy = "2H_Melee_Attack_Spinning"
+anim_idle = "2H_Melee_Idle"
+mesh_source = "res://assets/models/Barbarian.glb"
+mesh_right = "2H_Axe"

@@ -5,6 +5,7 @@ Todos los assets 3D de terceros son **CC0 1.0 (dominio público)**. No requieren
 | Asset | Autor | Origen | Licencia | Archivos |
 |---|---|---|---|---|
 | KayKit Character Pack: Adventurers 1.0 — Knight (modelo, textura, 76 animaciones, espada y escudo) | Kay Lousberg | https://kaylousberg.itch.io/kaykit-adventurers · https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 | CC0 1.0 | `assets/models/Knight.glb`, `assets/models/knight_texture.png` |
+| KayKit Character Pack: Adventurers 1.0 — Barbarian, Rogue, Rogue_Hooded, Mage (modelos, texturas, armas: hacha, dagas, ballestas, bastón) | Kay Lousberg | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 | CC0 1.0 | `assets/models/Barbarian.glb`, `Rogue.glb`, `Rogue_Hooded.glb`, `Mage.glb` y sus texturas |
 | Horse (Ultimate Animated Animals) | Quaternius | https://poly.pizza/m/qvTrSG9pZF · https://quaternius.com/packs/ultimateanimatedanimals.html | CC0 1.0 | `assets/models/horse_quaternius.glb` |
 | Wolf (Ultimate Animated Animals) | Quaternius | https://poly.pizza/m/P1gU3Qkr9r | CC0 1.0 | `assets/models/wolf_quaternius.glb` |
 | Dragon (Ultimate Monsters), recoloreado como fénix | Quaternius | https://poly.pizza/m/3rUm1cN3yp · https://quaternius.com/packs/ultimatemonsters.html | CC0 1.0 | `assets/models/dragon_quaternius.glb` |

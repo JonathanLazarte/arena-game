@@ -94,6 +94,14 @@ const EXHAUST_TIME := 1.5
 @export var mount: MountData
 @export var eikon: EikonData
 var foot_stats: MountData = preload("res://resources/mounts/on_foot.tres")
+## Ronda 10: personaje (rol) y arma. Sin asignar = luchador neutro (stats del Caballero sin
+## pasiva) con espada y escudo: el comportamiento clásico en el que se basan las pruebas antiguas.
+var character: CharacterDef = _neutral()
+var weapon: WeaponDef = preload("res://resources/weapons/espada_escudo.tres")
+const FALLBACK_MELEE := preload("res://resources/weapons/dagas.tres") ## cuerpo a cuerpo del que lleva arco
+var stamina_max: float = STAMINA_MAX
+var poise_max: float = POISE_MAX
+var heals: float = 0.0 ## vida curada por la pasiva (pruebas)
 var team: int = 0
 var color: Color = Color(0.2, 0.4, 1.0)
 var display_name: String = "Jugador"
@@ -176,19 +184,55 @@ var _flash: float = 0.0
 func _ready() -> void:
 	add_to_group("damageable")
 	add_to_group("fighter")
-	max_health = 100.0 + (mount.health_bonus if mount else 0.0)
-	health = max_health
+	_apply_character()
 	_build_visuals()
 	_apply_mount_visuals()
+
+## Asigna personaje y arma (antes de añadir el luchador al árbol).
+func set_loadout_defs(c: CharacterDef, w: WeaponDef) -> void:
+	character = c if c else character
+	weapon = w if w and character.allows(w.id) else Catalog.weapon(character.default_weapon)
+
+static func _neutral() -> CharacterDef:
+	var c := CharacterDef.new()
+	c.passive_id = ""
+	c.weapons = PackedStringArray(["espada_escudo", "espada_larga", "hacha_2m", "dagas", "lanza", "arco"])
+	return c
+
+func _apply_character() -> void:
+	max_health = character.vida + (mount.health_bonus if mount else 0.0)
+	health = max_health
+	stamina_max = character.estamina
+	stamina = stamina_max
+	poise_max = character.poise
+	poise = poise_max
+	if weapon.ranged:
+		loadout = Loadout.BOW
+
+## Arma cuerpo a cuerpo efectiva (el arquero usa dagas al cambiar de arma).
+func melee() -> WeaponDef:
+	return FALLBACK_MELEE if weapon.ranged else weapon
+
+func has_shield() -> bool:
+	return melee().allows_shield and character.shield_mesh != ""
 
 func stats() -> MountData:
 	return mount_node.data if mounted and mount_node else foot_stats
 
+func speed_mult() -> float:
+	return character.velocidad
+
 func sword_range() -> float:
-	return SWORD_RANGE_MOUNTED if mounted else SWORD_RANGE_FOOT
+	return melee().reach_mounted if mounted else melee().reach_foot
 
 func sword_half_arc() -> float:
-	return SWORD_HALF_ARC_MOUNTED if mounted else SWORD_HALF_ARC_FOOT
+	return deg_to_rad(melee().half_arc_mounted_deg if mounted else melee().half_arc_foot_deg)
+
+func max_combo() -> int:
+	return melee().max_combo
+
+func roll_iframe_end() -> float:
+	return ROLL_IFRAME_END + character.roll_iframe_bonus / ROLL_FPS
 
 ## "none", "startup", "iframes" o "recovery".
 func roll_phase() -> String:
@@ -196,7 +240,7 @@ func roll_phase() -> String:
 		return "none"
 	if roll_t < ROLL_STARTUP:
 		return "startup"
-	if roll_t < ROLL_IFRAME_END:
+	if roll_t < roll_iframe_end():
 		return "iframes"
 	return "recovery"
 
@@ -218,7 +262,7 @@ func _build_visuals() -> void:
 	_rider_root.add_child(_prim)
 	_kv = KnightVisual.new()
 	_rider_root.add_child(_kv)
-	_kv.setup(color)
+	_kv.setup(color, character, weapon)
 	_body = MeshUtil.box(_prim, Vector3(0.6, 1.0, 0.45), Vector3(0, 1.0, 0.1), color)
 	MeshUtil.sphere(_prim, 0.25, Vector3(0, 1.75, 0.1), Color(0.95, 0.8, 0.65))
 	for x: float in [-0.15, 0.15]:
@@ -325,8 +369,8 @@ func _update_stamina(delta: float, idle: bool) -> void:
 	_since_spend += delta
 	if exhausted > 0.0:
 		exhausted = maxf(exhausted - delta, 0.0)
-	if _since_spend >= REGEN_DELAY and stamina < STAMINA_MAX:
-		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * delta, STAMINA_MAX)
+	if _since_spend >= REGEN_DELAY and stamina < stamina_max:
+		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * delta, stamina_max)
 		stamina_changed.emit(stamina, exhausted > 0.0)
 
 # ---------------- Bucle principal ----------------
@@ -335,7 +379,13 @@ func _physics_process(delta: float) -> void:
 	riposte_t = maxf(riposte_t - delta, 0.0)
 	_since_hit += delta
 	if _since_hit > 1.5:
-		poise = minf(poise + POISE_REGEN * delta, POISE_MAX)
+		poise = minf(poise + POISE_REGEN * delta, poise_max)
+	# Pasiva "Luz sanadora": se cura si lleva 3 s sin recibir golpes
+	if character.passive_id == "luz_sanadora" and alive and _since_hit > 3.0 and health < max_health:
+		var hv := minf(2.0 * delta, max_health - health)
+		health += hv
+		heals += hv
+		health_changed.emit(health, max_health)
 	if swap_t > 0.0:
 		swap_t -= delta
 		if swap_t <= 0.0:
@@ -384,15 +434,15 @@ func _physics_process(delta: float) -> void:
 			var fdot := dirn.dot(facing)
 			var k := lerpf(0.8, 1.0, fdot) if fdot >= 0.0 else lerpf(0.8, REVERSE_FACTOR, -fdot)
 			reversing = fdot < -0.6
-			target_vel = dirn * st.speed * amount * k
+			target_vel = dirn * st.speed * speed_mult() * amount * k
 	elif amount > 0.05:
 		var dirn := inp.normalized()
 		if dirn.dot(facing) < -0.6:
 			reversing = true
-			target_vel = -facing * st.speed * REVERSE_FACTOR * amount
+			target_vel = -facing * st.speed * speed_mult() * REVERSE_FACTOR * amount
 		else:
 			facing = _turn_toward(facing, dirn, turn)
-			target_vel = facing * st.speed * amount
+			target_vel = facing * st.speed * speed_mult() * amount
 	# Galope / sprint
 	sprinting = want_sprint and not reversing and amount > 0.3 and exhausted <= 0.0 and not blocking and stamina > 0.0
 	if sprinting:
@@ -536,14 +586,25 @@ func attack_heavy() -> bool:
 	return _request_attack(true)
 
 func _atk_data() -> Dictionary:
-	return HEAVY if atk_heavy else LIGHT
+	var d := melee().attack(atk_heavy)
+	d["damage"] = d["damage"] * damage_mult()
+	return d
+
+## Multiplicador de daño cuerpo a cuerpo: personaje, lanza a caballo y pasiva "Furia".
+func damage_mult() -> float:
+	var k := character.dano
+	if mounted:
+		k *= melee().mounted_damage_mult
+	if character.passive_id == "furia" and health < max_health * 0.4:
+		k *= 1.25
+	return k
 
 func _request_attack(heavy: bool) -> bool:
 	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
 	if atk_state != Atk.NONE:
 		# Búfer de entrada para encadenar ligeros
-		if not heavy and not atk_heavy and combo < MAX_COMBO and (atk_state != Atk.WINDUP or atk_t > atk_dur * 0.5):
+		if not heavy and not atk_heavy and combo < max_combo() and (atk_state != Atk.WINDUP or atk_t > atk_dur * 0.5):
 			_buffered = true
 		return false
 	if blocking or stamina <= 0.0:
@@ -643,10 +704,10 @@ func _update_attack(delta: float) -> void:
 				atk_state = Atk.RECOVERY
 				atk_t = 0.0
 				atk_dur = d["recovery"] + (0.0 if _atk_landed else d["whiff"])
-				if combo >= MAX_COMBO:
+				if combo >= max_combo():
 					atk_dur += FINISHER_EXTRA_RECOVERY
 		Atk.RECOVERY:
-			if _buffered and combo < MAX_COMBO and atk_t >= CHAIN_MIN_RECOVERY and stamina > 0.0 and exhausted <= 0.0 and stun <= 0.0:
+			if _buffered and combo < max_combo() and atk_t >= CHAIN_MIN_RECOVERY and stamina > 0.0 and exhausted <= 0.0 and stun <= 0.0:
 				combo += 1
 				_start_attack(false, true)
 				return
@@ -702,7 +763,7 @@ func shoot() -> bool:
 	p.team = team
 	p.shooter = self
 	p.direction = dir
-	p.damage = 8.0
+	p.damage = 8.0 * (1.3 if character.passive_id == "ojo_de_halcon" else 1.0)
 	p.color = Color(0.9, 0.8, 0.5)
 	get_parent().add_child(p)
 	p.global_position = origin
@@ -741,11 +802,11 @@ func _start_roll(st: MountData) -> bool:
 	dash_cd = maxf(st.dash_cooldown, ROLL_TOTAL)
 	invuln = 0.0
 	_dash_hit = true # la voltereta no embiste
-	spend_stamina(COST_ROLL)
+	spend_stamina(COST_ROLL * character.roll_cost_mult)
 	return true
 
 func _roll_velocity() -> Vector3:
-	var fast := ROLL_IFRAME_END
+	var fast := ROLL_IFRAME_END # la distancia no cambia con la pasiva "Sombra" (solo los i-frames)
 	if roll_t < fast:
 		return dash_dir * (ROLL_DISTANCE / fast)
 	# Recuperación: frena linealmente (área = ROLL_RECOVERY_DRIFT)
@@ -827,8 +888,9 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 			if stamina <= 0.0:
 				_guard_break()
 			return "block"
-		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else BLOCK_REDUCTION))
-		spend_stamina(COST_BLOCKED_HIT * (COST_BLOCKED_HEAVY_MULT if amount >= HEAVY_HIT else 1.0))
+		var chip := BLOCK_REDUCTION if has_shield() else melee().no_shield_block_chip
+		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else chip))
+		spend_stamina(blocked_hit_cost(amount, from))
 		add_meter(3.0)
 		_kv.event("block_hit")
 		if stamina <= 0.0:
@@ -844,9 +906,9 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis
 	_since_hit = 0.0
-	poise -= amount * 2.0
+	poise -= amount * 2.0 * ((from as Fighter).melee().poise_damage_mult if from is Fighter and _kind == "melee" else 1.0)
 	if poise <= 0.0:
-		poise = POISE_MAX
+		poise = poise_max
 		apply_stun(0.6 + (0.3 if amount >= HEAVY_HIT else 0.0))
 	elif atk_state == Atk.WINDUP and not atk_heavy:
 		apply_stun(0.2) # los ligeros se interrumpen; el fuerte tiene súper-armadura
@@ -860,6 +922,19 @@ func _guard_break() -> void:
 	blocking = false
 	apply_stun(GUARD_BREAK_STAGGER)
 	impact.emit(0.8)
+
+## Aguante que cuesta bloquear un golpe: ligero/fuerte, rompeguardias del atacante,
+## guardia del personaje, pasiva "Guardia firme" y bloqueo sin escudo (x1.5).
+func blocked_hit_cost(amount: float, from: Node3D) -> float:
+	var c := COST_BLOCKED_HIT * (COST_BLOCKED_HEAVY_MULT if amount >= HEAVY_HIT else 1.0)
+	if from is Fighter:
+		c *= (from as Fighter).melee().guard_break_mult
+	c *= character.guardia
+	if character.passive_id == "guardia_firme":
+		c *= 0.8
+	if not has_shield():
+		c *= 1.5
+	return c
 
 func _damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
@@ -897,17 +972,18 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	health = max_health
 	if not keep_meter:
 		meter = 0.0
-	stamina = STAMINA_MAX
+	stamina = stamina_max
 	exhausted = 0.0
 	alive = true
 	stun = 0.0
 	_cancel_attack()
 	parry_state = Parry.NONE
-	poise = POISE_MAX
+	poise = poise_max
 	riposte_t = 0.0
-	if swap_t > 0.0 or loadout != Loadout.SWORD_SHIELD:
+	var start_l := Loadout.BOW if weapon.ranged else Loadout.SWORD_SHIELD
+	if swap_t > 0.0 or loadout != start_l:
 		swap_t = 0.0
-		loadout = Loadout.SWORD_SHIELD
+		loadout = start_l
 		_apply_loadout_visuals()
 		loadout_changed.emit(loadout)
 	bow_cd = 0.0

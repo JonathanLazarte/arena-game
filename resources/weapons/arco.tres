@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "arco"
+display_name = "Arco"
+description = "A distancia. Flechas de 8 de daño; el escudo las anula. Cambia a dagas para el cuerpo a cuerpo."
+ranged = true
+allows_shield = false
+mesh_right = ""
+procedural = "arco"
