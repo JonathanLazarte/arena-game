@@ -68,7 +68,7 @@ func _ready() -> void:
 	_touch_button("Atacar", "attack_sword", Vector2(1160, 600), 62, Color(0.85, 0.85, 0.9))
 	_touch_button("Escudo", "block", Vector2(1030, 640), 52, Color(0.4, 0.5, 0.9))
 	_touch_button("Cambiar", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
-	_touch_button("Eikon", "summon", Vector2(640, 600), 48, Color(1.0, 0.5, 0.1))
+	_touch_button("Eikon", "summon", Vector2(150, 400), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
 	_touch_button("Objetivo", "target_next", Vector2(1190, 255), 34, Color(0.95, 0.8, 0.35))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
@@ -292,7 +292,8 @@ func _process(_d: float) -> void:
 		_run_label.text = "Galope" if _player.mounted else ("Correr ✔" if on else "Correr")
 		_run_btn.modulate = Color(1.5, 1.4, 0.9) if (on or _player.sprinting) else Color.WHITE
 	if _special_btn:
-		_special_btn.visible = (_player.has_special() or _player.weapon_art_id != "") and joystick.visible
+		# Ronda 22: Habilidad/Arte no se usan montado: se oculta
+		_special_btn.visible = (_player.has_special() or _player.weapon_art_id != "") and joystick.visible and not _player.mounted
 		var cd := _player.special_cd if _player.has_special() else _player.art_cd
 		_special_btn.modulate = Color.WHITE if cd <= 0.0 else Color(1, 1, 1, 0.45)
 		if not _player.has_special() and btn_labels.has("special"):

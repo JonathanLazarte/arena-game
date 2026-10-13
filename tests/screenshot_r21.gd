@@ -26,7 +26,6 @@ func _run() -> void:
 	arena.enemy.global_position = p.global_position + p.facing * 6.0
 	p.meter = Fighter.METER_MAX
 	await create_timer(0.2).timeout
-	print("spells ", p.spells, " hud ", arena.hud.btns["spell"].visible)
 	p.cast_spell()
 	await create_timer(0.55).timeout
 	root.get_viewport().get_texture().get_image().save_png(args[0])

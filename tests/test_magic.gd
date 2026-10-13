@@ -117,11 +117,10 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var hx: Dictionary = arena.hud.btns
-	var left := true
-	for k: String in hx:
-		if k != "summon" and (hx[k] as TouchScreenButton).position.x <= (hx["summon"] as TouchScreenButton).position.x:
-			left = false
-	check(left, "Eikon es el botón de combate más a la izquierda")
+	var sp: Vector2 = (hx["summon"] as TouchScreenButton).position
+	var js: Vector2 = arena.hud.joystick.position
+	check(absf(sp.x - js.x) < 60.0 and sp.y < js.y - 100.0, "Eikon encima del joystick (lado izquierdo)")
+	check(not hx["special"].visible and not p.special(), "montado: botón Arte oculto y sin arte")
 	check(not hx["summon"].visible, "medidor vacío: botón Eikon oculto")
 	check(not hx["mount"].visible, "sin eikon activo: botón Montar oculto")
 	p.meter = Fighter.METER_MAX
@@ -149,6 +148,7 @@ func _run() -> void:
 	p.dismount(false)
 	await create_timer(0.3).timeout
 	check(not p.mounted and arena.hud.btns["parry"].visible, "a pie: vuelve el botón Parry")
+	check(arena.hud.btns["special"].visible, "a pie: vuelve el botón Arte")
 	p.stamina = p.stamina_max
 	check(p.parry(), "a pie: parry funciona")
 	await create_timer(1.0).timeout

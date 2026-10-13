@@ -128,4 +128,4 @@ func _physics_process(delta: float) -> void:
 	if ds: me.dash()
 	if mt: me.toggle_mount()
 	if jp: me.jump()
-	if sp: me.special()
+	if sp and not me.mounted: me.special() # ronda 22: sin Habilidad/Arte montado

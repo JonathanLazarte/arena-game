@@ -470,3 +470,9 @@ Ranuras: 2 base, +1 con Sabiduría o Devoción ≥ 18, +1 con ≥ 30 (máx. 4): 
 Curación (lágrimas) queda pospuesta por decisión del usuario. Guardado **v8**: `spells` por ranura de personaje y `[artes]` (colección y arte por arma). Al migrar desde v7 se equipa el hechizo de tu eikon y la Estocada impulsada. La IA del rival todavía no usa hechizos ni artes.
 
 Prueba nueva: `test_magic.gd` (parry montado, botón Objetivo, ranuras, hechizos en combate, artes, Tienda, persistencia y migración v7→v8).
+
+## Ronda 22 — Ajustes del HUD táctil
+
+- **Eikon** pasa al lado izquierdo, encima del joystick de movimiento. Sigue las mismas reglas: solo aparece cuando se puede invocar, y montado en tu eikon dice «Especial».
+- **Arte / Habilidad** se oculta montado (y la tecla G no hace nada montado). Vuelve al bajar.
+- Flujo nuevo: el proyecto vive en GitHub (`origin`, rama `master`). Para probar: `git pull` y Play en Godot 4.7.
