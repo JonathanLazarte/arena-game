@@ -14,6 +14,9 @@ signal summoned(eikon: Node3D)
 ## Se pulsó invocar sin poder hacerlo: "meter" (medidor sin llenar), "active" (ya hay uno) o "stun".
 signal summon_failed(reason: String)
 signal impact(strength: float)
+signal hitstop(duration: float) ## ronda 23: congelación breve de impacto
+const HITSTOP_HEAVY := 0.08
+const HITSTOP_PARRY := 0.06
 signal mount_changed(mounted: bool)
 signal loadout_changed(loadout: int)
 signal landed_hit(target: Node3D, result: String, target_was_open: bool)
@@ -1114,7 +1117,8 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
 	if tgt and global_position.distance_to(tgt.global_position) < sword_range() + 1.5:
 		var dd := MeshUtil.flat(tgt.global_position - global_position)
-		if dd.length() > 0.1 and facing.dot(dd.normalized()) > 0.0:
+		# Ronda 23: con objetivo fijado se encara siempre; sin fijar, solo si está delante
+		if dd.length() > 0.1 and (_lock_valid() or facing.dot(dd.normalized()) > 0.0):
 			facing = dd.normalized()
 	# Telegrafía: hoja alzada y brillante
 	_sword_pivot.rotation = Vector3(1.4 if heavy else 1.0, sword_half_arc(), 0)
@@ -1228,6 +1232,9 @@ func _strike_frame(d: Dictionary) -> void:
 			add_meter(3.0)
 		if res == "hit":
 			hits_landed += 1
+			if atk_heavy or was_open:
+				hitstop.emit(HITSTOP_HEAVY) # ronda 23: fuertes y castigos «pesan»
+				impact.emit(0.9)
 		landed_hit.emit(t, res, was_open)
 
 # ---------------- Armas: espada+escudo O arco ----------------
@@ -1603,6 +1610,8 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		add_meter(15.0)
 		parries_landed += 1
 		parry_state = Parry.NONE # éxito: sin recuperación
+		hitstop.emit(HITSTOP_PARRY)
+		impact.emit(0.7)
 		_snd("parry")
 		return "parry"
 	if parry_state == Parry.RECOVERY:

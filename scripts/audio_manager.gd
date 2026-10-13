@@ -91,13 +91,21 @@ func save_settings() -> void:
 	cfg.load(settings_path)
 	for b: String in BUSES:
 		cfg.set_value("audio", b, volumes[b])
+	cfg.set_value("control", "buffer", PlayerController.buffer_window) # ronda 23
 	cfg.save(settings_path)
+
+## Ronda 23: ventana del búfer de entrada (Ajustes → Controles).
+func set_buffer_window(v: float, save: bool = true) -> void:
+	PlayerController.buffer_window = clampf(v, 0.1, 1.5)
+	if save:
+		save_settings()
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(settings_path) == OK:
 		for b: String in BUSES:
 			volumes[b] = float(cfg.get_value("audio", b, volumes[b]))
+		PlayerController.buffer_window = clampf(float(cfg.get_value("control", "buffer", PlayerController.BUFFER_WINDOW)), 0.1, 1.5)
 	for b: String in BUSES:
 		set_volume(b, volumes[b], false)
 

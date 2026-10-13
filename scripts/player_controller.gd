@@ -101,12 +101,14 @@ func _physics_process(delta: float) -> void:
 	var sp := _pressed_edge("special")
 	var cs := _pressed_edge("spell")
 	var cn := _pressed_edge("spell_next")
+	_update_buffer_hit()
 	if not enabled:
+		_clear_buffer()
 		return
-	if swp: me.swap_loadout()
+	if swp: _try("swap")
 	# Ataque: pulsar = ligero (al soltar), mantener 0,4 s = fuerte. En modo arco dispara.
 	if me.loadout == Fighter.Loadout.BOW:
-		if atk_edge: me.shoot()
+		if atk_edge: _try("shoot")
 		_atk_hold = -1.0
 	elif atk_down:
 		if _atk_hold < 0.0:
@@ -116,16 +118,80 @@ func _physics_process(delta: float) -> void:
 			_atk_hold += delta
 		if _atk_hold >= Fighter.HEAVY_HOLD and not _heavy_fired:
 			_heavy_fired = true
-			me.attack_heavy()
+			_try("heavy")
 	elif _atk_hold >= 0.0:
 		if not _heavy_fired:
-			me.attack_light()
+			_try("light")
 		_atk_hold = -1.0
-	if pr and not me.mounted: me.parry() # ronda 21: sin parry montado
+	if pr: _try("parry")
 	if cn: me.cycle_spell()
-	if cs: me.cast_spell()
+	if cs: _try("spell")
 	if sm: me.summon()
-	if ds: me.dash()
-	if mt: me.toggle_mount()
-	if jp: me.jump()
-	if sp and not me.mounted: me.special() # ronda 22: sin Habilidad/Arte montado
+	if ds: _try("dash")
+	if mt: _try("mount")
+	if jp: _try("jump")
+	if sp: _try("special")
+	_update_buffer(delta)
+
+# ---------------- Ronda 23: búfer de entrada ----------------
+## Una acción pulsada cuando todavía no es posible (en mitad de un golpe, voltereta, cambio de arma,
+## aturdimiento...) se guarda y se ejecuta en el primer fotograma en que sea posible, si no pasaron
+## más de `buffer_window` segundos. Gana la última pulsación, salvo que la guardada sea esquivar
+## (la esquiva tiene prioridad). Un golpe recibido (nuevo aturdimiento) vacía el búfer; lo pulsado
+## DURANTE el aturdimiento sí se guarda y sale al recuperarse.
+const BUFFER_WINDOW := 0.4 ## por defecto (estilo souls); configurable en Ajustes
+static var buffer_window: float = BUFFER_WINDOW
+var buffered: String = ""
+var buffer_age: float = 0.0
+var buffer_fired: Array[String] = [] ## historial (pruebas / depuración)
+var _prev_stun: float = 0.0
+
+func _do(a: String, retry: bool) -> bool:
+	match a:
+		"light": return me.attack_light() or me._buffered # el combo ya lo encadena
+		"heavy": return me.attack_heavy()
+		"shoot": return me.shoot()
+		"swap": return me.swap_loadout()
+		"parry": return not me.mounted and me.parry() # sin parry montado
+		"spell": return me.cast_spell()
+		"special": return not me.mounted and me.special() # sin Habilidad/Arte montado
+		"jump": return me.jump()
+		"mount": return me.toggle_mount()
+		"dash":
+			# Al reintentar no convierte la anticipación de un ligero en estocada con dash
+			if retry and me.atk_state == Fighter.Atk.WINDUP:
+				return false
+			return me.dash()
+	return false
+
+func _try(a: String) -> void:
+	if _do(a, false):
+		if buffered == a:
+			_clear_buffer()
+		return
+	if buffered == "dash" and a != "dash":
+		return # la esquiva guardada tiene prioridad
+	buffered = a
+	buffer_age = 0.0
+
+func _update_buffer(delta: float) -> void:
+	if buffered == "":
+		return
+	buffer_age += delta
+	if buffer_age > buffer_window:
+		_clear_buffer() # caducó
+		return
+	if buffer_age <= 0.0:
+		return
+	if _do(buffered, true):
+		buffer_fired.append(buffered)
+		_clear_buffer()
+
+func _update_buffer_hit() -> void:
+	if me.stun > _prev_stun + 0.001:
+		_clear_buffer() # lo golpearon: se descarta lo pulsado antes
+	_prev_stun = me.stun
+
+func _clear_buffer() -> void:
+	buffered = ""
+	buffer_age = 0.0

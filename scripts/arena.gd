@@ -55,6 +55,8 @@ func _ready() -> void:
 	player.opponent = enemy
 	player.impact.connect(_on_impact)
 	enemy.impact.connect(func(_s: float) -> void: pass)
+	player.hitstop.connect(_on_hitstop)
+	enemy.hitstop.connect(_on_hitstop)
 	enemy.opponent = player
 	var au := get_node_or_null("/root/Audio")
 	if au:
@@ -84,7 +86,28 @@ func _ready() -> void:
 	start_round()
 
 func _on_impact(strength: float) -> void:
-	shake = maxf(shake, 0.35 * strength)
+	shake = maxf(shake, SHAKE_SCALE * strength)
+
+## Ronda 23: hit-stop (el tiempo casi se detiene unos milisegundos, en tiempo real).
+const SHAKE_SCALE := 0.3
+static var hitstop_enabled: bool = true
+var hitstops: int = 0
+func _on_hitstop(d: float) -> void:
+	if not hitstop_enabled or _hs_prev > 0.0 or Engine.time_scale <= 0.0:
+		return
+	hitstops += 1
+	_hs_prev = Engine.time_scale # respeta la escala previa (pruebas aceleradas, capturas)
+	Engine.time_scale = _hs_prev * 0.05
+	await get_tree().create_timer(d, true, false, true).timeout
+	if _hs_prev > 0.0:
+		Engine.time_scale = _hs_prev
+		_hs_prev = 0.0
+
+var _hs_prev: float = 0.0
+func _exit_tree() -> void:
+	if _hs_prev > 0.0:
+		Engine.time_scale = _hs_prev
+		_hs_prev = 0.0
 
 func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 		cd: CharacterDef = null, wd: WeaponDef = null, sk: Array = [], at: Dictionary = {}, eqp: Dictionary = {}) -> Fighter:
@@ -292,7 +315,7 @@ func _physics_process(delta: float) -> void:
 	if camera.global_position.distance_to(look) > 0.5:
 		camera.look_at(look, Vector3.UP)
 	if shake > 0.0:
-		shake = maxf(shake - delta, 0.0)
+		shake = shake * exp(-7.0 * delta) if shake > 0.01 else 0.0 # ronda 23: caída exponencial (golpe seco, sin temblor largo)
 		camera.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * shake
 	var lt: Node3D = player.face_target if is_instance_valid(player.face_target) else null
 	lock_marker.visible = lt != null

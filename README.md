@@ -476,3 +476,20 @@ Prueba nueva: `test_magic.gd` (parry montado, botón Objetivo, ranuras, hechizos
 - **Eikon** pasa al lado izquierdo, encima del joystick de movimiento. Sigue las mismas reglas: solo aparece cuando se puede invocar, y montado en tu eikon dice «Especial».
 - **Arte / Habilidad** se oculta montado (y la tecla G no hace nada montado). Vuelve al bajar.
 - Flujo nuevo: el proyecto vive en GitHub (`origin`, rama `master`). Para probar: `git pull` y Play en Godot 4.7.
+
+## Ronda 23 — Búfer de entrada y sensación de juego
+
+**Búfer de entrada** (`PlayerController`). Si pulsás una acción cuando todavía no se puede hacer (en mitad de un golpe, de una voltereta, de un cambio de arma, de un salto o aturdido), se guarda y sale en el primer fotograma en que sea posible, siempre que no hayan pasado más de **0,4 s** desde la pulsación (`BUFFER_WINDOW`; ajustable de 0,1 a 1,5 s en **Ajustes → Controles → Búfer**, se guarda en `user://ajustes.cfg`).
+- Cubre: ataque ligero y fuerte (y pasos de combo), disparo, voltereta/dash, cambio de arma, hechizo, Habilidad/Arte, parry, salto y montar/desmontar. Igual a pie y montado (montado no se guardan parry ni Arte porque no existen).
+- Gana la última pulsación, salvo que la guardada sea **esquivar**: la esquiva tiene prioridad.
+- Un golpe que te aturde vacía el búfer; lo que pulses **durante** el aturdimiento sí se guarda y sale al recuperarte.
+- El ligero pulsado durante un golpe se integra al combo (no dispara un ataque de más). Al reintentar, una esquiva no convierte la anticipación del siguiente ligero en estocada con dash.
+- No hay objetos consumibles todavía, así que «usar objeto» queda para cuando existan.
+
+**Mejoras de sensación**
+1. **Hit-stop:** los golpes fuertes y los castigos (golpear a alguien en recuperación o aturdido) congelan el juego 0,08 s; un parry logrado, 0,06 s. Es en tiempo real y siempre se restablece (`Arena.hitstop_enabled`).
+2. **Temblor de cámara afinado:** escala 0,3 por impacto y caída exponencial; los golpes fuertes y el parry ahora también sacuden. Golpe seco, sin temblor largo.
+3. **Giro hacia el objetivo al atacar:** con objetivo fijado el golpe se encara siempre al objetivo (antes solo si estaba delante); sin fijar, sigue igual (solo si está delante y cerca).
+4. Ya existían y se mantienen: cancelar la recuperación del golpe con voltereta en su segunda mitad, voltereta en la dirección del joystick aunque esté fijado, búfer de estocada tras los i-frames y demora de 0,6 s antes de recuperar aguante.
+
+El equilibrio a nivel 1 no cambia (no se tocó daño, costes ni tiempos de acciones). Prueba nueva: `test_buffer.gd`.

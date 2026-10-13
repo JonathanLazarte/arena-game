@@ -843,4 +843,32 @@ func _build_settings() -> void:
 		row.add_child(sl)
 		row.add_child(pl)
 		list_box.add_child(row)
-	detail.text = "[b]Ajustes de sonido[/b]\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
+	# Ronda 23: búfer de entrada
+	list_box.add_child(UIKit.title("Controles", 22))
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 10)
+	var bl := UIKit.label("Búfer", 18)
+	bl.custom_minimum_size = Vector2(100, 0)
+	brow.add_child(bl)
+	var bs := HSlider.new()
+	bs.name = "BufferWindow"
+	bs.min_value = 0.1
+	bs.max_value = 1.5
+	bs.step = 0.05
+	bs.custom_minimum_size = Vector2(200, 32)
+	bs.value = PlayerController.buffer_window
+	var bp := UIKit.label("%.2f s" % bs.value, 16, UIKit.MUTED)
+	bp.custom_minimum_size = Vector2(56, 0)
+	bs.value_changed.connect(func(v: float) -> void:
+		if au:
+			au.set_buffer_window(v)
+		else:
+			PlayerController.buffer_window = v
+		bp.text = "%.2f s" % v)
+	brow.add_child(bs)
+	brow.add_child(bp)
+	list_box.add_child(brow)
+	var ct := list_box.get_child(list_box.get_child_count() - 2)
+	list_box.move_child(ct, 0) # Controles arriba, a la vista
+	list_box.move_child(brow, 1)
+	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
