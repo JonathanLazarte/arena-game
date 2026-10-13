@@ -184,6 +184,7 @@ func _run() -> void:
 	var blk := p.blocking
 	var res := p.take_hit(5.0, e, "melee")
 	Input.action_release("block")
+	p.stun = 0.0 # ronda 17: el golpe aturde (hitstun); no es lo que se prueba aquí
 	check(not blk and res == "hit", "en modo arco no hay bloqueo con escudo")
 	check(not p.attack_light(), "en modo arco no hay espada")
 	await tap("swap_weapon")

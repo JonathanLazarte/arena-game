@@ -5,6 +5,7 @@
 
 [sub_resource type="Resource" id="combo_9"]
 script = ExtResource("ch")
+hitstun = 0.9
 name = "Escudazo y estocada"
 anim = "Block_Attack"
 then_anim = "1H_Melee_Attack_Stab"

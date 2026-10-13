@@ -29,6 +29,9 @@ extends Resource
 @export var lunge: float = 0.0 ## m/s hacia delante durante el final de la anticipación y el golpe
 @export var hop: float = 0.0 ## salto visual (m) del remate con salto
 @export var finisher: bool = false
+## Ronda 17: aturdimiento que causa al defensor. Golpes 1 y 2: corto (da tiempo a rodar antes del
+## siguiente si no se es codicioso); remate: largo (tambaleo).
+@export var hitstun: float = 0.3
 
 func attack_dict() -> Dictionary:
 	return {"windup": windup, "chain_windup": windup, "active": active, "recovery": recovery,

@@ -197,8 +197,14 @@ func _run() -> void:
 	await wait(0.5)
 	p.global_position = pm.global_position + Vector3(1.5, 0, 0)
 	await physics_frame
+	while not p.can_mount_now(): # ronda 17: solo se sube estando libre
+		await physics_frame
 	await tap("mount")
 	await physics_frame
+	var mt := 0
+	while not p.mounted and mt < 90: # ronda 17: si aún no está libre, el eikon lo monta al quedar libre
+		await physics_frame
+		mt += 1
 	check(p.mounted and p.mount_node == pm, "F vuelve a montar cerca de la montura")
 	while e.stun > 0.0:
 		await physics_frame

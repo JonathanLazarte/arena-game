@@ -5,6 +5,7 @@
 
 [sub_resource type="Resource" id="combo_0"]
 script = ExtResource("ch")
+hitstun = 0.18
 name = "Puñalada izquierda"
 anim = "Dualwield_Melee_Attack_Slice"
 direction = "izq→der"
@@ -19,6 +20,7 @@ window = 0.4
 
 [sub_resource type="Resource" id="combo_1"]
 script = ExtResource("ch")
+hitstun = 0.18
 name = "Puñalada derecha"
 anim = "Dualwield_Melee_Attack_Slice"
 mirror = true
@@ -34,6 +36,7 @@ window = 0.4
 
 [sub_resource type="Resource" id="combo_2"]
 script = ExtResource("ch")
+hitstun = 0.55
 name = "Doble estocada"
 anim = "Dualwield_Melee_Attack_Stab"
 direction = "estocada"
@@ -78,3 +81,4 @@ mesh_right = "Knife"
 mesh_left = "Knife_Offhand"
 max_combo = 3
 combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])
+heavy_hitstun = 0.45

@@ -17,7 +17,8 @@ var kind: String = "arrow" ## "arrow" (el escudo la anula) o "eikon" (el escudo 
 ## Ronda 16: autoapuntado = SOLO APUNTAR. Al disparar se apunta a la posición actual del
 ## objetivo (ver Projectile.aim_dir) y el proyectil vuela RECTO, sin perseguir: correr de lado a
 ## distancia lo esquiva. Durante los i-frames de la voltereta lo atraviesa (take_hit = "dodge").
-var aimed_at: Node3D = null ## a quién se apuntó al disparar (solo informativo)
+var aimed_at: Node3D = null
+var hitstun: float = 0.0 ## Ronda 17: aturdimiento del proyectil (flecha 0,25 / virote 0,45) ## a quién se apuntó al disparar (solo informativo)
 var dodged_by: Array = [] ## objetivos que lo esquivaron con i-frames (no les vuelve a golpear)
 
 func _ready() -> void:
@@ -58,6 +59,8 @@ func _physics_process(delta: float) -> void:
 		if t in dodged_by:
 			continue
 		if p.distance_to(t.get_hit_center()) < radius + t.hit_radius:
+			if hitstun > 0.0 and t is Fighter:
+				(t as Fighter).incoming_arrow_stun = hitstun
 			var res: String = t.take_hit(damage, shooter, kind)
 			if res == "dodge":
 				dodged_by.append(t) # lo atraviesa durante los i-frames y sigue de largo

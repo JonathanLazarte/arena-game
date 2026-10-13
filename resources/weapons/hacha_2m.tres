@@ -5,6 +5,7 @@
 
 [sub_resource type="Resource" id="combo_0"]
 script = ExtResource("ch")
+hitstun = 0.5
 name = "Hachazo diagonal"
 anim = "2H_Melee_Attack_Slice"
 direction = "der→izq"
@@ -19,6 +20,7 @@ window = 0.4
 
 [sub_resource type="Resource" id="combo_1"]
 script = ExtResource("ch")
+hitstun = 0.5
 name = "Revés ascendente"
 anim = "2H_Melee_Attack_Slice"
 reverse = true
@@ -34,6 +36,7 @@ window = 0.4
 
 [sub_resource type="Resource" id="combo_2"]
 script = ExtResource("ch")
+hitstun = 1.2
 name = "Salto demoledor"
 anim = "2H_Melee_Attack_Chop"
 direction = "vertical"
@@ -78,3 +81,4 @@ mesh_source = "res://assets/models/Barbarian.glb"
 mesh_right = "2H_Axe"
 max_combo = 3
 combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])
+heavy_hitstun = 0.8

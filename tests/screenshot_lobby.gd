@@ -40,6 +40,66 @@ func _run() -> void:
 		cam.look_at_from_position(pp + ar.player.facing.cross(Vector3.UP) * 4.0 + Vector3(0, 2, 0) + ar.player.facing * 1.5, pp + ar.player.facing * 1.5 + Vector3(0, 1, 0))
 		cam.current = true
 		await create_timer(0.3).timeout
+	elif mode in ["fire_bow", "fire_xbow", "parthian"]:
+		# Ronda 17
+		gs.character_id = "arquero"
+		gs.weapon_id = "ballesta" if mode == "fire_xbow" else "arco"
+		gs.eikon_id = "lobo"
+		Arena.start_mounted = false
+		gs.from_lobby = true
+		gs.random_rival = false
+		change_scene_to_file("res://scenes/arena.tscn")
+		await process_frame
+		await process_frame
+		var ar: Arena = current_scene
+		ar.ai.enabled = false
+		ar.controller.set_physics_process(false)
+		ar.time_left = 76.0
+		var p := ar.player
+		var e := ar.enemy
+		await create_timer(0.8).timeout
+		p.global_position = Vector3(0, 0, 8)
+		p.facing = Vector3.FORWARD
+		e.global_position = Vector3(-2, 0, -6)
+		p.face_target = e
+		var cam := Camera3D.new()
+		ar.add_child(cam)
+		if mode == "parthian":
+			p.meter = Fighter.METER_MAX
+			p.summon()
+			await create_timer(0.5).timeout
+			p.want_sprint = true
+			for i in 70:
+				p.move_input = MeshUtil.flat(p.global_position - e.global_position).normalized().rotated(Vector3.UP, 0.5)
+				await physics_frame
+			p.bow_cd = 0.0
+			p.shoot()
+			for i in 22:
+				p.move_input = MeshUtil.flat(p.global_position - e.global_position).normalized().rotated(Vector3.UP, 0.5)
+				await physics_frame
+			var pp := p.global_position
+			var side := p.facing.cross(Vector3.UP)
+			cam.look_at_from_position(pp + side * 7.0 + Vector3(0, 3.0, 0) + p.facing * 2.0, pp + Vector3(0, 1.6, 0) - p.facing * 1.5)
+			print("giro jinete: ", rad_to_deg(p.rider_yaw))
+		else:
+			await create_timer(1.6).timeout
+			p.global_position = Vector3(0, 0, 8)
+			p.facing = Vector3.FORWARD
+			await physics_frame
+			print("arma: ", p.weapon.id, " estado ", p.shot_state, " ok ", p.shoot())
+			var target_state := Fighter.Shot.RELOAD if mode == "fire_xbow" else Fighter.Shot.DRAW
+			var guard := 0
+			while p.shot_state != target_state and guard < 200:
+				await physics_frame
+				guard += 1
+			for i in (12 if mode == "fire_xbow" else 18):
+				await physics_frame
+			var pp := p.global_position
+			cam.look_at_from_position(pp + Vector3(3.6, 2.0, 1.6), pp + Vector3(0, 1.1, -1.2))
+		Engine.time_scale = 0.0
+		cam.make_current()
+		for i in 3:
+			await process_frame
 	elif mode in ["lock_eikon", "combo", "run_cam"]:
 		# Ronda 16
 		gs.choose_first_character("caballero")

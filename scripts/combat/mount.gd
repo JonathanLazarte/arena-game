@@ -25,7 +25,10 @@ var max_health: float = 0.0
 var alive: bool = true
 var hit_radius: float = 1.2
 var attack_cd: float = 0.8
-var recall_t: float = 0.0 ## s volviendo con el dueño (pulsó «Montar» lejos)
+var recall_t: float = 0.0 ## (ronda 16; ya no se usa)
+## Ronda 17: llamado con «Montar»: corre hacia el dueño (siguiéndolo) y lo monta al llegar.
+var called: bool = false
+const CALL_REACH := 2.2
 var attacks_done: int = 0
 var companion_target: Node3D = null
 signal expired(m: Mount)
@@ -182,6 +185,11 @@ func _physics_process(delta: float) -> void:
 			_wander_dir = Vector3.ZERO
 	attack_cd -= delta
 	recall_t = maxf(recall_t - delta, 0.0)
+	if called:
+		if is_instance_valid(owner_fighter) and owner_fighter.alive and not owner_fighter.mounted:
+			_call_step(delta)
+			return
+		called = false
 	if eikon and is_instance_valid(owner_fighter) and owner_fighter.alive and recall_t <= 0.0:
 		companion_target = MeshUtil.companion_target(global_position, get_tree(), team)
 		if companion_target:
@@ -237,3 +245,21 @@ func _companion_step(delta: float) -> void:
 				var tw := create_tween()
 				tw.tween_property(model, "position:z", -0.5, 0.08).as_relative()
 				tw.tween_property(model, "position:z", 0.5, 0.15).as_relative()
+
+## Viene corriendo hacia la posición actual del dueño; al llegar (y si está libre) lo monta.
+func _call_step(delta: float) -> void:
+	var o := owner_fighter
+	var d := MeshUtil.flat(o.global_position - global_position)
+	var dist := d.length()
+	var v := Vector3.ZERO
+	if dist > CALL_REACH * 0.6:
+		v = d.normalized() * maxf(data.speed, 10.0)
+	velocity.x = v.x
+	velocity.z = v.z
+	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
+	move_and_slide()
+	if dist > 0.1:
+		rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), delta * 8.0)
+	if dist <= CALL_REACH and o.can_mount_now():
+		called = false
+		o.mount_on(self)

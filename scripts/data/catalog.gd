@@ -5,7 +5,7 @@ const CHARACTERS := ["res://resources/characters/caballero.tres", "res://resourc
 	"res://resources/characters/berserker.tres", "res://resources/characters/paladin.tres", "res://resources/characters/asesino.tres"]
 const WEAPONS := ["res://resources/weapons/espada_escudo.tres", "res://resources/weapons/espada_larga.tres",
 	"res://resources/weapons/hacha_2m.tres", "res://resources/weapons/dagas.tres", "res://resources/weapons/lanza.tres",
-	"res://resources/weapons/arco.tres"]
+	"res://resources/weapons/arco.tres", "res://resources/weapons/ballesta.tres"]
 ## Ronda 14: los eikons son también las monturas (fénix, lobo y grifo se montan; el gólem lucha a tu lado).
 const EIKONS := {"fenix": "res://resources/eikons/phoenix.tres", "lobo": "res://resources/eikons/ice_wolf.tres",
 	"grifo": "res://resources/eikons/griffin.tres", "golem": "res://resources/eikons/stone_golem.tres"}

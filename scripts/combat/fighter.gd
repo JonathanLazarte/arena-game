@@ -129,6 +129,12 @@ var foot_stats: MountData = preload("res://resources/mounts/on_foot.tres")
 var character: CharacterDef = _neutral()
 var weapon: WeaponDef = preload("res://resources/weapons/espada_escudo.tres")
 const FALLBACK_MELEE := preload("res://resources/weapons/dagas.tres") ## cuerpo a cuerpo del que lleva arco
+const FALLBACK_BOW := preload("res://resources/weapons/arco.tres") ## arma a distancia de quien lleva cuerpo a cuerpo
+## Ronda 17: disparo con compromiso. DRAW = tensar/apuntar (a pie: quieto), RECOVER = tras soltar
+## (a pie: andar lento), RELOAD = recarga de la ballesta (a pie: andar algo lento, sin disparar).
+enum Shot { NONE, DRAW, RECOVER, RELOAD }
+## Montado y de espaldas al rival (huida fijado), el jinete gira el torso hasta mirar al rival.
+const MELEE_TWIST_MAX_DEG := 100.0 ## más girado que esto no se puede atacar cuerpo a cuerpo
 var stamina_max: float = STAMINA_MAX
 var poise_max: float = POISE_MAX
 var heals: float = 0.0 ## vida curada por la pasiva (pruebas)
@@ -192,6 +198,15 @@ var aim_lead: float = 0.0
 var swap_t: float = 0.0
 var swap_from: int = Loadout.SWORD_SHIELD ## arma que se enfunda durante el cambio
 var bow_cd: float = 0.0
+var shot_state: Shot = Shot.NONE
+var shot_t: float = 0.0
+var shot_dur: float = 0.0
+var shots_fired: int = 0
+var shot_cut_sprint: bool = false ## el disparo cortó la carrera (el control apaga «Correr»)
+var incoming_arrow_stun: float = 0.0 ## lo fija el proyectil justo antes de impactar
+var last_hitstun: float = 0.0
+var rider_yaw: float = 0.0 ## giro del jinete sobre la silla respecto a la montura (rad)
+var run_away: bool = false
 var dash_time: float = 0.0
 var dash_cd: float = 0.0
 var roll_t: float = -1.0 ## tiempo dentro de la voltereta a pie (-1 = sin voltereta)
@@ -275,6 +290,27 @@ func _apply_character() -> void:
 ## Arma cuerpo a cuerpo efectiva (el arquero usa dagas al cambiar de arma).
 func melee() -> WeaponDef:
 	return FALLBACK_MELEE if weapon.ranged else weapon
+
+## Arma a distancia efectiva (con arma cuerpo a cuerpo, el arco de recambio).
+func ranged() -> WeaponDef:
+	return weapon if weapon.ranged else FALLBACK_BOW
+
+func is_shooting() -> bool:
+	return shot_state == Shot.DRAW or shot_state == Shot.RECOVER
+
+## Dirección hacia la que mira el jinete/arquero (montado puede girarse sobre la silla).
+func aim_facing() -> Vector3:
+	return facing.rotated(Vector3.UP, rider_yaw) if mounted else facing
+
+## Ronda 17: aturdimiento que causa el golpe actual de este luchador.
+func current_hitstun() -> float:
+	if atk_dash or atk_jump:
+		return 0.45
+	if atk_heavy:
+		return melee().heavy_hitstun
+	if cur_hit:
+		return cur_hit.hitstun
+	return 0.3
 
 func has_shield() -> bool:
 	return melee().allows_shield and character.shield_mesh != ""
@@ -433,17 +469,31 @@ func can_remount() -> bool:
 
 ## Acción "Montar": monta si hay montura libre cerca, desmonta si va montado.
 func toggle_mount() -> bool:
-	if not alive or stun > 0.0 or atk_state != Atk.NONE or swap_t > 0.0 or airborne or special_t > 0.0:
+	if not alive:
+		return false
+	# Ronda 17: tu eikon sin jinete: «Montar» lo llama (viene corriendo desde cualquier distancia y
+	# te monta solo al llegar, aunque estés atacando o aturdido: monta en cuanto quedes libre).
+	# Pulsar otra vez cancela la llamada.
+	if not mounted and is_instance_valid(owned_mount) and owned_mount.owner_fighter == self and owned_mount.can_ride(self):
+		if owned_mount.called:
+			owned_mount.called = false
+			return false
+		if can_mount_now() and global_position.distance_to(owned_mount.global_position) <= MOUNT_REACH:
+			return mount_on(owned_mount)
+		owned_mount.called = true
+		return false
+	if not can_mount_now():
 		return false
 	if mounted:
 		dismount(false)
 		return true
 	if can_remount():
 		return mount_on(nearest_free_mount())
-	# Ronda 16: tu eikon está luchando lejos: «Montar» lo llama de vuelta para montarlo
-	if is_instance_valid(owned_mount) and owned_mount.can_ride(self):
-		owned_mount.recall_t = 3.0
 	return false
+
+## ¿Libre para subir/bajar de la montura ahora mismo?
+func can_mount_now() -> bool:
+	return alive and stun <= 0.0 and atk_state == Atk.NONE and swap_t <= 0.0 and not airborne and special_t <= 0.0 and roll_t < 0.0 and not is_shooting()
 
 # ---------------- Aguante ----------------
 
@@ -488,6 +538,7 @@ func _physics_process(delta: float) -> void:
 	if meter_passive and alive and meter < METER_MAX and not is_instance_valid(active_eikon):
 		add_meter(METER_PASSIVE * delta)
 	bow_cd = maxf(bow_cd - delta, 0.0)
+	_update_shot(delta)
 	dash_cd = maxf(dash_cd - delta, 0.0)
 	special_cd = maxf(special_cd - delta, 0.0)
 	land_t = maxf(land_t - delta, 0.0)
@@ -527,8 +578,10 @@ func _physics_process(delta: float) -> void:
 	var turn := st.turn_speed * delta
 	reversing = false
 	var run_req := want_sprint and amount > 0.3 and exhausted <= 0.0 and not blocking and stamina > 0.0
-	var run_away := false
-	if _lock_valid() and run_req and not mounted and amount > 0.05:
+	if shot_state != Shot.NONE and not mounted:
+		run_req = false # disparar a pie corta la carrera (vuelve a andar)
+	run_away = false
+	if _lock_valid() and run_req and amount > 0.05:
 		# Ronda 16: corriendo fijado, si la entrada se aleja más de RUN_TURN_DEG del rival el
 		# personaje se gira y corre hacia allí (hacia la cámara), sin correr de espaldas.
 		var d0 := MeshUtil.flat(face_target.global_position - global_position)
@@ -574,6 +627,22 @@ func _physics_process(delta: float) -> void:
 		target_vel *= 0.55 if mounted else 0.3 # compromiso: casi no te mueves al atacar
 	if land_t > 0.0:
 		target_vel *= 0.4
+	# Ronda 17: compromiso del disparo a pie (montado se dispara sin penalizar a la montura)
+	if not mounted:
+		match shot_state:
+			Shot.DRAW:
+				target_vel = Vector3.ZERO
+				planar_vel = Vector3.ZERO # raíz inmediata al tensar
+			Shot.RECOVER: target_vel *= ranged().fire_slow
+			Shot.RELOAD: target_vel *= ranged().reload_slow
+	# Jinete girado sobre la silla: mira al rival mientras la montura huye
+	var want_yaw := 0.0
+	if mounted and _lock_valid():
+		var dt := MeshUtil.flat(face_target.global_position - global_position)
+		if dt.length() > 0.1:
+			want_yaw = facing.signed_angle_to(dt.normalized(), Vector3.UP)
+	rider_yaw = lerp_angle(rider_yaw, want_yaw, clampf(delta * 10.0, 0.0, 1.0)) if mounted else 0.0
+	_rider_root.rotation.y = rider_yaw
 	_update_stamina(delta, amount < 0.3 or reversing)
 	planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta * (AIR_CONTROL if airborne else 1.0))
 	var v := planar_vel
@@ -747,6 +816,8 @@ func _request_attack(heavy: bool) -> bool:
 		return false
 	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
+	if mounted and absf(rad_to_deg(rider_yaw)) > MELEE_TWIST_MAX_DEG:
+		return false # girado en la silla (huyendo): solo se puede disparar
 	if airborne and not mounted:
 		if atk_state != Atk.NONE or stamina <= 0.0:
 			return false
@@ -917,30 +988,71 @@ func _apply_loadout_visuals() -> void:
 	_kv.set_loadout(0 if sw else 1)
 
 func shoot() -> bool:
-	if loadout != Loadout.BOW or swap_t > 0.0 or atk_state != Atk.NONE:
+	if loadout != Loadout.BOW or swap_t > 0.0 or atk_state != Atk.NONE or shot_state != Shot.NONE:
 		return false
-	if not _can_act() or bow_cd > 0.0 or stamina <= 0.0:
+	if not _can_act() or bow_cd > 0.0 or stamina <= 0.0 or roll_t >= 0.0:
 		return false
-	bow_cd = BOW_COOLDOWN
+	var r := ranged()
 	spend_stamina(COST_BOW)
-	var origin := get_hit_center() + Vector3(0, 0.8, 0) + facing * 1.4
-	var dir := facing
+	shot_state = Shot.DRAW
+	shot_t = 0.0
+	shot_dur = r.fire_draw
+	if not mounted:
+		shot_cut_sprint = want_sprint or sprinting
+		sprinting = false
+	return true
+
+func _update_shot(delta: float) -> void:
+	if shot_state == Shot.NONE:
+		return
+	if stun > 0.0 and shot_state == Shot.DRAW:
+		shot_state = Shot.NONE # interrumpido: no sale el tiro
+		bow_cd = 0.2
+		return
+	shot_t += delta
+	if shot_t < shot_dur:
+		return
+	var r := ranged()
+	shot_t = 0.0
+	match shot_state:
+		Shot.DRAW:
+			_release_shot()
+			shot_state = Shot.RECOVER
+			shot_dur = r.fire_recovery
+		Shot.RECOVER:
+			if r.reload_time > 0.0:
+				shot_state = Shot.RELOAD
+				shot_dur = r.reload_time
+			else:
+				shot_state = Shot.NONE
+				bow_cd = r.fire_cooldown
+		Shot.RELOAD:
+			shot_state = Shot.NONE
+			bow_cd = r.fire_cooldown
+
+func _release_shot() -> void:
+	var r := ranged()
+	var af := aim_facing()
+	var origin := get_hit_center() + Vector3(0, 0.8, 0) + af * 1.4
+	var dir := af
 	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
 	if tgt:
 		var d: Vector3 = tgt.get_hit_center() - origin
-		if MeshUtil.flat(d).normalized().dot(facing) > -0.2:
-			dir = Projectile.aim_dir(origin, tgt, 32.0, aim_lead)
+		if MeshUtil.flat(d).normalized().dot(af) > -0.2:
+			dir = Projectile.aim_dir(origin, tgt, r.projectile_speed, aim_lead)
 	var p := Projectile.new()
 	p.team = team
 	p.shooter = self
 	p.direction = dir
 	p.aimed_at = tgt
-	p.damage = 8.0 * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0)
-	p.color = Color(0.9, 0.8, 0.5)
+	p.speed = r.projectile_speed
+	p.hitstun = r.ranged_hitstun
+	p.damage = r.arrow_damage * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0)
+	p.color = Color(0.9, 0.8, 0.5) if r.reload_time <= 0.0 else Color(0.75, 0.85, 1.0)
 	get_parent().add_child(p)
 	p.global_position = origin
+	shots_fired += 1
 	_kv.event("shoot")
-	return true
 
 ## Dash montado / voltereta a pie.
 func dash() -> bool:
@@ -1247,6 +1359,17 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		apply_stun(0.6 + (0.3 if amount >= HEAVY_HIT else 0.0))
 	elif atk_state == Atk.WINDUP and not atk_heavy:
 		apply_stun(0.2) # los ligeros se interrumpen; el fuerte tiene súper-armadura
+	# Ronda 17: aturdimiento por golpe (según arma y posición en el combo / tipo de proyectil)
+	var hs := 0.0
+	if from is Fighter and is_instance_valid(from):
+		if _kind == "melee":
+			hs = (from as Fighter).current_hitstun()
+		elif _kind == "arrow":
+			hs = incoming_arrow_stun if incoming_arrow_stun > 0.0 else (from as Fighter).ranged().ranged_hitstun
+	incoming_arrow_stun = 0.0
+	if hs > 0.0 and not (atk_state == Atk.WINDUP and atk_heavy):
+		apply_stun(hs)
+		last_hitstun = hs
 	if mounted and alive and amount >= HEAVY_HIT and randf() < knockoff_chance_heavy:
 		dismount(true)
 	return "hit"
@@ -1331,6 +1454,8 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 		_apply_loadout_visuals()
 		loadout_changed.emit(loadout)
 	bow_cd = 0.0
+	shot_state = Shot.NONE
+	rider_yaw = 0.0
 	dash_cd = 0.0
 	health_changed.emit(health, max_health)
 	meter_changed.emit(meter)

@@ -141,7 +141,7 @@ func _run() -> void:
 	p.face_target = e
 	p.facing = Vector3.FORWARD
 	p.shoot()
-	await physics_frame
+	await wait(p.ranged().fire_draw + 0.05) # Ronda 17: la flecha sale al acabar de tensar
 	var shot: Projectile = null
 	for n in get_nodes_in_group("projectile"):
 		if (n as Projectile).shooter == p:

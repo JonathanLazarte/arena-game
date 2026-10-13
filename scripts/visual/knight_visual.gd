@@ -22,11 +22,12 @@ const STATES := {
 	"parry": "Block_Attack", "dodge_f": "Dodge_Forward", "dodge_b": "Dodge_Backward",
 	"dodge_l": "Dodge_Left", "dodge_r": "Dodge_Right", "hit": "Hit_A", "stun": "Hit_B",
 	"death": "Death_A", "aim": "2H_Ranged_Aiming", "shoot": "2H_Ranged_Shoot", "swap": "Use_Item",
+	"reload": "2H_Ranged_Reload", # Ronda 17 (ballesta)
 	# Ronda 14
 	"dash_strike": DASH_STRIKE_ANIM, "jump_up": "Jump_Start", "jump_air": "Jump_Idle", "land": "Jump_Land",
 	"slam": "2H_Melee_Attack_Chop",
 }
-const SCALED := ["light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
+const SCALED := ["reload", "aim", "light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
 ## Animación propia (KayKit no trae una estocada en carrera): se compone en Godot a partir de
 ## Dodge_Forward (piernas y cadera: el impulso de la zancada) y 1H_Melee_Attack_Slice_Horizontal
 ## (tronco y brazos: el tajo), con el tronco inclinado hacia delante durante la arremetida.
@@ -45,7 +46,7 @@ const LOCO_SPEEDS := {
 	"Run_Strafe_R": ["Running_Strafe_Right", Vector2(1.35, 0), 1.2],
 }
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
-const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap"]
+const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap", "reload"]
 
 var model: Node3D
 var ap: AnimationPlayer
@@ -83,6 +84,10 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	for i in 3:
 		states["light%d" % i] = melee_w.anim_light[i % melee_w.anim_light.size()]
 	states["heavy"] = melee_w.anim_heavy
+	var rw: WeaponDef = wdef if wdef.ranged else load("res://resources/weapons/arco.tres") as WeaponDef
+	states["aim"] = rw.anim_aim
+	states["shoot"] = rw.anim_shoot
+	states["reload"] = rw.anim_reload
 	tint = c
 	_char_tint = cdef.tint
 	model = (load(cdef.model_path) as PackedScene).instantiate() as Node3D
@@ -129,6 +134,11 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	sk.add_child(att)
 	bow = MeshUtil.box(att, Vector3(0.1, 1.8, 0.14), Vector3.ZERO, Color(0.5, 0.3, 0.12))
 	MeshUtil.box(bow, Vector3(0.02, 1.7, 0.02), Vector3(0, 0, 0.25), Color(0.9, 0.9, 0.85)) # cuerda
+	if wdef.procedural == "ballesta":
+		# Ronda 17: ballesta = malla «1H_Crossbow» del Rogue (KayKit Adventurers, CC0)
+		bow.queue_free()
+		bow = _weapon_mesh(sk, wdef.mesh_source, wdef.mesh_right)
+		bow.name = "Ballesta"
 	bow.visible = false
 	# Postura a horcajadas sobre el AnimationTree (SkeletonModifier3D)
 	riding = RidingPose.new()
@@ -476,7 +486,7 @@ func update(f: Fighter, delta: float) -> void:
 	if not f.alive:
 		s = "death"
 		upper = false
-	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE:
+	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE and not (oneshot == "hit" and oneshot_t > 0.0 and f.stun <= f.last_hitstun + 0.01):
 		s = "stun"
 	elif f.is_dash_striking():
 		s = "dash_strike"
@@ -498,6 +508,8 @@ func update(f: Fighter, delta: float) -> void:
 		s = "jump_up" if f.velocity.y > 1.5 else "jump_air"
 	elif f.land_t > 0.0 and not f.mounted:
 		s = "land"
+	elif f.shot_state == Fighter.Shot.RELOAD:
+		s = "reload"
 	elif oneshot_t > 0.0:
 		s = oneshot
 	elif f.blocking:
@@ -537,6 +549,11 @@ func update(f: Fighter, delta: float) -> void:
 			Fighter.Atk.RECOVERY:
 				sc = L * 0.38 / maxf(f.atk_dur, 0.05)
 		tree.set("parameters/act/%s/ts/scale" % s, sc)
+	elif s == "reload":
+		tree.set("parameters/act/reload/ts/scale", _clip_len("reload") / maxf(f.ranged().reload_time, 0.1))
+	elif s == "aim":
+		# tensar/apuntar dura fire_draw (luego mantiene la pose de apuntar)
+		tree.set("parameters/act/aim/ts/scale", 1.0 if f.shot_state != Fighter.Shot.DRAW else maxf(_clip_len("aim") * 0.5 / maxf(f.ranged().fire_draw, 0.05), 0.5))
 	elif s == "swap":
 		tree.set("parameters/act/swap/ts/scale", _clip_len("swap") / Fighter.SWAP_TIME)
 	if f.swap_t > 0.0:

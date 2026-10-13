@@ -39,6 +39,20 @@ extends Resource
 @export var mesh_left: String = ""
 @export var procedural: String = "" ## "lanza" = malla generada por código
 @export var arrow_damage: float = 8.0
+## Ronda 17: disparo con compromiso (a pie). Montado no hay raíz ni lentitud, pero sí los tiempos.
+@export var fire_draw: float = 0.5 ## tensar/apuntar: a pie, quieto
+@export var fire_recovery: float = 0.4 ## tras soltar: a pie, andar a fire_slow
+@export var fire_slow: float = 0.25
+@export var fire_cooldown: float = 0.15 ## espera antes del siguiente disparo
+@export var reload_time: float = 0.0 ## ballesta: recarga (sin disparar)
+@export var reload_slow: float = 0.6
+@export var projectile_speed: float = 32.0
+@export var ranged_hitstun: float = 0.25
+@export var anim_aim: String = "2H_Ranged_Aiming"
+@export var anim_shoot: String = "2H_Ranged_Shoot"
+@export var anim_reload: String = "2H_Ranged_Reload"
+## Aturdimiento del ataque fuerte cuerpo a cuerpo (los del combo van en cada ComboHit.hitstun).
+@export var heavy_hitstun: float = 0.6
 ## Ronda 16: cadena de ataques básicos (3 golpes: ida, vuelta y remate). Vacío = ligero genérico.
 @export var combo: Array[Resource] = []
 

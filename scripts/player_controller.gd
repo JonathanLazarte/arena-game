@@ -84,7 +84,9 @@ func _physics_process(delta: float) -> void:
 	if _pressed_edge("run_toggle") and not me.mounted:
 		run_toggled = not run_toggled
 	if me.exhausted > 0.0 or me.mounted:
-		run_toggled = false # agotado: deja de correr (hay que volver a activarlo)
+		run_toggled = false
+	if me.shot_state != Fighter.Shot.NONE and not me.mounted:
+		run_toggled = false # Ronda 17: disparar a pie apaga «Correr» (vuelves a andar) # agotado: deja de correr (hay que volver a activarlo)
 	me.want_sprint = enabled and (Input.is_action_pressed("sprint") or run_toggled)
 	var atk_down := Input.is_action_pressed("attack_sword")
 	var atk_edge := _pressed_edge("attack_sword")

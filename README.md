@@ -319,3 +319,22 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
 - **Correr hacia atrás fijado (corrección).** Corriendo, si la entrada se aleja más de **110°**
   del rival, el personaje se gira y corre de cara hacia allí (hacia la cámara). Lateral y diagonal
   hacia delante siguen haciendo strafe encarado. Caminando, retrocede mirando al rival.
+
+## Ronda 17 — compromiso a distancia, ballesta, tiro parto, aturdimiento por golpe
+
+| Arma | Tensado (inmóvil) | Recuperación (25 % vel.) | Enfriamiento | Recarga | Daño | Vel. proyectil | Aturdimiento |
+|---|---|---|---|---|---|---|---|
+| Arco | 0,50 s | 0,40 s | 0,12 s | — | 8 | 32 m/s | 0,25 s |
+| Ballesta (nv 3, 500 oro; Arquero/Asesino) | 0,25 s | 0,15 s | 0,05 s | 1,3 s (60 % vel.) | 16 | 46 m/s | 0,45 s |
+
+Disparar a pie cancela el sprint y apaga el modo correr. Montado se dispara sin penalización. Montado, fijado y galopando hacia atrás (>110°), la montura huye y el jinete se gira hacia el objetivo (tiro parto). Con el jinete girado más de 100° no hay cuerpo a cuerpo.
+
+| Arma | Golpe 1 | Golpe 2 | Remate | Pesado |
+|---|---|---|---|---|
+| Espada y escudo | 0,35 | 0,35 | 0,85 (Caballero 0,9) | 0,6 |
+| Espada larga | 0,4 | 0,4 | 1,0 | 0,7 |
+| Hacha a dos manos | 0,5 | 0,5 | 1,2 | 0,8 |
+| Dagas | 0,18 | 0,18 | 0,55 | 0,45 |
+| Lanza | 0,38 | 0,38 | 0,8 | 0,6 |
+
+Llamada del eikon (F a pie): viene corriendo desde cualquier distancia y te monta al llegar, en cuanto estés libre. F otra vez o la muerte del eikon cancelan la llamada.

@@ -77,7 +77,7 @@ const LEGACY_CHARACTER_PRICE := {"caballero": 1200, "arquero": 1200, "berserker"
 const CHARACTER_CHANGE_ENABLED := false
 const CHARACTER_CHANGE_ITEM := {"id": "cambio_personaje", "name": "Cambio de personaje", "gemas": 0, "available": false}
 const WEAPON_REQ := {"espada_escudo": [1, 0], "arco": [1, 0], "dagas": [1, 0], "hacha_2m": [1, 0],
-	"espada_larga": [2, 350], "lanza": [4, 600]}
+	"espada_larga": [2, 350], "lanza": [4, 600], "ballesta": [3, 500]}
 const EIKON_REQ := {"fenix": [1, 0], "lobo": [3, 800], "grifo": [5, 1200], "golem": [6, 1400]}
 ## Ronda 14 (guardado v3): monturas antiguas -> eikon equivalente, o se devuelve el oro.
 const MOUNT_TO_EIKON := {"grifo": "grifo"}

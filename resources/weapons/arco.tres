@@ -6,8 +6,15 @@
 script = ExtResource("1")
 id = "arco"
 display_name = "Arco"
-description = "A distancia. Flechas de 8 de daño; el escudo las anula. Cambia a dagas para el cuerpo a cuerpo."
+description = "A distancia. Tensar 0,5 s quieto y andar lento 0,4 s; flechas de 8 que enlazan rápido. El escudo las anula. Cambia a dagas para el cuerpo a cuerpo."
 ranged = true
 allows_shield = false
 mesh_right = ""
 procedural = "arco"
+fire_draw = 0.5
+fire_recovery = 0.4
+fire_slow = 0.25
+fire_cooldown = 0.12
+projectile_speed = 32.0
+ranged_hitstun = 0.25
+arrow_damage = 8.0

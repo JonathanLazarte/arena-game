@@ -206,7 +206,7 @@ func _process(_d: float) -> void:
 	if _player.is_swapping():
 		loadout_label.text = "Cambiando de arma..."
 	else:
-		loadout_label.text = _player.melee().display_name if _player.loadout == Fighter.Loadout.SWORD_SHIELD else "Arco"
+		loadout_label.text = _player.melee().display_name if _player.loadout == Fighter.Loadout.SWORD_SHIELD else _player.ranged().display_name
 	# Eikon activo: tiempo restante; montado en él, el botón Eikon lanza su especial
 	var riding_eikon := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
 	if is_instance_valid(_player.active_eikon):

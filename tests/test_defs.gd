@@ -11,7 +11,7 @@ func _run() -> void:
 	var cs := Catalog.characters()
 	var ws := Catalog.weapons()
 	check(cs.size() == 5, "5 personajes (%d)" % cs.size())
-	check(ws.size() == 6, "6 tipos de arma (%d)" % ws.size())
+	check(ws.size() == 7, "7 tipos de arma (%d)" % ws.size())
 	var ids := {}
 	for w in ws:
 		ids[w.id] = true
