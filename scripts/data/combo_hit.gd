@@ -24,6 +24,7 @@ extends Resource
 @export var active: float = 0.12
 @export var recovery: float = 0.55
 @export var stamina: float = 13.0
+@export var phys_type: String = "" ## ronda 24: "" = el del arma (las estocadas, perforantes)
 @export var poise_mult: float = 1.0 ## daño de poise relativo (el remate > 1)
 @export var window: float = 0.45 ## s desde el fin del golpe en que se acepta la siguiente pulsación
 @export var lunge: float = 0.0 ## m/s hacia delante durante el final de la anticipación y el golpe

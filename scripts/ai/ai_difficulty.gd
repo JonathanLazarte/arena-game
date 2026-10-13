@@ -38,3 +38,10 @@ extends Resource
 @export var aim_lead: float = 0.0
 ## Probabilidad (por decisión) de usar la habilidad del personaje / el especial del eikon montado.
 @export var special_chance: float = 0.3
+## Ronda 24: «El intercambio».
+@export var guard_counter_chance: float = 0.45 ## tras bloquear, contraataca con la contra de guardia
+@export var crit_chance: float = 0.85 ## aprovecha la postura rota del jugador con un crítico
+@export var stance_caution: float = 0.3 ## con la postura por debajo de esto, deja de presionar
+## Fase 2: golpes retrasados (espera antes de soltar el primer golpe para romper el ritmo del parry).
+@export var delay_chance: float = 0.35
+@export var delay_max: float = 0.45

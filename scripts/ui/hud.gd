@@ -333,6 +333,11 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 	name_e.text = enemy.display_name
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
 	player.summon_failed.connect(_on_summon_failed)
+	# Ronda 24: avisos del intercambio
+	player.counter_landed.connect(func(_t: Node3D) -> void: show_message("¡Contraataque!", 0.5))
+	player.critical_landed.connect(func(_t: Node3D, d: float) -> void: show_message("¡Crítico! %d" % int(d), 0.9))
+	enemy.stance_broken.connect(func() -> void: show_message("¡Postura rota! Ataca de frente", 1.0))
+	player.stance_broken.connect(func() -> void: show_message("¡Tu postura se rompió!", 0.9))
 	player.summoned.connect(func(e: Node3D) -> void:
 		var ed: EikonData = (e as Mount).eikon if e is Mount else (e as Eikon).data
 		show_message(("¡%s! Montado (E: %s)" % [ed.eikon_name, ed.special_name]) if ed.rideable else "¡%s invocado!" % ed.eikon_name, 1.2))

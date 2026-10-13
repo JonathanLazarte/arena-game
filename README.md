@@ -493,3 +493,40 @@ Prueba nueva: `test_magic.gd` (parry montado, botón Objetivo, ranuras, hechizos
 4. Ya existían y se mantienen: cancelar la recuperación del golpe con voltereta en su segunda mitad, voltereta en la dirección del joystick aunque esté fijado, búfer de estocada tras los i-frames y demora de 0,6 s antes de recuperar aguante.
 
 El equilibrio a nivel 1 no cambia (no se tocó daño, costes ni tiempos de acciones). Prueba nueva: `test_buffer.gd`.
+
+## Ronda 24 — «El intercambio» (Fase 1 de la hoja de ruta, sin curación)
+
+**1. Contraataque.** Golpear al rival mientras está en anticipación o en pleno golpe (o lanzando un hechizo) hace ×1,15 de daño (×1,25 con perforante) y ×1,3 de daño de equilibrio. Aviso «¡Contraataque!».
+
+**2. Subtipos físicos y equilibrio por arma.** Cada arma tiene subtipo (`WeaponDef.phys_type`) y cada golpe de combo puede definir el suyo (`ComboHit.phys_type`; las estocadas son perforantes). El subtipo escala la absorción física de la armadura según su clase de peso (la referencia del rol usa el mismo factor, así que con el equipo inicial el nivel 1 no cambia).
+
+| Arma | Subtipo | Equilibrio (x) |
+|---|---|---|
+| Espada y escudo | estándar | 1,0 |
+| Espada larga | cortante | 1,2 |
+| Hacha a 2 manos | contundente | 1,8 |
+| Lanza | perforante (estocadas) | 1,0 |
+| Dagas | cortante | 0,6 |
+
+| Absorción física × | estándar | contundente | cortante | perforante |
+|---|---|---|---|---|
+| Ligera | 1,0 | 1,15 | 0,75 | 0,9 |
+| Media | 1,0 | 1,0 | 1,0 | 0,9 |
+| Pesada | 1,0 | 0,7 | 1,25 | 1,1 |
+
+Equilibrio extra por subtipo: contundente ×1,15, cortante ×0,95.
+
+**3. Contra de guardia.** Atacar (ligero o fuerte) en los 0,35 s después de bloquear un golpe lanza un fuerte rápido (anticipación ×0,6), con súper-armadura y ×2 de daño de equilibrio. Sin botón nuevo: es el mismo botón de ataque.
+
+**4. Postura y crítico frontal.** Además del equilibrio hay **postura** (equilibrio ×3,5, unas dos cadenas completas sin pausa) que solo se recupera tras 2,5 s sin recibir golpes (12/s). Al vaciarse, el luchador a pie queda **expuesto 1,2 s**. Atacar de frente a menos de 2,6 m lanza un **crítico**: 0,8 s de animación (provisional, el golpe sísmico) con el atacante invulnerable, ×2,2 del daño fuerte del arma, hit-stop. Avisos «¡Postura rota!» y «¡Crítico!».
+
+**IA.** Aprovecha tu postura rota con un crítico (fácil 50 %, normal 85 %, difícil 100 %), usa la contra de guardia tras bloquear (15 / 45 / 75 %), deja de presionar con la postura baja y, como novedad de la Fase 2, a veces **retrasa** su primer golpe para romper el ritmo del parry (20 / 35 / 50 %, hasta 0,35-0,55 s).
+
+**Fase 2 adelantada.**
+- **Fuerte cargado:** mantener el ataque después de que salga el fuerte lo retiene hasta 0,6 s: hasta +40 % de daño y equilibrio.
+- **Ataque corriendo:** atacar mientras corrés a pie = embestida en la dirección de carrera.
+- **Guardia alzada:** el aguante se regenera a la mitad.
+
+**Pendiente:** curación (pospuesta), animación propia del crítico y del ataque corriendo (necesitan clips), barra de postura en el HUD, estabilidad propia de cada escudo, crítico montado. La contra de guardia y el crítico son solo a pie.
+
+Prueba nueva: `test_exchange.gd`.

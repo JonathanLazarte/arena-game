@@ -15,6 +15,39 @@ signal summoned(eikon: Node3D)
 signal summon_failed(reason: String)
 signal impact(strength: float)
 signal hitstop(duration: float) ## ronda 23: congelación breve de impacto
+## Ronda 24: «El intercambio» — contraataque, contra de guardia, rotura de postura y crítico frontal
+signal counter_landed(target: Node3D)
+signal stance_broken
+signal critical_landed(target: Node3D, damage: float)
+const GUARD_COUNTER_WINDOW := 0.35 ## s tras bloquear en que atacar = contra de guardia
+const GC_WINDUP_MULT := 0.6 ## la contra de guardia sale más rápido que un fuerte
+const GC_POISE := 2.0
+const STANCE_MULT := 3.5 ## postura = equilibrio x3,5 (se rompe con presión sostenida)
+const STANCE_DELAY := 2.5 ## s sin recibir golpes antes de recuperar postura
+const STANCE_REGEN := 12.0
+const STANCE_BREAK_TIME := 1.2 ## expuesto tras romper la postura
+const CRIT_MULT := 2.2
+const CRIT_RANGE := 2.6
+const CRIT_TIME := 0.8 ## animación del crítico (el atacante es invulnerable)
+const CRIT_HIT_AT := 0.45
+const CHARGE_MAX := 0.6 ## ronda 24 (fase 2): carga extra del fuerte manteniendo
+const CHARGE_BONUS := 0.4 ## +40 % de daño y equilibrio con carga completa
+const BLOCK_REGEN_MULT := 0.5 ## aguante con la guardia alzada
+var counter_hits: int = 0
+var guard_counter_t: float = 0.0
+var atk_gc: bool = false
+var guard_counters: int = 0
+var stance: float = POISE_MAX * STANCE_MULT
+var stance_max: float = POISE_MAX * STANCE_MULT
+var stance_broken_t: float = 0.0
+var stance_breaks: int = 0
+var crit_t: float = -1.0
+var _crit_target: Fighter = null
+var _crit_done: bool = false
+var crits: int = 0
+var want_charge: bool = false ## lo fija el controlador: botón de ataque mantenido
+var charge_t: float = 0.0
+var running_attacks: int = 0
 const HITSTOP_HEAVY := 0.08
 const HITSTOP_PARRY := 0.06
 signal mount_changed(mounted: bool)
@@ -495,6 +528,8 @@ func _apply_character() -> void:
 	energy = energy_max
 	parry_window = PARRY_WINDOW + float(mods["parry_window"])
 	poise = poise_max
+	stance_max = poise_max * STANCE_MULT
+	stance = stance_max
 	if weapon.ranged:
 		loadout = Loadout.BOW
 
@@ -558,7 +593,16 @@ func poise_mult_now() -> float:
 	var k := melee().poise_damage_mult
 	if cur_hit and atk_state != Atk.NONE:
 		k *= cur_hit.poise_mult
-	return k
+	if atk_gc and atk_state != Atk.NONE:
+		k *= GC_POISE
+	k *= 1.0 + CHARGE_BONUS * charge_t / CHARGE_MAX
+	return k * float(PhysTypes.POISE_MOD.get(phys_now(), 1.0))
+
+## Ronda 24: subtipo físico del golpe en curso.
+func phys_now() -> String:
+	if atk_heavy or atk_dash or atk_jump:
+		return melee().phys_type
+	return PhysTypes.of_hit(melee(), cur_hit)
 
 ## ¿Toca el suelo? (para los golpes de área en el suelo). En el fénix se vuela.
 func is_grounded() -> bool:
@@ -726,7 +770,7 @@ func _update_stamina(delta: float, idle: bool) -> void:
 	if exhausted > 0.0:
 		exhausted = maxf(exhausted - delta, 0.0)
 	if _since_spend >= REGEN_DELAY and stamina < stamina_max:
-		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * float(roll_mod()["regen"]) * status_fx.regen_mult() * delta, stamina_max)
+		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * float(roll_mod()["regen"]) * status_fx.regen_mult() * (BLOCK_REGEN_MULT if blocking else 1.0) * delta, stamina_max)
 		stamina_changed.emit(stamina, exhausted > 0.0)
 
 # ---------------- Bucle principal ----------------
@@ -773,6 +817,7 @@ func _physics_process(delta: float) -> void:
 	if special_t > 0.0:
 		special_t = maxf(special_t - delta, 0.0)
 	_update_magic(delta)
+	_update_exchange(delta)
 	var was_dashing := dash_time > 0.0
 	dash_time = maxf(dash_time - delta, 0.0)
 	if roll_t >= 0.0:
@@ -792,7 +837,7 @@ func _physics_process(delta: float) -> void:
 	invuln = maxf(invuln - delta, 0.0)
 	var st := stats()
 	var inp := move_input
-	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0:
+	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0 or crit_t >= 0.0:
 		inp = Vector3.ZERO
 	var wb := want_block and alive and stun <= 0.0 and roll_t < 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
@@ -1023,7 +1068,7 @@ func add_meter(v: float) -> void:
 	meter_changed.emit(meter)
 
 func _can_act() -> bool:
-	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0
+	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0 and crit_t < 0.0
 
 ## ¿Está t dentro del arco de la espada?
 func in_sword_arc(t: Node3D) -> bool:
@@ -1049,7 +1094,7 @@ func _atk_data() -> Dictionary:
 	var d: Dictionary = DASH_STRIKE.duplicate() if atk_dash else (JUMP_ATTACK.duplicate() if atk_jump else melee().attack(atk_heavy))
 	if cur_hit and not atk_dash and not atk_jump and not atk_heavy:
 		d = cur_hit.attack_dict()
-	d["damage"] = d["damage"] * damage_mult()
+	d["damage"] = d["damage"] * damage_mult() * (1.0 + CHARGE_BONUS * charge_t / CHARGE_MAX)
 	var sp := attr_speed()
 	for k: String in ["windup", "chain_windup", "recovery", "whiff"]:
 		d[k] = d[k] / sp
@@ -1070,6 +1115,27 @@ func _request_attack(heavy: bool) -> bool:
 		return false
 	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
+	if not mounted and not airborne and atk_state == Atk.NONE and stamina > 0.0:
+		var ct := crit_candidate()
+		if ct:
+			_start_crit(ct)
+			return true
+		if guard_counter_t > 0.0:
+			# Contra de guardia: fuerte rápido, súper-armadura y mucho daño de equilibrio
+			guard_counter_t = 0.0
+			blocking = false
+			combo = max_combo()
+			_start_attack(true, false)
+			atk_gc = true
+			atk_dur *= GC_WINDUP_MULT
+			guard_counters += 1
+			return true
+		if sprinting and not heavy and move_input.length() > 0.5:
+			# Fase 2: ataque corriendo = embestida con la inercia
+			dash_dir = MeshUtil.flat(move_input).normalized()
+			running_attacks += 1
+			_start_dash_strike()
+			return true
 	if mounted and absf(rad_to_deg(rider_yaw)) > MELEE_TWIST_MAX_DEG:
 		return false # girado en la silla (huyendo): solo se puede disparar
 	if airborne and not mounted:
@@ -1096,6 +1162,8 @@ func _request_attack(heavy: bool) -> bool:
 
 func _start_attack(heavy: bool, chained: bool) -> void:
 	_art_mult = 1.0
+	atk_gc = false
+	charge_t = 0.0
 	atk_heavy = heavy
 	cur_hit = null
 	if not heavy and not atk_dash and not atk_jump:
@@ -1181,6 +1249,11 @@ func _update_attack(delta: float) -> void:
 				atk_t = atk_dur # el dash hizo de anticipación: golpe ya, delante del rival
 				dash_strikes += 1
 			_dash_atk = _dash_atk and atk_t < atk_dur
+			# Fase 2: fuerte cargado — mantener el botón retiene el golpe al final de la anticipación
+			if atk_heavy and not atk_gc and not mounted and want_charge and atk_t >= atk_dur and charge_t < CHARGE_MAX and stamina > 0.0:
+				charge_t = minf(charge_t + delta, CHARGE_MAX)
+				atk_t = atk_dur - 0.001
+				return
 			if atk_t >= atk_dur:
 				atk_state = Atk.ACTIVE
 				atk_t = 0.0
@@ -1633,6 +1706,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 			if stamina <= 0.0:
 				_guard_break()
 			return "block"
+		guard_counter_t = GUARD_COUNTER_WINDOW # ronda 24: ventana de contra de guardia
 		var chip := BLOCK_REDUCTION if has_shield() else melee().no_shield_block_chip
 		_damage(amount * (EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else chip))
 		spend_stamina(blocked_hit_cost(amount, from))
@@ -1647,7 +1721,17 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		riposte_t = 0.0
 	# Ronda 18: Vitalidad = defensa física; Devoción = resistencia sagrada (eikon/área)
 	# Ronda 19: Defensa (plana, nivel y atributos) y Absorción % de la armadura por tipo de daño
-	amount = EquipStats.incoming(amount, _damage_type(from, _kind), eq, eq_ref)
+	# Ronda 24: contraataque — te golpean mientras atacas (anticipación o golpe)
+	var counter := false
+	var sub := ""
+	if from is Fighter and is_instance_valid(from) and (_kind == "melee" or _kind == "critico"):
+		sub = (from as Fighter).phys_now()
+	if from is Fighter and (_kind == "melee" or _kind == "arrow") and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE or cast_t > 0.0):
+		counter = true
+		amount *= float(PhysTypes.COUNTER_DMG.get(sub if sub != "" else "estandar", 1.15))
+		(from as Fighter).counter_hits += 1
+		(from as Fighter).counter_landed.emit(self)
+	amount = EquipStats.incoming(amount, _damage_type(from, _kind), eq, eq_ref, sub)
 	if _kind == "eikon" or _kind == "aoe":
 		amount *= 1.0 - float(ad["sagrado"])
 	if _kind == "aoe":
@@ -1668,7 +1752,24 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis
 	_since_hit = 0.0
-	poise -= amount * 2.0 / (float(_stoneskin.get("poise", 1.0)) if stoneskin_t > 0.0 else 1.0) * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
+	var pd := amount * 2.0 / (float(_stoneskin.get("poise", 1.0)) if stoneskin_t > 0.0 else 1.0) * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
+	if counter:
+		pd *= PhysTypes.COUNTER_POISE
+	poise -= pd
+	if _kind != "critico":
+		stance -= pd
+	if stance <= 0.0 and alive and not mounted:
+		# Rotura de postura: expuesto ~1,2 s a un crítico frontal
+		stance = stance_max
+		poise = poise_max
+		stance_broken_t = STANCE_BREAK_TIME
+		stance_breaks += 1
+		blocking = false
+		_cancel_attack()
+		apply_stun(STANCE_BREAK_TIME)
+		stance_broken.emit()
+		_snd("guard_break")
+		return "hit"
 	if poise <= 0.0:
 		poise = poise_max
 		apply_stun((0.6 + (0.3 if amount >= HEAVY_HIT else 0.0)) * EquipStats.resist_mult("concentracion", eq, eq_ref))
@@ -1741,6 +1842,12 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	special_cd = 0.0
 	cast_t = 0.0
 	_cast_id = ""
+	crit_t = -1.0
+	_crit_target = null
+	stance = stance_max
+	stance_broken_t = 0.0
+	guard_counter_t = 0.0
+	charge_t = 0.0
 	spell_cd = {}
 	stoneskin_t = 0.0
 	art_cd = 0.0
@@ -1945,3 +2052,65 @@ func use_weapon_art() -> bool:
 			_kv.event("slam")
 			_snd("swing_heavy")
 	return true
+
+
+# ---------------- Ronda 24: postura y crítico ----------------
+
+func stance_fraction() -> float:
+	return clampf(stance / maxf(stance_max, 1.0), 0.0, 1.0)
+
+func _update_exchange(delta: float) -> void:
+	guard_counter_t = maxf(guard_counter_t - delta, 0.0)
+	stance_broken_t = maxf(stance_broken_t - delta, 0.0)
+	if _since_hit > STANCE_DELAY:
+		stance = minf(stance + STANCE_REGEN * delta, stance_max)
+	if crit_t >= 0.0:
+		crit_t += delta
+		if not _crit_done and crit_t >= CRIT_HIT_AT:
+			_crit_done = true
+			if is_instance_valid(_crit_target) and _crit_target.alive:
+				var dmg := melee().heavy_damage * damage_mult() * CRIT_MULT
+				var h0 := _crit_target.health
+				_crit_target.take_hit(dmg, self, "critico")
+				crits += 1
+				critical_landed.emit(_crit_target, h0 - _crit_target.health)
+				hitstop.emit(0.12)
+				impact.emit(1.2)
+		if crit_t >= CRIT_TIME:
+			crit_t = -1.0
+			_crit_target = null
+
+## Rival a tiro de crítico frontal: postura rota, a pie, cerca y de frente a mí.
+func crit_candidate() -> Fighter:
+	for t in MeshUtil.enemies_of(get_tree(), team):
+		if not (t is Fighter):
+			continue
+		var f := t as Fighter
+		if f.stance_broken_t <= 0.0 or f.mounted or not f.alive:
+			continue
+		var d := MeshUtil.flat(global_position - f.global_position)
+		if d.length() > CRIT_RANGE:
+			continue
+		if d.length() > 0.1 and f.facing.dot(d.normalized()) < 0.2:
+			continue # frontal: estoy delante de él
+		return f
+	return null
+
+func _start_crit(t: Fighter) -> void:
+	crit_t = 0.0
+	_crit_done = false
+	_crit_target = t
+	invuln = CRIT_TIME # invulnerable durante la animación
+	blocking = false
+	var dd := MeshUtil.flat(t.global_position - global_position)
+	if dd.length() > 0.1:
+		facing = dd.normalized()
+	t.stance_broken_t = 0.0
+	t.stun = maxf(t.stun, CRIT_TIME + 0.3)
+	t.blocking = false
+	spend_stamina(COST_PARRY)
+	_kv.event("slam")
+	_snd("swing_heavy")
+
+func is_criticalling() -> bool:
+	return crit_t >= 0.0

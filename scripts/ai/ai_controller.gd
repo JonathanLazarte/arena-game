@@ -42,6 +42,13 @@ var _connected: bool = false
 var aoe_jumps: int = 0 ## saltos para esquivar golpes de área (pruebas)
 var aoe_seen: int = 0
 var _aoe_done: Dictionary = {}
+## Ronda 24
+var _crit_roll: float = -1.0
+var _gc_roll: float = -1.0
+var _delay_t: float = -1.0
+var crits_tried: int = 0
+var guard_counters_tried: int = 0
+var delayed_attacks: int = 0
 
 func _on_landed(_t: Node3D, res: String, was_open: bool) -> void:
 	if res == "hit" and was_open:
@@ -87,6 +94,38 @@ func _physics_process(delta: float) -> void:
 				return
 	var sword_mode := me.loadout == Fighter.Loadout.SWORD_SHIELD
 	var reach := me.sword_range()
+	# --- Ronda 24: crítico frontal si el jugador tiene la postura rota ---
+	if opp.stance_broken_t <= 0.0:
+		_crit_roll = -1.0
+	elif sword_mode and not me.mounted and not opp.mounted and dist < 7.0:
+		if _crit_roll < 0.0:
+			_crit_roll = randf()
+		if _crit_roll < profile.crit_chance:
+			var spot := opp.global_position + opp.facing * 1.4
+			var to_spot := MeshUtil.flat(spot - me.global_position)
+			me.want_block = false
+			me.move_input = to_spot.normalized() if to_spot.length() > 0.4 else Vector3.ZERO
+			if me.crit_candidate() == opp and me.atk_state == Fighter.Atk.NONE:
+				crits_tried += 1
+				me.attack_light()
+			return
+	# --- Contra de guardia tras bloquear ---
+	if me.guard_counter_t <= 0.0:
+		_gc_roll = -1.0
+	elif sword_mode and not me.mounted and dist < reach + 0.6:
+		if _gc_roll < 0.0:
+			_gc_roll = randf()
+			if _gc_roll < profile.guard_counter_chance:
+				_block_hold = 0.0
+				me.want_block = false
+				var okg := me.attack_heavy()
+				if okg:
+					guard_counters_tried += 1
+				return
+	# --- Postura baja: deja de presionar ---
+	if phase == Phase.COMMIT and me.stance_fraction() < profile.stance_caution and me.atk_state == Fighter.Atk.NONE:
+		phase = Phase.RETREAT
+		_phase_t = 1.0
 	# --- Leer el ataque telegrafiado del jugador y reaccionar al final de su anticipación ---
 	if opp.atk_state == Fighter.Atk.WINDUP and opp.attacks_started != _reacted_id \
 			and dist < opp.sword_range() + 2.5 and opp.atk_dur - opp.atk_t < 0.3:
@@ -229,6 +268,7 @@ func _physics_process(delta: float) -> void:
 				_start_breather()
 			elif _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > profile.commit_min_stamina and sword_mode and not me.is_swapping():
 				phase = Phase.COMMIT
+				_delay_t = -1.0
 				_phase_t = 2.5
 				_swings = 1 + randi() % maxi(profile.max_chain, 1)
 				_started = false
@@ -244,8 +284,16 @@ func _physics_process(delta: float) -> void:
 				if _started:
 					_swings = 0
 				elif dist < reach and me.facing.dot(dir) > 0.6:
-					var ok := me.attack_heavy() if randf() < profile.heavy_chance else me.attack_light()
-					_started = ok
+					# Fase 2: a veces retrasa el primer golpe (rompe el ritmo del parry)
+					if _delay_t < 0.0:
+						_delay_t = randf() * profile.delay_max if randf() < profile.delay_chance else 0.0
+						if _delay_t > 0.0:
+							delayed_attacks += 1
+					_delay_t -= get_physics_process_delta_time()
+					if _delay_t <= 0.0:
+						var ok := me.attack_heavy() if randf() < profile.heavy_chance else me.attack_light()
+						_started = ok
+						_delay_t = -1.0
 			elif me.atk_state != Fighter.Atk.WINDUP and not me.atk_heavy and me.combo < _swings:
 				me.attack_light() # búfer para encadenar
 			if _swings <= 0 or _phase_t <= 0.0 or (me.stun > 0.0 and me.atk_state == Fighter.Atk.NONE):

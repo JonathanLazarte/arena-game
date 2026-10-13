@@ -110,11 +110,17 @@ static func role_reference(c: CharacterDef) -> Dictionary:
 	return sheet(c, 1, Attributes.start_for(c.id), Catalog.weapon(c.default_weapon), null, armor_defs(Catalog.starter_armor(c.id)))
 
 ## Daño recibido: ataque × multiplicador de defensa × (1 − absorción), relativo a la referencia.
-static func incoming(amount: float, dtype: String, me: Dictionary, ref: Dictionary) -> float:
+static func incoming(amount: float, dtype: String, me: Dictionary, ref: Dictionary, sub: String = "") -> float:
 	if amount <= 0.0:
 		return amount
 	var dm := defense_mult(amount, me["defensa"]) / defense_mult(amount, ref["defensa"])
-	var ab := (1.0 - float(me["absorcion"].get(dtype, 0.0))) / (1.0 - float(ref["absorcion"].get(dtype, 0.0)))
+	var am := float(me["absorcion"].get(dtype, 0.0))
+	var ar := float(ref["absorcion"].get(dtype, 0.0))
+	if dtype == "fisico" and sub != "":
+		# Ronda 24: subtipo físico contra la clase de armadura (la referencia del rol usa el mismo subtipo)
+		am = clampf(am * PhysTypes.absorb_mod(String(me.get("clase", "medio")), sub), 0.0, 0.9)
+		ar = clampf(ar * PhysTypes.absorb_mod(String(ref.get("clase", "medio")), sub), 0.0, 0.9)
+	var ab := (1.0 - am) / (1.0 - ar)
 	return amount * dm * ab
 
 ## Multiplicador de una resistencia frente a la referencia (más = menos efecto), con topes.

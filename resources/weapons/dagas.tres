@@ -63,6 +63,7 @@ reach_foot = 1.7
 reach_mounted = 2.6
 half_arc_foot_deg = 60.0
 half_arc_mounted_deg = 85.0
+phys_type = "cortante"
 light_damage = 8.0
 heavy_damage = 18.0
 light_windup = 0.28

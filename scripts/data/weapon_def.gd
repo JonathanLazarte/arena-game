@@ -61,6 +61,7 @@ extends Resource
 ## Ronda 20: acumulación de estado por golpe {"sangrado"/"veneno"/"congelacion": puntos}
 @export var status: Dictionary = {}
 ## Ronda 20: herrería (las fija Smithing.effective en una copia; el recurso base va a +0)
+@export var phys_type: String = "estandar" ## ronda 24: subtipo físico (PhysTypes)
 @export var upgrade_level: int = 0
 @export var infusion: String = ""
 @export var upgrade_dmg_mult: float = 1.0

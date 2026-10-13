@@ -585,18 +585,18 @@ Fuentes: https://eldenring.wiki.fextralife.com/PvP · https://eldenring.wiki.fex
 Ordenada por impacto en la sensación de combate y por dependencias.
 
 ### Fase 1: "El intercambio" (núcleo del 1v1)
-1. **Contraataque**: ×1,15 de daño y ×1,3 de equilibrio, con texto y destello (§3). *Sin dependencias.*
-2. **Tabla de daño de equilibrio por arma** y **subtipos físicos** (estándar, contundente, cortante, perforante) en `WeaponDef` y `ComboHit` (§2, §16).
-3. **Contra de guardia**: atacar en los 0,35 s tras bloquear (§3). *Depende de 2.*
-4. **Rotura de postura + crítico frontal**, con animación e invulnerabilidad (§3). *Depende de 2.*
-5. **Lágrima carmesí**: 1 carga por ronda, botón "Curar" y castigo de la IA (§9, §14).
+1. ✅ (Ronda 24) **Contraataque**: ×1,15 de daño y ×1,3 de equilibrio, con texto y destello (§3). *Sin dependencias.*
+2. ✅ (Ronda 24) **Tabla de daño de equilibrio por arma** y **subtipos físicos** (estándar, contundente, cortante, perforante) en `WeaponDef` y `ComboHit` (§2, §16).
+3. ✅ (Ronda 24) **Contra de guardia**: atacar en los 0,35 s tras bloquear (§3). *Depende de 2.*
+4. ✅ (Ronda 24, animación provisional) **Rotura de postura + crítico frontal**, con animación e invulnerabilidad (§3). *Depende de 2.*
+5. ⏸ (pospuesto por el usuario) **Lágrima carmesí**: 1 carga por ronda, botón "Curar" y castigo de la IA (§9, §14).
 6. Pruebas: `test_counter.gd`, `test_guard_counter.gd`, `test_stance_break.gd`, `test_flask.gd`.
 
 ### Fase 2: "Identidad de las armas"
-1. **Artes de arma** (Cenizas de guerra propias) con Energía: una por arma; el botón "Habilidad" pasa a ser "Arte" (§5). *Depende de que se decidan las preguntas 1-2.*
-2. **Fuerte cargado** (mantener) y **ataque corriendo** (§5).
-3. **Estabilidad del escudo** + **regeneración ×0,5 con guardia alzada** (§3, §13).
-4. **Golpes retrasados y combos variables de la IA** (§14).
+1. ✅ (Ronda 21) **Artes de arma** (Cenizas de guerra propias) con Energía: una por arma; el botón "Habilidad" pasa a ser "Arte" (§5). *Depende de que se decidan las preguntas 1-2.*
+2. ✅ (Ronda 24) **Fuerte cargado** (mantener) y **ataque corriendo** (§5).
+3. 🟡 (Ronda 24: regeneración ×0,5 con guardia; estabilidad por escudo pendiente) **Estabilidad del escudo** + **regeneración ×0,5 con guardia alzada** (§3, §13).
+4. 🟡 (Ronda 24: golpes retrasados; combos variables ya existían por cadena aleatoria) **Golpes retrasados y combos variables de la IA** (§14).
 5. Pruebas por cada arte y prueba de IA con retrasos.
 
 ### Fase 3: "Construcciones" (builds)

@@ -47,6 +47,7 @@ func _chain(n: int) -> Dictionary:
 	for i in 240:
 		await physics_frame
 		e.stun = 0.0
+		e.stance = e.stance_max # ronda 24: se mide el equilibrio, no la postura
 		if p.combo != last and p.atk_state != Fighter.Atk.NONE:
 			last = p.combo
 			if p._kv.state.begins_with("light"):

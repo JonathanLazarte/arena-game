@@ -63,6 +63,7 @@ allows_shield = false
 reach_foot = 2.5
 reach_mounted = 3.6
 half_arc_foot_deg = 80.0
+phys_type = "contundente"
 light_damage = 20.0
 heavy_damage = 40.0
 light_windup = 0.65

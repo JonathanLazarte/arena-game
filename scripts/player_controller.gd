@@ -91,6 +91,7 @@ func _physics_process(delta: float) -> void:
 		run_toggled = false
 	me.want_sprint = enabled and (Input.is_action_pressed("sprint") or run_toggled)
 	var atk_down := Input.is_action_pressed("attack_sword")
+	me.want_charge = enabled and atk_down # ronda 24: fuerte cargado (mantener)
 	var atk_edge := _pressed_edge("attack_sword")
 	var swp := _pressed_edge("swap_weapon")
 	var pr := _pressed_edge("parry")

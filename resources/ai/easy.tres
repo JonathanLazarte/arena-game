@@ -26,3 +26,7 @@ breather_dist = 13.0
 breather_interval = 9.0
 jump_aoe_chance = 0.35
 special_chance = 0.15
+guard_counter_chance = 0.15
+crit_chance = 0.5
+delay_chance = 0.2
+delay_max = 0.35
