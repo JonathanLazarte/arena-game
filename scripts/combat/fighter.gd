@@ -231,6 +231,12 @@ var special_cd: float = 0.0
 var attrs: Dictionary = {}
 var ad: Dictionary = Attributes.derived("caballero", {})
 var energy_max: float = 50.0
+var level: int = 1
+var armor_ids: Dictionary = {}
+var armor_set: bool = false
+var secondary: WeaponDef = null
+var eq: Dictionary = {}
+var eq_ref: Dictionary = {}
 var energy: float = 50.0
 signal energy_changed(value: float, max_value: float)
 var special_t: float = 0.0 ## anticipación del golpe sísmico
@@ -284,6 +290,40 @@ func set_skills(skills: Array) -> void:
 func set_attributes(a: Dictionary) -> void:
 	attrs = a.duplicate()
 
+## Ronda 19: nivel, armadura ({slot: id}; sin llamar = equipo inicial del rol) y arma secundaria.
+func set_equipment(lv: int, armor: Dictionary, w2: WeaponDef = null) -> void:
+	level = maxi(lv, 1)
+	armor_ids = armor.duplicate()
+	armor_set = true
+	secondary = w2 if w2 and character.allows(w2.id) and w2.ranged != weapon.ranged else null
+
+func armor_pieces() -> Dictionary:
+	return EquipStats.armor_defs(armor_ids if armor_set else Catalog.starter_armor(character.id))
+
+func _refresh_equipment() -> void:
+	eq = EquipStats.sheet(character, level, attributes(), weapon, secondary, armor_pieces())
+	eq_ref = EquipStats.role_reference(character)
+
+func roll_mod() -> Dictionary:
+	return eq["roll"] if not eq.is_empty() else EquipStats.ROLL_BY_LOAD["medio"]
+
+## Duración total de la voltereta (la recuperación se alarga con carga pesada).
+func roll_total() -> float:
+	return roll_iframe_end() + ROLL_RECOVERY_FRAMES * float(roll_mod()["rec"]) / ROLL_FPS
+
+## Tipo de daño de un golpe recibido.
+func _damage_type(from: Node3D, kind: String) -> String:
+	if kind == "melee" or kind == "arrow":
+		return "fisico"
+	var eid := ""
+	if from is Mount and (from as Mount).eikon:
+		eid = (from as Mount).eikon.id
+	elif from is Eikon and (from as Eikon).data:
+		eid = (from as Eikon).data.id
+	elif from is Fighter and kind == "eikon" and (from as Fighter).eikon:
+		eid = (from as Fighter).eikon.id
+	return EquipStats.EIKON_ELEMENT.get(eid, "fisico")
+
 func attributes() -> Dictionary:
 	return attrs if not attrs.is_empty() else Attributes.start_for(character.id)
 
@@ -304,11 +344,12 @@ func passive_k() -> float:
 
 func _apply_character() -> void:
 	_refresh_derived()
+	_refresh_equipment()
 	max_health = character.vida + float(mods["vida"]) + float(ad["vida"]) + (mount.health_bonus if mount else 0.0)
 	health = max_health
 	stamina_max = character.estamina + float(mods["estamina"]) + float(ad["estamina"])
 	stamina = stamina_max
-	poise_max = character.poise + float(mods["poise"]) + float(ad["poise"])
+	poise_max = character.poise + float(mods["poise"]) + float(ad["poise"]) + float(eq["armor_poise"]) - float(eq_ref["armor_poise"])
 	energy_max = float(ad["energia_max"])
 	energy = energy_max
 	parry_window = PARRY_WINDOW + float(mods["parry_window"])
@@ -318,11 +359,15 @@ func _apply_character() -> void:
 
 ## Arma cuerpo a cuerpo efectiva (el arquero usa dagas al cambiar de arma).
 func melee() -> WeaponDef:
-	return FALLBACK_MELEE if weapon.ranged else weapon
+	if weapon.ranged:
+		return secondary if secondary and not secondary.ranged else FALLBACK_MELEE
+	return weapon
 
 ## Arma a distancia efectiva (con arma cuerpo a cuerpo, el arco de recambio).
 func ranged() -> WeaponDef:
-	return weapon if weapon.ranged else FALLBACK_BOW
+	if weapon.ranged:
+		return weapon
+	return secondary if secondary and secondary.ranged else FALLBACK_BOW
 
 func is_shooting() -> bool:
 	return shot_state == Shot.DRAW or shot_state == Shot.RECOVER
@@ -348,7 +393,7 @@ func stats() -> MountData:
 	return mount_node.data if mounted and mount_node else foot_stats
 
 func speed_mult() -> float:
-	return character.velocidad * float(mods["velocidad"])
+	return character.velocidad * float(mods["velocidad"]) * float(roll_mod()["move"])
 
 func sword_range() -> float:
 	if cur_hit and atk_state != Atk.NONE:
@@ -384,7 +429,7 @@ func is_dash_striking() -> bool:
 	return atk_state != Atk.NONE and (_ds_visual or atk_dash)
 
 func roll_iframe_end() -> float:
-	return ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"]) + int(ad["iframes"])) / ROLL_FPS
+	return maxf(ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"]) + int(ad["iframes"]) + int(roll_mod()["iframes"])) / ROLL_FPS, ROLL_STARTUP)
 
 ## "none", "startup", "iframes" o "recovery".
 func roll_phase() -> String:
@@ -415,6 +460,7 @@ func _build_visuals() -> void:
 	_kv = KnightVisual.new()
 	_rider_root.add_child(_kv)
 	_kv.setup(color, character, weapon)
+	_kv.set_armor(armor_pieces())
 	_body = MeshUtil.box(_prim, Vector3(0.6, 1.0, 0.45), Vector3(0, 1.0, 0.1), color)
 	MeshUtil.sphere(_prim, 0.25, Vector3(0, 1.75, 0.1), Color(0.95, 0.8, 0.65))
 	for x: float in [-0.15, 0.15]:
@@ -539,7 +585,7 @@ func _update_stamina(delta: float, idle: bool) -> void:
 	if exhausted > 0.0:
 		exhausted = maxf(exhausted - delta, 0.0)
 	if _since_spend >= REGEN_DELAY and stamina < stamina_max:
-		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * delta, stamina_max)
+		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * float(roll_mod()["regen"]) * delta, stamina_max)
 		stamina_changed.emit(stamina, exhausted > 0.0)
 
 # ---------------- Bucle principal ----------------
@@ -586,7 +632,7 @@ func _physics_process(delta: float) -> void:
 			dash_time = 0.0
 			_roll_atk_buffer = false
 			_start_dash_strike()
-		elif roll_t >= ROLL_TOTAL or not alive:
+		elif roll_t >= roll_total() or not alive:
 			roll_t = -1.0
 			_roll_atk_buffer = false
 	if was_dashing and dash_time <= 0.0:
@@ -1129,8 +1175,8 @@ func dash() -> bool:
 ## Voltereta a pie: arranque vulnerable -> i-frames -> recuperación vulnerable.
 func _start_roll(st: MountData) -> bool:
 	roll_t = 0.0
-	dash_time = ROLL_TOTAL # solo para la animación Dodge_* y la IA (no da i-frames)
-	dash_cd = maxf(st.dash_cooldown, ROLL_TOTAL)
+	dash_time = roll_total() # solo para la animación Dodge_* y la IA (no da i-frames)
+	dash_cd = maxf(st.dash_cooldown, roll_total())
 	invuln = 0.0
 	_dash_hit = true # la voltereta no embiste
 	spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]) * float(ad["roll_cost"]))
@@ -1139,9 +1185,9 @@ func _start_roll(st: MountData) -> bool:
 func _roll_velocity() -> Vector3:
 	var fast := ROLL_IFRAME_END # la distancia no cambia con la pasiva "Sombra" (solo los i-frames)
 	if roll_t < fast:
-		return dash_dir * (ROLL_DISTANCE / fast)
+		return dash_dir * (ROLL_DISTANCE * float(roll_mod()["dist"]) / fast)
 	# Recuperación: frena linealmente (área = ROLL_RECOVERY_DRIFT)
-	var rec := ROLL_TOTAL - fast
+	var rec := roll_total() - fast
 	var k := 1.0 - (roll_t - fast) / rec
 	return dash_dir * (2.0 * ROLL_RECOVERY_DRIFT / rec) * maxf(k, 0.0)
 
@@ -1388,10 +1434,12 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		amount *= RIPOSTE_MULT # riposte tras parry
 		riposte_t = 0.0
 	# Ronda 18: Vitalidad = defensa física; Devoción = resistencia sagrada (eikon/área)
-	if _kind == "melee" or _kind == "arrow":
-		amount *= 1.0 - float(ad["defensa"])
-	elif _kind == "eikon" or _kind == "aoe":
+	# Ronda 19: Defensa (plana, nivel y atributos) y Absorción % de la armadura por tipo de daño
+	amount = EquipStats.incoming(amount, _damage_type(from, _kind), eq, eq_ref)
+	if _kind == "eikon" or _kind == "aoe":
 		amount *= 1.0 - float(ad["sagrado"])
+	if _kind == "aoe":
+		amount *= EquipStats.resist_mult("inmunidad", eq, eq_ref) # Inmunidad: daño de área
 	_damage(amount)
 	add_meter(5.0)
 	_kv.event("hit")
@@ -1402,7 +1450,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	poise -= amount * 2.0 * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
 	if poise <= 0.0:
 		poise = poise_max
-		apply_stun(0.6 + (0.3 if amount >= HEAVY_HIT else 0.0))
+		apply_stun((0.6 + (0.3 if amount >= HEAVY_HIT else 0.0)) * EquipStats.resist_mult("concentracion", eq, eq_ref))
 	elif atk_state == Atk.WINDUP and not atk_heavy:
 		apply_stun(0.2) # los ligeros se interrumpen; el fuerte tiene súper-armadura
 	# Ronda 17: aturdimiento por golpe (según arma y posición en el combo / tipo de proyectil)
@@ -1416,6 +1464,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if from is Fighter and is_instance_valid(from):
 		hs *= float((from as Fighter).ad["stun_dealt"]) # Fuerza del atacante
 	hs *= float(ad["stun_taken"]) # Aguante (robustez) del defensor
+	hs *= EquipStats.resist_mult("robustez", eq, eq_ref) # Robustez de la armadura
 	if hs > 0.0 and not (atk_state == Atk.WINDUP and atk_heavy):
 		apply_stun(hs)
 		last_hitstun = hs
@@ -1427,7 +1476,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 func _guard_break() -> void:
 	guard_breaks += 1
 	blocking = false
-	apply_stun(GUARD_BREAK_STAGGER)
+	apply_stun(GUARD_BREAK_STAGGER * (EquipStats.resist_mult("concentracion", eq, eq_ref) if not eq.is_empty() else 1.0))
 	impact.emit(0.8)
 
 ## Aguante que cuesta bloquear un golpe: ligero/fuerte, rompeguardias del atacante,

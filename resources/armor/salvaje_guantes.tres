@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "salvaje_guantes"
+display_name = "Guanteletes · Pieles salvajes"
+slot = "guantes"
+set_id = "salvaje"
+set_name = "Pieles salvajes"
+weight = 1.8
+absorption = {"fisico": 0.019, "magico": 0.0077, "fuego": 0.0092, "rayo": 0.0092, "sagrado": 0.0061}
+poise = 2.4
+resist = {"robustez": 7, "inmunidad": 5, "concentracion": 2, "vitalidad": 3}
+tint = Color(0.55, 0.36, 0.22, 1)
+level = 1
+price = 0
+starter_for = "berserker"
+weight_class = "medio"

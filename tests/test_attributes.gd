@@ -112,7 +112,7 @@ func _run() -> void:
 	check(int(ma["destreza"]) - 16 >= 5, "reparto por rol: el Asesino sube Destreza (%d)" % ma["destreza"])
 	var cfg2 := ConfigFile.new()
 	cfg2.load("user://test_attrs_v4.cfg")
-	check(int(cfg2.get_value("meta", "version", 0)) == 5 and cfg2.has_section_key("slot_0", "attrs"), "se reescribe como v5 con atributos")
+	check(int(cfg2.get_value("meta", "version", 0)) >= 5 and cfg2.has_section_key("slot_0", "attrs"), "se reescribe como v5 con atributos")
 	# --- Rival acorde al nivel ---
 	var r10 := Attributes.auto_allocate("caballero", 10)
 	check(Attributes.total(r10) == 80 + 18 and Attributes.valid("caballero", r10, 10), "rival nivel 10: reparto válido")

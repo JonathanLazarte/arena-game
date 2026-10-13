@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bastion_casco"
+display_name = "Casco · Placas del bastión"
+slot = "casco"
+set_id = "bastion"
+set_name = "Placas del bastión"
+weight = 6.4
+absorption = {"fisico": 0.0742, "magico": 0.0297, "fuego": 0.0343, "rayo": 0.0252, "sagrado": 0.0343}
+poise = 11.0
+resist = {"robustez": 16, "inmunidad": 9, "concentracion": 5, "vitalidad": 8}
+tint = Color(0.4, 0.42, 0.48, 1)
+level = 6
+price = 480
+starter_for = ""
+weight_class = "pesado"

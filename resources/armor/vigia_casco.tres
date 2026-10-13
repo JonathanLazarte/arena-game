@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "vigia_casco"
+display_name = "Casco · Malla del vigía"
+slot = "casco"
+set_id = "vigia"
+set_name = "Malla del vigía"
+weight = 3.8
+absorption = {"fisico": 0.0436, "magico": 0.0209, "fuego": 0.0252, "rayo": 0.0209, "sagrado": 0.0209}
+poise = 5.6
+resist = {"robustez": 11, "inmunidad": 8, "concentracion": 6, "vitalidad": 6}
+tint = Color(0.5, 0.52, 0.58, 1)
+level = 3
+price = 240
+starter_for = ""
+weight_class = "medio"

@@ -26,8 +26,7 @@ func _run() -> void:
 	check(gs.can_buy("character", "arquero") == "no_venta" and gs.buy("character", "arquero") == "no_venta" and gs.oro == 99999, "no se puede comprar un personaje aunque sobre oro")
 	check(gs.can_buy("character", "caballero") == "ya", "el propio ya está desbloqueado")
 	check(not gs.set_character("arquero") and gs.character_id == "caballero" and gs.unlocked_chars == ["caballero"], "no se puede cambiar de personaje")
-	check(gs.change_character("arquero") == "proximamente" and gs.character_id == "caballero", "«Cambio de personaje»: gancho presente pero Próximamente")
-	check(not Progression.CHARACTER_CHANGE_ENABLED and not Progression.CHARACTER_CHANGE_ITEM["available"], "el objeto de tienda no está a la venta")
+	check(not gs.has_method("change_character") and not "CHARACTER_CHANGE_ITEM" in Progression.new().get_script().get_script_constant_map(), "ronda 19: «Cambio de personaje» eliminado")
 	check(not "CHARACTER_PRICE" in Progression.new().get_script().get_script_constant_map(), "sin tabla de precios de personajes")
 	gs.oro = 5000
 	# Requisito de nivel
@@ -48,20 +47,13 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var lobby := current_scene
+	check(lobby.tab == "" and not lobby.right_panel.visible and not lobby.sheet.visible, "ronda 19: al entrar no hay pestaña abierta")
 	lobby.set_tab("Personaje")
 	await process_frame
-	var txt := ""
-	var cc: Button = null
-	for bt in lobby.list_box.get_children():
-		if bt.is_queued_for_deletion(): continue
-		txt += (bt as Button).text + "|"
-		if not bt.is_queued_for_deletion() and String(bt.name).begins_with("CambioPersonaje"): cc = bt
-	check(not txt.contains("Paladín") and not txt.contains("oro") and txt.contains("Caballero"), "lobby: la pestaña Personaje solo muestra el tuyo (%s)" % txt)
-	check(cc != null and cc.text.contains("Próximamente"), "lobby: «Cambio de personaje — Próximamente»")
-	cc.pressed.emit()
-	check(lobby.modal.visible and lobby.modal_ok.disabled, "lobby: el objeto no se puede comprar aún")
-	lobby.close_modal()
-	check(gs.oro == 1300 and gs.character_id == "caballero", "nada cambia")
+	check(lobby.sheet.visible and lobby.sheet.find_child("AtributosButton", true, false) != null, "Personaje: ficha con botón Atributos")
+	check(lobby.root_ui.find_child("CambioPersonaje", true, false) == null, "sin «Cambio de personaje»")
+	lobby.set_tab("Tienda")
+	await process_frame
 	lobby.request_purchase("weapon", "espada_larga")
 	check(lobby.modal.visible and not lobby.modal_ok.disabled, "las armas siguen comprándose")
 	lobby.modal_ok.pressed.emit()

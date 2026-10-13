@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sombra_guantes"
+display_name = "Guanteletes · Telas de sombra"
+slot = "guantes"
+set_id = "sombra"
+set_name = "Telas de sombra"
+weight = 2.1
+absorption = {"fisico": 0.014, "magico": 0.0157, "fuego": 0.0092, "rayo": 0.0124, "sagrado": 0.0092}
+poise = 1.2
+resist = {"robustez": 3, "inmunidad": 4, "concentracion": 6, "vitalidad": 4}
+tint = Color(0.25, 0.22, 0.32, 1)
+level = 1
+price = 0
+starter_for = "asesino"
+weight_class = "medio"

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "escudero_casco"
+display_name = "Casco · Escudero"
+slot = "casco"
+set_id = "escudero"
+set_name = "Escudero"
+weight = 3.0
+absorption = {"fisico": 0.0389, "magico": 0.0165, "fuego": 0.0209, "rayo": 0.0165, "sagrado": 0.0165}
+poise = 4.0
+resist = {"robustez": 8, "inmunidad": 6, "concentracion": 5, "vitalidad": 5}
+tint = Color(0.62, 0.66, 0.74, 1)
+level = 1
+price = 0
+starter_for = "caballero"
+weight_class = "medio"

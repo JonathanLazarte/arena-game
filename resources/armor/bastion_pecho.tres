@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bastion_pecho"
+display_name = "Peto · Placas del bastión"
+slot = "pecho"
+set_id = "bastion"
+set_name = "Placas del bastión"
+weight = 12.8
+absorption = {"fisico": 0.143, "magico": 0.0585, "fuego": 0.0674, "rayo": 0.0498, "sagrado": 0.0674}
+poise = 22.0
+resist = {"robustez": 32, "inmunidad": 18, "concentracion": 10, "vitalidad": 16}
+tint = Color(0.4, 0.42, 0.48, 1)
+level = 6
+price = 960
+starter_for = ""
+weight_class = "pesado"

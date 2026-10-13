@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bastion_piernas"
+display_name = "Grebas · Placas del bastión"
+slot = "piernas"
+set_id = "bastion"
+set_name = "Placas del bastión"
+weight = 8.0
+absorption = {"fisico": 0.0919, "magico": 0.037, "fuego": 0.0427, "rayo": 0.0315, "sagrado": 0.0427}
+poise = 13.8
+resist = {"robustez": 20, "inmunidad": 11, "concentracion": 6, "vitalidad": 10}
+tint = Color(0.4, 0.42, 0.48, 1)
+level = 6
+price = 600
+starter_for = ""
+weight_class = "pesado"

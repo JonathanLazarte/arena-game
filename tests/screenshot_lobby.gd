@@ -311,7 +311,30 @@ func _run() -> void:
 		var lobby := current_scene
 		lobby.spin_speed = 0.0
 		lobby.pedestal.rotation.y = 0.4
-		if args.size() > 3 and args[3] == "Atributos":
+		if args.size() > 3 and args[3].begins_with("flow_"):
+			# Ronda 19: flujo real con clics del ratón/táctil sobre los botones (no se abre por código)
+			gs.char_xp[cid] = Progression.xp_at_level(5)
+			gs.oro = 2400
+			await create_timer(0.6).timeout
+			var steps: Array = {"flow_sheet": ["Tab_Personaje"], "flow_attrs": ["Tab_Personaje", "AtributosButton"],
+				"flow_picker": ["Tab_Personaje", "Slot_pecho"], "flow_shop": ["Tab_Tienda", "Cat_Armaduras"]}[args[3]]
+			for nm: String in steps:
+				var b := lobby.root_ui.find_child(nm, true, false) as Control
+				var c := b.get_global_rect().get_center()
+				for pressed in [true, false]:
+					var ev := InputEventMouseButton.new()
+					ev.button_index = MOUSE_BUTTON_LEFT
+					ev.pressed = pressed
+					ev.position = c
+					ev.global_position = c
+					root.push_input(ev)
+					await process_frame
+				await create_timer(0.5).timeout
+			if args[3] == "flow_picker":
+				var opts: Array = lobby.sheet.picker_list.get_children()
+				if opts.size() > 0:
+					lobby.sheet.select_option("")
+		elif args.size() > 3 and args[3] == "Atributos":
 			# Ronda 18: pantalla de atributos con cambios pendientes (vista previa)
 			gs.char_xp[cid] = Progression.xp_at_level(7)
 			var a0: Dictionary = gs.char_attrs().duplicate()

@@ -3,10 +3,11 @@ extends Node
 ## guardado en user:// con versión (v1 = ronda 10, v2 = ronda 11 con progresión,
 ## v3 = ronda 14: sin monturas; los eikons son las monturas,
 ## v4 = ronda 15: un único personaje por ranura; sin compra/cambio de personajes,
-## v5 = ronda 18: atributos por ranura; los antiguos se reparten solos según rol y nivel).
+## v5 = ronda 18: atributos por ranura; los antiguos se reparten solos según rol y nivel,
+## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 5
+const SAVE_VERSION := 6
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -24,7 +25,12 @@ var account_xp: int = 0
 var char_xp: Dictionary = {} ## id -> XP total del personaje
 var skills: Dictionary = {} ## id personaje -> Array de ids de habilidad
 var attrs: Dictionary = {} ## ronda 18: id personaje -> {atributo: valor}
-var attr_migrated: bool = false ## ronda 18: se repartieron los atributos al migrar
+var attr_migrated: bool = false
+# --- Ronda 19 ---
+var owned_armor: Array = []
+var armor_eq: Dictionary = {} ## slot -> id ("" = nada)
+var weapon2_id: String = "" ## arma secundaria (la del otro tipo: cuerpo a cuerpo / a distancia)
+var armor_migrated: bool = false ## ronda 18: se repartieron los atributos al migrar
 var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
 var active_slot: int = 0
 var char_migration: Dictionary = {} ## ronda 15: personajes extra reembolsados al migrar
@@ -84,11 +90,88 @@ func respec() -> void:
 	attrs[character_id] = Attributes.start_for(character_id)
 	save_loadout()
 
+# ---------------- Ronda 19: equipo ----------------
+
+func _give_starter_armor(cid: String) -> void:
+	var st := Catalog.starter_armor(cid)
+	for sl: String in st:
+		if not st[sl] in owned_armor:
+			owned_armor.append(st[sl])
+		if String(armor_eq.get(sl, "")) == "":
+			armor_eq[sl] = st[sl]
+
+## Equipa una pieza (o "" para quitarla). Solo lo que tienes y de esa ranura.
+func equip_armor(slot: String, id: String) -> bool:
+	if not slot in Catalog.ARMOR_SLOTS:
+		return false
+	if id != "":
+		var a := Catalog.armor(id)
+		if a == null or a.slot != slot or not id in owned_armor:
+			return false
+	armor_eq[slot] = id
+	save_loadout()
+	return true
+
+## Arma secundaria: del tipo contrario a la principal ("" = la de recambio).
+func set_weapon2(id: String) -> bool:
+	if id == "":
+		weapon2_id = ""
+		save_loadout()
+		return true
+	var w := Catalog.weapon(id)
+	if w.id != id or not Catalog.character(character_id).allows(id) or not id in owned_weapons or w.ranged == Catalog.weapon(weapon_id).ranged:
+		return false
+	weapon2_id = id
+	save_loadout()
+	return true
+
+func weapon2() -> WeaponDef:
+	if weapon2_id == "":
+		return null
+	var w := Catalog.weapon(weapon2_id)
+	return w if w.id == weapon2_id and w.ranged != Catalog.weapon(weapon_id).ranged else null
+
+func armor_pieces() -> Dictionary:
+	return EquipStats.armor_defs(armor_eq)
+
+## Hoja de estadísticas del personaje equipado.
+func sheet() -> Dictionary:
+	return EquipStats.sheet(Catalog.character(character_id), char_level(), char_attrs(), Catalog.weapon(weapon_id), weapon2(), armor_pieces())
+
+## Compra todas las piezas que faltan de un conjunto. "ok", "ya", "nivel" u "oro".
+func buy_set(set_id: String) -> String:
+	var missing: Array = []
+	var price := 0
+	var lv := 1
+	for a in Catalog.armors():
+		if a.set_id == set_id and a.price > 0 and not a.id in owned_armor:
+			missing.append(a.id)
+			price += a.price
+			lv = maxi(lv, a.level)
+	if missing.is_empty():
+		return "ya"
+	if account_level() < lv:
+		return "nivel"
+	if oro < price:
+		return "oro"
+	oro -= price
+	owned_armor.append_array(missing)
+	save_loadout()
+	return "ok"
+
+func set_price(set_id: String) -> int:
+	var price := 0
+	for a in Catalog.armors():
+		if a.set_id == set_id and a.price > 0 and not a.id in owned_armor:
+			price += a.price
+	return price
+
 func is_unlocked(kind: String, id: String) -> bool:
 	match kind:
 		"character": return id in unlocked_chars
 		"weapon": return id in owned_weapons
 		"eikon": return id in owned_eikons
+		"armor": return id in owned_armor
 	return false
 
 ## "ok" si se puede comprar, si no el motivo: "ya", "nivel", "oro".
@@ -124,6 +207,7 @@ func _unlock_char(id: String) -> void:
 		char_xp[id] = 0
 	if not attrs.has(id):
 		attrs[id] = Attributes.start_for(id)
+	_give_starter_armor(id)
 
 func buy(kind: String, id: String) -> String:
 	var r := can_buy(kind, id)
@@ -134,6 +218,7 @@ func buy(kind: String, id: String) -> String:
 		"character": _unlock_char(id)
 		"weapon": owned_weapons.append(id)
 		"eikon": owned_eikons.append(id)
+		"armor": owned_armor.append(id)
 	save_loadout()
 	return "ok"
 
@@ -155,7 +240,7 @@ func learn_skill(sid: String) -> String:
 	return "ok"
 
 ## Elige personaje (si está desbloqueado) y, si el arma no es compatible o no es suya, su arma por defecto.
-## Ronda 15: tras la primera elección el personaje queda fijo (ver change_character).
+## Ronda 15: tras la primera elección el personaje queda fijo.
 func set_character(id: String) -> bool:
 	if first_run_done and id != character_id:
 		return false
@@ -165,28 +250,18 @@ func set_character(id: String) -> bool:
 		weapon_id = c.default_weapon
 	return true
 
-## Gancho para el futuro objeto de tienda «Cambio de personaje». Hoy devuelve "proximamente".
-func change_character(id: String) -> String:
-	if not Progression.CHARACTER_CHANGE_ENABLED:
-		return "proximamente"
-	if id == character_id:
-		return "ya"
-	unlocked_chars = []
-	_unlock_char(id)
-	character_id = id
-	weapon_id = Catalog.character(id).default_weapon
-	save_loadout()
-	return "ok"
-
 ## Datos de la ranura activa (lo que se guarda por personaje).
 func slot_data() -> Dictionary:
 	return {"character_id": character_id, "weapon_id": weapon_id,
-		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills(), "attrs": char_attrs()}
+		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills(), "attrs": char_attrs(),
+		"armor": armor_eq, "weapon2": weapon2_id}
 
 func set_weapon(id: String) -> bool:
 	if not Catalog.character(character_id).allows(id) or (first_run_done and not id in owned_weapons):
 		return false
 	weapon_id = id
+	if weapon2() == null:
+		weapon2_id = ""
 	return true
 
 ## Aplica el resultado de una partida. Devuelve el resumen para la pantalla de resultados.
@@ -225,6 +300,7 @@ func save_loadout() -> void:
 	cfg.set_value("progreso", "account_xp", account_xp)
 	cfg.set_value("progreso", "owned_weapons", owned_weapons)
 	cfg.set_value("progreso", "owned_eikons", owned_eikons)
+	cfg.set_value("progreso", "owned_armor", owned_armor)
 	cfg.save(save_path)
 
 func load_loadout() -> void:
@@ -258,6 +334,9 @@ func load_loadout() -> void:
 		if ver >= 4:
 			char_xp = {character_id: int(cfg.get_value(sec, "xp", 0))}
 			skills = {character_id: cfg.get_value(sec, "skills", [])}
+			if ver >= 6:
+				armor_eq = cfg.get_value(sec, "armor", {})
+				weapon2_id = cfg.get_value(sec, "weapon2", "")
 			if ver >= 5:
 				attrs = {character_id: cfg.get_value(sec, "attrs", Attributes.start_for(character_id))}
 			unlocked_chars = [character_id] if first_run_done else []
@@ -267,6 +346,7 @@ func load_loadout() -> void:
 			unlocked_chars = cfg.get_value("progreso", "unlocked_chars", [])
 		owned_weapons = cfg.get_value("progreso", "owned_weapons", [])
 		owned_eikons = cfg.get_value("progreso", "owned_eikons", ["fenix"])
+		owned_armor = cfg.get_value("progreso", "owned_armor", [])
 		if ver < 3:
 			migrated_from = ver
 			old_mounts = cfg.get_value("progreso", "owned_mounts", ["caballo"])
@@ -281,6 +361,12 @@ func load_loadout() -> void:
 		character_id = String(unlocked_chars[0])
 	if migrated_from > 0 and ver < 4:
 		_migrate_characters()
+	armor_migrated = false
+	if ver < 6 and first_run_done:
+		_give_starter_armor(character_id) # v<6: se regala el equipo inicial del rol
+		armor_migrated = true
+		if migrated_from == 0:
+			migrated_from = ver
 	attr_migrated = false
 	if ver < 5:
 		_migrate_attrs()
@@ -370,6 +456,10 @@ func reset_defaults() -> void:
 	skills = {}
 	attrs = {}
 	attr_migrated = false
+	owned_armor = []
+	armor_eq = {}
+	weapon2_id = ""
+	armor_migrated = false
 	unlocked_chars = []
 	owned_weapons = []
 	owned_eikons = ["fenix"]

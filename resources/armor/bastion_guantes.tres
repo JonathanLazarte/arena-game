@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bastion_guantes"
+display_name = "Guanteletes · Placas del bastión"
+slot = "guantes"
+set_id = "bastion"
+set_name = "Placas del bastión"
+weight = 4.8
+absorption = {"fisico": 0.0562, "magico": 0.0224, "fuego": 0.0258, "rayo": 0.019, "sagrado": 0.0258}
+poise = 8.2
+resist = {"robustez": 12, "inmunidad": 7, "concentracion": 4, "vitalidad": 6}
+tint = Color(0.4, 0.42, 0.48, 1)
+level = 6
+price = 360
+starter_for = ""
+weight_class = "pesado"

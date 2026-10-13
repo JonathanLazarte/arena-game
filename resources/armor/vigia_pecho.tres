@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "vigia_pecho"
+display_name = "Peto · Malla del vigía"
+slot = "pecho"
+set_id = "vigia"
+set_name = "Malla del vigía"
+weight = 7.6
+absorption = {"fisico": 0.0854, "magico": 0.0413, "fuego": 0.0498, "rayo": 0.0413, "sagrado": 0.0413}
+poise = 11.2
+resist = {"robustez": 22, "inmunidad": 16, "concentracion": 12, "vitalidad": 12}
+tint = Color(0.5, 0.52, 0.58, 1)
+level = 3
+price = 480
+starter_for = ""
+weight_class = "medio"

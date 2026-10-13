@@ -73,9 +73,6 @@ static func match_rewards(stats: Dictionary) -> Dictionary:
 ## Ronda 15: los personajes ya no se compran. Precios antiguos, solo para reembolsar al migrar (v<4).
 const LEGACY_CHARACTER_PRICE := {"caballero": 1200, "arquero": 1200, "berserker": 1500, "paladin": 1800, "asesino": 1800}
 ## Armas/eikons/monturas: nivel de cuenta mínimo + precio. Precio 0 = gratis al llegar al nivel.
-## Gancho: objeto de tienda «Cambio de personaje» (aún no a la venta; se muestra «Próximamente»).
-const CHARACTER_CHANGE_ENABLED := false
-const CHARACTER_CHANGE_ITEM := {"id": "cambio_personaje", "name": "Cambio de personaje", "gemas": 0, "available": false}
 const WEAPON_REQ := {"espada_escudo": [1, 0], "arco": [1, 0], "dagas": [1, 0], "hacha_2m": [1, 0],
 	"espada_larga": [2, 350], "lanza": [4, 600], "ballesta": [3, 500]}
 const EIKON_REQ := {"fenix": [1, 0], "lobo": [3, 800], "grifo": [5, 1200], "golem": [6, 1400]}
@@ -87,6 +84,9 @@ static func req(kind: String, id: String) -> Array:
 	match kind:
 		"weapon": return WEAPON_REQ.get(id, [1, 0])
 		"eikon": return EIKON_REQ.get(id, [1, 0])
+		"armor":
+			var a := Catalog.armor(id)
+			return [a.level, a.price] if a else [1, 0]
 	return [1, 0]
 
 # ---------------- Árboles de habilidad ----------------

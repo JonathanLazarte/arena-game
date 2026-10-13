@@ -10,14 +10,14 @@ const NAMES := {"vitalidad": "Vitalidad", "concentracion": "Concentración", "ag
 const SHORT := {"vitalidad": "VIT", "concentracion": "CON", "aguante": "AGU", "fuerza": "FUE",
 	"destreza": "DES", "sabiduria": "SAB", "devocion": "DEV", "vinculo": "VIN"}
 const DESC := {
-	"vitalidad": "Vida máxima y algo de defensa física.",
-	"concentracion": "Energía máxima y su regeneración (habilidades como el Golpe sísmico).",
+	"vitalidad": "Vida máxima, Defensa e Inmunidad.",
+	"concentracion": "Energía máxima y su regeneración (Golpe sísmico) y la resistencia Concentración.",
 	"aguante": "Estamina, equilibrio (poise), carga y robustez: menos aturdimiento recibido, guardia más firme.",
 	"fuerza": "Daño de armas de Fuerza, daño al equilibrio y a la guardia, y aturdimiento infligido.",
 	"destreza": "Daño de armas de Destreza, velocidad de ataque y disparo, voltereta más barata y con más invulnerabilidad.",
 	"sabiduria": "Poder mágico (para futuros hechizos).",
 	"devocion": "Curación, resistencia sagrada (eikons y áreas) y daño sagrado de armas con Devoción.",
-	"vinculo": "Afinidad con el eikon: su daño y su vida, y ganancia del medidor de invocación.",
+	"vinculo": "Afinidad con el eikon: su daño y su vida, ganancia del medidor y la resistencia Vitalidad.",
 }
 const MIN_VALUE := 6
 const MAX_VALUE := 60

@@ -101,7 +101,7 @@ func _run() -> void:
 	check(not gs.char_xp.has("caballero") and not gs.skills.has("caballero"), "descarta el progreso de los extra")
 	var c4 := ConfigFile.new()
 	c4.load(gs.save_path)
-	check(c4.get_value("meta", "version", 0) == 5 and c4.has_section_key("slot_0", "attrs") and c4.get_value("slot_0", "character_id") == "berserker" and c4.get_value("slot_0", "xp") == 700 and not c4.has_section_key("progreso", "unlocked_chars"), "v4: datos del personaje en la ranura 0")
+	check(c4.get_value("meta", "version", 0) >= 5 and c4.has_section_key("slot_0", "attrs") and c4.get_value("slot_0", "character_id") == "berserker" and c4.get_value("slot_0", "xp") == 700 and not c4.has_section_key("progreso", "unlocked_chars"), "v4: datos del personaje en la ranura 0")
 	gs.reset_defaults()
 	gs.load_loadout()
 	check(gs.migrated_from == 0 and gs.oro == 40 + exp_refund and gs.character_id == "berserker" and gs.char_skills() == ["ber_furia"], "recargar v4 no reembolsa dos veces y conserva todo")

@@ -371,3 +371,32 @@ Guardado v5: atributos por ranura; las partidas v4 o anteriores reciben los punt
 Ronda 18 extra: disparar a pie *suspende* la carrera solo durante tensar/recuperar; si «Correr» sigue activo (o Mayús mantenida) se vuelve a correr solo.
 
 Fuentes: Bandai Namco, «ELDEN RING How-To Guide Part 2 – Advanced Stats»; Fextralife «Stats»; Eldenpedia (wiki.gg) «Stats and Attributes»; Fandom «Weapon Scaling»; Prima Games «Soft caps for each stat and attribute in Elden Ring».
+
+## Ronda 19 — Ficha de personaje, armadura, carga de equipo y Tienda
+
+- Lobby: al entrar no hay pestaña abierta (solo el escaparate). Pestañas: Personaje (ficha), Armas, Eikons, Habilidades, **Tienda**, Inventario. Comprar solo en la Tienda (Armas / Armaduras / Eikons, con confirmación); el resto solo equipa lo que tienes. «Cambio de personaje» eliminado.
+- Ficha: nivel, atributos, botón **ATRIBUTOS** (con punto y «+N» si hay puntos), pasiva y habilidades, Vida/Energía/Estamina, Ataque der./izq. (base + bono), Defensa, Absorción por tipo, Resistencias, Equilibrio, Carga con barra y tipo de voltereta, y 7 ranuras (arma principal, secundaria, casco, pecho, guantes, piernas, eikon) con selector y comparación verde/rojo.
+
+Fórmulas (propias; todo relativo a la referencia del rol: nivel 1, reparto inicial y equipo inicial ⇒ el nivel 1 es igual que antes):
+
+| Estadística | Fórmula |
+|---|---|
+| Ataque (AR) | base (daño ligero o de flecha × daño del rol × habilidades) + bono = base × (multiplicador de atributos − 1); parte sagrada = base × coef. DEV × escala(DEV) |
+| Defensa | 20 + 1·(nivel − 1) + 0,2·VIT + 0,15·AGU + 0,15·FUE |
+| Multiplicador de defensa | r = ataque / defensa; m = 0,9·r / (r + 0,45), entre 10 % y 90 % |
+| Absorción (por tipo: físico, mágico, fuego, rayo, sagrado) | 1 − Π(1 − absorción de cada pieza) |
+| Daño recibido | ataque × m(ataque, Defensa)/m(ataque, Defensa_ref) × (1 − Abs)/(1 − Abs_ref) |
+| Resistencias | 40 + 1,5·(nivel − 1) + atributo (VIT→Inmunidad, AGU→Robustez, CON→Concentración, VIN→Vitalidad; ×0,4 por encima de 40) + armadura. Efecto = 1 − (R − R_ref)/400, entre 0,7 y 1,15: Robustez → aturdimiento por golpe; Inmunidad → daño de área; Concentración → aturdimiento por rotura de equilibrio/guardia; Vitalidad: sin efecto todavía |
+| Equilibrio | poise del rol + Aguante + (poise de la armadura − la del equipo inicial) |
+| Carga | peso (armadura + armas) / carga máx. (Aguante): ligero < 30 %, medio < 70 %, pesado < 100 %, sobrecargado |
+
+| Carga | Distancia de la voltereta | I-frames | Recuperación | Regeneración de aguante | Movimiento |
+|---|---|---|---|---|---|
+| Ligero | ×1,15 | = | = | = | = |
+| Medio | ×1 | = | = | = | = |
+| Pesado | ×0,8 | −1 | ×1,6 | ×0,8 | ×0,95 |
+| Sobrecargado | ×0,35 (tropiezo) | ninguno | ×1,8 | ×0,6 | ×0,6 |
+
+Elementos de los eikons: fénix fuego, lobo mágico, grifo rayo y gólem físico. Las armaduras son 9 conjuntos de 4 piezas: los 5 iniciales de cada rol y 4 a la venta (Seda del viento, ligera; Malla del vigía, media; Túnica de ceniza, ligera con absorción de fuego; Placas del bastión, pesada). La armadura se ve con piezas sencillas teñidas sobre los huesos del modelo de KayKit. Guardado v6: se regala el equipo inicial. El rival lleva el conjunto de su rol a partir del nivel 3.
+
+Fuentes: Fextralife «Calculating Damage», «Equip Load», «Damage Types», «Robustness»; Eldenpedia «Equip Load», «Immunity», «Vitality», «Poise»; Bandai Namco «ELDEN RING How-To Guide Part 1 – Stats».

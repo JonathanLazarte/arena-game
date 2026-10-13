@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "viento_pecho"
+display_name = "Peto · Seda del viento"
+slot = "pecho"
+set_id = "viento"
+set_name = "Seda del viento"
+weight = 2.8
+absorption = {"fisico": 0.0244, "magico": 0.0498, "fuego": 0.0244, "rayo": 0.0498, "sagrado": 0.0328}
+poise = 1.6
+resist = {"robustez": 8, "inmunidad": 16, "concentracion": 22, "vitalidad": 14}
+tint = Color(0.55, 0.8, 0.9, 1)
+level = 2
+price = 320
+starter_for = ""
+weight_class = "ligero"

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "vigia_piernas"
+display_name = "Grebas · Malla del vigía"
+slot = "piernas"
+set_id = "vigia"
+set_name = "Malla del vigía"
+weight = 4.75
+absorption = {"fisico": 0.0543, "magico": 0.026, "fuego": 0.0315, "rayo": 0.026, "sagrado": 0.026}
+poise = 7.0
+resist = {"robustez": 14, "inmunidad": 10, "concentracion": 8, "vitalidad": 8}
+tint = Color(0.5, 0.52, 0.58, 1)
+level = 3
+price = 300
+starter_for = ""
+weight_class = "medio"

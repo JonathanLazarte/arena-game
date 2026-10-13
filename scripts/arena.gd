@@ -39,14 +39,16 @@ func _ready() -> void:
 	var gs := get_node_or_null("/root/GameState")
 	if gs and gs.from_lobby:
 		player = _make_fighter(gs.player_name, 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
-			Catalog.character(gs.character_id), Catalog.weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs())
+			Catalog.character(gs.character_id), Catalog.weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
+			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2()})
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
 	if gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
 		var rc: CharacterDef = r["character"]
 		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["eikon"], rc, r["weapon"], [],
-			Attributes.auto_allocate(rc.id, gs.char_level())) # ronda 18: atributos acordes al nivel
+			Attributes.auto_allocate(rc.id, gs.char_level()), # ronda 18: atributos acordes al nivel
+			{"level": gs.char_level(), "armor": EquipStats.rival_armor(rc.id, gs.char_level())}) # ronda 19
 	else:
 		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), EIKONS[1 + randi() % 2])
 	player.opponent = enemy
@@ -81,12 +83,14 @@ func _on_impact(strength: float) -> void:
 	shake = maxf(shake, 0.35 * strength)
 
 func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
-		cd: CharacterDef = null, wd: WeaponDef = null, sk: Array = [], at: Dictionary = {}) -> Fighter:
+		cd: CharacterDef = null, wd: WeaponDef = null, sk: Array = [], at: Dictionary = {}, eqp: Dictionary = {}) -> Fighter:
 	var f := Fighter.new()
 	if cd:
 		f.set_loadout_defs(cd, wd)
 	f.set_skills(sk)
 	f.set_attributes(at)
+	if not eqp.is_empty():
+		f.set_equipment(int(eqp.get("level", 1)), eqp.get("armor", {}), eqp.get("w2", null))
 	f.display_name = n
 	f.team = team
 	f.color = c

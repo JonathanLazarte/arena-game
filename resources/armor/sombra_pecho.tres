@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sombra_pecho"
+display_name = "Peto · Telas de sombra"
+slot = "pecho"
+set_id = "sombra"
+set_name = "Telas de sombra"
+weight = 5.6
+absorption = {"fisico": 0.037, "magico": 0.0413, "fuego": 0.0244, "rayo": 0.0328, "sagrado": 0.0244}
+poise = 3.2
+resist = {"robustez": 8, "inmunidad": 12, "concentracion": 16, "vitalidad": 12}
+tint = Color(0.25, 0.22, 0.32, 1)
+level = 1
+price = 0
+starter_for = "asesino"
+weight_class = "medio"

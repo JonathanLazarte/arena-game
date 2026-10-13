@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "escudero_guantes"
+display_name = "Guanteletes · Escudero"
+slot = "guantes"
+set_id = "escudero"
+set_name = "Escudero"
+weight = 2.25
+absorption = {"fisico": 0.0293, "magico": 0.0124, "fuego": 0.0157, "rayo": 0.0124, "sagrado": 0.0124}
+poise = 3.0
+resist = {"robustez": 6, "inmunidad": 4, "concentracion": 4, "vitalidad": 4}
+tint = Color(0.62, 0.66, 0.74, 1)
+level = 1
+price = 0
+starter_for = "caballero"
+weight_class = "medio"

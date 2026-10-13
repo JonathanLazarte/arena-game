@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "viento_guantes"
+display_name = "Guanteletes · Seda del viento"
+slot = "guantes"
+set_id = "viento"
+set_name = "Seda del viento"
+weight = 1.05
+absorption = {"fisico": 0.0092, "magico": 0.019, "fuego": 0.0092, "rayo": 0.019, "sagrado": 0.0124}
+poise = 0.6
+resist = {"robustez": 3, "inmunidad": 6, "concentracion": 8, "vitalidad": 5}
+tint = Color(0.55, 0.8, 0.9, 1)
+level = 2
+price = 120
+starter_for = ""
+weight_class = "ligero"

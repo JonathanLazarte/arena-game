@@ -4,9 +4,11 @@ extends Node3D
 ## dificultad y botón JUGAR. Todo el texto en español.
 
 ## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
-const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Inventario"]
+## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
+const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Tienda", "Inventario"]
+const SHOP_CATS := ["Armas", "Armaduras", "Eikons"]
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
-const KIND_NAME := {"weapon": "arma", "eikon": "eikon"}
+const KIND_NAME := {"weapon": "arma", "eikon": "eikon", "armor": "armadura"}
 
 var gs: Node
 var stage: ShowcaseStage
@@ -17,7 +19,10 @@ var preview: KnightVisual:
 var spin_speed: float:
 	get: return stage.spin_speed
 	set(v): stage.spin_speed = v
-var tab: String = "Personaje"
+var tab: String = "" ## ronda 19: ninguna pestaña al entrar (solo el escaparate)
+var shop_cat: String = "Armas"
+var right_panel: Control
+var sheet: CharSheet
 var ui: CanvasLayer
 var root_ui: Control
 var tab_buttons: Dictionary = {}
@@ -79,7 +84,10 @@ func _unhandled_input(ev: InputEvent) -> void:
 			KEY_E, KEY_TAB: _cycle_tab(1)
 
 func _cycle_tab(d: int) -> void:
-	set_tab(TABS[(TABS.find(tab) + d + TABS.size()) % TABS.size()])
+	var i := TABS.find(tab)
+	if i < 0:
+		i = -1 if d > 0 else 0
+	set_tab(TABS[(i + d + TABS.size()) % TABS.size()])
 
 # ---------------- Interfaz ----------------
 
@@ -148,7 +156,7 @@ func _build_ui() -> void:
 	for t: String in TABS:
 		var b := UIKit.button(t, 21)
 		b.name = "Tab_" + t
-		b.custom_minimum_size = Vector2(210, 58)
+		b.custom_minimum_size = Vector2(210, 54)
 		b.toggle_mode = true
 		b.pressed.connect(set_tab.bind(t))
 		tabs.add_child(b)
@@ -169,6 +177,8 @@ func _build_ui() -> void:
 	root_ui.add_child(role_label)
 	# Panel derecho
 	var panel := UIKit.panel()
+	right_panel = panel
+	panel.name = "RightPanel"
 	panel.position = Vector2(850, 76)
 	panel.size = Vector2(410, 456)
 	panel.custom_minimum_size = Vector2(410, 456)
@@ -227,6 +237,12 @@ func _build_ui() -> void:
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast.modulate.a = 0.0
 	root_ui.add_child(toast)
+	sheet = CharSheet.new()
+	sheet.visible = false
+	root_ui.add_child(sheet)
+	sheet.build(gs)
+	sheet.attributes_requested.connect(open_attributes)
+	sheet.changed.connect(func() -> void: _refresh_all())
 	_build_modal()
 	attr_screen = AttrScreen.new()
 	attr_screen.visible = false
@@ -317,6 +333,10 @@ func _item_name(kind: String, id: String) -> String:
 		"character": return Catalog.character(id).display_name
 		"weapon": return Catalog.weapon(id).display_name
 		"eikon": return (load(Catalog.EIKONS[id]) as EikonData).eikon_name
+		"armor": return Catalog.armor(id).display_name
+		"set":
+			for st: Dictionary in Catalog.armor_sets_for_sale():
+				if st["set_id"] == id: return "Conjunto " + String(st["set_name"])
 	return id
 
 func _lock_text(kind: String, id: String) -> String:
@@ -340,16 +360,35 @@ func request_purchase(kind: String, id: String) -> void:
 		"oro":
 			open_modal("Oro insuficiente", "%s cuesta %d de oro y tienes %d. Gana partidas para conseguir más." % [nm, r[1], gs.oro], "Comprar", Callable(), false)
 
+## Conjunto de armadura completo (las piezas que te falten).
+func request_set_purchase(set_id: String) -> void:
+	var st: Dictionary = {}
+	for x: Dictionary in Catalog.armor_sets_for_sale():
+		if x["set_id"] == set_id: st = x
+	var price: int = gs.set_price(set_id)
+	var nm := _item_name("set", set_id)
+	if price <= 0:
+		show_toast("Ya tienes " + nm)
+	elif gs.account_level() < int(st["level"]):
+		open_modal("Bloqueado", "%s requiere nivel de cuenta %d (tienes %d)." % [nm, st["level"], gs.account_level()], "Comprar", Callable(), false)
+	elif gs.oro < price:
+		open_modal("Oro insuficiente", "%s cuesta %d de oro y tienes %d." % [nm, price, gs.oro], "Comprar", Callable(), false)
+	else:
+		open_modal("Comprar", "¿Comprar %s (4 piezas) por %d de oro?\nTe quedarán %d de oro. Equípalo desde la ficha de Personaje." % [nm, price, gs.oro - price], "Comprar", confirm_set_purchase.bind(set_id))
+
+func confirm_set_purchase(set_id: String) -> void:
+	if gs.buy_set(set_id) == "ok":
+		UIKit.sfx("confirm")
+		show_toast("¡%s comprado!" % _item_name("set", set_id))
+		_refresh_all(false)
+
 func confirm_purchase(kind: String, id: String) -> void:
 	if gs.buy(kind, id) != "ok":
 		return
 	UIKit.sfx("confirm")
 	show_toast("¡%s desbloqueado!" % _item_name(kind, id))
-	match kind:
-		"weapon": gs.set_weapon(id)
-		"eikon": gs.eikon_id = id
-	gs.save_loadout()
-	_refresh_all()
+	gs.save_loadout() # ronda 19: comprar no equipa (se equipa desde Personaje/Armas/Eikons)
+	_refresh_all(false)
 
 func _on_skill_pressed(sid: String) -> void:
 	var s := Progression.skill(sid)
@@ -374,6 +413,7 @@ func learn_skill(sid: String) -> void:
 
 func set_tab(t: String) -> void:
 	tab = t
+	if attr_screen: attr_screen.visible = false
 	_refresh_all(false)
 
 func set_difficulty(d: String) -> void:
@@ -414,38 +454,19 @@ func _refresh_all(rebuild: bool = true) -> void:
 		ch.queue_free()
 	list_scroll.visible = tab != "Habilidades"
 	tree_view.visible = tab == "Habilidades"
+	right_panel.visible = tab != "" and tab != "Personaje"
+	sheet.visible = tab == "Personaje"
+	name_label.visible = tab != "Personaje"
+	role_label.visible = tab != "Personaje"
 	match tab:
 		"Personaje":
-			# Ronda 15: vista de TU personaje (fijo desde la primera partida): stats, árbol y pasiva.
-			_card("%s — %s · Nv %d" % [c.display_name, c.role, gs.char_level()], true, false, func() -> void: pass)
-			var item: Dictionary = Progression.CHARACTER_CHANGE_ITEM
-			var cc := _card("%s — Próximamente" % item["name"], false, true, func() -> void:
-				open_modal(item["name"], "Pronto podrás cambiar de personaje con este objeto de la tienda. Por ahora tu personaje es fijo y conserva su nivel y habilidades.", "Comprar", Callable(), false), false)
-			cc.name = "CambioPersonaje"
-			var ap: int = gs.attr_points()
-			var ab := _card("Atributos%s" % ("  ·  %d punto(s) por repartir" % ap if ap > 0 else ""), ap > 0, false, open_attributes)
-			ab.name = "Atributos"
-			list_box.move_child(ab, 1)
-			cc.add_theme_color_override("font_color", Color(0.75, 0.78, 0.85))
-			_card("Pasiva · %s" % c.passive_name, false, false, func() -> void:
-				detail.text = "[b]Pasiva · %s[/b]\n%s" % [c.passive_name, c.passive_desc])
-			for sk: Dictionary in Progression.tree(c.id):
-				var have: bool = sk["id"] in gs.char_skills()
-				var sid: String = sk["id"]
-				_card("%s %s" % ["✔" if have else "·", sk["name"]], false, false, func() -> void:
-					set_tab("Habilidades")
-					_on_skill_pressed(sid))
-			detail.text = "[b]%s[/b]\n%s\n[color=#f2dc99]Pasiva · %s:[/color] %s" % [c.display_name, c.description, c.passive_name, c.passive_desc]
-			var m := Progression.combine_mods(gs.char_skills(c.id))
-			var dv := Attributes.derived(c.id, gs.char_attrs(c.id))
-			_stat("Vida", c.vida + m["vida"] + dv["vida"], STAT_MAX["vida"], str(int(c.vida + m["vida"] + dv["vida"])))
-			_stat("Estamina", c.estamina + m["estamina"] + dv["estamina"], STAT_MAX["estamina"], str(int(c.estamina + m["estamina"] + dv["estamina"])))
-			_stat("Velocidad", c.velocidad * m["velocidad"], STAT_MAX["velocidad"], "x%.2f" % (c.velocidad * m["velocidad"]))
-			_stat("Poise", c.poise + m["poise"] + dv["poise"], STAT_MAX["poise"], str(int(c.poise + m["poise"] + dv["poise"])))
-			_stat("Daño", c.dano * m["dano"], STAT_MAX["dano"], "x%.2f" % (c.dano * m["dano"]))
+			# Ronda 19: ficha completa (atributos, estadísticas y equipo)
+			sheet.refresh()
 		"Armas":
 			for w in Catalog.weapons_for(cur):
 				var own: bool = gs.is_unlocked("weapon", w.id)
+				if not own:
+					continue # ronda 19: se compran en la Tienda
 				var wt: String = "%s  [%s]" % [w.display_name, Attributes.scaling_text(w)]
 				if own and not Attributes.unmet(w, gs.char_attrs()).is_empty():
 					wt += "  ⚠"
@@ -456,6 +477,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 						_refresh_all()
 					else:
 						request_purchase("weapon", w.id))
+			list_box.add_child(UIKit.label("Más armas en la Tienda.", 15, UIKit.MUTED))
 			var cw := Catalog.weapon(gs.weapon_id)
 			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, "Sí" if cw.allows_shield else "No", cw.max_combo]
 			# Ronda 18: escalado (S-E) y requisitos
@@ -476,6 +498,8 @@ func _refresh_all(rebuild: bool = true) -> void:
 			for id: String in Catalog.EIKONS:
 				var ed: EikonData = load(Catalog.EIKONS[id])
 				var own: bool = gs.is_unlocked("eikon", id)
+				if not own:
+					continue
 				var kind_t := "montable" if ed.rideable else "compañero"
 				_card(("%s · %s" % [ed.eikon_name, kind_t]) if own else "%s — %s" % [ed.eikon_name, _lock_text("eikon", id)], id == gs.eikon_id, not own, func() -> void:
 					if own:
@@ -501,11 +525,13 @@ func _refresh_all(rebuild: bool = true) -> void:
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
 			detail.text = "[b]Árbol de %s[/b] · Nivel %d\nPuntos disponibles: [color=#f2dc99]%d[/color] (1 por nivel del personaje). Toca un nodo para aprenderlo." % [cur.display_name, gs.char_level(), gs.skill_points()]
 			_stat("XP personaje", cl.x, cl.y, "%d/%d" % [cl.x, cl.y])
+		"Tienda":
+			_build_shop(cur)
 		"Inventario":
 			var e2: EikonData = load(Catalog.EIKONS[gs.eikon_id])
 			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + Catalog.weapon(gs.weapon_id).display_name,
 					"Eikon: %s (%s)" % [e2.eikon_name, "montable" if e2.rideable else "compañero"], "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty],
-					"Armas: %d · Eikons: %d" % [gs.owned_weapons.size(), gs.owned_eikons.size()], "Tienda: Cambio de personaje (Próximamente)"]:
+					"Armas: %d · Eikons: %d · Piezas de armadura: %d" % [gs.owned_weapons.size(), gs.owned_eikons.size(), gs.owned_armor.size()]]:
 				list_box.add_child(UIKit.label(ln, 19))
 			detail.text = "[b]Equipamiento actual[/b]\nSe guarda automáticamente en este dispositivo. El rival recibe un equipamiento aleatorio."
 
@@ -525,6 +551,45 @@ func _card(text: String, selected: bool, locked: bool, cb: Callable, coin: bool 
 	UIKit.pop_in(b, 0.03 * list_box.get_child_count(), 0.85)
 	return b
 
+func _build_shop(cur: CharacterDef) -> void:
+	var cats := HBoxContainer.new()
+	cats.add_theme_constant_override("separation", 6)
+	list_box.add_child(cats)
+	for ct: String in SHOP_CATS:
+		var b := UIKit.button(ct, 16, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
+		b.name = "Cat_" + ct
+		b.custom_minimum_size = Vector2(118, 40)
+		b.pressed.connect(func() -> void:
+			shop_cat = ct
+			_refresh_all(false))
+		cats.add_child(b)
+	match shop_cat:
+		"Armas":
+			for w in Catalog.weapons_for(cur):
+				var own: bool = gs.is_unlocked("weapon", w.id)
+				var b := _card("%s  [%s]%s" % [w.display_name, Attributes.scaling_text(w), "  ✔" if own else " — " + _lock_text("weapon", w.id)], false, not own, request_purchase.bind("weapon", w.id))
+				b.name = "Buy_weapon_" + w.id
+				b.disabled = own
+			detail.text = "[b]Tienda · Armas[/b]\nArmas de tu personaje. Nivel de cuenta y oro. Equípalas en Armas o en la ficha."
+		"Armaduras":
+			for st: Dictionary in Catalog.armor_sets_for_sale():
+				var price: int = gs.set_price(st["set_id"])
+				var lvl_ok: bool = gs.account_level() >= int(st["level"])
+				var t: String = "%s (%s)" % [st["set_name"], {"ligero": "ligera", "medio": "media", "pesado": "pesada"}.get(st["class"], "")]
+				t += "  ✔" if price == 0 else (" — %d oro" % price if lvl_ok else " — Nivel %d" % st["level"])
+				var b := _card(t, false, price > 0, request_set_purchase.bind(st["set_id"]))
+				b.name = "Buy_set_" + String(st["set_id"])
+				b.disabled = price == 0
+			detail.text = "[b]Tienda · Armaduras[/b]\nConjuntos de 4 piezas (casco, pecho, guantes, piernas): peso, absorción, equilibrio y resistencias."
+		"Eikons":
+			for id: String in Catalog.EIKONS:
+				var ed: EikonData = load(Catalog.EIKONS[id])
+				var own: bool = gs.is_unlocked("eikon", id)
+				var b := _card("%s%s" % [ed.eikon_name, "  ✔" if own else " — " + _lock_text("eikon", id)], false, not own, request_purchase.bind("eikon", id))
+				b.name = "Buy_eikon_" + id
+				b.disabled = own
+			detail.text = "[b]Tienda · Eikons[/b]\nMontables y compañeros."
+
 ## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
 func _update_dots() -> void:
 	dots["Habilidades"].visible = gs.skill_points() > 0
@@ -532,11 +597,12 @@ func _update_dots() -> void:
 	var can_w := false
 	for w in Catalog.weapons_for(Catalog.character(gs.character_id)):
 		can_w = can_w or gs.can_buy("weapon", w.id) == "ok"
-	dots["Armas"].visible = can_w
+	dots["Armas"].visible = false
 	var can_e := false
 	for id: String in Catalog.EIKONS:
 		can_e = can_e or gs.can_buy("eikon", id) == "ok"
-	dots["Eikons"].visible = can_e
+	dots["Eikons"].visible = false
+	dots["Tienda"].visible = can_w or can_e
 
 func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
 	stats_box.add_child(UIKit.stat_row(label_t, v, vmax, txt))

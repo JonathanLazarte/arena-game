@@ -171,7 +171,7 @@ func _refresh() -> void:
 	var b := Attributes.derived(c.id, pending)
 	var t := "[b]Vista previa[/b]\n"
 	t += "Vida: %s\n" % _fmt(c.vida + a["vida"], c.vida + b["vida"], "%.0f")
-	t += "Defensa física: %s\n" % _fmt(a["defensa"] * 100.0, b["defensa"] * 100.0, "%+.1f %%")
+	t += "Defensa: %s\n" % _fmt(EquipStats.defense(gs.char_level(), saved), EquipStats.defense(gs.char_level(), pending), "%.1f")
 	t += "Estamina: %s\n" % _fmt(c.estamina + a["estamina"], c.estamina + b["estamina"], "%.0f")
 	t += "Equilibrio (poise): %s\n" % _fmt(c.poise + a["poise"], c.poise + b["poise"], "%.0f")
 	t += "Robustez (aturdimiento recibido): %s\n" % _fmt(a["stun_taken"] * 100.0, b["stun_taken"] * 100.0, "%.0f %%", true)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sombra_casco"
+display_name = "Casco · Telas de sombra"
+slot = "casco"
+set_id = "sombra"
+set_name = "Telas de sombra"
+weight = 2.8
+absorption = {"fisico": 0.0187, "magico": 0.0209, "fuego": 0.0123, "rayo": 0.0165, "sagrado": 0.0123}
+poise = 1.6
+resist = {"robustez": 4, "inmunidad": 6, "concentracion": 8, "vitalidad": 6}
+tint = Color(0.25, 0.22, 0.32, 1)
+level = 1
+price = 0
+starter_for = "asesino"
+weight_class = "medio"

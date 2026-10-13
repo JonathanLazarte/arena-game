@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "novicio_casco"
+display_name = "Casco · Placas del novicio"
+slot = "casco"
+set_id = "novicio"
+set_name = "Placas del novicio"
+weight = 3.2
+absorption = {"fisico": 0.0436, "magico": 0.0165, "fuego": 0.0165, "rayo": 0.0123, "sagrado": 0.0297}
+poise = 4.4
+resist = {"robustez": 8, "inmunidad": 6, "concentracion": 6, "vitalidad": 7}
+tint = Color(0.86, 0.8, 0.55, 1)
+level = 1
+price = 0
+starter_for = "paladin"
+weight_class = "medio"

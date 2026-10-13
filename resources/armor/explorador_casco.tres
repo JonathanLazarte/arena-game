@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "explorador_casco"
+display_name = "Casco · Explorador"
+slot = "casco"
+set_id = "explorador"
+set_name = "Explorador"
+weight = 3.0
+absorption = {"fisico": 0.0209, "magico": 0.0165, "fuego": 0.0165, "rayo": 0.0209, "sagrado": 0.0123}
+poise = 2.0
+resist = {"robustez": 5, "inmunidad": 7, "concentracion": 7, "vitalidad": 5}
+tint = Color(0.45, 0.55, 0.32, 1)
+level = 1
+price = 0
+starter_for = "arquero"
+weight_class = "medio"

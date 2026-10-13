@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "vigia_guantes"
+display_name = "Guanteletes · Malla del vigía"
+slot = "guantes"
+set_id = "vigia"
+set_name = "Malla del vigía"
+weight = 2.85
+absorption = {"fisico": 0.0329, "magico": 0.0157, "fuego": 0.019, "rayo": 0.0157, "sagrado": 0.0157}
+poise = 4.2
+resist = {"robustez": 8, "inmunidad": 6, "concentracion": 4, "vitalidad": 4}
+tint = Color(0.5, 0.52, 0.58, 1)
+level = 3
+price = 180
+starter_for = ""
+weight_class = "medio"

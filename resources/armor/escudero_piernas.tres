@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "escudero_piernas"
+display_name = "Grebas · Escudero"
+slot = "piernas"
+set_id = "escudero"
+set_name = "Escudero"
+weight = 3.75
+absorption = {"fisico": 0.0484, "magico": 0.0206, "fuego": 0.026, "rayo": 0.0206, "sagrado": 0.0206}
+poise = 5.0
+resist = {"robustez": 10, "inmunidad": 8, "concentracion": 6, "vitalidad": 6}
+tint = Color(0.62, 0.66, 0.74, 1)
+level = 1
+price = 0
+starter_for = "caballero"
+weight_class = "medio"

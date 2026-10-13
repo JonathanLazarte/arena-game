@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "salvaje_casco"
+display_name = "Casco · Pieles salvajes"
+slot = "casco"
+set_id = "salvaje"
+set_name = "Pieles salvajes"
+weight = 2.4
+absorption = {"fisico": 0.0252, "magico": 0.0102, "fuego": 0.0123, "rayo": 0.0123, "sagrado": 0.0081}
+poise = 3.2
+resist = {"robustez": 9, "inmunidad": 7, "concentracion": 3, "vitalidad": 4}
+tint = Color(0.55, 0.36, 0.22, 1)
+level = 1
+price = 0
+starter_for = "berserker"
+weight_class = "medio"

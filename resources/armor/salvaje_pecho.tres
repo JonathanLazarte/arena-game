@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "salvaje_pecho"
+display_name = "Peto · Pieles salvajes"
+slot = "pecho"
+set_id = "salvaje"
+set_name = "Pieles salvajes"
+weight = 4.8
+absorption = {"fisico": 0.0498, "magico": 0.0203, "fuego": 0.0244, "rayo": 0.0244, "sagrado": 0.0162}
+poise = 6.4
+resist = {"robustez": 18, "inmunidad": 14, "concentracion": 6, "vitalidad": 8}
+tint = Color(0.55, 0.36, 0.22, 1)
+level = 1
+price = 0
+starter_for = "berserker"
+weight_class = "medio"

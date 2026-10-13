@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "explorador_guantes"
+display_name = "Guanteletes · Explorador"
+slot = "guantes"
+set_id = "explorador"
+set_name = "Explorador"
+weight = 2.25
+absorption = {"fisico": 0.0157, "magico": 0.0124, "fuego": 0.0124, "rayo": 0.0157, "sagrado": 0.0092}
+poise = 1.5
+resist = {"robustez": 4, "inmunidad": 5, "concentracion": 5, "vitalidad": 4}
+tint = Color(0.45, 0.55, 0.32, 1)
+level = 1
+price = 0
+starter_for = "arquero"
+weight_class = "medio"

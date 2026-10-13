@@ -563,7 +563,7 @@ func update(f: Fighter, delta: float) -> void:
 		_apply_weapon_scale()
 	elif s.begins_with("dodge"):
 		# La voltereta (Dodge_* de KayKit) dura exactamente ROLL_TOTAL (24 frames a 30 fps)
-		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) / Fighter.ROLL_TOTAL)
+		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) / (f.roll_total() if f else Fighter.ROLL_TOTAL))
 	elif s == "parry":
 		tree.set("parameters/act/parry/ts/scale", _clip_len("parry") / (Fighter.PARRY_WINDOW + Fighter.PARRY_RECOVERY))
 	if s != state:
@@ -592,3 +592,39 @@ func update(f: Fighter, delta: float) -> void:
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)
 	var bp := Vector2(v.dot(f.facing.cross(Vector3.UP)), v.dot(f.facing))
 	tree.set("parameters/loco/blend_position", bp)
+
+# ---------------- Ronda 19: armadura visible ----------------
+## Piezas sencillas (cajas/esferas teñidas con el color de la pieza) enganchadas a los huesos
+## del rig de KayKit: casco en la cabeza, peto en el pecho, guanteletes en las manos y grebas
+## en las piernas. Las estadísticas son lo importante; esto solo da una pista visual.
+var _armor_nodes: Array = []
+
+func set_armor(pieces: Dictionary) -> void:
+	for n in _armor_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	_armor_nodes.clear()
+	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D if model else null
+	if sk == null:
+		return
+	var parts := {
+		"casco": [["head", Vector3(0.0, 0.42, 0.0), Vector3(0.78, 0.36, 0.78)]],
+		"pecho": [["chest", Vector3(0.0, 0.18, 0.12), Vector3(0.7, 0.5, 0.18)]],
+		"guantes": [["hand.l", Vector3.ZERO, Vector3(0.2, 0.2, 0.2)], ["hand.r", Vector3.ZERO, Vector3(0.2, 0.2, 0.2)]],
+		"piernas": [["lowerleg.l", Vector3(0, 0.12, 0.05), Vector3(0.22, 0.3, 0.12)], ["lowerleg.r", Vector3(0, 0.12, 0.05), Vector3(0.22, 0.3, 0.12)]],
+	}
+	for slot: String in parts:
+		var a: ArmorDef = pieces.get(slot)
+		if a == null:
+			continue
+		for d: Array in parts[slot]:
+			if sk.find_bone(d[0]) < 0:
+				continue
+			var att := BoneAttachment3D.new()
+			att.name = "armor_%s_%s" % [slot, d[0]]
+			att.bone_name = d[0]
+			sk.add_child(att)
+			var heavy := a.weight_class == "pesado"
+			var mi := MeshUtil.box(att, d[2] * (1.12 if heavy else 1.0), d[1], a.tint)
+			mi.name = "ArmorMesh"
+			_armor_nodes.append(att)

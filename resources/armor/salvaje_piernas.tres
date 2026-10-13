@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "salvaje_piernas"
+display_name = "Grebas · Pieles salvajes"
+slot = "piernas"
+set_id = "salvaje"
+set_name = "Pieles salvajes"
+weight = 3.0
+absorption = {"fisico": 0.0315, "magico": 0.0127, "fuego": 0.0153, "rayo": 0.0153, "sagrado": 0.0102}
+poise = 4.0
+resist = {"robustez": 11, "inmunidad": 9, "concentracion": 4, "vitalidad": 5}
+tint = Color(0.55, 0.36, 0.22, 1)
+level = 1
+price = 0
+starter_for = "berserker"
+weight_class = "medio"

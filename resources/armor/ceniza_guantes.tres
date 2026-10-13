@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ceniza_guantes"
+display_name = "Guanteletes · Túnica de ceniza"
+slot = "guantes"
+set_id = "ceniza"
+set_name = "Túnica de ceniza"
+weight = 1.8
+absorption = {"fisico": 0.0157, "magico": 0.019, "fuego": 0.0521, "rayo": 0.0092, "sagrado": 0.0157}
+poise = 1.8
+resist = {"robustez": 4, "inmunidad": 9, "concentracion": 6, "vitalidad": 6}
+tint = Color(0.75, 0.35, 0.2, 1)
+level = 4
+price = 210
+starter_for = ""
+weight_class = "ligero"

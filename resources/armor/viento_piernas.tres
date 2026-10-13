@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "viento_piernas"
+display_name = "Grebas · Seda del viento"
+slot = "piernas"
+set_id = "viento"
+set_name = "Seda del viento"
+weight = 1.75
+absorption = {"fisico": 0.0153, "magico": 0.0315, "fuego": 0.0153, "rayo": 0.0315, "sagrado": 0.0206}
+poise = 1.0
+resist = {"robustez": 5, "inmunidad": 10, "concentracion": 14, "vitalidad": 9}
+tint = Color(0.55, 0.8, 0.9, 1)
+level = 2
+price = 200
+starter_for = ""
+weight_class = "ligero"

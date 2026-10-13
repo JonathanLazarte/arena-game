@@ -262,6 +262,9 @@ func show_character(cd: CharacterDef, wd: WeaponDef, locked: bool = false) -> vo
 	preview.setup(Color(0.35, 0.5, 0.9), cd, wd)
 	preview.set_mounted(false, 1.0)
 	preview.set_loadout(1 if wd.ranged else 0)
+	var gs := get_node_or_null("/root/GameState")
+	if gs and not locked and gs.character_id == cd.id:
+		preview.set_armor(gs.armor_pieces()) # ronda 19
 	if locked:
 		preview.set_tint(Color(0.08, 0.1, 0.2), false) # silueta si está bloqueado
 

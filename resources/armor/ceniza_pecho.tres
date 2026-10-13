@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmorDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/armor_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ceniza_pecho"
+display_name = "Peto · Túnica de ceniza"
+slot = "pecho"
+set_id = "ceniza"
+set_name = "Túnica de ceniza"
+weight = 4.8
+absorption = {"fisico": 0.0413, "magico": 0.0498, "fuego": 0.133, "rayo": 0.0244, "sagrado": 0.0413}
+poise = 4.8
+resist = {"robustez": 12, "inmunidad": 24, "concentracion": 16, "vitalidad": 16}
+tint = Color(0.75, 0.35, 0.2, 1)
+level = 4
+price = 560
+starter_for = ""
+weight_class = "ligero"
