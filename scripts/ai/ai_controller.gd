@@ -39,6 +39,9 @@ var _punish_t: float = 0.0
 var _backstep_t: float = 0.0
 var _started: bool = false
 var _connected: bool = false
+var aoe_jumps: int = 0 ## saltos para esquivar golpes de área (pruebas)
+var aoe_seen: int = 0
+var _aoe_done: Dictionary = {}
 
 func _on_landed(_t: Node3D, res: String, was_open: bool) -> void:
 	if res == "hit" and was_open:
@@ -63,7 +66,10 @@ func _physics_process(delta: float) -> void:
 	if not _connected:
 		_connected = true
 		me.landed_hit.connect(_on_landed)
-	# --- A pie: volver a montar cuando sea seguro, si no, luchar a pie ---
+	# --- Golpe de área en el suelo que le va a alcanzar: a veces lo salta (o rueda fuera) ---
+	if _avoid_aoe(dir):
+		return
+	# --- A pie: volver a montar (su eikon) cuando sea seguro, si no, luchar a pie ---
 	if not me.mounted:
 		var m := me.nearest_free_mount()
 		if m:
@@ -136,8 +142,9 @@ func _physics_process(delta: float) -> void:
 		if sword_mode and _incoming_projectile() and me.stamina > 15.0 and randf() < profile.block_arrow_chance:
 			_block_hold = 0.35
 			return
-		if me.meter >= Fighter.METER_MAX:
+		if me.meter >= Fighter.METER_MAX and me.atk_state == Fighter.Atk.NONE:
 			me.summon()
+		_try_specials(dist, dir)
 		# Cambio de armas por distancia (cuesta 2 s, igual que al jugador)
 		if not me.is_swapping() and me.atk_state == Fighter.Atk.NONE and phase != Phase.COMMIT:
 			if sword_mode and dist > 17.0 and randf() < 0.05:
@@ -287,3 +294,41 @@ func _incoming_projectile() -> bool:
 			if d.length() < 12.0 and pr.direction.dot(d.normalized()) > 0.9:
 				return true
 	return false
+
+func _avoid_aoe(dir: Vector3) -> bool:
+	for n in me.get_tree().get_nodes_in_group("ground_aoe"):
+		var a := n as GroundAoE
+		if a == null or a.detonated or a.team == me.team or _aoe_done.has(a.get_instance_id()):
+			continue
+		if not a.contains(me.global_position) or a.time_left() > 0.3:
+			continue
+		_aoe_done[a.get_instance_id()] = true
+		aoe_seen += 1
+		var r := randf()
+		if r < profile.jump_aoe_chance and me.jump():
+			aoe_jumps += 1
+			return true
+		if r < profile.jump_aoe_chance + 0.15 and me.dash_cd <= 0.0 and not me.mounted:
+			me.move_input = MeshUtil.flat(me.global_position - a.global_position).normalized()
+			me.dash() # voltereta: los i-frames también lo evitan
+			return true
+	return false
+
+## Habilidad del personaje (golpe sísmico) y especial del eikon montado.
+func _try_specials(dist: float, dir: Vector3) -> void:
+	if randf() > profile.special_chance:
+		return
+	if me.has_special() and me.special_cd <= 0.0 and not me.mounted and dist < Fighter.SLAM_RADIUS - 1.0 and me.stamina > 35.0:
+		me.special()
+		return
+	if me.mounted and me.mount_node and me.mount_node.eikon and me.mount_node.owner_fighter == me and me.mount_node.special_cd <= 0.0:
+		match me.mount_node.eikon.special_id:
+			"llamarada":
+				if dist > 4.0 and dist < 18.0:
+					me.eikon_special()
+			"colmillo":
+				if dist < 4.2 and me.facing.dot(dir) > 0.6:
+					me.eikon_special()
+			"vendaval":
+				if dist < 5.0:
+					me.eikon_special()

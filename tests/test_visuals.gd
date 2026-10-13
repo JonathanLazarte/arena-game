@@ -17,6 +17,7 @@ func wait(s: float) -> void:
 
 func _run() -> void:
 	seed(6)
+	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -115,6 +116,6 @@ func _run() -> void:
 	e.summon()
 	await wait(0.5)
 	var ek: Node = e.active_eikon
-	check(ek != null and ek._ap != null and ek._ap.is_playing(), "eikon con modelo animado")
+	check(ek != null and ((ek is Eikon and ek._ap != null and ek._ap.is_playing()) or (ek is Mount and ek.tree != null and ek.tree.active)), "eikon con modelo animado (%s)" % [e.eikon.eikon_name])
 	print("RESULT: %s (%d fallos)" % ["OK" if fails == 0 else "FALLO", fails])
 	quit(1 if fails > 0 else 0)

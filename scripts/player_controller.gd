@@ -47,6 +47,8 @@ func _physics_process(delta: float) -> void:
 	var sm := _pressed_edge("summon")
 	var ds := _pressed_edge("dash")
 	var mt := _pressed_edge("mount")
+	var jp := _pressed_edge("jump")
+	var sp := _pressed_edge("special")
 	if not enabled:
 		return
 	if swp: me.swap_loadout()
@@ -71,3 +73,5 @@ func _physics_process(delta: float) -> void:
 	if sm: me.summon()
 	if ds: me.dash()
 	if mt: me.toggle_mount()
+	if jp: me.jump()
+	if sp: me.special()

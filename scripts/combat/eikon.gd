@@ -1,6 +1,7 @@
 class_name Eikon
 extends CharacterBody3D
-## Invocación temporal que lucha junto a su dueño. Es un objetivo dañable.
+## Invocación temporal que lucha junto a su dueño (eikons NO montables: el gólem). Es un objetivo dañable.
+## Los eikons montables (fénix, lobo, grifo) son monturas: ver Mount y Fighter._summon_mount().
 
 var data: EikonData
 var team: int = 0
@@ -221,15 +222,12 @@ func _attack(tgt: Node3D) -> void:
 				var tv := MeshUtil.flat((tgt as CharacterBody3D).velocity)
 				aim += tv * (origin.distance_to(aim) / p.speed)
 			p.direction = (aim - origin).normalized()
+			p.target = tgt
+			p.turn_rate = 1.4
 			get_parent().add_child(p)
 			p.global_position = origin
 		_:
-			for t in MeshUtil.enemies_of(get_tree(), team):
-				if MeshUtil.flat(t.global_position - global_position).length() <= data.attack_range:
-					t.take_hit(data.attack_damage, self, "eikon")
-			if is_instance_valid(_ring):
-				_ring.queue_free()
-			_ring = MeshUtil.cylinder(self, 1.0, 0.1, Vector3(0, 0.1, 0), data.color.lightened(0.3))
-			get_tree().create_timer(0.5).timeout.connect(func() -> void:
-				if is_instance_valid(_ring):
-					_ring.queue_free())
+			# Ronda 14: el gólem golpea el suelo con aviso (GroundAoE): saltar lo esquiva
+			var aoe := GroundAoE.spawn(get_parent(), self, team, global_position, data.attack_range, 0.6, data.attack_damage)
+			aoe.knock = 6.0
+			aoe.stun_time = 0.3

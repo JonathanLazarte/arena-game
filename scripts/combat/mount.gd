@@ -2,7 +2,10 @@ class_name Mount
 extends CharacterBody3D
 ## Montura independiente del jinete. Cuando lleva jinete sigue su transform;
 ## sin jinete se queda cerca de donde la dejaron y pasea un poco.
-## Cualquier jinete (jugador, IA, futuros mobs) puede montar cualquier montura libre.
+## Ronda 14: las monturas son EIKONS montables (fénix, lobo, grifo). Una montura de eikon
+## pertenece a su invocador (owner_fighter): solo él la monta, dura `life` segundos y al
+## acabarse lo baja (sin derribo) y desaparece. Sin dueño (owner_fighter = null) es una
+## montura neutral que cualquiera puede montar (solo pruebas antiguas / Arena.start_mounted).
 
 var data: MountData
 var rider: Fighter = null
@@ -10,9 +13,16 @@ var home: Vector3 = Vector3.ZERO
 var _wander_t: float = 0.0
 var _wander_dir: Vector3 = Vector3.ZERO
 var _col: CollisionShape3D
+var eikon: EikonData = null ## eikon del que sale esta montura (null = montura neutral)
+var owner_fighter: Fighter = null
+var life: float = INF ## s restantes (eikon); INF = permanente
+var special_cd: float = 0.0
+signal expired(m: Mount)
 
 func _ready() -> void:
 	add_to_group("mount")
+	if eikon:
+		add_to_group("eikon_mount")
 	if data == null:
 		data = load("res://resources/mounts/horse.tres")
 	collision_layer = 4
@@ -25,8 +35,6 @@ func _ready() -> void:
 	add_child(_col)
 	_build_model()
 
-const HORSE := preload("res://assets/models/horse_quaternius.glb")
-const HORSE_SCALE := 0.62
 const SADDLE_BONE := "Torso"
 const SADDLE_FALLBACK := Vector3(0, 1.3, 0)
 var saddle: BoneAttachment3D
@@ -37,14 +45,15 @@ var speed_now: float = 0.0
 
 ## Caballo Quaternius (CC0). AnimationTree: BlendSpace1D Idle/Walk/Gallop por velocidad.
 func _build_model() -> void:
-	model = HORSE.instantiate() as Node3D
+	model = (load(data.model_path) as PackedScene).instantiate() as Node3D
 	# El glTF mira a +Z: lo giramos para que mire a -Z (frente del juego)
-	model.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * HORSE_SCALE)
+	model.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * data.model_scale)
+	model.position.y = data.hover
 	add_child(model)
-	if data.mount_name != "Caballo":
-		AnimUtil.tint_surfaces(model, data.color, 0.5)
+	if data.tint:
+		AnimUtil.tint_surfaces(model, data.color, 0.6 if data.hover > 0.0 else 0.5, 1.2 if data.hover > 0.0 else 0.0)
 	var ap := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	AnimUtil.set_loops(ap, ["Idle", "Walk", "Gallop"])
+	AnimUtil.set_loops(ap, [data.anim_idle, data.anim_walk, data.anim_gallop])
 	# Punto de silla: sigue al hueso del lomo, así el jinete sube y baja con el galope
 	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
 	if sk and sk.find_bone(SADDLE_BONE) >= 0:
@@ -53,9 +62,9 @@ func _build_model() -> void:
 		saddle.bone_name = SADDLE_BONE
 		sk.add_child(saddle)
 	var bs := AnimationNodeBlendSpace1D.new()
-	bs.add_blend_point(AnimUtil.anim_node("Idle"), 0.0, -1, &"Idle")
-	bs.add_blend_point(AnimUtil.anim_node("Walk"), 0.3, -1, &"Walk")
-	bs.add_blend_point(AnimUtil.anim_node("Gallop"), 1.0, -1, &"Gallop")
+	bs.add_blend_point(AnimUtil.anim_node(data.anim_idle), 0.0, -1, &"Idle")
+	bs.add_blend_point(AnimUtil.anim_node(data.anim_walk), 0.3, -1, &"Walk")
+	bs.add_blend_point(AnimUtil.anim_node(data.anim_gallop), 1.0, -1, &"Gallop")
 	bs.min_space = 0.0
 	bs.max_space = 1.3
 	tree = AnimationTree.new()
@@ -76,13 +85,35 @@ func _update_anim(delta: float) -> void:
 ## Punto de la silla en el mundo (lomo del caballo, con el balanceo de la animación).
 func saddle_position() -> Vector3:
 	if saddle and saddle.is_inside_tree():
-		return saddle.global_position + global_basis * SADDLE_OFFSET
-	return global_transform * SADDLE_FALLBACK
-
-const SADDLE_OFFSET := Vector3(0, 0.25, -0.4)
+		return saddle.global_position + global_basis * data.saddle_offset
+	return global_transform * (SADDLE_FALLBACK + Vector3(0, data.hover, 0))
 
 func is_free() -> bool:
 	return rider == null
+
+## ¿Puede montarla f? Las de eikon solo su dueño.
+func can_ride(f: Fighter) -> bool:
+	return is_free() and (owner_fighter == null or owner_fighter == f) and life > 0.0
+
+func is_flying() -> bool:
+	return data.hover > 0.0
+
+## Tiempo de vida restante en [0, 1] (barra del HUD).
+func life_fraction() -> float:
+	return 1.0 if life == INF or eikon == null else clampf(life / eikon.duration, 0.0, 1.0)
+
+## Se acaba la invocación: baja al jinete (sin aturdir) y desaparece.
+func expire() -> void:
+	if life <= -1.0:
+		return
+	life = -1.0
+	if rider:
+		rider.dismount(false)
+	if is_instance_valid(owner_fighter) and owner_fighter.active_eikon == self:
+		owner_fighter.active_eikon = null
+		owner_fighter.owned_mount = null
+	expired.emit(self)
+	queue_free()
 
 func set_rider(r: Fighter) -> void:
 	rider = r
@@ -93,6 +124,12 @@ func set_rider(r: Fighter) -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_anim(delta)
+	special_cd = maxf(special_cd - delta, 0.0)
+	if life != INF and life > -1.0:
+		life -= delta
+		if life <= 0.0 or not is_instance_valid(owner_fighter) or not owner_fighter.alive:
+			expire()
+			return
 	if rider != null:
 		return
 	_wander_t -= delta
@@ -105,6 +142,10 @@ func _physics_process(delta: float) -> void:
 			_wander_dir = Vector3.FORWARD.rotated(Vector3.UP, randf() * TAU)
 		else:
 			_wander_dir = Vector3.ZERO
+	if is_instance_valid(owner_fighter) and owner_fighter.alive:
+		# Eikon sin jinete: sigue de cerca a su dueño (para que pueda volver a montar)
+		var to_o := MeshUtil.flat(owner_fighter.global_position - global_position)
+		_wander_dir = to_o.normalized() * clampf((to_o.length() - 2.5) / 2.0, 0.0, 4.0) if to_o.length() > 2.5 else Vector3.ZERO
 	var v := _wander_dir * 1.5
 	velocity.x = v.x
 	velocity.z = v.z

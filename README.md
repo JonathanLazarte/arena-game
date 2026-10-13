@@ -195,3 +195,72 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
   - **Cristal flotante** con luz azul, esquirlas de cristal 3D y 2D, y luz principal cálida desde delante para que el personaje se lea bien.
 - Resultados al estilo FF: estandarte **VICTORIA** entre filos dorados, tabla de conceptos con columnas EXP/Oro, "EXP obtenida / Oro obtenido", barra de nivel con "Siguiente" y avisos de nivel.
 - Arena: luz natural (sol alto y lateral más luz de relleno opuesta sin sombras, para que los luchadores no se vean oscuros a contraluz), cielo diurno suave, niebla mínima y suelo de tierra menos pálido.
+
+## Ronda 14: eikons = monturas, combate a pie, esquivar proyectiles, estocada con dash, salto y áreas en el suelo
+
+### Eikons y monturas (decisiones)
+| Eikon | Tipo | Al montarlo | Especial (E montado) | Precio |
+|---|---|---|---|---|
+| Fénix | montable, **vuela** a ras de suelo (modelo de dragón Quaternius) | vel. 15, giro 3,6; las áreas en el suelo no te alcanzan; no salta | **Llamarada**: bola de fuego que persigue (8 de daño, 1,6 s) | gratis |
+| Lobo de Hielo | montable (modelo de lobo con el mismo rig que el caballo) | vel. 16,5, giro 4,2 (el más ágil), brinco | **Colmillo helado**: mordisco al frente, 14 de daño y congela 0,5 s (3 s) | Nv 3 · 800 |
+| Grifo | montable (reutiliza el modelo de la antigua montura, dorado) | vel. 17 (el más rápido), dash 36, brinco | **Vendaval**: aletazo de 5,5 m que empuja (10 de daño, 4 s) | Nv 5 · 1200 |
+| Gólem de Piedra | **no montable**: compañero con IA 15 s | — | sus golpes son áreas en el suelo con aviso (se pueden saltar) | Nv 6 · 1400 |
+
+- **Unicornio: eliminado.** No aportaba nada que no tuvieran el lobo o el grifo. El caballo genérico también desaparece: ahora las monturas son eikons.
+- **Invocar** (medidor lleno, E o botón Eikon):
+  - Un eikon montable aparece ensillado bajo ti y montas al instante. Dura 20 s (el grifo, 22 s).
+  - Con **F** te bajas y vuelves a subir, como antes. Solo su dueño puede montarlo: si bajas, te sigue de cerca.
+  - Mientras lo montas usas sus estadísticas de montura. E, o el botón (que pasa a llamarse "Especial"), lanza su ataque especial.
+  - Al acabarse el tiempo te baja sin aturdirte y desaparece. El HUD muestra los segundos que le quedan.
+  - Un eikon no montable (gólem) lucha a tu lado como antes.
+- **Las peleas empiezan a pie.** Cada ronda empieza a pie y sin eikon. El medidor se conserva entre rondas, como antes.
+- Reglas que se mantienen:
+  - Montado puedes recibir golpes y ser derribado.
+  - Los golpes van al jinete; el eikon montado no tiene vida propia.
+- **Lobby:** ya no hay pestaña ni ranura de Monturas. La pestaña Eikons indica si cada eikon es montable o compañero, muestra sus estadísticas de montura y su especial, y enseña el modelo del eikon junto al pedestal.
+- **Guardado v3 (migración):**
+  - Desaparecen `mount_id` y `owned_mounts`.
+  - La montura comprada Grifo pasa a ser el eikon Grifo (si ya lo tenía, se devuelve su precio).
+  - El Unicornio devuelve sus 500 de oro.
+  - El caballo era gratis y no se compensa.
+  - La migración funciona desde v1 y desde v2, y se guarda en `mount_migration`.
+- **Pruebas antiguas:** las de combate montado clásico ponen `Arena.start_mounted = true` antes de cargar la arena. Así cada luchador recibe un caballo de pruebas neutral (`resources/mounts/horse.tres`, no se vende) y sus comprobaciones siguen midiendo lo mismo.
+
+### Proyectiles con autoapuntado esquivables
+- **Autoapuntado:** flechas y bolas de eikon persiguen a su objetivo con un **giro limitado** (flecha 1,6 rad/s, bola 1,4 rad/s). A menos de 2,5 m dejan de corregir.
+- **Voltereta a tiempo** (el proyectil llega durante los i-frames): lo atraviesa, el proyectil "pierde" al objetivo y sigue de largo. Una vez rebasado no da la vuelta.
+- **Voltereta demasiado pronto:** el proyectil corrige el rumbo y te da.
+- El escudo y el parry funcionan igual (el reflejo no persigue).
+
+### Estocada con dash (a pie y montado)
+- **Animación propia `Dash_Strike`**, creada en Godot (`KnightVisual.author_dash_strike`) al cargar cada modelo KayKit:
+  - piernas y cadera: el arranque de `Dodge_Forward` (la zancada), que se funde con la pose del tajo;
+  - tronco y brazos: el tajo ligero del arma, re-temporizado;
+  - además, un override de spine/chest que inclina el tronco en la arremetida.
+  - Montado, el filtro de medio cuerpo deja solo el tajo.
+- **Búfer generoso:**
+  - Atacar durante el arranque o los i-frames de la voltereta: al acabar los i-frames sale la estocada, sin recuperación de voltereta y sin frames parados.
+  - Hacer dash durante la anticipación de un ligero: se convierte en la estocada.
+  - Montado, sigue la mecánica de la ronda 9 (golpe al acabar el dash) con la misma animación.
+  - Atacar en la recuperación de la voltereta sigue sin contar.
+- **Valores:** 15 de daño, anticipación 0,16 s avanzando a 12 m/s hacia el rival (se para delante, no lo atraviesa), recuperación 0,5 s.
+
+### Salto y golpes de área en el suelo
+- **Controles:** salto con **Espacio** o el botón **Saltar**. El dash pasa a **C**/**L** y la habilidad del personaje a **G** o el botón **Habilidad**.
+- **Salto a pie:** 8 m/s, unos 0,8 s en el aire y 1,6 m de altura. Cuesta 12 de aguante.
+  - En el aire: no hay voltereta, ni doble salto, ni habilidad, y el control es reducido.
+  - Al caer hay una recuperación de 0,18 s.
+  - **Ataque en salto:** atacar en el aire hace un picado que golpea al caer (16 de daño).
+- **Montado:** en el lobo o el grifo el salto es un **brinco de la montura**. En el fénix no se salta (ya vuela).
+- **`GroundAoE`** (`scripts/combat/ground_aoe.gd`): área en el suelo con **anillo de aviso** que se va llenando.
+  - Al detonar solo alcanza a los objetivos **en el suelo**: saltando o volando en el fénix no te da.
+  - La voltereta con i-frames también lo esquiva.
+  - El escudo deja pasar el 50 %, como un ataque de eikon, y no se puede hacer parry.
+  - A quien alcanza lo empuja y lo derriba un instante.
+- **Golpe sísmico del Berserker:** área de 5 m, 0,7 s de aviso, 22 de daño y 8 s de recarga.
+- **El gólem** ahora también golpea con un `GroundAoE`.
+- **IA:**
+  - Cuando un anillo enemigo le va a alcanzar, a veces salta. La probabilidad `jump_aoe_chance` es fácil 0,35, normal 0,6 y difícil 0,85; si no salta, a veces rueda fuera.
+  - Un rival Berserker usa el golpe sísmico de cerca.
+  - Usa el especial de su eikon montado según la distancia.
+- **Pruebas nuevas:** `test_eikon_mount`, `test_projectile_dodge`, `test_dash_strike`, `test_jump_aoe` y la migración v2→v3 en `test_migration`.

@@ -16,3 +16,12 @@ extends Resource
 @export var jump_velocity: float = 8.0 ## reservado para futuras versiones
 @export var can_fly: bool = false ## reservado para futuras versiones
 @export var color: Color = Color(0.45, 0.3, 0.18)
+# --- Ronda 14: las monturas son eikons montables. Modelo y animaciones de cada uno. ---
+@export var model_path: String = "res://assets/models/horse_quaternius.glb"
+@export var model_scale: float = 0.62
+@export var anim_idle: String = "Idle"
+@export var anim_walk: String = "Walk"
+@export var anim_gallop: String = "Gallop"
+@export var tint: bool = false ## teñir el modelo con color
+@export var hover: float = 0.0 ## altura de vuelo (fénix): el jinete no toca el suelo
+@export var saddle_offset: Vector3 = Vector3(0, 0.25, -0.4)

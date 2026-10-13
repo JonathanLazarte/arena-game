@@ -15,3 +15,15 @@ enum AttackKind { MELEE, RANGED, AREA }
 @export var attack_cooldown: float = 1.0
 @export var size: float = 1.0
 @export var flying: bool = false
+# --- Ronda 14: eikons = monturas ---
+@export var id: String = ""
+## Montable: al invocarlo aparece ensillado y el dueño monta (F baja/sube). Si no,
+## es un compañero con IA que lucha a pie a tu lado durante `duration`.
+@export var rideable: bool = false
+@export var ride: MountData ## estadísticas al montarlo
+## Ataque especial montado (tecla E / botón Eikon mientras lo montas): "llamarada", "colmillo", "vendaval".
+@export var special_id: String = ""
+@export var special_name: String = ""
+@export var special_cooldown: float = 3.0
+@export var special_damage: float = 10.0
+@export_multiline var description: String = ""

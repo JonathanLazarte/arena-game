@@ -9,7 +9,9 @@ const ACTIONS := {
 	"attack_sword": [KEY_J],
 	"block": [KEY_K],
 	"summon": [KEY_E],
-	"dash": [KEY_SPACE],
+	"dash": [KEY_C, KEY_L],
+	"jump": [KEY_SPACE], ## Ronda 14: Espacio = saltar (el dash pasa a C / L)
+	"special": [KEY_G], ## habilidad del personaje
 	"lock_on": [KEY_TAB],
 	"parry": [KEY_Q],
 	"mount": [KEY_F],

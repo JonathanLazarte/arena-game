@@ -23,6 +23,7 @@ func tap(action: String) -> void:
 	Input.action_release(action)
 
 func _run() -> void:
+	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -80,6 +81,8 @@ func _run() -> void:
 	await tap("swap_weapon")
 	await wait(2.1)
 	# Invocación
+	p.eikon = load("res://resources/eikons/stone_golem.tres") # compañero (no montable); el fénix se monta: ver test_eikon_mount
+	e.global_position = p.global_position + p.facing * 5.0
 	p.meter = Fighter.METER_MAX
 	await tap("summon")
 	await wait(0.2)

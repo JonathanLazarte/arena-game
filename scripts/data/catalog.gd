@@ -6,8 +6,9 @@ const CHARACTERS := ["res://resources/characters/caballero.tres", "res://resourc
 const WEAPONS := ["res://resources/weapons/espada_escudo.tres", "res://resources/weapons/espada_larga.tres",
 	"res://resources/weapons/hacha_2m.tres", "res://resources/weapons/dagas.tres", "res://resources/weapons/lanza.tres",
 	"res://resources/weapons/arco.tres"]
-const EIKONS := {"fenix": "res://resources/eikons/phoenix.tres", "lobo": "res://resources/eikons/ice_wolf.tres", "golem": "res://resources/eikons/stone_golem.tres"}
-const MOUNTS := {"caballo": "res://resources/mounts/horse.tres", "unicornio": "res://resources/mounts/unicorn.tres", "grifo": "res://resources/mounts/griffin.tres"}
+## Ronda 14: los eikons son también las monturas (fénix, lobo y grifo se montan; el gólem lucha a tu lado).
+const EIKONS := {"fenix": "res://resources/eikons/phoenix.tres", "lobo": "res://resources/eikons/ice_wolf.tres",
+	"grifo": "res://resources/eikons/griffin.tres", "golem": "res://resources/eikons/stone_golem.tres"}
 const DIFFICULTIES := {"facil": "res://resources/ai/easy.tres", "normal": "res://resources/ai/normal.tres", "dificil": "res://resources/ai/hard.tres"}
 const DIFFICULTY_NAMES := {"facil": "Fácil", "normal": "Normal", "dificil": "Difícil"}
 

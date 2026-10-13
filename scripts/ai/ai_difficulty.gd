@@ -31,3 +31,7 @@ extends Resource
 @export var breather_max: float = 4.0
 @export var breather_dist: float = 11.0 ## distancia a la que se queda durante el respiro
 @export var breather_interval: float = 14.0 ## si no ha respirado en este tiempo, fuerza un respiro
+## Ronda 14: probabilidad de saltar un golpe de área en el suelo (anillo de aviso) que le va a alcanzar.
+@export var jump_aoe_chance: float = 0.6
+## Probabilidad (por decisión) de usar la habilidad del personaje / el especial del eikon montado.
+@export var special_chance: float = 0.3

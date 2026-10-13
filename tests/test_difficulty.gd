@@ -44,6 +44,7 @@ func _measure(arena: Arena, prof: AIDifficulty) -> Dictionary:
 	return {"apm": apm, "min_d": min_d, "commits": commits}
 
 func _run() -> void:
+	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame

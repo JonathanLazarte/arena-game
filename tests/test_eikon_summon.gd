@@ -32,6 +32,7 @@ func _touch(pos: Vector2, pressed: bool) -> void:
 
 func _run() -> void:
 	seed(4)
+	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -72,9 +73,9 @@ func _run() -> void:
 	await physics_frame
 	check(is_instance_valid(p.active_eikon), "tecla E invoca al fénix")
 	check(p.meter < 1.0, "el medidor se vacía al invocar")
-	var ek := p.active_eikon as Eikon
+	var ek := p.active_eikon as Mount
+	check(is_instance_valid(ek) and p.mounted and p.mount_node == ek and ek.is_flying(), "ronda 14: el fénix aparece ensillado y el jugador lo monta")
 	if is_instance_valid(ek):
-		check(ek.data.flying and ek.global_position.distance_to(p.global_position) < 6.0, "el fénix aparece junto al jugador")
 		p.dismiss_eikon()
 	await physics_frame
 	# --- Botón táctil Eikon (móvil) ---
@@ -103,6 +104,8 @@ func _run() -> void:
 	var fire := [false]
 	for i in 600:
 		await physics_frame
+		if i % 20 == 0:
+			p.summon() # montado en el fénix: E = Llamarada
 		for pr in get_nodes_in_group("projectile"):
 			var proj := pr as Projectile
 			if proj.kind == "eikon" and not proj.has_meta("seen"):
@@ -112,9 +115,9 @@ func _run() -> void:
 		if not is_instance_valid(p.active_eikon):
 			break
 	var dealt := h0 - e.health
-	check(bolts[0] >= 5, "el fénix dispara bolas de fuego (%d)" % bolts[0])
+	check(bolts[0] >= 5, "el fénix montado lanza bolas de fuego (Llamarada, %d)" % bolts[0])
 	check(fire[0], "las bolas de fuego tienen núcleo y estela visibles")
-	check(dealt >= 3.0 * ek.data.attack_damage * 0.5 if is_instance_valid(ek) else dealt >= 9.0, "daña al rival en movimiento (%.0f en 10 s)" % dealt)
+	check(dealt >= 9.0, "daña al rival en movimiento (%.0f en 10 s)" % dealt)
 	# --- Reiniciar la partida sí vacía el medidor ---
 	p.meter = 80.0
 	arena.restart_match()

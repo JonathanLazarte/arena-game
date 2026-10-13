@@ -10,6 +10,11 @@ const PROPS := "res://assets/props/"
 const WINS_NEEDED := 2
 const ROUND_TIME := 90.0
 const EIKONS := ["res://resources/eikons/phoenix.tres", "res://resources/eikons/ice_wolf.tres", "res://resources/eikons/stone_golem.tres"]
+const LEGACY_MOUNT := "res://resources/mounts/horse.tres"
+## Ronda 14: los combates empiezan A PIE (las monturas son eikons que se invocan).
+## Las pruebas antiguas de combate montado ponen esto a true antes de cargar la escena:
+## cada luchador recibe entonces una montura neutral (caballo de pruebas) y empieza montado.
+static var start_mounted: bool = false
 
 var player: Fighter
 var enemy: Fighter
@@ -31,16 +36,16 @@ func _ready() -> void:
 	# Equipamiento: el del lobby (GameState) o el clásico si se carga la arena directamente (pruebas)
 	var gs := get_node_or_null("/root/GameState")
 	if gs and gs.from_lobby:
-		player = _make_fighter(gs.player_name, 0, Color(0.2, 0.4, 1.0), Catalog.MOUNTS[gs.mount_id], Catalog.EIKONS[gs.eikon_id],
+		player = _make_fighter(gs.player_name, 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), Catalog.weapon(gs.weapon_id), gs.char_skills())
 	else:
-		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), "res://resources/mounts/horse.tres", EIKONS[0])
+		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
 	if gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
 		var rc: CharacterDef = r["character"]
-		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["mount"], r["eikon"], rc, r["weapon"])
+		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["eikon"], rc, r["weapon"])
 	else:
-		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), "res://resources/mounts/horse.tres", EIKONS[1 + randi() % 2])
+		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), EIKONS[1 + randi() % 2])
 	player.opponent = enemy
 	player.impact.connect(_on_impact)
 	enemy.impact.connect(func(_s: float) -> void: pass)
@@ -70,7 +75,7 @@ func _ready() -> void:
 func _on_impact(strength: float) -> void:
 	shake = maxf(shake, 0.35 * strength)
 
-func _make_fighter(n: String, team: int, c: Color, mount_path: String, eikon_path: String,
+func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 		cd: CharacterDef = null, wd: WeaponDef = null, sk: Array = []) -> Fighter:
 	var f := Fighter.new()
 	if cd:
@@ -79,14 +84,17 @@ func _make_fighter(n: String, team: int, c: Color, mount_path: String, eikon_pat
 	f.display_name = n
 	f.team = team
 	f.color = c
-	f.mount = load(mount_path)
 	f.eikon = load(eikon_path)
-	var m := Mount.new()
-	m.data = f.mount
-	add_child(m)
-	add_child(f)
-	f.owned_mount = m
-	f.mount_on(m)
+	if start_mounted:
+		f.mount = load(LEGACY_MOUNT)
+		var m := Mount.new()
+		m.data = f.mount
+		add_child(m)
+		add_child(f)
+		f.owned_mount = m
+		f.mount_on(m)
+	else:
+		add_child(f)
 	f.died.connect(_on_fighter_died)
 	return f
 
@@ -277,8 +285,9 @@ func _physics_process(delta: float) -> void:
 		lock_marker.global_position = player.face_target.global_position + Vector3(0, 3.9 + sin(Time.get_ticks_msec() * 0.006) * 0.1, 0)
 
 func start_round(new_match: bool = false) -> void:
-	for n in get_tree().get_nodes_in_group("projectile"):
-		n.queue_free()
+	for g: String in ["projectile", "ground_aoe"]:
+		for n in get_tree().get_nodes_in_group(g):
+			n.queue_free()
 	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD, not new_match)
 	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK, not new_match)
 	camera.global_position = player.global_position + Vector3(0, 5, 9)

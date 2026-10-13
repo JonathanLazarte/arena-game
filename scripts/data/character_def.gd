@@ -28,6 +28,10 @@ extends Resource
 @export var shield_mesh: String = "Round_Shield" ## escudo de este personaje (si el arma lo permite)
 @export var shield_source: String = "res://assets/models/Knight.glb"
 @export var tint: Color = Color(1, 1, 1)
+## Ronda 14: habilidad especial (tecla G / botón "Habilidad"). "golpe_sismico" = área en el suelo.
+@export var special_id: String = ""
+@export var special_name: String = ""
+@export_multiline var special_desc: String = ""
 
 func allows(weapon_id: String) -> bool:
 	return weapons.has(weapon_id)

@@ -22,8 +22,18 @@ const STATES := {
 	"parry": "Block_Attack", "dodge_f": "Dodge_Forward", "dodge_b": "Dodge_Backward",
 	"dodge_l": "Dodge_Left", "dodge_r": "Dodge_Right", "hit": "Hit_A", "stun": "Hit_B",
 	"death": "Death_A", "aim": "2H_Ranged_Aiming", "shoot": "2H_Ranged_Shoot", "swap": "Use_Item",
+	# Ronda 14
+	"dash_strike": DASH_STRIKE_ANIM, "jump_up": "Jump_Start", "jump_air": "Jump_Idle", "land": "Jump_Land",
+	"slam": "2H_Melee_Attack_Chop",
 }
-const SCALED := ["light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r"]
+const SCALED := ["light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
+## Animación propia (KayKit no trae una estocada en carrera): se compone en Godot a partir de
+## Dodge_Forward (piernas y cadera: el impulso de la zancada) y 1H_Melee_Attack_Slice_Horizontal
+## (tronco y brazos: el tajo), con el tronco inclinado hacia delante durante la arremetida.
+const DASH_STRIKE_ANIM := "Dash_Strike"
+const DASH_STRIKE_LEN := 0.8
+const DASH_STRIKE_SLICE := 0.75 ## fracción del tajo usada
+const DS_CONTACT := CONTACT / DASH_STRIKE_SLICE ## momento del impacto dentro de Dash_Strike
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
 const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap"]
 
@@ -116,7 +126,8 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	sk.add_child(riding)
 	ap = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	AnimUtil.set_loops(ap, ["Idle", "Walking_A", "Walking_Backwards", "Running_A", "Running_Strafe_Left",
-		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose"])
+		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose", "Jump_Idle"])
+	author_dash_strike(ap, states["light1"])
 	_build_tree()
 
 ## Malla de arma: la del propio modelo si existe, o copiada de otro .glb KayKit
@@ -162,6 +173,61 @@ func _make_lance(sk: Skeleton3D) -> MeshInstance3D:
 	var tip := MeshUtil.box(shaft, Vector3(0.14, 0.4, 0.05), Vector3(0, 1.45, 0), Color(0.8, 0.82, 0.9))
 	tip.rotation.y = PI / 4
 	return shaft
+
+## Crea la animación Dash_Strike en la biblioteca del AnimationPlayer (una vez por modelo).
+## Muestrea a 30 fps: tren superior = tajo (re-temporizado), tren inferior = arranque de la
+## voltereta hacia delante mezclado de vuelta a la pose del tajo, y un "override" de hueso
+## (spine/chest) que inclina el tronco en la arremetida.
+static func author_dash_strike(player: AnimationPlayer, slice_name: String = "1H_Melee_Attack_Slice_Horizontal") -> Animation:
+	if player.has_animation(DASH_STRIKE_ANIM):
+		return player.get_animation(DASH_STRIKE_ANIM)
+	if not player.has_animation(slice_name):
+		slice_name = "1H_Melee_Attack_Slice_Horizontal"
+	var atk := player.get_animation(slice_name)
+	var dodge := player.get_animation("Dodge_Forward")
+	var anim := Animation.new()
+	anim.length = DASH_STRIKE_LEN
+	var fps := 30.0
+	var n := int(DASH_STRIKE_LEN * fps)
+	var la := atk.length * DASH_STRIKE_SLICE
+	var lunge_end := DASH_STRIKE_LEN * 0.35
+	for i in atk.get_track_count():
+		var ty := atk.track_get_type(i)
+		if ty != Animation.TYPE_POSITION_3D and ty != Animation.TYPE_ROTATION_3D and ty != Animation.TYPE_SCALE_3D:
+			continue
+		var path := atk.track_get_path(i)
+		var bone := String(path.get_concatenated_subnames())
+		var upper := bone in UPPER
+		var di := dodge.find_track(path, ty) if dodge else -1
+		var use_dodge := not upper and di >= 0 and bone != "root" and ty != Animation.TYPE_SCALE_3D
+		var nt := anim.add_track(ty)
+		anim.track_set_path(nt, path)
+		for k in n + 1:
+			var t := k / fps
+			var ta := t / DASH_STRIKE_LEN * la
+			# peso de la zancada: 1 al principio, se funde con la pose del tajo hacia el final
+			var w := 1.0 - smoothstep(lunge_end, DASH_STRIKE_LEN * 0.85, t)
+			var td := minf(t, lunge_end) / lunge_end * dodge.length * 0.22 if dodge else 0.0
+			var lean := sin(clampf(t / (DASH_STRIKE_LEN * 0.6), 0.0, 1.0) * PI) * deg_to_rad(16.0)
+			match ty:
+				Animation.TYPE_ROTATION_3D:
+					var q := atk.rotation_track_interpolate(i, ta)
+					if use_dodge:
+						q = q.slerp(dodge.rotation_track_interpolate(di, td), w)
+					if bone == "spine" or bone == "chest":
+						q = q * Quaternion(Vector3.RIGHT, lean * 0.5)
+					anim.rotation_track_insert_key(nt, t, q.normalized())
+				Animation.TYPE_POSITION_3D:
+					var pv := atk.position_track_interpolate(i, ta)
+					if use_dodge:
+						pv = pv.lerp(dodge.position_track_interpolate(di, td), w)
+					anim.position_track_insert_key(nt, t, pv)
+				_:
+					anim.scale_track_insert_key(nt, t, atk.scale_track_interpolate(i, ta))
+	var lib := player.get_animation_library(&"")
+	if lib and not lib.has_animation(DASH_STRIKE_ANIM):
+		lib.add_animation(DASH_STRIKE_ANIM, anim)
+	return anim
 
 func _build_tree() -> void:
 	var root := AnimationNodeBlendTree.new()
@@ -239,7 +305,7 @@ func set_mounted(m: bool, sword_scale: float) -> void:
 ## Evento puntual: "hit", "block_hit", "shoot".
 func event(e: String) -> void:
 	oneshot = e
-	oneshot_t = {"hit": 0.4, "block_hit": 0.45, "shoot": 0.5}.get(e, 0.4)
+	oneshot_t = {"hit": 0.4, "block_hit": 0.45, "shoot": 0.5, "slam": Fighter.SLAM_TELEGRAPH + 0.25}.get(e, 0.4)
 	_last_attack_id = -1
 	if e == state:
 		playback.start(e, true)
@@ -257,8 +323,12 @@ func update(f: Fighter, delta: float) -> void:
 		upper = false
 	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE:
 		s = "stun"
+	elif f.is_dash_striking():
+		s = "dash_strike"
 	elif f.atk_state != Fighter.Atk.NONE:
-		s = "heavy" if f.atk_heavy else "light%d" % (maxi(f.combo - 1, 0) % 3)
+		s = "heavy" if f.atk_heavy or f.atk_jump else "light%d" % (maxi(f.combo - 1, 0) % 3)
+	elif f.special_t > 0.0 or (oneshot == "slam" and oneshot_t > 0.0):
+		s = "slam"
 	elif f.swap_t > 0.0:
 		s = "swap"
 	elif f.parry_state != Fighter.Parry.NONE:
@@ -269,6 +339,10 @@ func update(f: Fighter, delta: float) -> void:
 			s = "dodge_r" if rel.x > 0.0 else "dodge_l"
 		else:
 			s = "dodge_f" if rel.y >= 0.0 else "dodge_b"
+	elif f.airborne and not f.mounted:
+		s = "jump_up" if f.velocity.y > 1.5 else "jump_air"
+	elif f.land_t > 0.0 and not f.mounted:
+		s = "land"
 	elif oneshot_t > 0.0:
 		s = oneshot
 	elif f.blocking:
@@ -278,7 +352,23 @@ func update(f: Fighter, delta: float) -> void:
 	if s in UPPER_STATES:
 		upper = true
 	# Ataques: reinicia el clip en cada ataque nuevo y ajusta su velocidad por fase
-	if s == "heavy" or s.begins_with("light"):
+	if s == "dash_strike":
+		if f.attacks_started != _last_attack_id:
+			_last_attack_id = f.attacks_started
+			playback.start(s, true)
+		var Ld := _clip_len(s)
+		var scd := 1.0
+		match f.atk_state:
+			Fighter.Atk.WINDUP:
+				scd = Ld * DS_CONTACT / maxf(f.atk_dur, 0.05)
+			Fighter.Atk.ACTIVE:
+				scd = Ld * 0.12 / maxf(f.atk_dur, 0.05)
+			Fighter.Atk.RECOVERY:
+				scd = Ld * maxf(1.0 - DS_CONTACT - 0.12, 0.05) / maxf(f.atk_dur, 0.05)
+		tree.set("parameters/act/dash_strike/ts/scale", scd)
+	elif s == "slam":
+		tree.set("parameters/act/slam/ts/scale", _clip_len("slam") * CONTACT / Fighter.SLAM_TELEGRAPH)
+	elif s == "heavy" or s.begins_with("light"):
 		if f.attacks_started != _last_attack_id:
 			_last_attack_id = f.attacks_started
 			playback.start(s, true)
@@ -301,7 +391,7 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/parry/ts/scale", _clip_len("parry") / (Fighter.PARRY_WINDOW + Fighter.PARRY_RECOVERY))
 	if s != state:
 		if s != "none":
-			if state == "none" or s in ["death", "stun", "hit", "block_hit", "shoot"] or s.begins_with("dodge"):
+			if state == "none" or s in ["death", "stun", "hit", "block_hit", "shoot", "dash_strike", "jump_up", "land", "slam"] or s.begins_with("dodge"):
 				playback.start(s, true)
 			else:
 				playback.travel(s)

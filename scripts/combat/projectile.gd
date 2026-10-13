@@ -14,6 +14,16 @@ var color: Color = Color.WHITE
 var life: float = 2.5
 var radius: float = 0.5
 var kind: String = "arrow" ## "arrow" (el escudo la anula) o "eikon" (el escudo deja pasar un 50 %)
+## Ronda 14: autoapuntado con giro LIMITADO. El proyectil persigue a `target` girando como
+## mucho turn_rate rad/s, así que un dash/voltereta lateral bien medido le hace fallar:
+## - durante los i-frames lo atraviesa (take_hit = "dodge") y sigue de largo;
+## - una vez que lo ha rebasado (o lo esquivó) deja de perseguirlo: no da la vuelta;
+## - si te apartas pronto, gira y te alcanza (mal medido = te da).
+var target: Node3D = null
+var turn_rate: float = 1.6 ## rad/s
+var homing_min_dist: float = 2.5 ## por debajo de esta distancia ya no corrige (no "gira en el sitio")
+var lost: bool = false ## dejó de perseguir (rebasado o esquivado)
+var dodged_by: Array = [] ## objetivos que lo esquivaron con i-frames (no les vuelve a golpear)
 
 func _ready() -> void:
 	add_to_group("projectile")
@@ -39,6 +49,7 @@ func _physics_process(delta: float) -> void:
 	if not _oriented:
 		_oriented = true
 		_orient()
+	_home(delta)
 	global_position += direction * speed * delta
 	life -= delta
 	var p := global_position
@@ -50,15 +61,21 @@ func _physics_process(delta: float) -> void:
 			queue_free()
 			return
 	for t in MeshUtil.enemies_of(get_tree(), team):
+		if t in dodged_by:
+			continue
 		if p.distance_to(t.get_hit_center()) < radius + t.hit_radius:
 			var res: String = t.take_hit(damage, shooter, kind)
 			if res == "dodge":
+				dodged_by.append(t) # lo atraviesa durante los i-frames y sigue de largo
+				if t == target:
+					lost = true
 				continue
 			if res == "parry":
 				# Reflejo: la flecha cambia de bando
 				direction = -direction
 				team = t.team
 				shooter = t
+				target = null # el reflejo no persigue
 				life = 2.0
 				_orient()
 				return
@@ -66,3 +83,25 @@ func _physics_process(delta: float) -> void:
 				(shooter as Fighter).add_meter(8.0)
 			queue_free()
 			return
+
+func _home(delta: float) -> void:
+	if lost or not is_instance_valid(target) or not bool(target.get("alive")):
+		return
+	var to: Vector3 = target.get_hit_center() - global_position
+	var d := to.length()
+	if d < 0.01:
+		return
+	if direction.dot(to / d) < 0.0:
+		lost = true # ya lo rebasó: sigue recto
+		return
+	if d < homing_min_dist:
+		return
+	var want := to / d
+	var ang := direction.angle_to(want)
+	if ang < 0.0001:
+		return
+	var axis := direction.cross(want)
+	if axis.length() < 0.0001:
+		return
+	direction = direction.rotated(axis.normalized(), minf(ang, turn_rate * delta)).normalized()
+	_orient()

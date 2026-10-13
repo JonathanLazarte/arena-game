@@ -1,9 +1,10 @@
 extends Node
 ## Autoload "GameState": perfil local (jugador, oro, progresión, desbloqueos) y equipamiento,
-## guardado en user:// con versión (v1 = ronda 10, v2 = ronda 11 con progresión).
+## guardado en user:// con versión (v1 = ronda 10, v2 = ronda 11 con progresión,
+## v3 = ronda 14: sin monturas; los eikons son las monturas).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 var save_path: String = SAVE_PATH ## las pruebas usan otra ruta
 var player_name: String = "Jugador"
 var oro: int = Progression.START_GOLD
@@ -11,7 +12,6 @@ var gemas: int = 50 ## moneda premium de muestra (ronda 12: solo se muestra)
 var character_id: String = "caballero"
 var weapon_id: String = "espada_escudo"
 var eikon_id: String = "fenix"
-var mount_id: String = "caballo"
 var difficulty: String = "facil"
 # --- Ronda 11 ---
 var first_run_done: bool = false ## ya eligió su primer personaje
@@ -21,7 +21,8 @@ var skills: Dictionary = {} ## id personaje -> Array de ids de habilidad
 var unlocked_chars: Array = []
 var owned_weapons: Array = []
 var owned_eikons: Array = ["fenix"]
-var owned_mounts: Array = ["caballo"]
+## Ronda 14: resumen de la migración de monturas (eikons concedidos y oro devuelto).
+var mount_migration: Dictionary = {}
 var migrated_from: int = 0 ## versión de la que se migró al cargar (0 = ninguna)
 var last_result: Dictionary = {} ## resultado de la última partida (pantalla de resultados)
 ## Rival: si es true (al jugar desde el lobby) recibe un equipamiento aleatorio; si no, el de siempre.
@@ -54,7 +55,6 @@ func is_unlocked(kind: String, id: String) -> bool:
 		"character": return id in unlocked_chars
 		"weapon": return id in owned_weapons
 		"eikon": return id in owned_eikons
-		"mount": return id in owned_mounts
 	return false
 
 ## "ok" si se puede comprar, si no el motivo: "ya", "nivel", "oro".
@@ -96,7 +96,6 @@ func buy(kind: String, id: String) -> String:
 		"character": _unlock_char(id)
 		"weapon": owned_weapons.append(id)
 		"eikon": owned_eikons.append(id)
-		"mount": owned_mounts.append(id)
 	save_loadout()
 	return "ok"
 
@@ -159,7 +158,7 @@ func save_loadout() -> void:
 	cfg.set_value("jugador", "nombre", player_name)
 	cfg.set_value("jugador", "oro", oro)
 	cfg.set_value("jugador", "gemas", gemas)
-	for k: String in ["character_id", "weapon_id", "eikon_id", "mount_id", "difficulty"]:
+	for k: String in ["character_id", "weapon_id", "eikon_id", "difficulty"]:
 		cfg.set_value("loadout", k, get(k))
 	cfg.set_value("progreso", "first_run_done", first_run_done)
 	cfg.set_value("progreso", "account_xp", account_xp)
@@ -168,7 +167,6 @@ func save_loadout() -> void:
 	cfg.set_value("progreso", "unlocked_chars", unlocked_chars)
 	cfg.set_value("progreso", "owned_weapons", owned_weapons)
 	cfg.set_value("progreso", "owned_eikons", owned_eikons)
-	cfg.set_value("progreso", "owned_mounts", owned_mounts)
 	cfg.save(save_path)
 
 func load_loadout() -> void:
@@ -180,14 +178,16 @@ func load_loadout() -> void:
 	player_name = cfg.get_value("jugador", "nombre", player_name)
 	oro = cfg.get_value("jugador", "oro", oro)
 	gemas = cfg.get_value("jugador", "gemas", 50)
-	for k: String in ["character_id", "weapon_id", "eikon_id", "mount_id", "difficulty"]:
+	for k: String in ["character_id", "weapon_id", "eikon_id", "difficulty"]:
 		set(k, cfg.get_value("loadout", k, get(k)))
 	if not Catalog.EIKONS.has(eikon_id): eikon_id = "fenix"
-	if not Catalog.MOUNTS.has(mount_id): mount_id = "caballo"
+	var old_mounts: Array = []
+	mount_migration = {}
 	if not Catalog.DIFFICULTIES.has(difficulty): difficulty = "facil"
 	character_id = Catalog.character(character_id).id
 	if ver < 2:
 		_migrate_v1()
+		old_mounts = ["caballo", String(cfg.get_value("loadout", "mount_id", "caballo"))]
 	else:
 		first_run_done = cfg.get_value("progreso", "first_run_done", false)
 		account_xp = cfg.get_value("progreso", "account_xp", 0)
@@ -196,14 +196,18 @@ func load_loadout() -> void:
 		unlocked_chars = cfg.get_value("progreso", "unlocked_chars", [])
 		owned_weapons = cfg.get_value("progreso", "owned_weapons", [])
 		owned_eikons = cfg.get_value("progreso", "owned_eikons", ["fenix"])
-		owned_mounts = cfg.get_value("progreso", "owned_mounts", ["caballo"])
+		if ver < 3:
+			migrated_from = ver
+			old_mounts = cfg.get_value("progreso", "owned_mounts", ["caballo"])
+			old_mounts.append(String(cfg.get_value("loadout", "mount_id", "caballo")))
+	if migrated_from > 0:
+		_migrate_mounts(old_mounts)
 	if first_run_done and unlocked_chars.is_empty():
 		_unlock_char(character_id)
 	if first_run_done and not character_id in unlocked_chars:
 		character_id = String(unlocked_chars[0])
 	set_character(character_id)
 	if first_run_done and not eikon_id in owned_eikons: eikon_id = "fenix"
-	if first_run_done and not mount_id in owned_mounts: mount_id = "caballo"
 	if migrated_from > 0:
 		save_loadout()
 
@@ -222,8 +226,29 @@ func _migrate_v1() -> void:
 		owned_weapons.append(weapon_id)
 	owned_eikons = ["fenix"]
 	if eikon_id != "fenix": owned_eikons.append(eikon_id)
-	owned_mounts = ["caballo"]
-	if mount_id != "caballo": owned_mounts.append(mount_id)
+
+## v1/v2 -> v3: cada montura comprada pasa a ser su eikon equivalente (grifo) o se devuelve
+## su precio en oro (unicornio). El caballo era gratis: desaparece sin compensación.
+func _migrate_mounts(old: Array) -> void:
+	var given: Array = []
+	var refund := 0
+	var seen: Array = []
+	for m in old:
+		var id := String(m)
+		if id in seen:
+			continue
+		seen.append(id)
+		if Progression.MOUNT_TO_EIKON.has(id):
+			var eid: String = Progression.MOUNT_TO_EIKON[id]
+			if not eid in owned_eikons:
+				owned_eikons.append(eid)
+				given.append(eid)
+			else:
+				refund += int(Progression.EIKON_REQ[eid][1]) # ya lo tenía: se devuelve el oro
+		elif Progression.MOUNT_REFUND.has(id):
+			refund += int(Progression.MOUNT_REFUND[id])
+	oro += refund
+	mount_migration = {"eikons": given, "refund": refund, "from": seen}
 
 func reset_defaults() -> void:
 	player_name = "Jugador"
@@ -232,7 +257,6 @@ func reset_defaults() -> void:
 	character_id = "caballero"
 	weapon_id = "espada_escudo"
 	eikon_id = "fenix"
-	mount_id = "caballo"
 	difficulty = "facil"
 	first_run_done = false
 	account_xp = 0
@@ -241,7 +265,7 @@ func reset_defaults() -> void:
 	unlocked_chars = []
 	owned_weapons = []
 	owned_eikons = ["fenix"]
-	owned_mounts = ["caballo"]
+	mount_migration = {}
 	last_result = {}
 
 ## Equipamiento aleatorio coherente para el rival.
@@ -249,5 +273,5 @@ static func random_loadout() -> Dictionary:
 	var cs := Catalog.characters()
 	var c: CharacterDef = cs[randi() % cs.size()]
 	var ws := Catalog.weapons_for(c).filter(func(w: WeaponDef) -> bool: return not w.ranged) # la IA lucha cuerpo a cuerpo
-	return {"character": c, "weapon": ws[randi() % ws.size()], "eikon": Catalog.EIKONS.values()[randi() % 3],
-		"mount": Catalog.MOUNTS.values()[randi() % 3]}
+	var es: Array = Catalog.EIKONS.values()
+	return {"character": c, "weapon": ws[randi() % ws.size()], "eikon": es[randi() % es.size()]}

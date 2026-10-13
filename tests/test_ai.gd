@@ -8,6 +8,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var seed_arg0 := OS.get_cmdline_user_args()
 	seed(int(seed_arg0[0]) if seed_arg0.size() > 0 else 12345) # también el eikon del rival
+	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame

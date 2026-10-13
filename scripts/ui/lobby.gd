@@ -3,9 +3,10 @@ extends Node3D
 ## pestañas de equipamiento con bloqueos y compras con oro, árbol de habilidades,
 ## dificultad y botón JUGAR. Todo el texto en español.
 
-const TABS := ["Personajes", "Armas", "Eikons", "Monturas", "Habilidades", "Inventario"]
+## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
+const TABS := ["Personajes", "Armas", "Eikons", "Habilidades", "Inventario"]
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
-const KIND_NAME := {"character": "personaje", "weapon": "arma", "eikon": "eikon", "mount": "montura"}
+const KIND_NAME := {"character": "personaje", "weapon": "arma", "eikon": "eikon"}
 
 var gs: Node
 var stage: ShowcaseStage
@@ -307,7 +308,6 @@ func _item_name(kind: String, id: String) -> String:
 		"character": return Catalog.character(id).display_name
 		"weapon": return Catalog.weapon(id).display_name
 		"eikon": return (load(Catalog.EIKONS[id]) as EikonData).eikon_name
-		"mount": return (load(Catalog.MOUNTS[id]) as MountData).mount_name
 	return id
 
 func _lock_text(kind: String, id: String) -> String:
@@ -342,7 +342,6 @@ func confirm_purchase(kind: String, id: String) -> void:
 			view_char = id
 		"weapon": gs.set_weapon(id)
 		"eikon": gs.eikon_id = id
-		"mount": gs.mount_id = id
 	gs.save_loadout()
 	_refresh_all()
 
@@ -382,6 +381,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 	if rebuild:
 		var w := Catalog.weapon(gs.weapon_id) if not locked else Catalog.weapon(c.default_weapon)
 		stage.show_character(c, w, locked)
+	stage.show_eikon(load(Catalog.EIKONS[gs.eikon_id]) if tab == "Eikons" else null)
 	for t: String in tab_buttons:
 		(tab_buttons[t] as Button).button_pressed = t == tab
 	for d: String in diff_buttons:
@@ -453,7 +453,8 @@ func _refresh_all(rebuild: bool = true) -> void:
 			for id: String in Catalog.EIKONS:
 				var ed: EikonData = load(Catalog.EIKONS[id])
 				var own: bool = gs.is_unlocked("eikon", id)
-				_card(ed.eikon_name if own else "%s — %s" % [ed.eikon_name, _lock_text("eikon", id)], id == gs.eikon_id, not own, func() -> void:
+				var kind_t := "montable" if ed.rideable else "compañero"
+				_card(("%s · %s" % [ed.eikon_name, kind_t]) if own else "%s — %s" % [ed.eikon_name, _lock_text("eikon", id)], id == gs.eikon_id, not own, func() -> void:
 					if own:
 						gs.eikon_id = id
 						gs.save_loadout()
@@ -461,27 +462,17 @@ func _refresh_all(rebuild: bool = true) -> void:
 					else:
 						request_purchase("eikon", id))
 			var e: EikonData = load(Catalog.EIKONS[gs.eikon_id])
-			detail.text = "[b]%s[/b]\nInvocación (medidor lleno). %s. Dura %d s." % [e.eikon_name, "Vuela" if e.flying else "Terrestre", e.duration]
-			_stat("Vida", e.max_health, 200.0, str(int(e.max_health)))
-			_stat("Daño", e.attack_damage, 20.0, str(e.attack_damage))
-			_stat("Alcance", e.attack_range, 12.0, "%.1f m" % e.attack_range)
-		"Monturas":
-			for id: String in Catalog.MOUNTS:
-				var md: MountData = load(Catalog.MOUNTS[id])
-				var own: bool = gs.is_unlocked("mount", id)
-				_card(md.mount_name if own else "%s — %s" % [md.mount_name, _lock_text("mount", id)], id == gs.mount_id, not own, func() -> void:
-					if own:
-						gs.mount_id = id
-						gs.save_loadout()
-						_refresh_all(false)
-					else:
-						request_purchase("mount", id))
-			var mo: MountData = load(Catalog.MOUNTS[gs.mount_id])
-			detail.text = "[b]%s[/b]\n%s" % [mo.mount_name, "+%d de vida al jinete." % mo.health_bonus if mo.health_bonus > 0 else "Montura de guerra."]
-			_stat("Velocidad", mo.speed, 18.0, "%.0f" % mo.speed)
-			_stat("Aceleración", mo.acceleration, 24.0, "%.0f" % mo.acceleration)
-			_stat("Giro", mo.turn_speed, 4.0, "%.1f" % mo.turn_speed)
-			_stat("Dash", mo.dash_speed, 40.0, "%.0f" % mo.dash_speed)
+			if e.rideable:
+				detail.text = "[b]%s[/b] · [color=#a8ccff]Montable[/color]\n%s\nCon el medidor lleno (E) aparece ensillado y lo montas %d s. Especial (E montado): [color=#f2dc99]%s[/color]." % [e.eikon_name, e.description, e.duration, e.special_name]
+				_stat("Velocidad", e.ride.speed, 18.0, "%.1f" % e.ride.speed)
+				_stat("Giro", e.ride.turn_speed, 4.5, "%.1f" % e.ride.turn_speed)
+				_stat("Dash", e.ride.dash_speed, 40.0, "%.0f" % e.ride.dash_speed)
+				_stat("Especial", e.special_damage, 20.0, "%d · %.1f s" % [e.special_damage, e.special_cooldown])
+			else:
+				detail.text = "[b]%s[/b] · [color=#a8ccff]Compañero[/color]\n%s" % [e.eikon_name, e.description]
+				_stat("Vida", e.max_health, 200.0, str(int(e.max_health)))
+				_stat("Daño", e.attack_damage, 20.0, str(e.attack_damage))
+				_stat("Alcance", e.attack_range, 12.0, "%.1f m" % e.attack_range)
 		"Habilidades":
 			tree_view.build(gs.character_id, gs.char_skills(), gs.skill_points())
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
@@ -489,9 +480,8 @@ func _refresh_all(rebuild: bool = true) -> void:
 			_stat("XP personaje", cl.x, cl.y, "%d/%d" % [cl.x, cl.y])
 		"Inventario":
 			var e2: EikonData = load(Catalog.EIKONS[gs.eikon_id])
-			var m2: MountData = load(Catalog.MOUNTS[gs.mount_id])
 			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + Catalog.weapon(gs.weapon_id).display_name,
-					"Eikon: " + e2.eikon_name, "Montura: " + m2.mount_name, "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty],
+					"Eikon: %s (%s)" % [e2.eikon_name, "montable" if e2.rideable else "compañero"], "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty],
 					"Desbloqueados: %d/5 personajes, %d armas" % [gs.unlocked_chars.size(), gs.owned_weapons.size()]]:
 				list_box.add_child(UIKit.label(ln, 19))
 			detail.text = "[b]Equipamiento actual[/b]\nSe guarda automáticamente en este dispositivo. El rival recibe un equipamiento aleatorio."
@@ -526,10 +516,6 @@ func _update_dots() -> void:
 	for id: String in Catalog.EIKONS:
 		can_e = can_e or gs.can_buy("eikon", id) == "ok"
 	dots["Eikons"].visible = can_e
-	var can_m := false
-	for id: String in Catalog.MOUNTS:
-		can_m = can_m or gs.can_buy("mount", id) == "ok"
-	dots["Monturas"].visible = can_m
 
 func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
 	stats_box.add_child(UIKit.stat_row(label_t, v, vmax, txt))

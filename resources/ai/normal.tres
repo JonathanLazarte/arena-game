@@ -11,3 +11,5 @@ breather_min = 2.0
 breather_max = 4.5
 breather_dist = 11.0
 breather_interval = 14.0
+jump_aoe_chance = 0.6
+special_chance = 0.3

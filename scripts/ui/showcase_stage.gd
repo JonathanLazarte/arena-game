@@ -265,6 +265,36 @@ func show_character(cd: CharacterDef, wd: WeaponDef, locked: bool = false) -> vo
 	if locked:
 		preview.set_tint(Color(0.08, 0.1, 0.2), false) # silueta si está bloqueado
 
+## Ronda 14: en la pestaña Eikons se muestra el eikon equipado junto al pedestal.
+var eikon_preview: Node3D
+var _eikon_shown: EikonData
+func show_eikon(ed: EikonData) -> void:
+	if ed == _eikon_shown and (ed == null or is_instance_valid(eikon_preview)):
+		return
+	_eikon_shown = ed
+	if is_instance_valid(eikon_preview):
+		eikon_preview.queue_free()
+	eikon_preview = null
+	if ed == null:
+		return
+	if ed.rideable:
+		var m := Mount.new()
+		m.data = ed.ride
+		eikon_preview = m
+		add_child(m)
+		m.set_physics_process(false)
+		m.scale = Vector3.ONE * 0.85
+	else:
+		var e := Eikon.new()
+		e.data = ed
+		e.preview = true
+		eikon_preview = e
+		add_child(e)
+		e.scale = Vector3.ONE * 0.7
+	eikon_preview.name = "EikonPreview"
+	eikon_preview.position = Vector3(-1.75, 0.0, -0.9)
+	eikon_preview.rotation.y = deg_to_rad(-135.0) # de perfil, mirando hacia el pedestal
+
 func _process(delta: float) -> void:
 	_t += delta
 	pedestal.rotation.y += spin_speed * delta

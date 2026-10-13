@@ -13,3 +13,7 @@ attack_damage = 14.0
 attack_range = 4.5
 attack_cooldown = 2.2
 size = 1.6
+id = "golem"
+rideable = false
+special_name = "Golpe de tierra"
+description = "No se monta: bestia enorme que lucha a pie a tu lado 15 s. Sus golpes al suelo (anillo de aviso) no dañan a quien salte."

@@ -1,15 +1,43 @@
-[gd_resource type="Resource" script_class="EikonData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EikonData" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/data/eikon_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/mount_data.gd" id="2"]
+
+[sub_resource type="Resource" id="ride"]
+script = ExtResource("2")
+mount_name = "Fénix"
+speed = 15.0
+acceleration = 20.0
+turn_speed = 3.6
+dash_speed = 32.0
+can_fly = true
+model_path = "res://assets/models/dragon_quaternius.glb"
+model_scale = 0.8
+anim_idle = "CharacterArmature|Flying_Idle"
+anim_walk = "CharacterArmature|Fast_Flying"
+anim_gallop = "CharacterArmature|Fast_Flying"
+tint = true
+hover = 0.6
+saddle_offset = Vector3(0, 0.15, 0.05)
+color = Color(1, 0.4, 0.1, 1)
 
 [resource]
 script = ExtResource("1")
 eikon_name = "Fénix"
+id = "fenix"
 color = Color(1, 0.4, 0.1, 1)
 max_health = 50.0
+duration = 20.0
 move_speed = 12.0
 attack_kind = 1
 attack_damage = 6.0
 attack_range = 14.0
 attack_cooldown = 1.0
 flying = true
+rideable = true
+ride = SubResource("ride")
+special_id = "llamarada"
+special_name = "Llamarada"
+special_cooldown = 1.6
+special_damage = 8.0
+description = "Montable y vuela a ras de suelo: los golpes de área en el suelo no te alcanzan. Especial: bola de fuego que persigue al rival."

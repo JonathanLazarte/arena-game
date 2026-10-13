@@ -75,15 +75,16 @@ const CHARACTER_PRICE := {"caballero": 1200, "arquero": 1200, "berserker": 1500,
 ## Armas/eikons/monturas: nivel de cuenta mínimo + precio. Precio 0 = gratis al llegar al nivel.
 const WEAPON_REQ := {"espada_escudo": [1, 0], "arco": [1, 0], "dagas": [1, 0], "hacha_2m": [1, 0],
 	"espada_larga": [2, 350], "lanza": [4, 600]}
-const EIKON_REQ := {"fenix": [1, 0], "lobo": [3, 800], "golem": [6, 1400]}
-const MOUNT_REQ := {"caballo": [1, 0], "unicornio": [2, 500], "grifo": [5, 1200]}
+const EIKON_REQ := {"fenix": [1, 0], "lobo": [3, 800], "grifo": [5, 1200], "golem": [6, 1400]}
+## Ronda 14 (guardado v3): monturas antiguas -> eikon equivalente, o se devuelve el oro.
+const MOUNT_TO_EIKON := {"grifo": "grifo"}
+const MOUNT_REFUND := {"unicornio": 500}
 
 static func req(kind: String, id: String) -> Array:
 	match kind:
 		"character": return [1, CHARACTER_PRICE.get(id, 1500)]
 		"weapon": return WEAPON_REQ.get(id, [1, 0])
 		"eikon": return EIKON_REQ.get(id, [1, 0])
-		"mount": return MOUNT_REQ.get(id, [1, 0])
 	return [1, 0]
 
 # ---------------- Árboles de habilidad ----------------

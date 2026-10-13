@@ -34,11 +34,12 @@ func _run() -> void:
 	gs.account_xp = Progression.xp_at_level(Progression.WEAPON_REQ["lanza"][0])
 	var o: int = gs.oro
 	check(gs.buy("weapon", "lanza") == "ok" and gs.oro == o - Progression.WEAPON_REQ["lanza"][1] and gs.set_weapon("lanza"), "con nivel la compra y la equipa")
-	check(gs.can_buy("eikon", "golem") == "nivel" and gs.can_buy("mount", "unicornio") == "ok", "eikon gólem pide nivel; unicornio disponible")
-	check(gs.buy("mount", "unicornio") == "ok" and "unicornio" in gs.owned_mounts, "compra montura")
+	gs.oro += Progression.EIKON_REQ["lobo"][1]
+	check(gs.can_buy("eikon", "golem") == "nivel" and gs.can_buy("eikon", "lobo") == "ok", "eikon gólem pide nivel; lobo (montable) disponible")
+	check(gs.buy("eikon", "lobo") == "ok" and "lobo" in gs.owned_eikons, "compra eikon montable")
 	gs.reset_defaults()
 	gs.load_loadout()
-	check("arquero" in gs.unlocked_chars and "lanza" in gs.owned_weapons and "unicornio" in gs.owned_mounts, "las compras se guardan")
+	check("arquero" in gs.unlocked_chars and "lanza" in gs.owned_weapons and "lobo" in gs.owned_eikons, "las compras se guardan")
 	# Flujo en el lobby con confirmación
 	gs.oro = 1300
 	change_scene_to_file("res://scenes/lobby.tscn")

@@ -27,6 +27,8 @@ var loadout_label: Label
 var _player: Fighter
 var _meter_full: bool = false
 var _summon_btn: TouchScreenButton
+var _special_btn: TouchScreenButton
+var _summon_label: Label
 
 func _ready() -> void:
 	var root := Control.new()
@@ -69,6 +71,9 @@ func _ready() -> void:
 	_touch_button("Galope", "sprint", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
 	_touch_button("Parry", "parry", Vector2(925, 530), 40, Color(0.3, 0.9, 1.0))
 	_touch_button("Dash", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
+	# Ronda 14: salto y habilidad del personaje
+	_touch_button("Saltar", "jump", Vector2(805, 535), 40, Color(0.75, 0.85, 1.0))
+	_touch_button("Habilidad", "special", Vector2(930, 415), 40, Color(1.0, 0.45, 0.25))
 	for l: Label in [round_label, timer_label, message]:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
@@ -153,6 +158,8 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 	if action == "summon":
 		_summon_btn = tb
 		tb.modulate = Color(1, 1, 1, 0.55)
+	if action == "special":
+		_special_btn = tb
 	var shape := CircleShape2D.new()
 	shape.radius = r
 	tb.shape = shape
@@ -172,6 +179,8 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 5)
 	tb.add_child(l)
+	if action == "summon":
+		_summon_label = l
 
 class _Circle extends Node2D:
 	var r: float = 40.0
@@ -189,6 +198,17 @@ func _process(_d: float) -> void:
 		loadout_label.text = "Cambiando de arma..."
 	else:
 		loadout_label.text = _player.melee().display_name if _player.loadout == Fighter.Loadout.SWORD_SHIELD else "Arco"
+	# Eikon activo: tiempo restante; montado en él, el botón Eikon lanza su especial
+	var riding_eikon := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
+	if is_instance_valid(_player.active_eikon):
+		loadout_label.text += "   ·   %s %d s" % [_player.eikon.eikon_name, ceili(_player.eikon_time_left())]
+	if _summon_label:
+		_summon_label.text = "Especial" if riding_eikon else "Eikon"
+		if riding_eikon:
+			_summon_btn.modulate = Color(1.6, 1.4, 1.0) if _player.mount_node.special_cd <= 0.0 else Color(1, 1, 1, 0.55)
+	if _special_btn:
+		_special_btn.visible = _player.has_special() and joystick.visible
+		_special_btn.modulate = Color.WHITE if _player.special_cd <= 0.0 else Color(1, 1, 1, 0.45)
 
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
@@ -197,7 +217,8 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
 	player.summon_failed.connect(_on_summon_failed)
 	player.summoned.connect(func(e: Node3D) -> void:
-		show_message("¡%s invocado!" % (e as Eikon).data.eikon_name, 1.0))
+		var ed: EikonData = (e as Mount).eikon if e is Mount else (e as Eikon).data
+		show_message(("¡%s! Montado (E: %s)" % [ed.eikon_name, ed.special_name]) if ed.rideable else "¡%s invocado!" % ed.eikon_name, 1.2))
 	player.meter_changed.connect(func(v: float) -> void:
 		var full := v >= Fighter.METER_MAX
 		if full and not _meter_full:
@@ -228,7 +249,9 @@ func _on_summon_failed(reason: String) -> void:
 	if reason == "meter":
 		show_message("Eikon: medidor al %d %%" % int(_player.meter), 0.8)
 	elif reason == "active":
-		show_message("El eikon ya está luchando", 0.8)
+		show_message("El eikon ya está luchando" if not _player.eikon.rideable else "Tu eikon te espera: F para montar", 0.8)
+	elif reason == "busy":
+		show_message("Termina la acción para invocar", 0.8)
 	else:
 		show_message("No puedes invocar aturdido", 0.8)
 

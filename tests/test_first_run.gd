@@ -45,7 +45,7 @@ func _run() -> void:
 	var lobby := current_scene
 	check(not gs.set_character("paladin") and gs.character_id == "berserker", "no se puede equipar un personaje bloqueado")
 	var cfg := ConfigFile.new()
-	check(cfg.load(gs.save_path) == OK and cfg.get_value("progreso", "first_run_done") == true and cfg.get_value("meta", "version") == 2, "elección guardada (v2)")
+	check(cfg.load(gs.save_path) == OK and cfg.get_value("progreso", "first_run_done") == true and cfg.get_value("meta", "version") == gs.SAVE_VERSION, "elección guardada (v%d)" % gs.SAVE_VERSION)
 	gs.reset_defaults()
 	gs.load_loadout()
 	check(gs.first_run_done and gs.unlocked_chars == ["berserker"], "se recupera al reabrir")

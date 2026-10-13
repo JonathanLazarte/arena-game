@@ -29,6 +29,7 @@ func _shoot(arena: Arena, from: Fighter, to: Fighter, kind: String, dmg: float) 
 
 func _run() -> void:
 	seed(3)
+	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -74,10 +75,12 @@ func _run() -> void:
 	p.want_block = false
 	e.want_block = true
 	p.meter = 100.0
-	p.summon()
+	p.summon() # ronda 14: el fénix se monta; su especial (E montado) dispara
 	var got := false
 	for i in 240:
 		await physics_frame
+		if i % 20 == 5:
+			p.summon()
 		for pr in get_nodes_in_group("projectile"):
 			if (pr as Projectile).kind == "eikon":
 				got = true

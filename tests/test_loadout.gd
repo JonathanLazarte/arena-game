@@ -18,7 +18,6 @@ func _run() -> void:
 	check(not gs.set_weapon("arco") and gs.weapon_id == "hacha_2m", "no deja equipar un arma no compatible")
 	check(gs.set_weapon("espada_larga"), "equipa un arma compatible")
 	gs.eikon_id = "golem"
-	gs.mount_id = "grifo"
 	gs.difficulty = "dificil"
 	gs.player_name = "Pollo"
 	gs.save_loadout()
@@ -26,7 +25,7 @@ func _run() -> void:
 	check(gs.character_id == "caballero", "restablecido")
 	gs.load_loadout()
 	check(gs.character_id == "berserker" and gs.weapon_id == "espada_larga" and gs.eikon_id == "golem"
-		and gs.mount_id == "grifo" and gs.difficulty == "dificil" and gs.player_name == "Pollo", "se recupera todo del archivo")
+		and gs.difficulty == "dificil" and gs.player_name == "Pollo", "se recupera todo del archivo")
 	# Archivo corrupto/viejo: valores inválidos se corrigen
 	var cfg := ConfigFile.new()
 	cfg.load(gs.save_path)
@@ -39,7 +38,7 @@ func _run() -> void:
 	# La partida usa el equipamiento
 	gs.set_character("berserker")
 	gs.weapon_id = "hacha_2m"
-	gs.mount_id = "unicornio"
+	gs.eikon_id = "grifo"
 	gs.difficulty = "normal"
 	gs.from_lobby = true
 	gs.random_rival = true
@@ -49,8 +48,8 @@ func _run() -> void:
 	var arena: Arena = current_scene as Arena
 	var p := arena.player
 	check(p.character.id == "berserker" and p.weapon.id == "hacha_2m", "el jugador lleva berserker + hacha")
-	check(is_equal_approx(p.max_health, 120.0 + 20.0), "vida del berserker + unicornio (%.0f)" % p.max_health)
-	check(p.mount.mount_name == "Unicornio" and arena.ai.profile.resource_path.ends_with("normal.tres"), "montura y dificultad del lobby")
+	check(is_equal_approx(p.max_health, 120.0), "vida del berserker (%.0f)" % p.max_health)
+	check(p.eikon.id == "grifo" and not p.mounted and arena.ai.profile.resource_path.ends_with("normal.tres"), "eikon (montura) y dificultad del lobby; empieza a pie")
 	check(arena.enemy.character != null and arena.enemy.character.allows(arena.enemy.weapon.id) and not arena.enemy.weapon.ranged, "rival con equipamiento aleatorio coherente (%s, %s)" % [arena.enemy.character.id, arena.enemy.weapon.id])
 	var lb := arena.hud.end_panel.find_child("LobbyButton", true, false) as Button
 	check(lb != null and lb.text == "Volver al lobby", "panel final con botón Volver al lobby")

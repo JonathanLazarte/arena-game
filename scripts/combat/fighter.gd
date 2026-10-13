@@ -48,6 +48,29 @@ const ROLL_RECOVERY_DRIFT := 0.4 ## m extra que se desliza al levantarse
 ## Dash montado + ataque: la anticipación sigue durante el dash y el golpe sale al acabarlo.
 const DASH_STRIKE_MIN_TIME := 0.12 ## anticipación mínima (s) de un ataque ligado al dash antes de golpear
 const HEAVY_HOLD := 0.4 ## mantener ataque este tiempo = ataque fuerte
+## Ronda 14: GOLPE CON DASH a pie (estocada en carrera). Sale de 2 maneras, con búfer generoso:
+##  - atacar en cualquier momento del arranque o de los i-frames de la voltereta: al acabar los
+##    i-frames la voltereta se convierte en la estocada (se salta la recuperación de la voltereta);
+##  - hacer dash durante la anticipación de un ligero: el ligero se convierte en la estocada.
+## Durante la anticipación y los frames activos avanza (lunge) hacia el rival.
+const DASH_STRIKE := {"windup": 0.16, "chain_windup": 0.16, "active": 0.14, "recovery": 0.5, "whiff": 0.25, "damage": 15.0, "stamina": 10.0}
+const LUNGE_SPEED := 12.0 ## m/s durante la estocada (≈2,5 m)
+## Salto (Espacio / botón "Saltar"): a pie salto completo; montado en lobo o grifo, un brinco
+## de la montura; en el fénix no hace falta (ya vuela). En el aire los golpes de área en el
+## suelo (GroundAoE) no alcanzan. Al caer hay una breve recuperación.
+const JUMP_VELOCITY := 8.0 ## ≈0,8 s en el aire, 1,6 m de altura
+const MOUNT_HOP_MULT := 0.85
+const COST_JUMP := 12.0
+const LAND_RECOVERY := 0.18
+const AIR_CONTROL := 0.35
+## Ataque en salto: picado. Cae rápido y golpea al aterrizar cerca.
+const JUMP_ATTACK := {"windup": 0.22, "chain_windup": 0.22, "active": 0.12, "recovery": 0.45, "whiff": 0.2, "damage": 16.0, "stamina": 14.0}
+## Habilidad "Golpe sísmico" (Berserker): área en el suelo con aviso.
+const SLAM_RADIUS := 5.0
+const SLAM_TELEGRAPH := 0.7
+const SLAM_DAMAGE := 22.0
+const SLAM_COOLDOWN := 8.0
+const COST_SLAM := 25.0
 const POISE_MAX := 50.0
 const POISE_REGEN := 25.0
 const SWAP_TIME := 2.0
@@ -164,6 +187,21 @@ var rolls_dodged: int = 0 ## golpes evitados con i-frames de voltereta (pruebas)
 var dash_strikes: int = 0 ## ataques que salieron al final de un dash montado (pruebas)
 var _dash_atk: bool = false ## hay un ataque en anticipación ligado al dash actual
 var active_eikon: Node3D = null
+# --- Ronda 14 ---
+var atk_dash: bool = false ## el ataque actual es la estocada con dash (a pie)
+var _ds_visual: bool = false ## el ataque actual va ligado a un dash (a pie o montado): animación Dash_Strike
+var _roll_atk_buffer: bool = false ## se pulsó atacar durante la voltereta
+var atk_jump: bool = false ## ataque en salto
+var airborne: bool = false
+var _air_t: float = 0.0
+var _jump_v: float = 0.0
+var land_t: float = 0.0
+var jumps: int = 0
+var aoe_jumped: int = 0 ## golpes de área esquivados en el aire (pruebas / IA)
+var special_cd: float = 0.0
+var special_t: float = 0.0 ## anticipación del golpe sísmico
+var specials_used: int = 0
+var eikon_specials: int = 0
 
 var mounted: bool = false
 var mount_node: Mount = null ## montura actual (si está montado)
@@ -244,6 +282,15 @@ func sword_half_arc() -> float:
 func max_combo() -> int:
 	return melee().max_combo
 
+## ¿Toca el suelo? (para los golpes de área en el suelo). En el fénix se vuela.
+func is_grounded() -> bool:
+	if mounted and mount_node and mount_node.is_flying():
+		return false
+	return not airborne and global_position.y < GroundAoE.GROUND_HEIGHT
+
+func is_dash_striking() -> bool:
+	return atk_state != Atk.NONE and (_ds_visual or atk_dash)
+
 func roll_iframe_end() -> float:
 	return ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"])) / ROLL_FPS
 
@@ -311,7 +358,7 @@ func _apply_mount_visuals() -> void:
 # ---------------- Montar / desmontar ----------------
 
 func mount_on(m: Mount) -> bool:
-	if m == null or not m.is_free() or mounted:
+	if m == null or not m.can_ride(self) or mounted:
 		return false
 	mounted = true
 	mount_node = m
@@ -343,13 +390,13 @@ func nearest_free_mount() -> Mount:
 	var bd := INF
 	for n in get_tree().get_nodes_in_group("mount"):
 		var m := n as Mount
-		if m and m.is_free():
+		if m and m.can_ride(self):
 			var d := global_position.distance_to(m.global_position)
 			if d < bd:
 				bd = d
 				best = m
 	# Preferir la propia si está a la misma distancia aproximada
-	if owned_mount and owned_mount.is_free() and global_position.distance_to(owned_mount.global_position) <= bd + 1.0:
+	if is_instance_valid(owned_mount) and owned_mount.can_ride(self) and global_position.distance_to(owned_mount.global_position) <= bd + 1.0:
 		return owned_mount
 	return best
 
@@ -359,7 +406,7 @@ func can_remount() -> bool:
 
 ## Acción "Montar": monta si hay montura libre cerca, desmonta si va montado.
 func toggle_mount() -> bool:
-	if not alive or stun > 0.0 or atk_state != Atk.NONE or swap_t > 0.0:
+	if not alive or stun > 0.0 or atk_state != Atk.NONE or swap_t > 0.0 or airborne or special_t > 0.0:
 		return false
 	if mounted:
 		dismount(false)
@@ -412,19 +459,30 @@ func _physics_process(delta: float) -> void:
 		add_meter(METER_PASSIVE * delta)
 	bow_cd = maxf(bow_cd - delta, 0.0)
 	dash_cd = maxf(dash_cd - delta, 0.0)
+	special_cd = maxf(special_cd - delta, 0.0)
+	land_t = maxf(land_t - delta, 0.0)
+	if special_t > 0.0:
+		special_t = maxf(special_t - delta, 0.0)
 	var was_dashing := dash_time > 0.0
 	dash_time = maxf(dash_time - delta, 0.0)
 	if roll_t >= 0.0:
 		roll_t += delta
-		if roll_t >= ROLL_TOTAL or not alive:
+		if _roll_atk_buffer and roll_t >= roll_iframe_end() and alive and stun <= 0.0:
+			# Búfer: la voltereta enlaza con la estocada (sin recuperación de voltereta)
 			roll_t = -1.0
+			dash_time = 0.0
+			_roll_atk_buffer = false
+			_start_dash_strike()
+		elif roll_t >= ROLL_TOTAL or not alive:
+			roll_t = -1.0
+			_roll_atk_buffer = false
 	if was_dashing and dash_time <= 0.0:
 		_on_dash_end()
 	stun = maxf(stun - delta, 0.0)
 	invuln = maxf(invuln - delta, 0.0)
 	var st := stats()
 	var inp := move_input
-	if not alive or stun > 0.0:
+	if not alive or stun > 0.0 or special_t > 0.0:
 		inp = Vector3.ZERO
 	var wb := want_block and alive and stun <= 0.0 and roll_t < 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
@@ -467,10 +525,15 @@ func _physics_process(delta: float) -> void:
 		target_vel *= 0.6
 	if atk_state != Atk.NONE:
 		target_vel *= 0.55 if mounted else 0.3 # compromiso: casi no te mueves al atacar
+	if land_t > 0.0:
+		target_vel *= 0.4
 	_update_stamina(delta, amount < 0.3 or reversing)
-	planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta)
+	planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta * (AIR_CONTROL if airborne else 1.0))
 	var v := planar_vel
-	if roll_t >= 0.0:
+	if atk_dash and not mounted and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE):
+		v = _lunge_velocity()
+		planar_vel = v * 0.5
+	elif roll_t >= 0.0:
 		v = _roll_velocity()
 		planar_vel = v
 	elif dash_time > 0.0:
@@ -490,11 +553,18 @@ func _physics_process(delta: float) -> void:
 				v += (sep.normalized() if sl > 0.01 else facing.cross(Vector3.UP)) * (min_sep - sl) * 8.0
 	velocity.x = v.x
 	velocity.z = v.z
-	if is_on_floor():
+	if _jump_v > 0.0:
+		velocity.y = _jump_v
+		_jump_v = 0.0
+	elif is_on_floor() and not airborne:
 		velocity.y = 0.0
 	else:
-		velocity.y -= GRAVITY * delta
+		velocity.y -= GRAVITY * delta * (1.8 if atk_jump else 1.0)
 	move_and_slide()
+	if airborne:
+		_air_t += delta
+		if _air_t > 0.08 and (is_on_floor() or global_position.y < 0.02) and velocity.y <= 0.0:
+			_land()
 	rotation.y = atan2(-facing.x, -facing.z)
 	if mounted and mount_node:
 		mount_node.global_transform = global_transform
@@ -576,7 +646,7 @@ func add_meter(v: float) -> void:
 	meter_changed.emit(meter)
 
 func _can_act() -> bool:
-	return alive and stun <= 0.0 and exhausted <= 0.0
+	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0
 
 ## ¿Está t dentro del arco de la espada?
 func in_sword_arc(t: Node3D) -> bool:
@@ -599,7 +669,7 @@ func attack_heavy() -> bool:
 	return _request_attack(true)
 
 func _atk_data() -> Dictionary:
-	var d := melee().attack(atk_heavy)
+	var d: Dictionary = DASH_STRIKE.duplicate() if atk_dash else (JUMP_ATTACK.duplicate() if atk_jump else melee().attack(atk_heavy))
 	d["damage"] = d["damage"] * damage_mult()
 	return d
 
@@ -613,8 +683,19 @@ func damage_mult() -> float:
 	return k
 
 func _request_attack(heavy: bool) -> bool:
+	if roll_t >= 0.0 and not mounted and loadout == Loadout.SWORD_SHIELD and alive and roll_t < roll_iframe_end():
+		_roll_atk_buffer = true # búfer: la estocada sale al acabar los i-frames
+		return false
 	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
+	if airborne and not mounted:
+		if atk_state != Atk.NONE or stamina <= 0.0:
+			return false
+		atk_jump = true # ataque en salto (picado)
+		combo = max_combo()
+		_start_attack(false, false)
+		velocity.y = minf(velocity.y, -2.0)
+		return true
 	if atk_state != Atk.NONE:
 		# Búfer de entrada para encadenar ligeros
 		if not heavy and not atk_heavy and combo < max_combo() and (atk_state != Atk.WINDUP or atk_t > atk_dur * 0.5):
@@ -624,6 +705,8 @@ func _request_attack(heavy: bool) -> bool:
 		return false
 	combo = 1
 	_start_attack(heavy, false)
+	if mounted and dash_time > 0.0:
+		_ds_visual = true # ataque empezado durante el dash montado
 	return true
 
 func _start_attack(heavy: bool, chained: bool) -> void:
@@ -677,6 +760,9 @@ func _update_parry(delta: float) -> void:
 func _cancel_attack() -> void:
 	atk_state = Atk.NONE
 	_dash_atk = false
+	atk_dash = false
+	_ds_visual = false
+	atk_jump = false
 	combo = 0
 	_buffered = false
 	_blade_mat.emission_enabled = false
@@ -722,6 +808,8 @@ func _update_attack(delta: float) -> void:
 		Atk.RECOVERY:
 			if _buffered and combo < max_combo() and atk_t >= CHAIN_MIN_RECOVERY and stamina > 0.0 and exhausted <= 0.0 and stun <= 0.0:
 				combo += 1
+				atk_dash = false
+				_ds_visual = false
 				_start_attack(false, true)
 				return
 			if atk_t >= atk_dur:
@@ -778,6 +866,7 @@ func shoot() -> bool:
 	p.team = team
 	p.shooter = self
 	p.direction = dir
+	p.target = tgt
 	p.damage = 8.0 * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0)
 	p.color = Color(0.9, 0.8, 0.5)
 	get_parent().add_child(p)
@@ -789,9 +878,19 @@ func shoot() -> bool:
 func dash() -> bool:
 	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
+	if airborne or special_t > 0.0:
+		return false
 	if atk_state != Atk.NONE:
 		if mounted and atk_state == Atk.WINDUP:
-			pass # montado: el ataque sigue cargándose durante el dash y golpea al final
+			_ds_visual = true # montado: el ataque sigue cargándose durante el dash y golpea al final
+		elif not mounted and atk_state == Atk.WINDUP and not atk_heavy and not atk_dash and not atk_jump:
+			# A pie: dash durante la anticipación del ligero = estocada con dash
+			var mi0 := MeshUtil.flat(move_input)
+			dash_dir = mi0.normalized() if mi0.length() > 0.2 else facing
+			spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]))
+			dash_cd = stats().dash_cooldown
+			_start_dash_strike()
+			return true
 		elif atk_state == Atk.RECOVERY and atk_t >= atk_dur * ROLL_CANCEL_FRACTION:
 			_cancel_attack() # compromiso: solo se cancela al final de la recuperación
 		else:
@@ -835,10 +934,131 @@ func _on_dash_end() -> void:
 	if atk_state != Atk.WINDUP:
 		_dash_atk = false
 
+## Estocada con dash (a pie): anticipación corta avanzando hacia el rival y golpe.
+func _start_dash_strike() -> void:
+	if atk_state != Atk.NONE:
+		_cancel_attack()
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	if tgt and global_position.distance_to(tgt.global_position) < 9.0:
+		var dd := MeshUtil.flat(tgt.global_position - global_position)
+		if dd.length() > 0.1 and dd.normalized().dot(dash_dir) > -0.2:
+			dash_dir = dd.normalized()
+	facing = dash_dir
+	atk_dash = true
+	_ds_visual = true
+	combo = max_combo() # no se encadena: es un golpe único
+	dash_strikes += 1
+	_start_attack(false, false)
+	atk_dash = true
+	_ds_visual = true
+
+func _lunge_velocity() -> Vector3:
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	if tgt:
+		var d := MeshUtil.flat(tgt.global_position - global_position)
+		if d.length() < sword_range() - 0.5:
+			return Vector3.ZERO # ya está delante: no lo atraviesa
+	var k := 1.0 if atk_state == Atk.WINDUP else 0.6
+	return dash_dir * LUNGE_SPEED * k
+
+## Salto (a pie) o brinco de la montura (lobo/grifo). En el fénix no se salta.
+func jump() -> bool:
+	if not _can_act() or airborne or roll_t >= 0.0 or atk_state != Atk.NONE or parry_state != Parry.NONE or swap_t > 0.0:
+		return false
+	if stamina <= 0.0 or not (is_on_floor() or global_position.y < 0.05):
+		return false
+	var v := JUMP_VELOCITY
+	if mounted:
+		if mount_node == null or mount_node.is_flying():
+			return false
+		v = mount_node.data.jump_velocity * MOUNT_HOP_MULT
+	blocking = false
+	spend_stamina(COST_JUMP)
+	_jump_v = v
+	airborne = true
+	_air_t = 0.0
+	jumps += 1
+	return true
+
+func _land() -> void:
+	airborne = false
+	_air_t = 0.0
+	velocity.y = 0.0
+	land_t = LAND_RECOVERY
+	if atk_jump and atk_state == Atk.WINDUP:
+		atk_t = atk_dur # el picado golpea al tocar el suelo
+
+func has_special() -> bool:
+	return character.special_id != ""
+
+## Habilidad del personaje (G / botón "Habilidad"). Berserker: golpe sísmico.
+func special() -> bool:
+	if not has_special() or not _can_act() or special_cd > 0.0 or airborne or mounted or roll_t >= 0.0:
+		return false
+	if atk_state != Atk.NONE or parry_state != Parry.NONE or swap_t > 0.0 or stamina <= 0.0:
+		return false
+	match character.special_id:
+		"golpe_sismico":
+			special_cd = SLAM_COOLDOWN
+			special_t = SLAM_TELEGRAPH
+			blocking = false
+			spend_stamina(COST_SLAM)
+			specials_used += 1
+			GroundAoE.spawn(get_parent(), self, team, global_position, SLAM_RADIUS, SLAM_TELEGRAPH, SLAM_DAMAGE * damage_mult())
+			_kv.event("slam")
+			return true
+	return false
+
+## Especial del eikon montado (E mientras lo montas).
+func eikon_special() -> bool:
+	if not mounted or mount_node == null or mount_node.eikon == null or mount_node.owner_fighter != self:
+		return false
+	var m := mount_node
+	if m.special_cd > 0.0 or not alive or stun > 0.0:
+		return false
+	var ed := m.eikon
+	m.special_cd = ed.special_cooldown
+	eikon_specials += 1
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	match ed.special_id:
+		"llamarada":
+			var p := Projectile.new()
+			p.team = team
+			p.shooter = self
+			p.kind = "eikon"
+			p.damage = ed.special_damage
+			p.speed = 24.0
+			p.radius = 0.7
+			p.color = ed.color
+			p.target = tgt
+			p.turn_rate = 1.4
+			var origin := global_position + Vector3(0, 1.6 + m.data.hover, 0) + facing * 1.8
+			p.direction = ((tgt.get_hit_center() - origin).normalized() if tgt else facing)
+			get_parent().add_child(p)
+			p.global_position = origin
+		"colmillo":
+			knock = facing * 10.0
+			for t in MeshUtil.enemies_of(get_tree(), team):
+				var d := MeshUtil.flat(t.global_position - global_position)
+				if d.length() < 4.5 and (d.length() < 0.5 or absf(facing.signed_angle_to(d.normalized(), Vector3.UP)) < deg_to_rad(60)):
+					if t.take_hit(ed.special_damage, self, "eikon") == "hit" and t is Fighter:
+						(t as Fighter).apply_stun(0.5) # congelado un instante
+		"vendaval":
+			for t in MeshUtil.enemies_of(get_tree(), team):
+				var d := MeshUtil.flat(t.global_position - global_position)
+				if d.length() < 5.5:
+					var r: String = t.take_hit(ed.special_damage, self, "eikon")
+					if (r == "hit" or r == "block") and t.has_method("apply_knockback"):
+						t.apply_knockback((d.normalized() if d.length() > 0.1 else facing) * 14.0, r == "hit")
+	impact.emit(0.6)
+	return true
+
 func summon() -> bool:
 	if not alive or eikon == null:
 		return false
 	if is_instance_valid(active_eikon):
+		if eikon.rideable and mounted and mount_node == active_eikon:
+			return eikon_special() # montado en tu eikon: E = su ataque especial
 		summon_failed.emit("active")
 		return false
 	if meter < METER_MAX:
@@ -847,6 +1067,8 @@ func summon() -> bool:
 	if stun > 0.0:
 		summon_failed.emit("stun")
 		return false
+	if eikon.rideable:
+		return _summon_mount()
 	var e := Eikon.new()
 	e.data = eikon
 	e.team = team
@@ -858,6 +1080,37 @@ func summon() -> bool:
 	meter_changed.emit(meter)
 	summoned.emit(e)
 	return true
+
+## Eikon montable: aparece ensillado y su dueño monta al instante.
+func _summon_mount() -> bool:
+	if atk_state != Atk.NONE or roll_t >= 0.0 or airborne or special_t > 0.0 or swap_t > 0.0:
+		summon_failed.emit("busy")
+		return false
+	if mounted:
+		dismount(false) # (solo con monturas neutrales de las pruebas antiguas)
+	var m := Mount.new()
+	m.data = eikon.ride
+	m.eikon = eikon
+	m.owner_fighter = self
+	m.life = eikon.duration
+	get_parent().add_child(m)
+	m.global_position = Vector3(global_position.x, 0.0, global_position.z)
+	m.rotation.y = rotation.y
+	owned_mount = m
+	active_eikon = m
+	mount_on(m)
+	meter = 0.0
+	meter_changed.emit(meter)
+	summoned.emit(m)
+	return true
+
+## Segundos que le quedan a la invocación activa (0 si no hay).
+func eikon_time_left() -> float:
+	if active_eikon is Mount:
+		return maxf((active_eikon as Mount).life, 0.0)
+	if active_eikon is Eikon:
+		return maxf((active_eikon as Eikon).life, 0.0)
+	return 0.0
 
 func apply_stun(t: float) -> void:
 	stun = maxf(stun, t)
@@ -878,7 +1131,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		var d := MeshUtil.flat(from.global_position - global_position)
 		if d.length() > 0.1:
 			frontal = facing.dot(d.normalized()) > 0.0
-	if parry_state == Parry.ACTIVE and frontal and _kind != "eikon":
+	if parry_state == Parry.ACTIVE and frontal and _kind != "eikon" and _kind != "aoe":
 		if from is Fighter and _kind == "melee":
 			(from as Fighter).apply_stun(PARRY_STAGGER)
 			(from as Fighter).riposte_t = PARRY_STAGGER
@@ -895,7 +1148,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 			if stamina <= 0.0:
 				_guard_break()
 			return "block"
-		if _kind == "eikon":
+		if _kind == "eikon" or _kind == "aoe":
 			_damage(amount * maxf(EIKON_BLOCK_PASS, EXHAUSTED_BLOCK_REDUCTION if exhausted > 0.0 else 0.0))
 			spend_stamina(COST_BLOCKED_EIKON)
 			add_meter(3.0)
@@ -961,14 +1214,22 @@ func _damage(amount: float) -> void:
 		died.emit(self)
 
 func dismiss_eikon() -> void:
-	if is_instance_valid(active_eikon):
+	if active_eikon is Mount and is_instance_valid(active_eikon):
+		(active_eikon as Mount).expire()
+	elif is_instance_valid(active_eikon):
 		active_eikon.queue_free()
 	active_eikon = null
 
 ## keep_meter: el medidor de eikon se conserva entre rondas (antes se perdía y casi nunca se llenaba).
 func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> void:
 	dismiss_eikon()
-	if not mounted and owned_mount:
+	airborne = false
+	_jump_v = 0.0
+	land_t = 0.0
+	special_t = 0.0
+	special_cd = 0.0
+	_roll_atk_buffer = false
+	if not mounted and is_instance_valid(owned_mount) and owned_mount.owner_fighter == null:
 		if not owned_mount.is_free() and owned_mount.rider:
 			owned_mount.rider.dismount(false)
 		owned_mount.global_position = pos
