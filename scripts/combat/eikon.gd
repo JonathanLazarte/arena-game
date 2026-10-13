@@ -215,7 +215,12 @@ func _attack(tgt: Node3D) -> void:
 			p.radius = 0.7
 			p.kind = "eikon" # el escudo no la anula del todo
 			var origin := get_hit_center()
-			p.direction = (tgt.get_hit_center() - origin).normalized()
+			# Apunta adelantándose al movimiento del objetivo (los jinetes van rápido)
+			var aim: Vector3 = tgt.get_hit_center()
+			if tgt is CharacterBody3D:
+				var tv := MeshUtil.flat((tgt as CharacterBody3D).velocity)
+				aim += tv * (origin.distance_to(aim) / p.speed)
+			p.direction = (aim - origin).normalized()
 			get_parent().add_child(p)
 			p.global_position = origin
 		_:

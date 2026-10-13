@@ -188,7 +188,7 @@ func _run() -> void:
 	await wait(0.6)
 	st0 = p.stamina
 	await tap("dash")
-	check(p.invuln > 0.0 and not p.mounted, "a pie el dash es una voltereta con invulnerabilidad")
+	check(p.is_rolling() and not p.mounted, "a pie el dash es una voltereta (con i-frames tras el arranque, ver test_roll)")
 	check(st0 - p.stamina >= Fighter.COST_ROLL - 1.0, "voltereta gasta aguante")
 	# --- Volver a montar ---
 	await wait(0.5)
@@ -238,7 +238,7 @@ func _run() -> void:
 	while arena.ai.phase == AIController.Phase.REST and t_back < 8.0:
 		await wait(0.2)
 		t_back += 0.2
-	check(arena.ai.phase != AIController.Phase.REST and e.stamina > 60.0, "IA recupera aguante y vuelve a luchar (%.1f s)" % t_back)
+	check(arena.ai.phase != AIController.Phase.REST and e.stamina > 60.0, "IA recupera aguante y vuelve a luchar (%.1f s, fase %d, aguante %.0f)" % [t_back, arena.ai.phase, e.stamina])
 	arena.ai.enabled = false
 	# --- Aguante: bloqueo drena, regenera, agotamiento ---
 	p.health = p.max_health

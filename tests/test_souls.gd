@@ -79,9 +79,10 @@ func _run() -> void:
 	Input.action_press("block")
 	await physics_frame
 	await physics_frame
-	var no_actions := not p.dash() and not p.shoot() and not p.swap_loadout() and not p.toggle_mount() and not p.blocking
+	# Ronda 9: montado SÍ se puede hacer dash durante la anticipación (dash + ataque, ver test_dash_attack)
+	var no_actions := not p.shoot() and not p.swap_loadout() and not p.toggle_mount() and not p.blocking
 	Input.action_release("block")
-	check(p.is_attacking() and no_actions, "en anticipación: sin dash, arco, cambio, montar ni escudo")
+	check(p.is_attacking() and no_actions, "en anticipación: sin arco, cambio, montar ni escudo")
 	while not (p.in_recovery() and p.atk_t < p.atk_dur * 0.4):
 		await physics_frame
 	check(not p.dash(), "recuperación temprana: no se puede cancelar con dash")

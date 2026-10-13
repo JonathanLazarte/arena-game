@@ -17,8 +17,16 @@ var kind: String = "arrow" ## "arrow" (el escudo la anula) o "eikon" (el escudo 
 
 func _ready() -> void:
 	add_to_group("projectile")
-	var m := MeshUtil.box(self, Vector3(0.08, 0.08, 1.0), Vector3.ZERO, color)
-	m.material_override = MeshUtil.mat(color, true)
+	if kind == "eikon":
+		# Bola de fuego visible (antes era una varilla fina como una flecha)
+		var core := MeshUtil.sphere(self, 0.35, Vector3.ZERO, color)
+		core.material_override = MeshUtil.mat(color.lightened(0.3), true)
+		var trail := MeshUtil.box(self, Vector3(0.3, 0.3, 1.2), Vector3(0, 0, 0.6), color)
+		trail.material_override = MeshUtil.mat(color, true)
+		trail.transparency = 0.5
+	else:
+		var m := MeshUtil.box(self, Vector3(0.08, 0.08, 1.0), Vector3.ZERO, color)
+		m.material_override = MeshUtil.mat(color, true)
 
 func _orient() -> void:
 	if direction.length() > 0.01 and is_inside_tree():

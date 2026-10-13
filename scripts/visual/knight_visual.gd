@@ -23,7 +23,7 @@ const STATES := {
 	"dodge_l": "Dodge_Left", "dodge_r": "Dodge_Right", "hit": "Hit_A", "stun": "Hit_B",
 	"death": "Death_A", "aim": "2H_Ranged_Aiming", "shoot": "2H_Ranged_Shoot", "swap": "Use_Item",
 }
-const SCALED := ["light0", "light1", "light2", "heavy", "swap", "parry"]
+const SCALED := ["light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r"]
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
 const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap"]
 
@@ -190,7 +190,7 @@ func update(f: Fighter, delta: float) -> void:
 		s = "swap"
 	elif f.parry_state != Fighter.Parry.NONE:
 		s = "parry"
-	elif f.dash_time > 0.0 and not f.mounted:
+	elif f.is_rolling() and not f.mounted:
 		var rel := Vector2(f.dash_dir.dot(f.facing.cross(Vector3.UP)), f.dash_dir.dot(f.facing))
 		if absf(rel.x) > absf(rel.y):
 			s = "dodge_r" if rel.x > 0.0 else "dodge_l"
@@ -221,11 +221,14 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/%s/ts/scale" % s, sc)
 	elif s == "swap":
 		tree.set("parameters/act/swap/ts/scale", _clip_len("swap") / Fighter.SWAP_TIME)
+	elif s.begins_with("dodge"):
+		# La voltereta (Dodge_* de KayKit) dura exactamente ROLL_TOTAL (24 frames a 30 fps)
+		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) / Fighter.ROLL_TOTAL)
 	elif s == "parry":
 		tree.set("parameters/act/parry/ts/scale", _clip_len("parry") / (Fighter.PARRY_WINDOW + Fighter.PARRY_RECOVERY))
 	if s != state:
 		if s != "none":
-			if state == "none" or s in ["death", "stun", "hit", "block_hit", "shoot"]:
+			if state == "none" or s in ["death", "stun", "hit", "block_hit", "shoot"] or s.begins_with("dodge"):
 				playback.start(s, true)
 			else:
 				playback.travel(s)

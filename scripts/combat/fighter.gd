@@ -11,12 +11,16 @@ signal meter_changed(value: float)
 signal stamina_changed(value: float, exhausted: bool)
 signal died(fighter: Fighter)
 signal summoned(eikon: Node3D)
+## Se pulsó invocar sin poder hacerlo: "meter" (medidor sin llenar), "active" (ya hay uno) o "stun".
+signal summon_failed(reason: String)
 signal impact(strength: float)
 signal mount_changed(mounted: bool)
 signal loadout_changed(loadout: int)
 signal landed_hit(target: Node3D, result: String, target_was_open: bool)
 
 const METER_MAX := 100.0
+const METER_PASSIVE := 1.2 ## por segundo en combate (sin eikon activo); con golpes se llena en ~35-45 s
+var meter_passive: bool = true
 const GRAVITY := 20.0
 const SWORD_DAMAGE := 12.0
 const SWORD_RANGE_MOUNTED := 3.4
@@ -30,6 +34,19 @@ const MAX_COMBO := 3
 const FINISHER_EXTRA_RECOVERY := 0.3 ## el último golpe del combo deja más expuesto
 const CHAIN_MIN_RECOVERY := 0.3 ## un encadenado no se salta toda la recuperación
 const ROLL_CANCEL_FRACTION := 0.5 ## voltereta/dash permitido en la 2.ª mitad de la recuperación
+## Voltereta a pie estilo Dark Souls (frames a 30 fps; ver README "Ronda 9" para las fuentes).
+## DS1 fast roll (25 % de carga): 24 frames en total; 11-13 de invulnerabilidad.
+const ROLL_FPS := 30.0
+const ROLL_STARTUP_FRAMES := 2 ## vulnerable: el cuerpo aún no ha bajado
+const ROLL_IFRAMES := 12 ## invulnerable (DS1 fast 11-13, DS3 12-13)
+const ROLL_RECOVERY_FRAMES := 10 ## vulnerable: levantarse; no se puede atacar, bloquear ni volver a rodar
+const ROLL_STARTUP := ROLL_STARTUP_FRAMES / ROLL_FPS
+const ROLL_IFRAME_END := (ROLL_STARTUP_FRAMES + ROLL_IFRAMES) / ROLL_FPS
+const ROLL_TOTAL := (ROLL_STARTUP_FRAMES + ROLL_IFRAMES + ROLL_RECOVERY_FRAMES) / ROLL_FPS
+const ROLL_DISTANCE := 4.5 ## m (casi todo durante el arranque y los i-frames)
+const ROLL_RECOVERY_DRIFT := 0.4 ## m extra que se desliza al levantarse
+## Dash montado + ataque: la anticipación sigue durante el dash y el golpe sale al acabarlo.
+const DASH_STRIKE_MIN_TIME := 0.12 ## anticipación mínima (s) de un ataque ligado al dash antes de golpear
 const HEAVY_HOLD := 0.4 ## mantener ataque este tiempo = ataque fuerte
 const POISE_MAX := 50.0
 const POISE_REGEN := 25.0
@@ -57,7 +74,7 @@ const HEAVY_HIT := 14.0 ## golpes de este daño o más pueden derribar
 # Aguante (stamina)
 const STAMINA_MAX := 100.0
 const COST_DASH := 25.0
-const COST_ROLL := 18.0
+const COST_ROLL := 20.0
 const COST_SWORD := 12.0
 const COST_BOW := 6.0
 const COST_BLOCKED_HIT := 22.0 ## por golpe ligero bloqueado: ~4-5 golpes con la barra llena
@@ -130,6 +147,10 @@ var swap_t: float = 0.0
 var bow_cd: float = 0.0
 var dash_time: float = 0.0
 var dash_cd: float = 0.0
+var roll_t: float = -1.0 ## tiempo dentro de la voltereta a pie (-1 = sin voltereta)
+var rolls_dodged: int = 0 ## golpes evitados con i-frames de voltereta (pruebas)
+var dash_strikes: int = 0 ## ataques que salieron al final de un dash montado (pruebas)
+var _dash_atk: bool = false ## hay un ataque en anticipación ligado al dash actual
 var active_eikon: Node3D = null
 
 var mounted: bool = false
@@ -168,6 +189,19 @@ func sword_range() -> float:
 
 func sword_half_arc() -> float:
 	return SWORD_HALF_ARC_MOUNTED if mounted else SWORD_HALF_ARC_FOOT
+
+## "none", "startup", "iframes" o "recovery".
+func roll_phase() -> String:
+	if roll_t < 0.0:
+		return "none"
+	if roll_t < ROLL_STARTUP:
+		return "startup"
+	if roll_t < ROLL_IFRAME_END:
+		return "iframes"
+	return "recovery"
+
+func is_rolling() -> bool:
+	return roll_t >= 0.0
 
 func is_exhausted() -> bool:
 	return exhausted > 0.0
@@ -311,16 +345,25 @@ func _physics_process(delta: float) -> void:
 			loadout_changed.emit(loadout)
 	_update_attack(delta)
 	_update_parry(delta)
+	if meter_passive and alive and meter < METER_MAX and not is_instance_valid(active_eikon):
+		add_meter(METER_PASSIVE * delta)
 	bow_cd = maxf(bow_cd - delta, 0.0)
 	dash_cd = maxf(dash_cd - delta, 0.0)
+	var was_dashing := dash_time > 0.0
 	dash_time = maxf(dash_time - delta, 0.0)
+	if roll_t >= 0.0:
+		roll_t += delta
+		if roll_t >= ROLL_TOTAL or not alive:
+			roll_t = -1.0
+	if was_dashing and dash_time <= 0.0:
+		_on_dash_end()
 	stun = maxf(stun - delta, 0.0)
 	invuln = maxf(invuln - delta, 0.0)
 	var st := stats()
 	var inp := move_input
 	if not alive or stun > 0.0:
 		inp = Vector3.ZERO
-	var wb := want_block and alive and stun <= 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
+	var wb := want_block and alive and stun <= 0.0 and roll_t < 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
 		block_time = 0.0
 	blocking = wb
@@ -364,7 +407,10 @@ func _physics_process(delta: float) -> void:
 	_update_stamina(delta, amount < 0.3 or reversing)
 	planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta)
 	var v := planar_vel
-	if dash_time > 0.0:
+	if roll_t >= 0.0:
+		v = _roll_velocity()
+		planar_vel = v
+	elif dash_time > 0.0:
 		v = dash_dir * st.dash_speed
 		if mounted:
 			_check_dash_hit()
@@ -420,6 +466,12 @@ func _check_dash_hit() -> void:
 		return
 	for t in MeshUtil.enemies_of(get_tree(), team):
 		var d := MeshUtil.flat(t.global_position - global_position)
+		if atk_state == Atk.WINDUP and d.length() < sword_range() - 0.4 and (d.length() < 0.5 or dash_dir.dot(d.normalized()) > 0.3):
+			# Dash + ataque: se frena justo delante del rival y golpea la espada (sin embestida)
+			_dash_hit = true
+			dash_time = 0.0
+			_on_dash_end()
+			return
 		if d.length() < 2.9 and (d.length() < 0.5 or dash_dir.dot(d.normalized()) > 0.3):
 			_dash_hit = true
 			var res: String = t.take_hit(DASH_DAMAGE, self, "dash")
@@ -487,7 +539,7 @@ func _atk_data() -> Dictionary:
 	return HEAVY if atk_heavy else LIGHT
 
 func _request_attack(heavy: bool) -> bool:
-	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE:
+	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
 	if atk_state != Atk.NONE:
 		# Búfer de entrada para encadenar ligeros
@@ -525,7 +577,7 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 
 ## Parry dedicado (tecla Q / botón Parry). Solo con espada+escudo.
 func parry() -> bool:
-	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0:
+	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or roll_t >= 0.0:
 		return false
 	if atk_state != Atk.NONE or parry_state != Parry.NONE or stamina <= 0.0:
 		return false
@@ -550,6 +602,7 @@ func _update_parry(delta: float) -> void:
 
 func _cancel_attack() -> void:
 	atk_state = Atk.NONE
+	_dash_atk = false
 	combo = 0
 	_buffered = false
 	_blade_mat.emission_enabled = false
@@ -563,6 +616,13 @@ func _update_attack(delta: float) -> void:
 	var d := _atk_data()
 	match atk_state:
 		Atk.WINDUP:
+			if dash_time > 0.0 and mounted:
+				_dash_atk = true # la anticipación se carga durante el dash; el golpe sale al acabar
+				return
+			if _dash_atk and atk_t >= DASH_STRIKE_MIN_TIME and atk_t < atk_dur:
+				atk_t = atk_dur # el dash hizo de anticipación: golpe ya, delante del rival
+				dash_strikes += 1
+			_dash_atk = _dash_atk and atk_t < atk_dur
 			if atk_t >= atk_dur:
 				atk_state = Atk.ACTIVE
 				atk_t = 0.0
@@ -651,28 +711,65 @@ func shoot() -> bool:
 
 ## Dash montado / voltereta a pie.
 func dash() -> bool:
-	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE:
+	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
 	if atk_state != Atk.NONE:
-		# Compromiso: solo se puede cancelar con voltereta al final de la recuperación
-		if atk_state == Atk.RECOVERY and atk_t >= atk_dur * ROLL_CANCEL_FRACTION:
-			_cancel_attack()
+		if mounted and atk_state == Atk.WINDUP:
+			pass # montado: el ataque sigue cargándose durante el dash y golpea al final
+		elif atk_state == Atk.RECOVERY and atk_t >= atk_dur * ROLL_CANCEL_FRACTION:
+			_cancel_attack() # compromiso: solo se cancela al final de la recuperación
 		else:
 			return false
 	var st := stats()
+	var mi := MeshUtil.flat(move_input)
+	dash_dir = mi.normalized() if mi.length() > 0.2 else facing
+	if not mounted:
+		return _start_roll(st)
+	# Dash montado: sin cambios (embestida, empuje y derribo)
 	dash_cd = st.dash_cooldown
 	dash_time = st.dash_duration
 	invuln = st.dash_iframes
 	_dash_hit = false
-	spend_stamina(COST_DASH if mounted else COST_ROLL)
-	var mi := MeshUtil.flat(move_input)
-	dash_dir = mi.normalized() if mi.length() > 0.2 else facing
+	_dash_atk = atk_state == Atk.WINDUP
+	spend_stamina(COST_DASH)
 	return true
 
+## Voltereta a pie: arranque vulnerable -> i-frames -> recuperación vulnerable.
+func _start_roll(st: MountData) -> bool:
+	roll_t = 0.0
+	dash_time = ROLL_TOTAL # solo para la animación Dodge_* y la IA (no da i-frames)
+	dash_cd = maxf(st.dash_cooldown, ROLL_TOTAL)
+	invuln = 0.0
+	_dash_hit = true # la voltereta no embiste
+	spend_stamina(COST_ROLL)
+	return true
+
+func _roll_velocity() -> Vector3:
+	var fast := ROLL_IFRAME_END
+	if roll_t < fast:
+		return dash_dir * (ROLL_DISTANCE / fast)
+	# Recuperación: frena linealmente (área = ROLL_RECOVERY_DRIFT)
+	var rec := ROLL_TOTAL - fast
+	var k := 1.0 - (roll_t - fast) / rec
+	return dash_dir * (2.0 * ROLL_RECOVERY_DRIFT / rec) * maxf(k, 0.0)
+
+## Al acabar un dash montado: si hay un ataque ligado en anticipación, golpea en el
+## siguiente frame (o en cuanto lleve DASH_STRIKE_MIN_TIME de anticipación).
+func _on_dash_end() -> void:
+	if atk_state != Atk.WINDUP:
+		_dash_atk = false
+
 func summon() -> bool:
-	if not alive or stun > 0.0 or eikon == null or meter < METER_MAX:
+	if not alive or eikon == null:
 		return false
 	if is_instance_valid(active_eikon):
+		summon_failed.emit("active")
+		return false
+	if meter < METER_MAX:
+		summon_failed.emit("meter")
+		return false
+	if stun > 0.0:
+		summon_failed.emit("stun")
 		return false
 	var e := Eikon.new()
 	e.data = eikon
@@ -696,6 +793,9 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if not alive:
 		return "none"
 	if invuln > 0.0:
+		return "dodge"
+	if roll_phase() == "iframes":
+		rolls_dodged += 1
 		return "dodge"
 	var frontal := true
 	if is_instance_valid(from):
@@ -774,7 +874,8 @@ func dismiss_eikon() -> void:
 		active_eikon.queue_free()
 	active_eikon = null
 
-func reset_for_round(pos: Vector3, face: Vector3) -> void:
+## keep_meter: el medidor de eikon se conserva entre rondas (antes se perdía y casi nunca se llenaba).
+func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> void:
 	dismiss_eikon()
 	if not mounted and owned_mount:
 		if not owned_mount.is_free() and owned_mount.rider:
@@ -791,8 +892,11 @@ func reset_for_round(pos: Vector3, face: Vector3) -> void:
 	knock = Vector3.ZERO
 	invuln = 0.0
 	dash_time = 0.0
+	roll_t = -1.0
+	_dash_atk = false
 	health = max_health
-	meter = 0.0
+	if not keep_meter:
+		meter = 0.0
 	stamina = STAMINA_MAX
 	exhausted = 0.0
 	alive = true

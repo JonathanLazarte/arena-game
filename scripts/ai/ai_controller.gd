@@ -4,7 +4,7 @@ extends Node
 ## mirándolo, se compromete a atacar en ventanas (espada o dash + espada) y luego
 ## se retira. Nunca se solapa ni se queda pegado a la espalda.
 
-enum Phase { CIRCLE, COMMIT, RETREAT, REST }
+enum Phase { CIRCLE, COMMIT, RETREAT, REST, BREATHE }
 
 var me: Fighter
 var enabled: bool = true
@@ -24,6 +24,11 @@ var _block_hold: float = 0.0
 
 const MAX_ORBIT := 1.15
 var rest_time: float = 0.0 ## tiempo total descansando (para pruebas)
+var breathers: int = 0 ## respiros empezados (pruebas)
+var breathe_time: float = 0.0 ## tiempo total en respiros (pruebas)
+var _since_breather: float = 0.0
+var _breathe_wait: float = 0.0 ## sub-fase: quieto esperando
+var _breathe_orbit: float = 0.3
 var _flee: bool = false
 # Lectura de ataques / castigo
 var dodges: int = 0 ## esquivas a ataques telegrafiados (para pruebas)
@@ -53,6 +58,7 @@ func _physics_process(delta: float) -> void:
 	var dir := to.normalized() if dist > 0.01 else me.facing
 	var side := dir.cross(Vector3.UP) * _orbit_dir
 	_phase_t -= delta
+	_since_breather += delta
 	me.want_sprint = false
 	if not _connected:
 		_connected = true
@@ -150,6 +156,25 @@ func _physics_process(delta: float) -> void:
 	# Ángulo de la IA respecto a la mirada del jugador (0 = justo delante)
 	var rel_n := -dir
 	var ang := opp.facing.signed_angle_to(rel_n, Vector3.UP)
+	if phase == Phase.BREATHE:
+		breathe_time += delta
+		_since_breather = 0.0
+		# Alejarse hasta su distancia de respiro, luego rodear despacio o esperar quieto
+		var radial := clampf((profile.breather_dist - dist) / 3.0, -0.5, 1.0)
+		_breathe_wait -= delta
+		if _breathe_wait <= 0.0 and randf() < delta * 0.5:
+			_breathe_wait = randf_range(0.8, 2.0)
+			_breathe_orbit = randf_range(0.2, 0.45) * (1.0 if randf() < 0.5 else -1.0)
+		if _breathe_wait > 0.0 and radial < 0.2:
+			move = Vector3.ZERO # espera mirando al jugador
+		else:
+			move = side * _breathe_orbit - dir * radial
+		if _phase_t <= 0.0 and (me.stamina > 60.0 or _phase_t < -3.0):
+			phase = Phase.CIRCLE
+			_phase_t = 0.4 + randf() * 0.6
+			_pref_dist = randf_range(6.0, 9.0)
+		me.move_input = move.limit_length(0.8)
+		return
 	if phase == Phase.REST:
 		rest_time += delta
 		if _flee:
@@ -192,7 +217,9 @@ func _physics_process(delta: float) -> void:
 			if not sword_mode or me.is_swapping():
 				_pref_dist = 13.0
 			me.want_sprint = dist > 14.0 and me.stamina > 60.0
-			if _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > profile.commit_min_stamina and sword_mode and not me.is_swapping():
+			if _since_breather > profile.breather_interval and dist > 4.0:
+				_start_breather()
+			elif _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > profile.commit_min_stamina and sword_mode and not me.is_swapping():
 				phase = Phase.COMMIT
 				_phase_t = 2.5
 				_swings = 1 + randi() % maxi(profile.max_chain, 1)
@@ -220,7 +247,9 @@ func _physics_process(delta: float) -> void:
 			var front := opp.global_position + opp.facing.rotated(Vector3.UP, clampf(ang, -0.6, 0.6)) * _pref_dist
 			front = _clamp_arena(front)
 			move = MeshUtil.flat(front - me.global_position).normalized() - dir * 0.5
-			if _phase_t <= 0.0:
+			if _phase_t <= 0.0 and randf() < profile.breather_chance:
+				_start_breather()
+			elif _phase_t <= 0.0:
 				phase = Phase.CIRCLE
 				_phase_t = profile.engage_pause_min + randf() * profile.engage_pause_extra
 				_pref_dist = randf_range(6.0, 9.0)
@@ -232,6 +261,15 @@ func _physics_process(delta: float) -> void:
 	if phase != Phase.COMMIT and dist < keep:
 		move -= dir * (keep - dist)
 	me.move_input = move.limit_length(1.0)
+
+## Respiro: varios segundos (aleatorios) sin presionar al jugador.
+func _start_breather() -> void:
+	phase = Phase.BREATHE
+	_phase_t = randf_range(profile.breather_min, profile.breather_max)
+	_breathe_wait = randf_range(0.0, 1.0)
+	_breathe_orbit = randf_range(0.2, 0.45) * (1.0 if randf() < 0.5 else -1.0)
+	_since_breather = 0.0
+	breathers += 1
 
 func _clamp_arena(p: Vector3) -> Vector3:
 	var f := MeshUtil.flat(p)

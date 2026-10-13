@@ -24,3 +24,10 @@ extends Resource
 @export var reaction_time: float = 0.0
 ## Intervalo entre decisiones (s)
 @export var think_interval: float = 0.12
+## Respiros: tras un intercambio (o si lleva mucho rato presionando) se aleja, rodea a distancia,
+## recupera aguante o espera quieto. Duración aleatoria entre min y max (s).
+@export var breather_chance: float = 0.35
+@export var breather_min: float = 2.0
+@export var breather_max: float = 4.0
+@export var breather_dist: float = 11.0 ## distancia a la que se queda durante el respiro
+@export var breather_interval: float = 14.0 ## si no ha respirado en este tiempo, fuerza un respiro

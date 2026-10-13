@@ -242,11 +242,11 @@ func _physics_process(delta: float) -> void:
 	if lock_marker.visible:
 		lock_marker.global_position = player.face_target.global_position + Vector3(0, 3.9 + sin(Time.get_ticks_msec() * 0.006) * 0.1, 0)
 
-func start_round() -> void:
+func start_round(new_match: bool = false) -> void:
 	for n in get_tree().get_nodes_in_group("projectile"):
 		n.queue_free()
-	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD)
-	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK)
+	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD, not new_match)
+	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK, not new_match)
 	camera.global_position = player.global_position + Vector3(0, 5, 9)
 	state = "fight"
 	time_left = ROUND_TIME
@@ -280,4 +280,4 @@ func restart_match() -> void:
 	wins = [0, 0]
 	round_num = 1
 	hud.end_panel.visible = false
-	start_round()
+	start_round(true)

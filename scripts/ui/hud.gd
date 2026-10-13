@@ -19,6 +19,8 @@ var end_label: Label
 var swap_bar: ProgressBar
 var loadout_label: Label
 var _player: Fighter
+var _meter_full: bool = false
+var _summon_btn: TouchScreenButton
 
 func _ready() -> void:
 	var root := Control.new()
@@ -107,6 +109,9 @@ func _label(parent: Control, t: String, pos: Vector2, fs: int) -> Label:
 
 func _touch_button(text: String, action: String, center: Vector2, r: float, c: Color) -> void:
 	var tb := TouchScreenButton.new()
+	if action == "summon":
+		_summon_btn = tb
+		tb.modulate = Color(1, 1, 1, 0.55)
 	var shape := CircleShape2D.new()
 	shape.radius = r
 	tb.shape = shape
@@ -146,6 +151,17 @@ func _process(_d: float) -> void:
 
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
+	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
+	player.summon_failed.connect(_on_summon_failed)
+	player.summoned.connect(func(e: Node3D) -> void:
+		show_message("¡%s invocado!" % (e as Eikon).data.eikon_name, 1.0))
+	player.meter_changed.connect(func(v: float) -> void:
+		var full := v >= Fighter.METER_MAX
+		if full and not _meter_full:
+			show_message("¡Eikon listo! (E / botón Eikon)", 1.2)
+		_meter_full = full
+		if _summon_btn:
+			_summon_btn.modulate = Color(1.6, 1.4, 1.0) if full else Color(1, 1, 1, 0.55))
 	for pair: Array in [[player, p_health, p_meter, p_stamina], [enemy, e_health, e_meter, e_stamina]]:
 		var f: Fighter = pair[0]
 		var hb: ProgressBar = pair[1]
@@ -164,6 +180,14 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 		f.stamina_changed.connect(func(v: float, ex: bool) -> void:
 			sb.value = v
 			sb.modulate = Color(1, 0.4, 0.4) if ex else Color.WHITE)
+
+func _on_summon_failed(reason: String) -> void:
+	if reason == "meter":
+		show_message("Eikon: medidor al %d %%" % int(_player.meter), 0.8)
+	elif reason == "active":
+		show_message("El eikon ya está luchando", 0.8)
+	else:
+		show_message("No puedes invocar aturdido", 0.8)
 
 func show_message(t: String, secs: float = 2.0) -> void:
 	message.text = t

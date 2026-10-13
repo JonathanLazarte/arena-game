@@ -98,3 +98,29 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
 - **Escudo contra eikons:** un ataque de eikon bloqueado (bola de fuego del fénix, mordisco del lobo, onda del gólem) deja pasar el **50 %** del daño y cuesta **30** de aguante (`EIKON_BLOCK_PASS`, `COST_BLOCKED_EIKON`). Las flechas siguen anuladas del todo. Los proyectiles tienen ahora `kind` ("arrow" o "eikon"), y las bolas de fuego del fénix ya no se pueden devolver con parry (igual que el resto de ataques de eikon).
 - Pruebas nuevas: `tests/test_eikon_block.gd` y `tests/test_riding.gd`. Capturas: `tests/screenshot_mounted.gd -- <png> [still|gallop] [show|hide] [side|front]` y `tests/golem_preview.gd -- <png>` (necesitan pantalla, p. ej. `xvfb-run ... --rendering-driver opengl3`).
 - `test_match` devolvía código 1 aunque la partida terminara (comprobaba el estado después de reiniciar). Ya está corregido.
+
+## Ronda 9: respiros de la IA, voltereta estilo Dark Souls, eikon arreglado y dash + ataque
+- **Respiros de la IA** (`Phase.BREATHE` en `ai_controller.gd`, ajustes en `AIDifficulty`): tras un intercambio (con probabilidad `breather_chance`), o si lleva `breather_interval` s sin respirar, el rival se aleja a `breather_dist`, rodea despacio, recupera aguante o espera quieto mirándote durante un tiempo aleatorio entre `breather_min` y `breather_max`. En ese tiempo no ataca, pero sigue defendiéndose.
+  | Perfil | Probabilidad | Duración | Distancia | Respiro forzado cada |
+  |---|---|---|---|---|
+  | easy | 65 % | 3,5–7 s | 13 m | 9 s |
+  | normal | 35 % | 2–4,5 s | 11 m | 14 s |
+  | hard | 15 % | 1,2–2,8 s | 9 m | 22 s |
+- **Voltereta a pie estilo Dark Souls** (el dash montado no cambia). A 30 fps: **2 frames de arranque vulnerable + 12 i-frames + 10 de recuperación vulnerable = 24 frames (0,8 s)**, recorre 4,5 m (+0,4 m al levantarse) y cuesta 20 de aguante. Durante la recuperación no se puede atacar, bloquear, hacer parry ni volver a rodar. Si ruedas demasiado pronto o demasiado tarde, te golpean. Animación: `Dodge_Forward/Backward/Left/Right` de KayKit (la voltereta del pack), con la velocidad ajustada para que dure exactamente 0,8 s.
+  - Datos de referencia (30 fps):
+    - **DS1:** fast roll de 13 i-frames y 21–24 frames en total; medium roll de 11 i-frames y 33 frames; fat roll de 9 i-frames y 46 frames (GameFAQs, "Rol/Flip iFrames and recovery info", https://gamefaqs.gamespot.com/boards/606312-dark-souls/63774400). La wiki de Fandom da 11 i-frames para todas las rolls y separa la recuperación: fast roll al 25 %, 11 i-frames + 3 de recuperación + 8 de "inestabilidad" + 2 = 24 frames (https://darksouls.fandom.com/wiki/Rolling).
+    - **DS3:** 12 i-frames (0,4 s; Carthus Bloodring +3), según https://github.com/gastevens/dark-souls-3-mechanics-cheat-sheet/blob/master/ds3mechanicscheatsheet.md. El fast roll tiene unos 13 i-frames y 21 frames en total (datos de 60 fps divididos entre 2: https://gamefaqs.gamespot.com/boards/168566-dark-souls-iii/74600300).
+  - En DS1 los i-frames empiezan en el primer frame. Los 2 frames de arranque vulnerable son una decisión de diseño de este juego, para castigar el roll de pánico tardío.
+- **Eikon (fénix):** la entrada, la aparición y los ataques funcionaban. El problema era que el medidor casi nunca se llenaba:
+  - se ponía a 0 en cada ronda;
+  - solo subía con golpes (unos 8 golpes acertados en 90 s);
+  - en una partida IA contra IA el jugador llegó como máximo a 90 / 100 y solo invocó una vez en toda la partida.
+  - Además, pulsar E o el botón *Eikon* con el medidor a medias no daba ningún aviso, y las bolas de fuego eran una varilla fina que apuntaba a donde estaba el rival, no a donde iba (fallaban contra jinetes en movimiento).
+  - **Arreglos:**
+    - el medidor se conserva entre rondas (solo se vacía al reiniciar la partida);
+    - sube de forma pasiva (+1,2/s en combate);
+    - el HUD avisa ("Eikon: medidor al 70 %", "¡Eikon listo!") y el botón se ilumina cuando está lleno;
+    - las bolas de fuego se ven (núcleo y estela) y apuntan adelantándose al objetivo.
+  - Ahora se invoca hacia los 40 s y varias veces por partida.
+- **Dash montado + ataque:** puedes empezar la anticipación (ligero, o el fuerte cargado al mantener el botón) antes o durante el dash montado. La anticipación sigue cargándose durante el dash, el caballo frena justo delante del rival (sin embestida) y el golpe sale al acabar el dash (o en cuanto lleve 0,12 s de anticipación). El dash montado sin ataque es igual que antes.
+- Pruebas nuevas: `test_roll`, `test_dash_attack`, `test_eikon_summon` y `test_ai_breather`.

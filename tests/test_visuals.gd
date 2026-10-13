@@ -75,7 +75,7 @@ func _run() -> void:
 	await physics_frame
 	check(kv.state == "dodge_r", "voltereta lateral -> Dodge_Right (%s)" % kv.state)
 	p.move_input = Vector3.ZERO
-	await wait(0.6)
+	await wait(Fighter.ROLL_TOTAL + 0.1) # la voltereta estilo DS dura 0.8 s (ronda 9)
 	# Golpe recibido y aturdimiento
 	p.take_hit(1.0, e, "melee")
 	await physics_frame
@@ -100,6 +100,7 @@ func _run() -> void:
 	var bp: Vector2 = kv.tree.get("parameters/loco/blend_position")
 	check(bp.y > 0.5, "andar hacia delante -> blend de locomoción (%.2f)" % bp.y)
 	p.move_input = Vector3.ZERO
+	await wait(0.6) # el jugador puede haber empujado al caballo al andar
 	# Caballo libre: blend por velocidad
 	var m := p.owned_mount
 	var bpos: float = m.tree.get("parameters/blend_position")
