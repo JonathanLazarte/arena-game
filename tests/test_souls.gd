@@ -232,7 +232,7 @@ func _run() -> void:
 	e.attack_light() # impacta ~0,65 s después del parry: ya en recuperación
 	await idle_atk(e)
 	var exposed_dmg := ph - p.health
-	check(results[-1] == "hit" and absf(exposed_dmg - Fighter.LIGHT["damage"] * Fighter.PARRY_EXPOSED_MULT) < 0.1, "parry fallido: expuesto, recibe +25%% (%.1f)" % exposed_dmg)
+	check(results[-1] == "hit" and absf(exposed_dmg - (e.combo_hit_for(1).damage if e.combo_hit_for(1) else Fighter.LIGHT["damage"]) * e.damage_mult() * Fighter.PARRY_EXPOSED_MULT) < 0.1, "parry fallido: expuesto, recibe +25%% (%.1f)" % exposed_dmg)
 	await idle(e)
 	await idle(p)
 	await tap("parry")

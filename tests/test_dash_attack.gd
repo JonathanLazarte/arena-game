@@ -90,7 +90,7 @@ func _run() -> void:
 	check(r[1] >= 0 and r[3][0] == "hit", "el ligero impacta")
 	check(r[0] >= 0 and absf(r[1] - r[0]) <= 2, "el golpe sale al acabar el dash (±2 frames)")
 	check(r[2] < p.sword_range(), "golpea justo delante del rival (%.2f m)" % r[2])
-	check(is_equal_approx(h0 - e.health, Fighter.LIGHT["damage"]), "solo daño de espada, sin embestida (%.0f)" % (h0 - e.health))
+	check(is_equal_approx(h0 - e.health, p.combo_hit_for(1).damage * p.damage_mult()), "solo daño de espada (1.er golpe del combo), sin embestida (%.0f)" % (h0 - e.health))
 	check(p.dash_strikes == 1, "contado como golpe de dash")
 	# --- 2. Fuerte cargado con el botón (mantener), dash y golpe: por el controlador ---
 	arena.controller.set_physics_process(true)

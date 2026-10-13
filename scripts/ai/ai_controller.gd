@@ -56,6 +56,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var opp := me.opponent
 	me.face_target = opp
+	me.aim_lead = profile.aim_lead
 	var to := MeshUtil.flat(opp.global_position - me.global_position)
 	var dist := to.length()
 	var dir := to.normalized() if dist > 0.01 else me.facing

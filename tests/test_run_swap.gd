@@ -114,49 +114,71 @@ func _run() -> void:
 	if e.loadout != Fighter.Loadout.SWORD_SHIELD: e.swap_loadout()
 	if p.loadout != Fighter.Loadout.SWORD_SHIELD: p.swap_loadout()
 	await wait(0.6)
-	# --- 2. Correr fijado hacia atrás: sigue mirando al rival ---
+	# --- 2. Ronda 16: correr fijado hacia atrás = se gira y corre de cara (hacia la cámara) ---
+	check(is_equal_approx(Fighter.RUN_TURN_DEG, 110.0), "umbral de giro corriendo fijado: 110°")
 	await _place()
 	p.face_target = e
 	p.move_input = Vector3.BACK # alejarse del rival (está en -Z)
 	p.want_sprint = true
-	var face_ok := true
 	var spr := 0
-	var back_blend := 0.0
 	x0 = p.global_position
 	for i in 60:
 		await physics_frame
-		if p.facing.dot(_to_target()) < 0.95:
-			face_ok = false
 		if p.sprinting:
 			spr += 1
-		back_blend = minf(back_blend, (p._kv.tree.get("parameters/loco/blend_position") as Vector2).y)
 	var run_back := MeshUtil.flat(p.global_position - x0).length()
-	check(face_ok, "corriendo hacia atrás fijado no se da la vuelta (mira al rival)")
-	check(spr > 50, "corre de verdad (sprint %d/60 frames)" % spr)
-	check(back_blend < -0.85, "locomoción de carrera hacia atrás (blend y %.2f)" % back_blend)
-	check(p.global_position.z > x0.z + 1.0, "se aleja hacia atrás %.2f m" % run_back)
-	# comparado con caminar hacia atrás
-	await _place()
-	p.face_target = e
-	p.move_input = Vector3.BACK
-	x0 = p.global_position
-	await wait(1.0)
-	var walk_back := MeshUtil.flat(p.global_position - x0).length()
-	check(run_back > walk_back * 1.2, "correr de espaldas es más rápido que caminar de espaldas (%.2f vs %.2f)" % [run_back, walk_back])
-	# diagonal / lateral
+	var bp: Vector2 = p._kv.tree.get("parameters/loco/blend_position")
+	check(p.facing.dot(Vector3.BACK) > 0.95 and p.facing.dot(_to_target()) < -0.9, "corriendo hacia atrás fijado se da la vuelta y mira hacia donde corre (cámara)")
+	check(spr > 50 and not p.reversing, "corre de verdad hacia delante (sprint %d/60), sin correr de espaldas" % spr)
+	check(bp.y > 0.9, "locomoción de carrera hacia delante (blend y %.2f)" % bp.y)
+	check(p.face_target == e, "el fijado se mantiene mientras huye")
+	# diagonal atrás (135° > 110°): también se gira
 	await _place()
 	p.face_target = e
 	p.move_input = (Vector3.BACK + Vector3.RIGHT).normalized()
 	p.want_sprint = true
-	face_ok = true
+	await wait(0.5)
+	check(p.facing.dot(p.move_input) > 0.9, "diagonal hacia atrás (135°): corre de cara hacia allí")
+	# lateral puro (90° < 110°): strafe mirando al rival
+	await _place()
+	p.face_target = e
+	p.move_input = Vector3.RIGHT
+	p.want_sprint = true
+	var face_ok := true
 	var lat := 0.0
 	for i in 45:
+		p.move_input = _to_target().cross(Vector3.UP) # como el control: relativo al rival
 		await physics_frame
 		if p.facing.dot(_to_target()) < 0.9:
 			face_ok = false
 		lat = maxf(lat, (p._kv.tree.get("parameters/loco/blend_position") as Vector2).x)
-	check(face_ok and p.sprinting, "corriendo en diagonal hacia atrás sigue encarado al rival")
+	check(face_ok and p.sprinting, "corriendo de lado fijado: strafe encarado al rival")
 	check(lat > 0.6, "mezcla con el strafe lateral (blend x %.2f)" % lat)
+	# diagonal adelante: strafe encarado
+	await _place()
+	p.face_target = e
+	p.move_input = (Vector3.FORWARD + Vector3.LEFT).normalized()
+	p.want_sprint = true
+	face_ok = true
+	for i in 30:
+		p.move_input = (_to_target() - _to_target().cross(Vector3.UP)).normalized()
+		await physics_frame
+		if p.facing.dot(_to_target()) < 0.9:
+			face_ok = false
+	check(face_ok and p.sprinting, "diagonal adelante fijado: sigue encarado")
+	# caminar hacia atrás fijado: retrocede mirando al rival
+	await _place()
+	p.face_target = e
+	p.move_input = Vector3.BACK
+	x0 = p.global_position
+	face_ok = true
+	for i in 60:
+		await physics_frame
+		if p.facing.dot(_to_target()) < 0.95:
+			face_ok = false
+	var walk_back := MeshUtil.flat(p.global_position - x0).length()
+	check(face_ok and p.global_position.z > x0.z + 0.5, "caminando hacia atrás fijado retrocede encarado al rival (%.2f m)" % walk_back)
+	check(run_back > walk_back * 1.2, "correr es más rápido que retroceder (%.2f vs %.2f)" % [run_back, walk_back])
 	# --- 3. Sin fijar: correr gira al personaje ---
 	await _place()
 	p.face_target = null
@@ -193,7 +215,7 @@ func _run() -> void:
 	Input.action_press("move_back")
 	await wait(0.5)
 	check(arena.controller.run_toggled and p.want_sprint and p.sprinting, "«Correr» activa la carrera sin mantener nada")
-	check(p.facing.dot(_to_target()) > 0.95, "con el control real también corre de espaldas mirando al rival")
+	check(p.facing.dot(_to_target()) < -0.9, "con el control real, corriendo hacia atrás se gira hacia la cámara")
 	check(arena.hud._run_label.text.begins_with("Correr"), "botón táctil «Correr» a pie (%s)" % arena.hud._run_label.text)
 	Input.action_press("run_toggle")
 	await physics_frame

@@ -13,6 +13,7 @@ const ACTIONS := {
 	"jump": [KEY_SPACE], ## Ronda 14: Espacio = saltar (el dash pasa a C / L)
 	"special": [KEY_G], ## habilidad del personaje
 	"lock_on": [KEY_TAB],
+	"target_next": [KEY_Z], ## Ronda 16: cambiar objetivo (también rueda del ratón y botón «Objetivo»)
 	"parry": [KEY_Q],
 	"mount": [KEY_F],
 	"sprint": [KEY_SHIFT], ## mantener: correr a pie / galope montado

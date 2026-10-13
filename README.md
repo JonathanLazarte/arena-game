@@ -286,3 +286,36 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
   fijar, correr gira normalmente. Gasta aguante; al agotarse se detiene y el modo alternado se apaga.
   Locomoción direccional: puntos extra en el BlendSpace2D con clips KayKit acelerados/ralentizados
   (carrera atrás = Walking_Backwards ×1,9; strafe caminando = Running_Strafe ×0,6; carrera lateral ×1,2).
+
+## Ronda 16 — apuntado sin homing, cambio de objetivo, eikons compañeros y combos de 3 golpes
+
+- **Proyectiles: solo apuntar.** Al disparar se apunta a la posición *actual* del objetivo
+  (`Projectile.aim_dir`) y el proyectil vuela recto: sin homing ni giro (se eliminó lo de la
+  ronda 14). Correr de lado a distancia lo esquiva; la voltereta lo atraviesa en los i-frames.
+  IA honesta: `AIDifficulty.aim_lead` = 0 en fácil/normal y **0,5** (medio adelanto) en difícil;
+  los eikons usan el adelanto de su dueño.
+- **Fijado y cambio de objetivo.** Anillo en el suelo del objetivo (dorado con bordes azules,
+  cuatro marcas, pulso, visible a través de todo) + rombo dorado encima. Objetivos válidos:
+  cualquier enemigo vivo del grupo `damageable` (rival, su Gólem, su eikon montable **sin jinete**,
+  futuros enemigos); el rival va primero. **Tab** fija/suelta (igual que antes), **Z** o la
+  **rueda del ratón** cambian de objetivo, botón táctil **«Objetivo»**. Si el objetivo cae, vuelve al rival.
+- **Eikons con vida.** Los montables tienen ahora vida propia (`EikonData.max_health`: fénix 50,
+  lobo 60, grifo 80) mientras no los monta nadie; si llegan a 0 se retiran antes de tiempo (y se puede
+  volver a invocar al llenar el medidor). Montado, los golpes van al jinete.
+- **Eikon sin jinete = compañero de ataque.** El Gólem siempre, y los montables cuando no los
+  montas (o te bajas), atacan con sus datos de compañero: priorizan **eikons enemigos** y si no
+  hay, al luchador rival (igual para el rival). Para volver a montar: acércate y pulsa **Montar**
+  (F); si está lejos, «Montar» lo **llama** 3 s y lo montas al llegar.
+- **Combo de 3 golpes** (`ComboHit` en `WeaponDef.combo`; remate propio en `CharacterDef.combo_finisher`):
+  - Espada y escudo: tajo horizontal → revés → tajo descendente (Paladín). **Caballero**: remate
+    *escudazo + estocada*.
+  - Espada larga: arco amplio → arco de vuelta → giro devastador (180°).
+  - Hacha: hachazo diagonal → revés ascendente → *salto demoledor* (salto visual + arremetida).
+  - Dagas: puñalada izq. → puñalada der. (espejo) → doble estocada con arremetida.
+  - Lanza: estocada → barrido → embestida (arremetida de 9 m/s).
+  Cada golpe tiene clip, daño, alcance, arco, anticipación, ventana de entrada y daño de poise
+  (el remate ×1,8–2,5). Clips autorizados en Godot: **al revés** (mismo brazo, sentido contrario),
+  **espejo** .l/.r (dagas) y **concatenado** (escudo + estocada). La IA usa los combos (fácil: 2 golpes).
+- **Correr hacia atrás fijado (corrección).** Corriendo, si la entrada se aleja más de **110°**
+  del rival, el personaje se gira y corre de cara hacia allí (hacia la cámara). Lateral y diagonal
+  hacia delante siguen haciendo strafe encarado. Caminando, retrocede mirando al rival.

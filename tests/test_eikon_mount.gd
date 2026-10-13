@@ -54,7 +54,7 @@ func _run() -> void:
 	var bolt: Projectile = null
 	for pr in get_nodes_in_group("projectile"):
 		bolt = pr as Projectile
-	check(bolt != null and get_nodes_in_group("projectile").size() > n0 and bolt.kind == "eikon" and bolt.target == e, "la Llamarada es un proyectil de eikon que persigue al rival")
+	check(bolt != null and get_nodes_in_group("projectile").size() > n0 and bolt.kind == "eikon" and bolt.aimed_at == e, "la Llamarada es un proyectil de eikon apuntado al rival")
 	check(not p.summon(), "especial en enfriamiento")
 	# Bajar / subir. Solo el dueño puede montarlo.
 	check(p.toggle_mount() and not p.mounted and m.is_free(), "F baja del eikon y queda libre")

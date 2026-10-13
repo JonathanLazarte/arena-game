@@ -28,6 +28,8 @@ var state: String = "fight" ## fight / between / over
 var time_left: float = ROUND_TIME
 var shake: float = 0.0
 var lock_marker: MeshInstance3D
+## Ronda 16: anillo de objetivo fijado (estilo FF: dorado con borde azul) en el suelo del objetivo.
+var lock_ring: Node3D
 var match_result: Dictionary = {}
 
 func _ready() -> void:
@@ -70,7 +72,8 @@ func _ready() -> void:
 	if gs and gs.from_lobby:
 		ai.profile = load(Catalog.DIFFICULTIES[gs.difficulty])
 	add_child(ai)
-	lock_marker = MeshUtil.sphere(self, 0.25, Vector3.ZERO, Color(1, 0.2, 0.2), true)
+	lock_marker = MeshUtil.sphere(self, 0.22, Vector3.ZERO, Color(1.0, 0.82, 0.35), true)
+	lock_ring = _make_lock_ring()
 	start_round()
 
 func _on_impact(strength: float) -> void:
@@ -264,7 +267,7 @@ func _physics_process(delta: float) -> void:
 			_on_fighter_died(enemy if pl >= en else player)
 	var cam_target: Vector3
 	var look: Vector3
-	if player.face_target:
+	if is_instance_valid(player.face_target):
 		# Lock-on: la cámara encuadra a ambos luchadores
 		var d := MeshUtil.flat(player.face_target.global_position - player.global_position)
 		var dist := d.length()
@@ -281,9 +284,51 @@ func _physics_process(delta: float) -> void:
 	if shake > 0.0:
 		shake = maxf(shake - delta, 0.0)
 		camera.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * shake
-	lock_marker.visible = player.face_target != null
-	if lock_marker.visible:
-		lock_marker.global_position = player.face_target.global_position + Vector3(0, 3.9 + sin(Time.get_ticks_msec() * 0.006) * 0.1, 0)
+	var lt: Node3D = player.face_target if is_instance_valid(player.face_target) else null
+	lock_marker.visible = lt != null
+	lock_ring.visible = lt != null
+	if lt:
+		var top: float = lt.get_hit_center().y - lt.global_position.y
+		lock_marker.global_position = lt.global_position + Vector3(0, top * 2.0 + 1.9 + sin(Time.get_ticks_msec() * 0.006) * 0.1, 0)
+		var r: float = maxf(float(lt.get("hit_radius")), 0.6) * 1.5 + 0.4
+		lock_ring.global_position = Vector3(lt.global_position.x, 0.06, lt.global_position.z)
+		var pulse := 1.0 + sin(Time.get_ticks_msec() * 0.008) * 0.05
+		lock_ring.scale = Vector3(r, 1.0, r) * pulse
+		lock_ring.rotation.y += _d_ring * 1.2
+
+var _d_ring: float = 0.016
+
+func _make_lock_ring() -> Node3D:
+	var root := Node3D.new()
+	root.name = "LockRing"
+	add_child(root)
+	for spec: Array in [[1.0, 0.07, Color(1.0, 0.82, 0.35)], [0.86, 0.035, Color(0.45, 0.75, 1.0)], [1.12, 0.03, Color(0.45, 0.75, 1.0)]]:
+		var tm := TorusMesh.new()
+		tm.inner_radius = spec[0] - spec[1]
+		tm.outer_radius = spec[0] + spec[1]
+		tm.rings = 48
+		var mi := MeshInstance3D.new()
+		mi.mesh = tm
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = spec[2]
+		m.emission_enabled = true
+		m.emission = spec[2]
+		m.emission_energy_multiplier = 1.6
+		m.no_depth_test = true
+		m.render_priority = 2
+		mi.material_override = m
+		mi.scale = Vector3(1, 0.25, 1)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mi)
+	# cuatro marcas (estilo mira) sobre el anillo
+	for i in 4:
+		var b := MeshUtil.box(root, Vector3(0.12, 0.04, 0.34), Vector3(0, 0, 0), Color(1.0, 0.9, 0.5))
+		b.position = Vector3.FORWARD.rotated(Vector3.UP, i * PI / 2) * 1.0
+		b.rotation.y = i * PI / 2
+		(b.material_override as StandardMaterial3D).no_depth_test = true
+	root.visible = false
+	return root
 
 func start_round(new_match: bool = false) -> void:
 	for g: String in ["projectile", "ground_aoe"]:

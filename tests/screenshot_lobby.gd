@@ -40,6 +40,83 @@ func _run() -> void:
 		cam.look_at_from_position(pp + ar.player.facing.cross(Vector3.UP) * 4.0 + Vector3(0, 2, 0) + ar.player.facing * 1.5, pp + ar.player.facing * 1.5 + Vector3(0, 1, 0))
 		cam.current = true
 		await create_timer(0.3).timeout
+	elif mode in ["lock_eikon", "combo", "run_cam"]:
+		# Ronda 16
+		gs.choose_first_character("caballero")
+		gs.from_lobby = true
+		gs.random_rival = false
+		change_scene_to_file("res://scenes/arena.tscn")
+		await process_frame
+		await process_frame
+		var ar: Arena = current_scene
+		ar.ai.enabled = false
+		ar.time_left = 76.0
+		var p := ar.player
+		var e := ar.enemy
+		await create_timer(0.8).timeout
+		if mode == "lock_eikon":
+			ar.controller.set_physics_process(false)
+			p.global_position = Vector3(0, 0, 9)
+			e.global_position = Vector3(1.5, 0, -2)
+			e.eikon = load("res://resources/eikons/stone_golem.tres")
+			e.meter = Fighter.METER_MAX
+			e.summon()
+			await physics_frame
+			ar.controller.lock_on = true
+			ar.controller.target = e
+			p.face_target = ar.controller.cycle_target()
+			await create_timer(0.6).timeout
+			print("objetivo: ", p.face_target)
+		elif mode == "combo":
+			ar.controller.set_physics_process(false)
+			var n := int(args[2]) if args.size() > 2 else 1
+			p.global_position = Vector3(0, 0, 8)
+			p.facing = Vector3.FORWARD
+			e.global_position = Vector3(0, 0, 5.8)
+			e.facing = Vector3.BACK
+			e.max_health = 9999.0
+			e.health = 9999.0
+			p.face_target = e
+			await physics_frame
+			p.attack_light()
+			var guard := 0
+			while guard < 400:
+				await physics_frame
+				guard += 1
+				e.stun = 0.0
+				if p.atk_state == Fighter.Atk.RECOVERY and p.combo < n:
+					p.attack_light()
+				if p.combo == n and ((p.atk_state == Fighter.Atk.ACTIVE and p.atk_t > p.atk_dur * 0.5) or p.atk_state == Fighter.Atk.RECOVERY):
+					break
+			Engine.time_scale = 0.0 # congela la pose del golpe
+			var cam := Camera3D.new()
+			ar.add_child(cam)
+			p.face_target = null
+			cam.fov = 55.0
+			cam.look_at_from_position(p.global_position + Vector3(5.8, 2.3, 1.2), p.global_position + Vector3(0, 0.9, -1.0))
+			cam.make_current()
+			var cl := CanvasLayer.new()
+			cl.layer = 50
+			ar.add_child(cl)
+			var lb := Label.new()
+			lb.text = "Golpe %d: %s (%s)" % [n, p.cur_hit.name if p.cur_hit else "?", p.cur_hit.direction if p.cur_hit else ""]
+			lb.position = Vector3(380, 120, 0) if false else Vector2(380, 120)
+			lb.add_theme_font_size_override("font_size", 34)
+			lb.add_theme_color_override("font_color", Color(1.0, 0.86, 0.45))
+			lb.add_theme_color_override("font_outline_color", Color(0.05, 0.08, 0.2))
+			lb.add_theme_constant_override("outline_size", 8)
+			cl.add_child(lb)
+			for i in 3:
+				await process_frame
+		else:
+			# Corre hacia atrás fijado: se gira hacia la cámara (control real)
+			p.global_position = Vector3(0, 0, 2)
+			e.global_position = Vector3(0, 0, -6)
+			ar.controller.lock_on = true
+			ar.controller.run_toggled = true
+			Input.action_press("move_back")
+			await create_timer(0.9).timeout
+			print("mira hacia la cámara: ", p.facing.dot((ar.camera.global_position - p.global_position).normalized()))
 	elif mode == "run_back":
 		# Ronda 15: correr hacia atrás fijado (sigue mirando al rival)
 		gs.choose_first_character("caballero")

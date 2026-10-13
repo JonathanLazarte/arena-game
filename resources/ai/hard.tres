@@ -26,3 +26,4 @@ breather_dist = 9.0
 breather_interval = 22.0
 jump_aoe_chance = 0.85
 special_chance = 0.45
+aim_lead = 0.5

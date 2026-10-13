@@ -33,5 +33,8 @@ extends Resource
 @export var breather_interval: float = 14.0 ## si no ha respirado en este tiempo, fuerza un respiro
 ## Ronda 14: probabilidad de saltar un golpe de área en el suelo (anillo de aviso) que le va a alcanzar.
 @export var jump_aoe_chance: float = 0.6
+## Ronda 16: adelanto al disparar (0 = apunta a donde está el jugador ahora). Solo el difícil
+## se adelanta, y solo a medias (0,5): correr de lado a distancia sigue esquivando.
+@export var aim_lead: float = 0.0
 ## Probabilidad (por decisión) de usar la habilidad del personaje / el especial del eikon montado.
 @export var special_chance: float = 0.3

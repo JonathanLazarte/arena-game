@@ -137,7 +137,12 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	ap = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	AnimUtil.set_loops(ap, ["Idle", "Walking_A", "Walking_Backwards", "Running_A", "Running_Strafe_Left",
 		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose", "Jump_Idle"])
-	author_dash_strike(ap, states["light1"])
+	author_dash_strike(ap, melee_w.anim_light[1 % melee_w.anim_light.size()])
+	# Ronda 16: combo de 3 golpes con clips propios (espejados / encadenados en Godot)
+	if not melee_w.combo.is_empty():
+		for i in 3:
+			var h := melee_w.combo_hit(i, cdef)
+			states["light%d" % i] = author_combo_clip(ap, h)
 	_build_tree()
 
 ## Malla de arma: la del propio modelo si existe, o copiada de otro .glb KayKit
@@ -183,6 +188,119 @@ func _make_lance(sk: Skeleton3D) -> MeshInstance3D:
 	var tip := MeshUtil.box(shaft, Vector3(0.14, 0.4, 0.05), Vector3(0, 1.45, 0), Color(0.8, 0.82, 0.9))
 	tip.rotation.y = PI / 4
 	return shaft
+
+static func _mirror_bone(b: String) -> String:
+	if b.ends_with(".l"):
+		return b.substr(0, b.length() - 2) + ".r"
+	if b.ends_with(".r"):
+		return b.substr(0, b.length() - 2) + ".l"
+	return b
+
+## Ronda 16: crea (una vez por biblioteca) el clip de un golpe de combo y devuelve su nombre.
+## - reverse: el clip al revés (revés con el mismo brazo, empieza en el final del tajo anterior).
+## - mirror: espejo izquierda<->derecha (intercambia huesos .l/.r y refleja en X: rotación
+##   (x, -y, -z, w), posición (-x, y, z)), para que el 2.º tajo vuelva en sentido contrario.
+## - then_anim: concatena dos clips (primera parte de `anim` hasta `split`, después `then_anim`),
+##   con 0,06 s de fundido; p. ej. golpe de escudo + estocada.
+static func author_combo_clip(player: AnimationPlayer, h: ComboHit) -> String:
+	var nm := h.clip_name()
+	if player.has_animation(nm):
+		return nm
+	if not player.has_animation(h.anim):
+		return "1H_Melee_Attack_Slice_Horizontal"
+	var src := player.get_animation(h.anim)
+	var anim: Animation
+	if h.then_anim != "" and player.has_animation(h.then_anim):
+		anim = _concat(src, player.get_animation(h.then_anim), h.split)
+	elif h.mirror or h.reverse:
+		anim = _mirrored(src) if h.mirror else src
+		if h.reverse:
+			anim = _reversed(anim)
+	else:
+		return h.anim
+	var lib := player.get_animation_library(&"")
+	if lib and not lib.has_animation(nm):
+		lib.add_animation(nm, anim)
+	return nm
+
+static func _mirrored(src: Animation) -> Animation:
+	var anim := Animation.new()
+	anim.length = src.length
+	for i in src.get_track_count():
+		var ty := src.track_get_type(i)
+		if ty != Animation.TYPE_POSITION_3D and ty != Animation.TYPE_ROTATION_3D and ty != Animation.TYPE_SCALE_3D:
+			continue
+		var path := src.track_get_path(i)
+		var bone := String(path.get_concatenated_subnames())
+		var np := NodePath(String(path.get_concatenated_names()) + ":" + _mirror_bone(bone))
+		var nt := anim.add_track(ty)
+		anim.track_set_path(nt, np)
+		for k in src.track_get_key_count(i):
+			var t := src.track_get_key_time(i, k)
+			var v = src.track_get_key_value(i, k)
+			match ty:
+				Animation.TYPE_ROTATION_3D:
+					var q: Quaternion = v
+					anim.rotation_track_insert_key(nt, t, Quaternion(q.x, -q.y, -q.z, q.w))
+				Animation.TYPE_POSITION_3D:
+					var pv: Vector3 = v
+					anim.position_track_insert_key(nt, t, Vector3(-pv.x, pv.y, pv.z))
+				_:
+					anim.scale_track_insert_key(nt, t, v)
+	return anim
+
+static func _reversed(src: Animation) -> Animation:
+	var anim := Animation.new()
+	anim.length = src.length
+	for i in src.get_track_count():
+		var ty := src.track_get_type(i)
+		if ty != Animation.TYPE_POSITION_3D and ty != Animation.TYPE_ROTATION_3D and ty != Animation.TYPE_SCALE_3D:
+			continue
+		var nt := anim.add_track(ty)
+		anim.track_set_path(nt, src.track_get_path(i))
+		for k in src.track_get_key_count(i):
+			var t := src.length - src.track_get_key_time(i, k)
+			var v = src.track_get_key_value(i, k)
+			match ty:
+				Animation.TYPE_ROTATION_3D: anim.rotation_track_insert_key(nt, t, v)
+				Animation.TYPE_POSITION_3D: anim.position_track_insert_key(nt, t, v)
+				_: anim.scale_track_insert_key(nt, t, v)
+	return anim
+
+static func _concat(a: Animation, b: Animation, split: float) -> Animation:
+	var anim := Animation.new()
+	var la := a.length * split
+	var blend := 0.06
+	anim.length = la + b.length * 0.85
+	var fps := 30.0
+	var n := int(anim.length * fps)
+	for i in a.get_track_count():
+		var ty := a.track_get_type(i)
+		if ty != Animation.TYPE_POSITION_3D and ty != Animation.TYPE_ROTATION_3D and ty != Animation.TYPE_SCALE_3D:
+			continue
+		var path := a.track_get_path(i)
+		var bi := b.find_track(path, ty)
+		var nt := anim.add_track(ty)
+		anim.track_set_path(nt, path)
+		for k in n + 1:
+			var t := k / fps
+			var ta := minf(t, la)
+			var tb := clampf(t - la, 0.0, b.length)
+			var w := clampf((t - la + blend) / (2.0 * blend), 0.0, 1.0) if bi >= 0 else 0.0
+			match ty:
+				Animation.TYPE_ROTATION_3D:
+					var q := a.rotation_track_interpolate(i, ta)
+					if bi >= 0:
+						q = q.slerp(b.rotation_track_interpolate(bi, tb), w)
+					anim.rotation_track_insert_key(nt, t, q.normalized())
+				Animation.TYPE_POSITION_3D:
+					var pv := a.position_track_interpolate(i, ta)
+					if bi >= 0:
+						pv = pv.lerp(b.position_track_interpolate(bi, tb), w)
+					anim.position_track_insert_key(nt, t, pv)
+				_:
+					anim.scale_track_insert_key(nt, t, a.scale_track_interpolate(i, ta))
+	return anim
 
 ## Crea la animación Dash_Strike en la biblioteca del AnimationPlayer (una vez por modelo).
 ## Muestrea a 30 fps: tren superior = tajo (re-temporizado), tren inferior = arranque de la
@@ -441,6 +559,17 @@ func update(f: Fighter, delta: float) -> void:
 	_weight = move_toward(_weight, 0.0 if s == "none" else 1.0, delta * 10.0)
 	mix.filter_enabled = upper
 	tree.set("parameters/mix/blend_amount", _weight)
+	# Ronda 16: salto visual del remate (hacha: salto demoledor)
+	var hop_y := 0.0
+	if f.cur_hit and f.cur_hit.hop > 0.0 and not _mounted:
+		var ph := -1.0
+		if f.atk_state == Fighter.Atk.WINDUP:
+			ph = clampf((f.atk_t / maxf(f.atk_dur, 0.01) - 0.35) / 0.65, 0.0, 1.0) * 0.8
+		elif f.atk_state == Fighter.Atk.ACTIVE:
+			ph = 0.8 + 0.2 * f.atk_t / maxf(f.atk_dur, 0.01)
+		if ph >= 0.0:
+			hop_y = sin(ph * PI) * f.cur_hit.hop
+	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y
 	# Locomoción relativa a la mirada
 	var st := f.stats()
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)

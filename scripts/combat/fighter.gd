@@ -78,6 +78,9 @@ const POISE_REGEN := 25.0
 const SWAP_TIME := 0.42
 ## Correr a pie fijado: hacia atrás se corre algo más lento que de frente (estilo souls).
 const RUN_BACK_FACTOR := 0.8
+## Ronda 16: corriendo fijado, por encima de este ángulo entre la entrada y la dirección al
+## rival se deja de hacer strafe y se corre de cara hacia donde se va (atrás = hacia la cámara).
+const RUN_TURN_DEG := 110.0
 const PARRY_STAGGER := 1.6
 const RIPOSTE_MULT := 1.8
 enum Atk { NONE, WINDUP, ACTIVE, RECOVERY }
@@ -174,6 +177,8 @@ var atk_heavy: bool = false
 var atk_t: float = 0.0
 var atk_dur: float = 0.0
 var combo: int = 0
+var cur_hit: ComboHit = null ## Ronda 16: golpe del combo en curso
+var combo_log: Array[String] = [] ## nombres de los últimos golpes de combo (pruebas/HUD)
 var attacks_started: int = 0
 var _atk_landed: bool = false
 var _atk_hit: Array[Node3D] = []
@@ -182,6 +187,8 @@ var poise: float = POISE_MAX
 var _since_hit: float = 10.0
 var riposte_t: float = 0.0 ## tras sufrir un parry: recibe daño extra
 var loadout: Loadout = Loadout.SWORD_SHIELD
+## Ronda 16: adelanto al apuntar (0 = a la posición actual). Solo la IA difícil lo sube (0,5).
+var aim_lead: float = 0.0
 var swap_t: float = 0.0
 var swap_from: int = Loadout.SWORD_SHIELD ## arma que se enfunda durante el cambio
 var bow_cd: float = 0.0
@@ -279,13 +286,28 @@ func speed_mult() -> float:
 	return character.velocidad * float(mods["velocidad"])
 
 func sword_range() -> float:
+	if cur_hit and atk_state != Atk.NONE:
+		return cur_hit.reach * (melee().reach_mounted / maxf(melee().reach_foot, 0.1) if mounted else 1.0)
 	return melee().reach_mounted if mounted else melee().reach_foot
 
 func sword_half_arc() -> float:
+	if cur_hit and atk_state != Atk.NONE:
+		return deg_to_rad(minf(cur_hit.arc_deg * (1.3 if mounted else 1.0), 180.0))
 	return deg_to_rad(melee().half_arc_mounted_deg if mounted else melee().half_arc_foot_deg)
 
 func max_combo() -> int:
-	return melee().max_combo
+	return melee().combo.size() if not melee().combo.is_empty() else melee().max_combo
+
+## Ronda 16: golpe de la cadena n (1..3) para este personaje y arma (null = ligero genérico).
+func combo_hit_for(n: int) -> ComboHit:
+	return melee().combo_hit(n - 1, character)
+
+## Multiplicador de daño de poise del golpe actual (remates > 1).
+func poise_mult_now() -> float:
+	var k := melee().poise_damage_mult
+	if cur_hit and atk_state != Atk.NONE:
+		k *= cur_hit.poise_mult
+	return k
 
 ## ¿Toca el suelo? (para los golpes de área en el suelo). En el fénix se vuela.
 func is_grounded() -> bool:
@@ -418,6 +440,9 @@ func toggle_mount() -> bool:
 		return true
 	if can_remount():
 		return mount_on(nearest_free_mount())
+	# Ronda 16: tu eikon está luchando lejos: «Montar» lo llama de vuelta para montarlo
+	if is_instance_valid(owned_mount) and owned_mount.can_ride(self):
+		owned_mount.recall_t = 3.0
 	return false
 
 # ---------------- Aguante ----------------
@@ -502,7 +527,18 @@ func _physics_process(delta: float) -> void:
 	var turn := st.turn_speed * delta
 	reversing = false
 	var run_req := want_sprint and amount > 0.3 and exhausted <= 0.0 and not blocking and stamina > 0.0
-	if _lock_valid():
+	var run_away := false
+	if _lock_valid() and run_req and not mounted and amount > 0.05:
+		# Ronda 16: corriendo fijado, si la entrada se aleja más de RUN_TURN_DEG del rival el
+		# personaje se gira y corre hacia allí (hacia la cámara), sin correr de espaldas.
+		var d0 := MeshUtil.flat(face_target.global_position - global_position)
+		if d0.length() > 0.1 and rad_to_deg(d0.normalized().angle_to(inp.normalized())) > RUN_TURN_DEG:
+			run_away = true
+	if run_away:
+		var dirn := inp.normalized()
+		facing = _turn_toward(facing, dirn, turn * 2.2)
+		target_vel = facing * st.speed * speed_mult() * amount
+	elif _lock_valid():
 		var d := MeshUtil.flat(face_target.global_position - global_position)
 		if d.length() > 0.1:
 			facing = _turn_toward(facing, d.normalized(), turn * 1.8)
@@ -526,7 +562,7 @@ func _physics_process(delta: float) -> void:
 			facing = _turn_toward(facing, dirn, turn * (1.4 if run_req and not mounted else 1.0))
 			target_vel = facing * st.speed * speed_mult() * amount
 	# Galope (montado, igual que antes) / correr a pie (también de espaldas si va fijado)
-	sprinting = run_req and (not reversing or (not mounted and _lock_valid()))
+	sprinting = run_req and (not reversing or (not mounted and _lock_valid()) or run_away)
 	if sprinting:
 		target_vel *= st.sprint_multiplier
 		spend_stamina(DRAIN_SPRINT * delta)
@@ -543,6 +579,9 @@ func _physics_process(delta: float) -> void:
 	var v := planar_vel
 	if atk_dash and not mounted and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE):
 		v = _lunge_velocity()
+		planar_vel = v * 0.5
+	elif cur_hit and cur_hit.lunge > 0.0 and not mounted and _combo_lunging():
+		v = facing * cur_hit.lunge * speed_mult()
 		planar_vel = v * 0.5
 	elif roll_t >= 0.0:
 		v = _roll_velocity()
@@ -597,6 +636,13 @@ func _physics_process(delta: float) -> void:
 	if mounted and mount_node:
 		# Sentado en la silla: la cadera sigue el punto de silla del caballo
 		_rider_root.position = to_local(mount_node.saddle_position())
+
+## Arremetida del golpe de combo: final de la anticipación y frames activos, sin meterse en el rival.
+func _combo_lunging() -> bool:
+	if not (atk_state == Atk.ACTIVE or (atk_state == Atk.WINDUP and atk_t > atk_dur * 0.55)):
+		return false
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	return tgt == null or MeshUtil.flat(tgt.global_position - global_position).length() > 1.3
 
 func _lock_valid() -> bool:
 	return is_instance_valid(face_target) and bool(face_target.get("alive"))
@@ -681,6 +727,8 @@ func attack_heavy() -> bool:
 
 func _atk_data() -> Dictionary:
 	var d: Dictionary = DASH_STRIKE.duplicate() if atk_dash else (JUMP_ATTACK.duplicate() if atk_jump else melee().attack(atk_heavy))
+	if cur_hit and not atk_dash and not atk_jump and not atk_heavy:
+		d = cur_hit.attack_dict()
 	d["damage"] = d["damage"] * damage_mult()
 	return d
 
@@ -709,7 +757,8 @@ func _request_attack(heavy: bool) -> bool:
 		return true
 	if atk_state != Atk.NONE:
 		# Búfer de entrada para encadenar ligeros
-		if not heavy and not atk_heavy and combo < max_combo() and (atk_state != Atk.WINDUP or atk_t > atk_dur * 0.5):
+		var in_window := atk_state != Atk.RECOVERY or cur_hit == null or atk_t <= cur_hit.window
+		if not heavy and not atk_heavy and combo < max_combo() and in_window and (atk_state != Atk.WINDUP or atk_t > atk_dur * 0.5):
 			_buffered = true
 		return false
 	if blocking or stamina <= 0.0:
@@ -722,6 +771,13 @@ func _request_attack(heavy: bool) -> bool:
 
 func _start_attack(heavy: bool, chained: bool) -> void:
 	atk_heavy = heavy
+	cur_hit = null
+	if not heavy and not atk_dash and not atk_jump:
+		cur_hit = combo_hit_for(combo)
+		if cur_hit:
+			combo_log.append(cur_hit.name)
+			if combo_log.size() > 12:
+				combo_log.pop_front()
 	var d := _atk_data()
 	atk_state = Atk.WINDUP
 	atk_t = 0.0
@@ -775,6 +831,7 @@ func _cancel_attack() -> void:
 	_ds_visual = false
 	atk_jump = false
 	combo = 0
+	cur_hit = null
 	_buffered = false
 	_blade_mat.emission_enabled = false
 	_kv.set_glow(false, Color.BLACK)
@@ -872,12 +929,12 @@ func shoot() -> bool:
 	if tgt:
 		var d: Vector3 = tgt.get_hit_center() - origin
 		if MeshUtil.flat(d).normalized().dot(facing) > -0.2:
-			dir = d.normalized()
+			dir = Projectile.aim_dir(origin, tgt, 32.0, aim_lead)
 	var p := Projectile.new()
 	p.team = team
 	p.shooter = self
 	p.direction = dir
-	p.target = tgt
+	p.aimed_at = tgt
 	p.damage = 8.0 * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0)
 	p.color = Color(0.9, 0.8, 0.5)
 	get_parent().add_child(p)
@@ -1041,10 +1098,9 @@ func eikon_special() -> bool:
 			p.speed = 24.0
 			p.radius = 0.7
 			p.color = ed.color
-			p.target = tgt
-			p.turn_rate = 1.4
+			p.aimed_at = tgt
 			var origin := global_position + Vector3(0, 1.6 + m.data.hover, 0) + facing * 1.8
-			p.direction = ((tgt.get_hit_center() - origin).normalized() if tgt else facing)
+			p.direction = (Projectile.aim_dir(origin, tgt, p.speed, aim_lead) if tgt else facing)
 			get_parent().add_child(p)
 			p.global_position = origin
 		"colmillo":
@@ -1185,7 +1241,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis
 	_since_hit = 0.0
-	poise -= amount * 2.0 * ((from as Fighter).melee().poise_damage_mult if from is Fighter and _kind == "melee" else 1.0)
+	poise -= amount * 2.0 * ((from as Fighter).poise_mult_now() if from is Fighter and _kind == "melee" else 1.0)
 	if poise <= 0.0:
 		poise = poise_max
 		apply_stun(0.6 + (0.3 if amount >= HEAVY_HIT else 0.0))

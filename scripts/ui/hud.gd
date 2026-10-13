@@ -70,6 +70,7 @@ func _ready() -> void:
 	_touch_button("Cambiar", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
 	_touch_button("Eikon", "summon", Vector2(1050, 500), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
+	_touch_button("Objetivo", "target_next", Vector2(1190, 255), 34, Color(0.95, 0.8, 0.35))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
 	# Ronda 15: a pie es «Correr» (alternar); montado vuelve a ser «Galope» (mantener)
 	_touch_button("Correr", "run_toggle", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))

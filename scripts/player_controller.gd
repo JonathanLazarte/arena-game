@@ -13,6 +13,44 @@ var _atk_hold: float = -1.0
 var _heavy_fired: bool = false
 ## Ronda 15: correr a pie alternado (V / Bloq Mayús / botón táctil «Correr»). Mantener Mayús también corre.
 var run_toggled: bool = false
+## Ronda 16: objetivo fijado y cambio de objetivo (Z / rueda del ratón / botón «Objetivo»).
+var target: Node3D = null
+var _wheel: int = 0
+
+## Objetivos válidos: rival, eikon enemigo (compañero o montura sin jinete) y futuros enemigos
+## (cualquier nodo del grupo "damageable" de otro equipo que siga vivo). Rival primero.
+func targets() -> Array[Node3D]:
+	var out: Array[Node3D] = MeshUtil.enemies_of(me.get_tree(), me.team)
+	out.sort_custom(func(a: Node3D, b: Node3D) -> bool:
+		var fa := a is Fighter
+		var fb := b is Fighter
+		if fa != fb:
+			return fa
+		return me.global_position.distance_squared_to(a.global_position) < me.global_position.distance_squared_to(b.global_position))
+	return out
+
+func cycle_target() -> Node3D:
+	_update_target(true)
+	return target
+
+func _update_target(cycle: bool) -> void:
+	var list := targets()
+	if list.is_empty():
+		target = null
+		return
+	var idx := list.find(target)
+	if idx < 0:
+		var opp := me.opponent
+		target = opp if (opp != null and opp in list) else list[0]
+		idx = list.find(target)
+	if cycle:
+		target = list[(idx + 1) % list.size()]
+
+func _unhandled_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and ev.pressed:
+		var mb := ev as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_wheel = 1
 
 func _pressed_edge(action: String) -> bool:
 	var now := Input.is_action_pressed(action)
@@ -25,8 +63,10 @@ func _physics_process(delta: float) -> void:
 		return
 	if _pressed_edge("lock_on"):
 		lock_on = not lock_on
-	var opp := me.opponent
-	me.face_target = opp if (lock_on and opp != null and opp.alive) else null
+	var cyc := _pressed_edge("target_next") or _wheel != 0
+	_wheel = 0
+	_update_target(cyc)
+	me.face_target = target if lock_on else null
 	var v := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	if joystick:
 		v += joystick.axis

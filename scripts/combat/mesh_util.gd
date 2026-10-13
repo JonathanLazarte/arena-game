@@ -51,6 +51,16 @@ static func enemies_of(tree: SceneTree, team: int) -> Array[Node3D]:
 			out.append(n)
 	return out
 
+## Ronda 16: objetivo de un eikon compañero: prioriza eikons enemigos (compañeros o monturas de
+## eikon sin jinete); si no hay, el más cercano (normalmente el luchador rival).
+static func companion_target(from: Vector3, tree: SceneTree, team: int) -> Node3D:
+	var all := enemies_of(tree, team)
+	var eik: Array[Node3D] = []
+	for n in all:
+		if n.is_in_group("eikon") or n.is_in_group("eikon_mount"):
+			eik.append(n)
+	return nearest(from, eik) if not eik.is_empty() else nearest(from, all)
+
 static func nearest(from: Vector3, list: Array[Node3D]) -> Node3D:
 	var best: Node3D = null
 	var bd := INF

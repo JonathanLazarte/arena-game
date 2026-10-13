@@ -60,13 +60,13 @@ func _run() -> void:
 	var p: Fighter = r[0]
 	var e: Fighter = r[1]
 	var base := await hit_damage(p, e, false)
-	check(is_equal_approx(base, 12.0), "espada y escudo: ligero 12 (%.1f)" % base)
+	check(is_equal_approx(base, p.combo_hit_for(1).damage), "espada y escudo: 1.er golpe del combo %.0f (%.1f)" % [p.combo_hit_for(1).damage, base])
 	check(is_equal_approx(p.sword_range(), 2.2) and p.max_combo() == 3, "espada y escudo: alcance 2.2, combo 3")
 	r = await setup_pair("berserker", "hacha_2m")
 	p = r[0]; e = r[1]
 	var axe := await hit_damage(p, e, false)
-	check(is_equal_approx(axe, 20.0 * 1.15), "hacha + berserker: 20 x1.15 = 23 (%.1f)" % axe)
-	check(p.max_combo() == 2 and not p.has_shield() and p.poise_max == 80.0 and p.max_health == 120.0 + p.mount.health_bonus, "berserker: combo 2, sin escudo, poise 80, vida 120")
+	check(is_equal_approx(axe, p.combo_hit_for(1).damage * 1.15), "hacha + berserker: 1.er golpe x1.15 (%.1f)" % axe)
+	check(p.max_combo() == 3 and not p.has_shield() and p.poise_max == 80.0 and p.max_health == 120.0 + p.mount.health_bonus, "berserker: combo 3, sin escudo, poise 80, vida 120")
 	# Rompeguardias: bloquear el hacha cuesta el doble que la espada
 	var c_axe := e.blocked_hit_cost(12.0, p)
 	r = await setup_pair("caballero", "espada_escudo")
@@ -81,7 +81,7 @@ func _run() -> void:
 	# Dagas: rápidas y de corto alcance
 	r = await setup_pair("asesino", "dagas")
 	p = r[0]; e = r[1]
-	check(p.sword_range() < 2.0 and p.max_combo() == 4 and p.melee().light_windup < 0.3, "dagas: alcance corto, combo 4, windup 0.28")
+	check(p.sword_range() < 2.0 and p.max_combo() == 3 and p.combo_hit_for(1).windup < 0.3, "dagas: alcance corto, combo 3, 1.er golpe rápido")
 	e.global_position = Vector3(0, 0, -2.1) # fuera de alcance de las dagas, dentro del de la espada
 	var miss := await hit_damage(p, e, false)
 	check(miss == 0.0, "dagas: a 2.1 m no alcanzan (%.1f)" % miss)

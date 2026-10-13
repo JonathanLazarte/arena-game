@@ -1,6 +1,52 @@
-[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponDef" format=3]
 
 [ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/combo_hit.gd" id="ch"]
+
+[sub_resource type="Resource" id="combo_0"]
+script = ExtResource("ch")
+name = "Tajo horizontal"
+anim = "1H_Melee_Attack_Slice_Horizontal"
+direction = "der→izq"
+damage = 11.0
+reach = 2.2
+arc_deg = 75.0
+windup = 0.4
+active = 0.12
+recovery = 0.5
+stamina = 12.0
+window = 0.45
+
+[sub_resource type="Resource" id="combo_1"]
+script = ExtResource("ch")
+name = "Revés"
+anim = "1H_Melee_Attack_Slice_Horizontal"
+reverse = true
+direction = "izq→der"
+damage = 12.0
+reach = 2.2
+arc_deg = 75.0
+windup = 0.32
+active = 0.12
+recovery = 0.5
+stamina = 12.0
+window = 0.45
+
+[sub_resource type="Resource" id="combo_2"]
+script = ExtResource("ch")
+name = "Tajo descendente"
+anim = "1H_Melee_Attack_Chop"
+direction = "vertical"
+damage = 18.0
+reach = 2.4
+arc_deg = 45.0
+windup = 0.5
+active = 0.14
+recovery = 0.65
+stamina = 16.0
+poise_mult = 2.0
+lunge = 3.0
+finisher = true
 
 [resource]
 script = ExtResource("1")
@@ -8,3 +54,5 @@ id = "espada_escudo"
 display_name = "Espada y escudo"
 description = "Equilibrada. Permite escudo: bloqueo sólido (pasa un 12 %)."
 allows_shield = true
+max_combo = 3
+combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])

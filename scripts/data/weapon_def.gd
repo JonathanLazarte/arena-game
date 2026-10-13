@@ -39,6 +39,16 @@ extends Resource
 @export var mesh_left: String = ""
 @export var procedural: String = "" ## "lanza" = malla generada por código
 @export var arrow_damage: float = 8.0
+## Ronda 16: cadena de ataques básicos (3 golpes: ida, vuelta y remate). Vacío = ligero genérico.
+@export var combo: Array[Resource] = []
+
+func combo_hit(i: int, cdef: CharacterDef = null) -> ComboHit:
+	if combo.is_empty():
+		return null
+	var idx := clampi(i, 0, combo.size() - 1)
+	if cdef and cdef.combo_finisher and cdef.combo_finisher_weapon == id and idx == combo.size() - 1:
+		return cdef.combo_finisher as ComboHit
+	return combo[idx] as ComboHit
 
 ## Diccionario de ataque con las mismas claves que Fighter.LIGHT / Fighter.HEAVY.
 func attack(heavy: bool) -> Dictionary:

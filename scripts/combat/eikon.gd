@@ -172,7 +172,7 @@ func _physics_process(delta: float) -> void:
 	if life <= 0.0 or not is_instance_valid(owner_fighter) or not owner_fighter.alive:
 		_dismiss()
 		return
-	var tgt := MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt := MeshUtil.companion_target(global_position, get_tree(), team)
 	var v := Vector3.ZERO
 	if tgt:
 		var d := MeshUtil.flat(tgt.global_position - global_position)
@@ -216,14 +216,10 @@ func _attack(tgt: Node3D) -> void:
 			p.radius = 0.7
 			p.kind = "eikon" # el escudo no la anula del todo
 			var origin := get_hit_center()
-			# Apunta adelantándose al movimiento del objetivo (los jinetes van rápido)
-			var aim: Vector3 = tgt.get_hit_center()
-			if tgt is CharacterBody3D:
-				var tv := MeshUtil.flat((tgt as CharacterBody3D).velocity)
-				aim += tv * (origin.distance_to(aim) / p.speed)
-			p.direction = (aim - origin).normalized()
-			p.target = tgt
-			p.turn_rate = 1.4
+			# Ronda 16: apunta a la posición actual (adelanto solo si el dueño lo tiene: IA difícil)
+			var lead: float = float(owner_fighter.get("aim_lead")) if is_instance_valid(owner_fighter) else 0.0
+			p.direction = Projectile.aim_dir(origin, tgt, p.speed, lead)
+			p.aimed_at = tgt
 			get_parent().add_child(p)
 			p.global_position = origin
 		_:

@@ -17,12 +17,29 @@ var eikon: EikonData = null ## eikon del que sale esta montura (null = montura n
 var owner_fighter: Fighter = null
 var life: float = INF ## s restantes (eikon); INF = permanente
 var special_cd: float = 0.0
+## Ronda 16: el eikon montable sin jinete es un COMPAÑERO de combate: tiene vida propia
+## (EikonData.max_health), se puede fijar y golpear, y si cae se retira antes de tiempo.
+var team: int = -1
+var health: float = 0.0
+var max_health: float = 0.0
+var alive: bool = true
+var hit_radius: float = 1.2
+var attack_cd: float = 0.8
+var recall_t: float = 0.0 ## s volviendo con el dueño (pulsó «Montar» lejos)
+var attacks_done: int = 0
+var companion_target: Node3D = null
 signal expired(m: Mount)
 
 func _ready() -> void:
 	add_to_group("mount")
 	if eikon:
 		add_to_group("eikon_mount")
+		max_health = eikon.max_health
+		health = max_health
+		if is_instance_valid(owner_fighter):
+			team = owner_fighter.team
+		if rider == null:
+			add_to_group("damageable")
 	if data == null:
 		data = load("res://resources/mounts/horse.tres")
 	collision_layer = 4
@@ -115,9 +132,30 @@ func expire() -> void:
 	expired.emit(self)
 	queue_free()
 
+func get_hit_center() -> Vector3:
+	return global_position + Vector3(0, 1.0 + data.hover, 0)
+
+## Solo se le puede golpear sin jinete (montado, los golpes van al jinete).
+func take_hit(amount: float, _from: Node3D, _kind: String) -> String:
+	if not alive or rider != null or eikon == null:
+		return "none"
+	health -= amount
+	if health <= 0.0:
+		alive = false
+		expire()
+	return "hit"
+
+func is_companion() -> bool:
+	return eikon != null and rider == null and alive
+
 func set_rider(r: Fighter) -> void:
 	rider = r
 	_col.disabled = r != null
+	if eikon:
+		if r == null and alive and not is_in_group("damageable"):
+			add_to_group("damageable")
+		elif r != null and is_in_group("damageable"):
+			remove_from_group("damageable")
 	if r == null:
 		home = global_position
 		_wander_t = 1.0
@@ -142,6 +180,13 @@ func _physics_process(delta: float) -> void:
 			_wander_dir = Vector3.FORWARD.rotated(Vector3.UP, randf() * TAU)
 		else:
 			_wander_dir = Vector3.ZERO
+	attack_cd -= delta
+	recall_t = maxf(recall_t - delta, 0.0)
+	if eikon and is_instance_valid(owner_fighter) and owner_fighter.alive and recall_t <= 0.0:
+		companion_target = MeshUtil.companion_target(global_position, get_tree(), team)
+		if companion_target:
+			_companion_step(delta)
+			return
 	if is_instance_valid(owner_fighter) and owner_fighter.alive:
 		# Eikon sin jinete: sigue de cerca a su dueño (para que pueda volver a montar)
 		var to_o := MeshUtil.flat(owner_fighter.global_position - global_position)
@@ -153,3 +198,42 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if v.length() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-v.x, -v.z), delta * 3.0)
+
+## Modo ataque (compañero): persigue al objetivo y lo ataca con los datos de compañero del eikon.
+func _companion_step(delta: float) -> void:
+	var tgt := companion_target
+	var d := MeshUtil.flat(tgt.global_position - global_position)
+	var dist := d.length()
+	var v := Vector3.ZERO
+	if dist > eikon.attack_range * 0.8:
+		v = d.normalized() * eikon.move_speed * 0.7
+	velocity.x = v.x
+	velocity.z = v.z
+	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
+	move_and_slide()
+	if dist > 0.1:
+		rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), delta * 6.0)
+	if dist <= eikon.attack_range and attack_cd <= 0.0:
+		attack_cd = eikon.attack_cooldown
+		attacks_done += 1
+		if eikon.attack_kind == EikonData.AttackKind.RANGED:
+			var p := Projectile.new()
+			p.team = team
+			p.shooter = self
+			p.kind = "eikon"
+			p.damage = eikon.attack_damage
+			p.speed = 22.0
+			p.radius = 0.7
+			p.color = eikon.color
+			var origin := get_hit_center() + Vector3(0, 0.4, 0)
+			var lead: float = float(owner_fighter.get("aim_lead")) if is_instance_valid(owner_fighter) else 0.0
+			p.direction = Projectile.aim_dir(origin, tgt, p.speed, lead)
+			p.aimed_at = tgt
+			get_parent().add_child(p)
+			p.global_position = origin
+		else:
+			tgt.take_hit(eikon.attack_damage, self, "eikon")
+			if model:
+				var tw := create_tween()
+				tw.tween_property(model, "position:z", -0.5, 0.08).as_relative()
+				tw.tween_property(model, "position:z", 0.5, 0.15).as_relative()

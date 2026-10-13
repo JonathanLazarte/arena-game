@@ -35,3 +35,6 @@ extends Resource
 
 func allows(weapon_id: String) -> bool:
 	return weapons.has(weapon_id)
+## Ronda 16: remate propio del personaje con un arma concreta (p. ej. Caballero: escudazo + estocada).
+@export var combo_finisher: Resource = null
+@export var combo_finisher_weapon: String = ""
