@@ -58,7 +58,9 @@ func _run() -> void:
 	await wait(0.8)
 	var unblocked := ph - p.health
 	check(unblocked > 0.0 and blocked < unblocked, "escudo reduce daño (bloq %.1f vs sin %.1f)" % [blocked, unblocked])
-	# Parry (acción dedicada, ~0,2 s antes del impacto)
+	# Parry (acción dedicada, ~0,2 s antes del impacto). Ronda 21: montado no hay parry.
+	check(not p.parry(), "montado: sin parry")
+	p.dismount(false)
 	await wait(1.0)
 	ph = p.health
 	e.sword()
@@ -66,6 +68,9 @@ func _run() -> void:
 	await tap("parry")
 	await wait(0.6)
 	check(e.stun > 0.0 and is_equal_approx(ph, p.health), "parry aturde al rival sin daño (stun %.2f)" % e.stun)
+	p.owned_mount.global_position = p.global_position
+	p.mount_on(p.owned_mount) # vuelve a montar para el resto (combate montado clásico)
+	await wait(0.3)
 	# Arco
 	await wait(1.0)
 	e.global_position = p.global_position + p.facing * 12.0

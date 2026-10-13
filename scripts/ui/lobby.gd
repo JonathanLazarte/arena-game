@@ -644,9 +644,9 @@ func _build_shop(cur: CharacterDef) -> void:
 	cats.add_theme_constant_override("separation", 6)
 	list_box.add_child(cats)
 	for ct: String in SHOP_CATS:
-		var b := UIKit.button(ct, 14, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
+		var b := UIKit.button(ct, 12, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
 		b.name = "Cat_" + ct
-		b.custom_minimum_size = Vector2(70, 40)
+		b.custom_minimum_size = Vector2(64, 40)
 		b.pressed.connect(func() -> void:
 			shop_cat = ct
 			_refresh_all(false))

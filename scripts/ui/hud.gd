@@ -307,6 +307,8 @@ func _update_contextual_buttons() -> void:
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
 	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)
+	if not riding and _player.can_summon():
+		_summon_btn.modulate = Color(1.6, 1.4, 1.0)
 	# Montar: solo con un eikon activo en la arena
 	(btns["mount"] as TouchScreenButton).visible = tv and _player.has_active_eikon()
 	(btns["target_next"] as TouchScreenButton).visible = tv and controller != null and controller.can_cycle_target()

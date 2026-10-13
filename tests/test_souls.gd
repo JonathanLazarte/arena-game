@@ -190,7 +190,10 @@ func _run() -> void:
 	await tap("swap_weapon")
 	await wait(Fighter.SWAP_TIME + 0.2)
 	check(p.loadout == Fighter.Loadout.SWORD_SHIELD, "vuelta a espada + escudo")
-	# --- 8. Parry dedicado (ventana 0,3 s + recuperación vulnerable) ---
+	# --- 8. Parry dedicado (ventana 0,3 s + recuperación vulnerable) --- (ronda 21: solo a pie)
+	if p.mounted:
+		p.dismount(false)
+	await wait(0.4)
 	await place(p, e, 3.0)
 	await wait(0.5)
 	var results: Array[String] = []
@@ -209,11 +212,15 @@ func _run() -> void:
 	await physics_frame
 	await physics_frame
 	await idle(p)
+	e.dismount(false) # a pie contra a pie (la espada a pie no alcanza a un jinete)
+	e.global_position = p.global_position + p.facing * 1.5
 	p.attack_light()
 	await idle(p)
 	check(h0 - e.health > Fighter.LIGHT["damage"] + 1.0, "riposte con daño extra (%.1f)" % (h0 - e.health))
 	await idle(e)
 	await idle_atk(p)
+	e.owned_mount.global_position = e.global_position
+	e.mount_on(e.owned_mount)
 	await wait(0.5)
 	await place(p, e, 3.0)
 	var n_res := results.size()
@@ -250,6 +257,11 @@ func _run() -> void:
 	await tap("swap_weapon")
 	await wait(Fighter.SWAP_TIME + 0.2)
 	e.landed_hit.disconnect(cb2)
+	for f: Fighter in [p, e]: # vuelve al combate montado clásico
+		if not f.mounted and is_instance_valid(f.owned_mount):
+			f.owned_mount.global_position = f.global_position
+			f.mount_on(f.owned_mount)
+	await wait(0.3)
 	# --- 9. La IA lee ataques: esquiva y castiga; se compromete con los suyos ---
 	await wait(0.5)
 	arena.ai.enabled = true

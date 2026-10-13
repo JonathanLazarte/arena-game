@@ -341,6 +341,8 @@ func spell_slots() -> int:
 	return EikonSpells.slots_for(char_attrs())
 
 func equipped_spells() -> Array:
+	if spells.is_empty():
+		spells = EikonSpells.default_for(eikon_id) # nunca configurado: el hechizo de tu eikon
 	spells = EikonSpells.sanitize(spells, spell_slots(), owned_eikons)
 	return spells
 
