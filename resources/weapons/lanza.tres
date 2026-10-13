@@ -52,6 +52,8 @@ finisher = true
 
 [resource]
 script = ExtResource("1")
+scaling = {"fuerza": 0.9, "destreza": 0.9}
+requirements = {"fuerza": 10, "destreza": 8}
 id = "lanza"
 display_name = "Lanza"
 description = "Gran alcance en un arco estrecho. A caballo hace un 25 % más de daño."

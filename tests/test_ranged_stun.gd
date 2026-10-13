@@ -137,7 +137,30 @@ func _run() -> void:
 	await physics_frame
 	Input.action_release("attack_sword")
 	await wait(0.2)
-	check(was_spr and p.shot_state != Fighter.Shot.NONE and not p.sprinting and not arena.controller.run_toggled, "disparar corriendo: vuelve a andar y se apaga «Correr»")
+	check(was_spr and p.shot_state != Fighter.Shot.NONE and not p.sprinting and arena.controller.run_toggled, "disparar corriendo: suspende la carrera sin apagar «Correr» (ronda 18)")
+	var gd := 0
+	while p.is_shooting() and gd < 120:
+		await physics_frame
+		gd += 1
+	await wait(0.3)
+	check(p.sprinting and arena.controller.run_toggled, "al acabar el disparo vuelve a correr solo (toggle)")
+	# Mayús mantenida: también reanuda
+	arena.controller.run_toggled = false
+	Input.action_press("sprint")
+	await wait(0.4)
+	Input.action_press("attack_sword")
+	await physics_frame
+	await physics_frame
+	Input.action_release("attack_sword")
+	await wait(0.15)
+	var sus := not p.sprinting
+	gd = 0
+	while p.is_shooting() and gd < 120:
+		await physics_frame
+		gd += 1
+	await wait(0.3)
+	check(sus and p.sprinting, "con Mayús mantenida: suspende y reanuda la carrera")
+	Input.action_release("sprint")
 	Input.action_release("move_right")
 	arena.controller.set_physics_process(false)
 	# Cadencias

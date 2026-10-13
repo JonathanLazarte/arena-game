@@ -53,6 +53,8 @@ finisher = true
 
 [resource]
 script = ExtResource("1")
+scaling = {"fuerza": 0.2, "destreza": 1.8}
+requirements = {"destreza": 12}
 id = "dagas"
 display_name = "Dagas dobles"
 description = "Muy rápidas y baratas, poco alcance. Combos de 4."

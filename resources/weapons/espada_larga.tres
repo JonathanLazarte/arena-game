@@ -52,6 +52,8 @@ finisher = true
 
 [resource]
 script = ExtResource("1")
+scaling = {"fuerza": 1.0, "destreza": 1.0}
+requirements = {"fuerza": 8, "destreza": 8}
 id = "espada_larga"
 display_name = "Espada larga"
 description = "A dos manos: más alcance y daño, sin escudo."

@@ -37,7 +37,7 @@ func _ready() -> void:
 	add_to_group("mount")
 	if eikon:
 		add_to_group("eikon_mount")
-		max_health = eikon.max_health
+		max_health = eikon.max_health * (float(owner_fighter.ad["eikon"]) if is_instance_valid(owner_fighter) else 1.0)
 		health = max_health
 		if is_instance_valid(owner_fighter):
 			team = owner_fighter.team
@@ -229,7 +229,7 @@ func _companion_step(delta: float) -> void:
 			p.team = team
 			p.shooter = self
 			p.kind = "eikon"
-			p.damage = eikon.attack_damage
+			p.damage = eikon.attack_damage * _bond()
 			p.speed = 22.0
 			p.radius = 0.7
 			p.color = eikon.color
@@ -240,7 +240,7 @@ func _companion_step(delta: float) -> void:
 			get_parent().add_child(p)
 			p.global_position = origin
 		else:
-			tgt.take_hit(eikon.attack_damage, self, "eikon")
+			tgt.take_hit(eikon.attack_damage * _bond(), self, "eikon")
 			if model:
 				var tw := create_tween()
 				tw.tween_property(model, "position:z", -0.5, 0.08).as_relative()
@@ -263,3 +263,7 @@ func _call_step(delta: float) -> void:
 	if dist <= CALL_REACH and o.can_mount_now():
 		called = false
 		o.mount_on(self)
+
+## Ronda 18: Vínculo del dueño (daño del eikon).
+func _bond() -> float:
+	return float(owner_fighter.ad["eikon"]) if is_instance_valid(owner_fighter) else 1.0

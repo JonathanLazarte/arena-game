@@ -253,11 +253,25 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 			hb.value = v)
 		f.meter_changed.connect(func(v: float) -> void: mb.value = v)
 		var sb: ProgressBar = pair[3]
-		sb.max_value = Fighter.STAMINA_MAX
+		sb.max_value = f.stamina_max
 		sb.value = f.stamina
 		f.stamina_changed.connect(func(v: float, ex: bool) -> void:
 			sb.value = v
 			sb.modulate = Color(1, 0.4, 0.4) if ex else Color.WHITE)
+
+	# Ronda 18: barra de Energía (Concentración) para las habilidades (Golpe sísmico)
+	if player.has_special():
+		energy_bar = _bar(root_control(), Vector2(20, 82), Color(0.62, 0.45, 1.0), 6)
+		energy_bar.name = "EnergyBar"
+		energy_bar.max_value = player.energy_max
+		energy_bar.value = player.energy
+		player.energy_changed.connect(func(v: float, m: float) -> void:
+			energy_bar.max_value = m
+			energy_bar.value = v)
+
+var energy_bar: ProgressBar
+func root_control() -> Control:
+	return p_health.get_parent()
 
 func _on_summon_failed(reason: String) -> void:
 	if reason == "meter":

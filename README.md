@@ -338,3 +338,36 @@ Disparar a pie cancela el sprint y apaga el modo correr. Montado se dispara sin 
 | Lanza | 0,38 | 0,38 | 0,8 | 0,6 |
 
 Llamada del eikon (F a pie): viene corriendo desde cualquier distancia y te monta al llegar, en cuanto estés libre. F otra vez o la muerte del eikon cancelan la llamada.
+
+## Ronda 18 — Atributos (8), escalado de armas y requisitos
+
+Inspirado en el sistema de 8 atributos de los «soulslike» (Elden Ring: Vigor, Mind, Endurance, Strength, Dexterity, Intelligence, Faith, Arcane), con **nombres y fórmulas propias**. Todo bono es *relativo al reparto inicial del rol*: a nivel 1 el combate es idéntico al de la ronda 17. Cada nivel de personaje da **2 puntos de atributo** (el árbol de habilidades conserva su punto por nivel: sistemas separados). Valores 6–60. Redistribuir es gratis por ahora. Las curvas son por tramos (umbral blando = baja la ganancia por punto).
+
+| Atributo (equivalente) | Efectos | Fórmula (por punto, por tramos) |
+|---|---|---|
+| Vitalidad (Vigor) | Vida; defensa física | Vida +4 hasta 25, +2 hasta 40, +0,6 después · defensa +0,4 % hasta 30, +0,15 % hasta 50 (tope 15 %) |
+| Concentración (Mind) | Energía máx. y regeneración (Golpe sísmico cuesta 30) | Energía 50 +3 hasta 25, +1,5 hasta 40 · regen 5/s +0,25 hasta 30, +0,1 hasta 50 |
+| Aguante (Endurance + Robustness) | Estamina, poise, robustez (menos aturdimiento recibido), guardia más firme, carga | Estamina +2,5/+1,2/+0,4 (25/40) · poise +1,5/+0,6 (30/50) · aturdimiento recibido −1,2 %/−0,5 % (30/50, mín. 60 %) · coste de bloqueo −0,8 %/−0,3 % · carga 30 + 1,6/1,0/0,5 (25/60) |
+| Fuerza (Strength) | Daño de armas FUE; daño a poise y a la guardia; aturdimiento infligido | escala 2 %/1 %/0,4 % (20/40/60) × coef. del arma · poise/guardia +1,5 %/+0,6 % (30/50) · aturdimiento +1 %/+0,4 % (tope +35 %) |
+| Destreza (Dexterity) | Daño de armas DES; velocidad de ataque y disparo; voltereta más barata y con más i-frames | velocidad +0,6 %/+0,2 % (30/50, tope +16 %) · coste voltereta −0,8 %/−0,3 % · i-frames +0,07/+0,03 por punto (redondeado, tope +2) |
+| Sabiduría (Intelligence) | Poder mágico (futuros hechizos); escala armas SAB | 100 +4 hasta 30, +2 hasta 50 |
+| Devoción (Faith) | Curación (Luz sanadora), resistencia sagrada (eikon/área), daño de armas DEV | curación +3 %/+1,2 % (25/40) · resistencia +0,5 %/+0,2 % (30/50, tope 15 %) |
+| Vínculo (sustituye a Arcane) | Daño y vida del eikon, ganancia del medidor | eikon +2 %/+0,8 % (25/40) · medidor +1,5 %/+0,6 % |
+
+Escalado: letra según coeficiente (S > 1,7 · A ≥ 1,3 · B ≥ 0,9 · C ≥ 0,55 · D ≥ 0,25 · E). Daño del arma × (1 + Σ coef·escala(attr)) / (lo mismo con el reparto inicial). Bajo requisito: −30 % y aviso ⚠.
+
+| Arma | Escalado | Requisitos |
+|---|---|---|
+| Espada y escudo | FUE C · DES D · DEV D | FUE 10 · DES 8 |
+| Espada larga | FUE B · DES B | FUE 8 · DES 8 |
+| Hacha a dos manos | FUE A · DES E | FUE 11 |
+| Lanza | FUE B · DES B | FUE 10 · DES 8 |
+| Dagas | FUE E · DES S | DES 12 |
+| Arco | FUE D · DES B | DES 10 |
+| Ballesta | FUE C · DES C | FUE 8 · DES 12 |
+
+Guardado v5: atributos por ranura; las partidas v4 o anteriores reciben los puntos de su nivel repartidos según el rol. El rival aleatorio recibe atributos de su rol al nivel de tu personaje.
+
+Ronda 18 extra: disparar a pie *suspende* la carrera solo durante tensar/recuperar; si «Correr» sigue activo (o Mayús mantenida) se vuelve a correr solo.
+
+Fuentes: Bandai Namco, «ELDEN RING How-To Guide Part 2 – Advanced Stats»; Fextralife «Stats»; Eldenpedia (wiki.gg) «Stats and Attributes»; Fandom «Weapon Scaling»; Prima Games «Soft caps for each stat and attribute in Elden Ring».

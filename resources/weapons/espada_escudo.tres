@@ -53,6 +53,8 @@ finisher = true
 
 [resource]
 script = ExtResource("1")
+scaling = {"fuerza": 0.8, "destreza": 0.5, "devocion": 0.3}
+requirements = {"fuerza": 10, "destreza": 8}
 id = "espada_escudo"
 display_name = "Espada y escudo"
 description = "Equilibrada. Permite escudo: bloqueo sólido (pasa un 12 %)."

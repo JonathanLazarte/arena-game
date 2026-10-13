@@ -54,6 +54,8 @@ finisher = true
 
 [resource]
 script = ExtResource("1")
+scaling = {"fuerza": 1.5, "destreza": 0.2}
+requirements = {"fuerza": 11}
 id = "hacha_2m"
 display_name = "Hacha a dos manos"
 description = "Lenta y devastadora. Rompe guardias: bloquearla cuesta el doble de aguante."

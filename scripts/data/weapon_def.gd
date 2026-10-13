@@ -53,6 +53,9 @@ extends Resource
 @export var anim_reload: String = "2H_Ranged_Reload"
 ## Aturdimiento del ataque fuerte cuerpo a cuerpo (los del combo van en cada ComboHit.hitstun).
 @export var heavy_hitstun: float = 0.6
+## Ronda 18: escalado por atributo (coeficiente; letra S-E en Attributes.grade) y requisitos mínimos.
+@export var scaling: Dictionary = {}
+@export var requirements: Dictionary = {}
 ## Ronda 16: cadena de ataques básicos (3 golpes: ida, vuelta y remate). Vacío = ligero genérico.
 @export var combo: Array[Resource] = []
 

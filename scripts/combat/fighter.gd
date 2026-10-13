@@ -71,6 +71,7 @@ const SLAM_TELEGRAPH := 0.7
 const SLAM_DAMAGE := 22.0
 const SLAM_COOLDOWN := 8.0
 const COST_SLAM := 25.0
+const SLAM_ENERGY := 30.0 ## ronda 18: Energía que gasta el Golpe sísmico
 const POISE_MAX := 50.0
 const POISE_REGEN := 25.0
 ## Ronda 15: cambio arco<->cuerpo a cuerpo rápido (antes 2 s). Nunca bloquea el movimiento;
@@ -226,6 +227,12 @@ var land_t: float = 0.0
 var jumps: int = 0
 var aoe_jumped: int = 0 ## golpes de área esquivados en el aire (pruebas / IA)
 var special_cd: float = 0.0
+## Ronda 18: atributos y estadísticas derivadas; Energía (habilidades).
+var attrs: Dictionary = {}
+var ad: Dictionary = Attributes.derived("caballero", {})
+var energy_max: float = 50.0
+var energy: float = 50.0
+signal energy_changed(value: float, max_value: float)
 var special_t: float = 0.0 ## anticipación del golpe sísmico
 var specials_used: int = 0
 var eikon_specials: int = 0
@@ -272,16 +279,38 @@ static func _neutral() -> CharacterDef:
 func set_skills(skills: Array) -> void:
 	mods = Progression.combine_mods(skills)
 
+## Ronda 18: atributos (vacío = reparto inicial del rol: sin bonos). Antes de añadir al árbol
+## o seguido de _apply_character().
+func set_attributes(a: Dictionary) -> void:
+	attrs = a.duplicate()
+
+func attributes() -> Dictionary:
+	return attrs if not attrs.is_empty() else Attributes.start_for(character.id)
+
+func _refresh_derived() -> void:
+	ad = Attributes.derived(character.id, attributes())
+
+## Multiplicador de daño por atributos del arma (las de recambio no aplican requisitos).
+func weapon_attr_mult(w: WeaponDef) -> float:
+	return Attributes.weapon_mult(w, character.id, attributes(), w == weapon)
+
+## Velocidad de ataque/disparo por Destreza.
+func attr_speed() -> float:
+	return float(ad.get("vel", 1.0))
+
 ## Potencia de la pasiva (1.0 = base; las habilidades la suben).
 func passive_k() -> float:
 	return 1.0 + float(mods["passive"])
 
 func _apply_character() -> void:
-	max_health = character.vida + float(mods["vida"]) + (mount.health_bonus if mount else 0.0)
+	_refresh_derived()
+	max_health = character.vida + float(mods["vida"]) + float(ad["vida"]) + (mount.health_bonus if mount else 0.0)
 	health = max_health
-	stamina_max = character.estamina + float(mods["estamina"])
+	stamina_max = character.estamina + float(mods["estamina"]) + float(ad["estamina"])
 	stamina = stamina_max
-	poise_max = character.poise + float(mods["poise"])
+	poise_max = character.poise + float(mods["poise"]) + float(ad["poise"])
+	energy_max = float(ad["energia_max"])
+	energy = energy_max
 	parry_window = PARRY_WINDOW + float(mods["parry_window"])
 	poise = poise_max
 	if weapon.ranged:
@@ -355,7 +384,7 @@ func is_dash_striking() -> bool:
 	return atk_state != Atk.NONE and (_ds_visual or atk_dash)
 
 func roll_iframe_end() -> float:
-	return ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"])) / ROLL_FPS
+	return ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"]) + int(ad["iframes"])) / ROLL_FPS
 
 ## "none", "startup", "iframes" o "recovery".
 func roll_phase() -> String:
@@ -522,7 +551,7 @@ func _physics_process(delta: float) -> void:
 		poise = minf(poise + POISE_REGEN * delta, poise_max)
 	# Pasiva "Luz sanadora": se cura si lleva 3 s sin recibir golpes
 	if character.passive_id == "luz_sanadora" and alive and _since_hit > 3.0 and health < max_health:
-		var hv := minf(2.0 * passive_k() * delta, max_health - health)
+		var hv := minf(2.0 * passive_k() * float(ad["curacion"]) * delta, max_health - health)
 		health += hv
 		heals += hv
 		health_changed.emit(health, max_health)
@@ -541,6 +570,9 @@ func _physics_process(delta: float) -> void:
 	_update_shot(delta)
 	dash_cd = maxf(dash_cd - delta, 0.0)
 	special_cd = maxf(special_cd - delta, 0.0)
+	if energy < energy_max:
+		energy = minf(energy + float(ad["energia_regen"]) * delta, energy_max)
+		energy_changed.emit(energy, energy_max)
 	land_t = maxf(land_t - delta, 0.0)
 	if special_t > 0.0:
 		special_t = maxf(special_t - delta, 0.0)
@@ -768,6 +800,8 @@ func get_hit_center() -> Vector3:
 	return global_position + Vector3(0, 1.6 if mounted else 1.0, 0)
 
 func add_meter(v: float) -> void:
+	if v > 0.0:
+		v *= float(ad["medidor"])
 	meter = clampf(meter + v, 0.0, METER_MAX)
 	meter_changed.emit(meter)
 
@@ -799,11 +833,14 @@ func _atk_data() -> Dictionary:
 	if cur_hit and not atk_dash and not atk_jump and not atk_heavy:
 		d = cur_hit.attack_dict()
 	d["damage"] = d["damage"] * damage_mult()
+	var sp := attr_speed()
+	for k: String in ["windup", "chain_windup", "recovery", "whiff"]:
+		d[k] = d[k] / sp
 	return d
 
 ## Multiplicador de daño cuerpo a cuerpo: personaje, lanza a caballo y pasiva "Furia".
 func damage_mult() -> float:
-	var k := character.dano * float(mods["dano"])
+	var k := character.dano * float(mods["dano"]) * weapon_attr_mult(melee())
 	if mounted:
 		k *= melee().mounted_damage_mult
 	if character.passive_id == "furia" and health < max_health * 0.4:
@@ -996,7 +1033,7 @@ func shoot() -> bool:
 	spend_stamina(COST_BOW)
 	shot_state = Shot.DRAW
 	shot_t = 0.0
-	shot_dur = r.fire_draw
+	shot_dur = r.fire_draw / attr_speed()
 	if not mounted:
 		shot_cut_sprint = want_sprint or sprinting
 		sprinting = false
@@ -1047,7 +1084,7 @@ func _release_shot() -> void:
 	p.aimed_at = tgt
 	p.speed = r.projectile_speed
 	p.hitstun = r.ranged_hitstun
-	p.damage = r.arrow_damage * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0)
+	p.damage = r.arrow_damage * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0) * weapon_attr_mult(r)
 	p.color = Color(0.9, 0.8, 0.5) if r.reload_time <= 0.0 else Color(0.75, 0.85, 1.0)
 	get_parent().add_child(p)
 	p.global_position = origin
@@ -1067,7 +1104,7 @@ func dash() -> bool:
 			# A pie: dash durante la anticipación del ligero = estocada con dash
 			var mi0 := MeshUtil.flat(move_input)
 			dash_dir = mi0.normalized() if mi0.length() > 0.2 else facing
-			spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]))
+			spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]) * float(ad["roll_cost"]))
 			dash_cd = stats().dash_cooldown
 			_start_dash_strike()
 			return true
@@ -1096,7 +1133,7 @@ func _start_roll(st: MountData) -> bool:
 	dash_cd = maxf(st.dash_cooldown, ROLL_TOTAL)
 	invuln = 0.0
 	_dash_hit = true # la voltereta no embiste
-	spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]))
+	spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]) * float(ad["roll_cost"]))
 	return true
 
 func _roll_velocity() -> Vector3:
@@ -1177,8 +1214,12 @@ func special() -> bool:
 		return false
 	if atk_state != Atk.NONE or parry_state != Parry.NONE or swap_t > 0.0 or stamina <= 0.0:
 		return false
+	if energy < SLAM_ENERGY:
+		return false
 	match character.special_id:
 		"golpe_sismico":
+			energy -= SLAM_ENERGY
+			energy_changed.emit(energy, energy_max)
 			special_cd = SLAM_COOLDOWN
 			special_t = SLAM_TELEGRAPH
 			blocking = false
@@ -1206,7 +1247,7 @@ func eikon_special() -> bool:
 			p.team = team
 			p.shooter = self
 			p.kind = "eikon"
-			p.damage = ed.special_damage
+			p.damage = ed.special_damage * float(ad["eikon"])
 			p.speed = 24.0
 			p.radius = 0.7
 			p.color = ed.color
@@ -1220,13 +1261,13 @@ func eikon_special() -> bool:
 			for t in MeshUtil.enemies_of(get_tree(), team):
 				var d := MeshUtil.flat(t.global_position - global_position)
 				if d.length() < 4.5 and (d.length() < 0.5 or absf(facing.signed_angle_to(d.normalized(), Vector3.UP)) < deg_to_rad(60)):
-					if t.take_hit(ed.special_damage, self, "eikon") == "hit" and t is Fighter:
+					if t.take_hit(ed.special_damage * float(ad["eikon"]), self, "eikon") == "hit" and t is Fighter:
 						(t as Fighter).apply_stun(0.5) # congelado un instante
 		"vendaval":
 			for t in MeshUtil.enemies_of(get_tree(), team):
 				var d := MeshUtil.flat(t.global_position - global_position)
 				if d.length() < 5.5:
-					var r: String = t.take_hit(ed.special_damage, self, "eikon")
+					var r: String = t.take_hit(ed.special_damage * float(ad["eikon"]), self, "eikon")
 					if (r == "hit" or r == "block") and t.has_method("apply_knockback"):
 						t.apply_knockback((d.normalized() if d.length() > 0.1 else facing) * 14.0, r == "hit")
 	impact.emit(0.6)
@@ -1346,6 +1387,11 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if riposte_t > 0.0 and _kind == "melee":
 		amount *= RIPOSTE_MULT # riposte tras parry
 		riposte_t = 0.0
+	# Ronda 18: Vitalidad = defensa física; Devoción = resistencia sagrada (eikon/área)
+	if _kind == "melee" or _kind == "arrow":
+		amount *= 1.0 - float(ad["defensa"])
+	elif _kind == "eikon" or _kind == "aoe":
+		amount *= 1.0 - float(ad["sagrado"])
 	_damage(amount)
 	add_meter(5.0)
 	_kv.event("hit")
@@ -1353,7 +1399,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis
 	_since_hit = 0.0
-	poise -= amount * 2.0 * ((from as Fighter).poise_mult_now() if from is Fighter and _kind == "melee" else 1.0)
+	poise -= amount * 2.0 * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
 	if poise <= 0.0:
 		poise = poise_max
 		apply_stun(0.6 + (0.3 if amount >= HEAVY_HIT else 0.0))
@@ -1367,6 +1413,9 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		elif _kind == "arrow":
 			hs = incoming_arrow_stun if incoming_arrow_stun > 0.0 else (from as Fighter).ranged().ranged_hitstun
 	incoming_arrow_stun = 0.0
+	if from is Fighter and is_instance_valid(from):
+		hs *= float((from as Fighter).ad["stun_dealt"]) # Fuerza del atacante
+	hs *= float(ad["stun_taken"]) # Aguante (robustez) del defensor
 	if hs > 0.0 and not (atk_state == Atk.WINDUP and atk_heavy):
 		apply_stun(hs)
 		last_hitstun = hs
@@ -1386,7 +1435,8 @@ func _guard_break() -> void:
 func blocked_hit_cost(amount: float, from: Node3D) -> float:
 	var c := COST_BLOCKED_HIT * (COST_BLOCKED_HEAVY_MULT if amount >= HEAVY_HIT else 1.0)
 	if from is Fighter:
-		c *= (from as Fighter).melee().guard_break_mult
+		c *= (from as Fighter).melee().guard_break_mult * float((from as Fighter).ad["impacto"])
+	c *= float(ad["guard_k"])
 	c *= character.guardia
 	if character.passive_id == "guardia_firme":
 		c *= 1.0 - 0.2 * passive_k()
@@ -1418,6 +1468,8 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	land_t = 0.0
 	special_t = 0.0
 	special_cd = 0.0
+	energy = energy_max
+	energy_changed.emit(energy, energy_max)
 	_roll_atk_buffer = false
 	if not mounted and is_instance_valid(owned_mount) and owned_mount.owner_fighter == null:
 		if not owned_mount.is_free() and owned_mount.rider:

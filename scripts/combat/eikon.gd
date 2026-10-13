@@ -202,7 +202,7 @@ func _attack(tgt: Node3D) -> void:
 	_attack_anim_t = minf(_ap.get_animation(_anims[2]).length, data.attack_cooldown)
 	match data.attack_kind:
 		EikonData.AttackKind.MELEE:
-			tgt.take_hit(data.attack_damage, self, "eikon")
+			tgt.take_hit(data.attack_damage * _bond(), self, "eikon")
 			var tw := create_tween()
 			tw.tween_property(_body, "position", Vector3(0, 0, -0.6), 0.08)
 			tw.tween_property(_body, "position", Vector3.ZERO, 0.15)
@@ -210,7 +210,7 @@ func _attack(tgt: Node3D) -> void:
 			var p := Projectile.new()
 			p.team = team
 			p.shooter = self
-			p.damage = data.attack_damage
+			p.damage = data.attack_damage * _bond()
 			p.speed = 22.0
 			p.color = data.color
 			p.radius = 0.7
@@ -224,6 +224,10 @@ func _attack(tgt: Node3D) -> void:
 			p.global_position = origin
 		_:
 			# Ronda 14: el gólem golpea el suelo con aviso (GroundAoE): saltar lo esquiva
-			var aoe := GroundAoE.spawn(get_parent(), self, team, global_position, data.attack_range, 0.6, data.attack_damage)
+			var aoe := GroundAoE.spawn(get_parent(), self, team, global_position, data.attack_range, 0.6, data.attack_damage * _bond())
 			aoe.knock = 6.0
 			aoe.stun_time = 0.3
+
+## Ronda 18: Vínculo del invocador.
+func _bond() -> float:
+	return float(owner_fighter.ad["eikon"]) if is_instance_valid(owner_fighter) else 1.0

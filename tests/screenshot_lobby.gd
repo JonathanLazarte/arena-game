@@ -311,7 +311,18 @@ func _run() -> void:
 		var lobby := current_scene
 		lobby.spin_speed = 0.0
 		lobby.pedestal.rotation.y = 0.4
-		if args.size() > 3:
+		if args.size() > 3 and args[3] == "Atributos":
+			# Ronda 18: pantalla de atributos con cambios pendientes (vista previa)
+			gs.char_xp[cid] = Progression.xp_at_level(7)
+			var a0: Dictionary = gs.char_attrs().duplicate()
+			a0["fuerza"] += 4
+			a0["vitalidad"] += 2
+			gs.set_attrs(a0)
+			lobby.set_tab("Personaje")
+			lobby.open_attributes()
+			for k: String in ["fuerza", "fuerza", "aguante", "aguante", "destreza", "vinculo"]:
+				lobby.attr_screen.change(k, 1)
+		elif args.size() > 3:
 			lobby.set_tab(args[3])
 		await create_timer(1.2).timeout
 	root.get_viewport().get_texture().get_image().save_png(path)

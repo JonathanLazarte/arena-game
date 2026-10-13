@@ -2,10 +2,11 @@ extends Node
 ## Autoload "GameState": perfil local (jugador, oro, progresión, desbloqueos) y equipamiento,
 ## guardado en user:// con versión (v1 = ronda 10, v2 = ronda 11 con progresión,
 ## v3 = ronda 14: sin monturas; los eikons son las monturas,
-## v4 = ronda 15: un único personaje por ranura; sin compra/cambio de personajes).
+## v4 = ronda 15: un único personaje por ranura; sin compra/cambio de personajes,
+## v5 = ronda 18: atributos por ranura; los antiguos se reparten solos según rol y nivel).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -22,6 +23,8 @@ var first_run_done: bool = false ## ya eligió su primer personaje
 var account_xp: int = 0
 var char_xp: Dictionary = {} ## id -> XP total del personaje
 var skills: Dictionary = {} ## id personaje -> Array de ids de habilidad
+var attrs: Dictionary = {} ## ronda 18: id personaje -> {atributo: valor}
+var attr_migrated: bool = false ## ronda 18: se repartieron los atributos al migrar
 var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
 var active_slot: int = 0
 var char_migration: Dictionary = {} ## ronda 15: personajes extra reembolsados al migrar
@@ -55,6 +58,31 @@ func skill_points(id: String = "") -> int:
 	for s in char_skills(cid):
 		spent += int(Progression.skill(String(s)).get("cost", 0))
 	return Progression.skill_points_for_level(char_level(cid)) - spent
+
+# ---------------- Ronda 18: atributos ----------------
+
+func char_attrs(id: String = "") -> Dictionary:
+	var cid := id if id != "" else character_id
+	if not attrs.has(cid):
+		attrs[cid] = Attributes.start_for(cid)
+	return attrs[cid]
+
+func attr_points(id: String = "") -> int:
+	var cid := id if id != "" else character_id
+	return Attributes.free_points(cid, char_attrs(cid), char_level(cid))
+
+## Confirma un reparto nuevo (desde la pantalla de atributos). "ok" o "invalido".
+func set_attrs(a: Dictionary) -> String:
+	if not Attributes.valid(character_id, a, char_level()):
+		return "invalido"
+	attrs[character_id] = a.duplicate()
+	save_loadout()
+	return "ok"
+
+## Redistribuir (gratis por ahora): vuelve al reparto inicial y devuelve todos los puntos.
+func respec() -> void:
+	attrs[character_id] = Attributes.start_for(character_id)
+	save_loadout()
 
 func is_unlocked(kind: String, id: String) -> bool:
 	match kind:
@@ -94,6 +122,8 @@ func _unlock_char(id: String) -> void:
 		owned_weapons.append(dw)
 	if not char_xp.has(id):
 		char_xp[id] = 0
+	if not attrs.has(id):
+		attrs[id] = Attributes.start_for(id)
 
 func buy(kind: String, id: String) -> String:
 	var r := can_buy(kind, id)
@@ -151,7 +181,7 @@ func change_character(id: String) -> String:
 ## Datos de la ranura activa (lo que se guarda por personaje).
 func slot_data() -> Dictionary:
 	return {"character_id": character_id, "weapon_id": weapon_id,
-		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills()}
+		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills(), "attrs": char_attrs()}
 
 func set_weapon(id: String) -> bool:
 	if not Catalog.character(character_id).allows(id) or (first_run_done and not id in owned_weapons):
@@ -228,6 +258,8 @@ func load_loadout() -> void:
 		if ver >= 4:
 			char_xp = {character_id: int(cfg.get_value(sec, "xp", 0))}
 			skills = {character_id: cfg.get_value(sec, "skills", [])}
+			if ver >= 5:
+				attrs = {character_id: cfg.get_value(sec, "attrs", Attributes.start_for(character_id))}
 			unlocked_chars = [character_id] if first_run_done else []
 		else:
 			char_xp = cfg.get_value("progreso", "char_xp", {})
@@ -249,10 +281,22 @@ func load_loadout() -> void:
 		character_id = String(unlocked_chars[0])
 	if migrated_from > 0 and ver < 4:
 		_migrate_characters()
+	attr_migrated = false
+	if ver < 5:
+		_migrate_attrs()
+		if migrated_from == 0:
+			migrated_from = ver
 	set_character(character_id)
 	if first_run_done and not eikon_id in owned_eikons: eikon_id = "fenix"
 	if migrated_from > 0:
 		save_loadout()
+
+## v<5 -> v5: los personajes existentes reciben atributos según su nivel, repartidos por rol.
+func _migrate_attrs() -> void:
+	attrs = {}
+	for c in char_xp:
+		attrs[String(c)] = Attributes.auto_allocate(String(c), char_level(String(c)))
+	attr_migrated = true
 
 ## v1 (ronda 10): sin progresión. Se conserva el personaje que usaba como desbloqueado,
 ## y también lo que tenía equipado (no se le quita nada); el oro se mantiene.
@@ -324,6 +368,8 @@ func reset_defaults() -> void:
 	account_xp = 0
 	char_xp = {}
 	skills = {}
+	attrs = {}
+	attr_migrated = false
 	unlocked_chars = []
 	owned_weapons = []
 	owned_eikons = ["fenix"]

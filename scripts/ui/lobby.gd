@@ -228,6 +228,15 @@ func _build_ui() -> void:
 	toast.modulate.a = 0.0
 	root_ui.add_child(toast)
 	_build_modal()
+	attr_screen = AttrScreen.new()
+	attr_screen.visible = false
+	root_ui.add_child(attr_screen)
+	attr_screen.closed.connect(func(_c: bool) -> void: _refresh_all(false))
+
+var attr_screen: AttrScreen
+
+func open_attributes() -> void:
+	attr_screen.open(gs)
 
 func _build_modal() -> void:
 	modal = Control.new()
@@ -413,6 +422,10 @@ func _refresh_all(rebuild: bool = true) -> void:
 			var cc := _card("%s — Próximamente" % item["name"], false, true, func() -> void:
 				open_modal(item["name"], "Pronto podrás cambiar de personaje con este objeto de la tienda. Por ahora tu personaje es fijo y conserva su nivel y habilidades.", "Comprar", Callable(), false), false)
 			cc.name = "CambioPersonaje"
+			var ap: int = gs.attr_points()
+			var ab := _card("Atributos%s" % ("  ·  %d punto(s) por repartir" % ap if ap > 0 else ""), ap > 0, false, open_attributes)
+			ab.name = "Atributos"
+			list_box.move_child(ab, 1)
 			cc.add_theme_color_override("font_color", Color(0.75, 0.78, 0.85))
 			_card("Pasiva · %s" % c.passive_name, false, false, func() -> void:
 				detail.text = "[b]Pasiva · %s[/b]\n%s" % [c.passive_name, c.passive_desc])
@@ -424,15 +437,19 @@ func _refresh_all(rebuild: bool = true) -> void:
 					_on_skill_pressed(sid))
 			detail.text = "[b]%s[/b]\n%s\n[color=#f2dc99]Pasiva · %s:[/color] %s" % [c.display_name, c.description, c.passive_name, c.passive_desc]
 			var m := Progression.combine_mods(gs.char_skills(c.id))
-			_stat("Vida", c.vida + m["vida"], STAT_MAX["vida"], str(int(c.vida + m["vida"])))
-			_stat("Estamina", c.estamina + m["estamina"], STAT_MAX["estamina"], str(int(c.estamina + m["estamina"])))
+			var dv := Attributes.derived(c.id, gs.char_attrs(c.id))
+			_stat("Vida", c.vida + m["vida"] + dv["vida"], STAT_MAX["vida"], str(int(c.vida + m["vida"] + dv["vida"])))
+			_stat("Estamina", c.estamina + m["estamina"] + dv["estamina"], STAT_MAX["estamina"], str(int(c.estamina + m["estamina"] + dv["estamina"])))
 			_stat("Velocidad", c.velocidad * m["velocidad"], STAT_MAX["velocidad"], "x%.2f" % (c.velocidad * m["velocidad"]))
-			_stat("Poise", c.poise + m["poise"], STAT_MAX["poise"], str(int(c.poise + m["poise"])))
+			_stat("Poise", c.poise + m["poise"] + dv["poise"], STAT_MAX["poise"], str(int(c.poise + m["poise"] + dv["poise"])))
 			_stat("Daño", c.dano * m["dano"], STAT_MAX["dano"], "x%.2f" % (c.dano * m["dano"]))
 		"Armas":
 			for w in Catalog.weapons_for(cur):
 				var own: bool = gs.is_unlocked("weapon", w.id)
-				_card(w.display_name if own else "%s — %s" % [w.display_name, _lock_text("weapon", w.id)], w.id == gs.weapon_id, not own, func() -> void:
+				var wt: String = "%s  [%s]" % [w.display_name, Attributes.scaling_text(w)]
+				if own and not Attributes.unmet(w, gs.char_attrs()).is_empty():
+					wt += "  ⚠"
+				_card(wt if own else "%s — %s" % [wt, _lock_text("weapon", w.id)], w.id == gs.weapon_id, not own, func() -> void:
 					if own:
 						gs.set_weapon(w.id)
 						gs.save_loadout()
@@ -441,6 +458,13 @@ func _refresh_all(rebuild: bool = true) -> void:
 						request_purchase("weapon", w.id))
 			var cw := Catalog.weapon(gs.weapon_id)
 			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, "Sí" if cw.allows_shield else "No", cw.max_combo]
+			# Ronda 18: escalado (S-E) y requisitos
+			var at: Dictionary = gs.char_attrs()
+			detail.text += "\n[color=#f2dc99]Escalado:[/color] %s\n[color=#f2dc99]Requisitos:[/color] %s" % [Attributes.scaling_text(cw), Attributes.req_text(cw)]
+			var un := Attributes.unmet(cw, at)
+			if not un.is_empty():
+				detail.text += "\n[color=#ff8a7a]⚠ No cumples los requisitos: −30 %% de daño.[/color]"
+			_stat("Bono atributos", Attributes.weapon_mult(cw, gs.character_id, at), 1.6, "x%.2f" % Attributes.weapon_mult(cw, gs.character_id, at))
 			if cw.ranged:
 				_stat("Daño flecha", cw.arrow_damage, 15.0, str(cw.arrow_damage))
 			else:
@@ -504,7 +528,7 @@ func _card(text: String, selected: bool, locked: bool, cb: Callable, coin: bool 
 ## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
 func _update_dots() -> void:
 	dots["Habilidades"].visible = gs.skill_points() > 0
-	dots["Personaje"].visible = false
+	dots["Personaje"].visible = gs.attr_points() > 0
 	var can_w := false
 	for w in Catalog.weapons_for(Catalog.character(gs.character_id)):
 		can_w = can_w or gs.can_buy("weapon", w.id) == "ok"
