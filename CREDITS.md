@@ -16,3 +16,14 @@ Todos los assets 3D de terceros son **CC0 1.0 (dominio público)**. No requieren
 La postura de montar (a horcajadas) es un ajuste propio por código de los huesos de las piernas sobre `Sit_Chair_Pose` de KayKit (`scripts/visual/riding_pose.gd`).
 
 El arco del jugador, los efectos (arcos de espada, anillos, proyectiles) y la interfaz son primitivas generadas por código (propias).
+
+## Ronda 11 (dark fantasy)
+
+| Recurso | Autor | Fuente | Licencia | Archivos |
+|---|---|---|---|---|
+| Cinzel (fuente de títulos) | The Cinzel Project Authors (Natanael Gama) | https://github.com/NDISCOVER/Cinzel · https://github.com/google/fonts/tree/main/ofl/cinzel | SIL Open Font License 1.1 | `assets/fonts/Cinzel.ttf` (licencia en `assets/fonts/OFL-Cinzel.txt`) |
+| IM FELL English (fuente de texto) | Igino Marini | https://github.com/google/fonts/tree/main/ofl/imfellenglish | SIL Open Font License 1.1 | `assets/fonts/IMFellEnglish.ttf` (licencia en `assets/fonts/OFL-IMFell.txt`) |
+| UI Audio (click3, rollover2, switch7, switch33) | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | `assets/sfx/*.ogg` (licencia en `assets/sfx/License.txt`) |
+
+Paneles ornamentados, viñeta, brasas, antorchas y niebla son propios (código), sin recursos externos.
+

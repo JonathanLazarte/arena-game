@@ -54,9 +54,10 @@ func _run() -> void:
 	check(arena.enemy.character != null and arena.enemy.character.allows(arena.enemy.weapon.id) and not arena.enemy.weapon.ranged, "rival con equipamiento aleatorio coherente (%s, %s)" % [arena.enemy.character.id, arena.enemy.weapon.id])
 	var lb := arena.hud.end_panel.find_child("LobbyButton", true, false) as Button
 	check(lb != null and lb.text == "Volver al lobby", "panel final con botón Volver al lobby")
+	gs.first_run_done = true
+	gs.unlocked_chars = ["berserker"]
 	lb.pressed.emit()
-	await process_frame
-	await process_frame
+	await create_timer(1.0).timeout # fundido a negro
 	check(current_scene.name == "Lobby", "vuelve al lobby (%s)" % current_scene.name)
 	check(gs.from_lobby == false, "el lobby limpia la bandera de partida")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(gs.save_path))

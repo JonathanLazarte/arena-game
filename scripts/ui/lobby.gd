@@ -1,139 +1,73 @@
 extends Node3D
-## Lobby principal (estilo "sala" de Free Fire, simplificado). Personaje en un pedestal
-## giratorio, pestañas de equipamiento, dificultad y botón JUGAR. Todo el texto en español.
+## Lobby (estilo "sala" de Free Fire, en clave DARK FANTASY). Personaje en un pedestal,
+## pestañas de equipamiento con bloqueos y compras con oro, árbol de habilidades,
+## dificultad y botón JUGAR. Todo el texto en español.
 
-const PROPS := "res://assets/props/"
-const TABS := ["Personajes", "Armas", "Eikons", "Monturas", "Inventario"]
-const GOLD := Color(0.95, 0.78, 0.35)
-const STAT_MAX := {"vida": 140.0, "estamina": 120.0, "velocidad": 1.25, "poise": 90.0, "dano": 1.25}
+const TABS := ["Personajes", "Armas", "Eikons", "Monturas", "Habilidades", "Inventario"]
+const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
+const KIND_NAME := {"character": "personaje", "weapon": "arma", "eikon": "eikon", "mount": "montura"}
 
 var gs: Node
-var pedestal: Node3D
-var preview: KnightVisual
+var stage: DarkStage
+var pedestal: Node3D:
+	get: return stage.pedestal
+var preview: KnightVisual:
+	get: return stage.preview
+var spin_speed: float:
+	get: return stage.spin_speed
+	set(v): stage.spin_speed = v
 var tab: String = "Personajes"
 var ui: CanvasLayer
+var root_ui: Control
 var tab_buttons: Dictionary = {}
 var diff_buttons: Dictionary = {}
 var list_box: VBoxContainer
+var list_scroll: ScrollContainer
+var tree_view: SkillTreeView
 var detail: RichTextLabel
 var stats_box: VBoxContainer
 var name_label: Label
 var role_label: Label
 var oro_label: Label
+var level_label: Label
+var xp_bar: ProgressBar
 var play_button: Button
-var spin_speed: float = 0.35
+var modal: Control
+var modal_title: Label
+var modal_text: Label
+var modal_ok: Button
+var _modal_cb: Callable
+var toast: Label
+var view_char: String = "" ## personaje que se está viendo (puede estar bloqueado)
 
 func _ready() -> void:
 	gs = get_node("/root/GameState")
 	gs.from_lobby = false
-	_build_world()
+	if not gs.first_run_done:
+		# Primera vez: antes del lobby hay que elegir el rol
+		get_tree().change_scene_to_file.call_deferred("res://scenes/first_run.tscn")
+		return
+	stage = DarkStage.new()
+	add_child(stage)
 	_build_ui()
+	view_char = gs.character_id
 	_refresh_all()
 
-# ---------------- Mundo 3D ----------------
-
-func _build_world() -> void:
-	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_SKY
-	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.12, 0.12, 0.3)
-	sm.sky_horizon_color = Color(0.95, 0.55, 0.3)
-	sm.ground_bottom_color = Color(0.1, 0.08, 0.07)
-	sm.ground_horizon_color = Color(0.5, 0.35, 0.25)
-	sky.sky_material = sm
-	e.sky = sky
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	e.ambient_light_energy = 0.7
-	e.fog_enabled = true
-	e.fog_light_color = Color(0.7, 0.45, 0.35)
-	e.fog_density = 0.02
-	env.environment = e
-	add_child(env)
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-35, -40, 0)
-	sun.light_color = Color(1.0, 0.85, 0.7)
-	sun.shadow_enabled = true
-	add_child(sun)
-	var key := OmniLight3D.new() # foco cálido sobre el pedestal
-	key.position = Vector3(1.2, 3.0, 2.5)
-	key.light_color = Color(1.0, 0.8, 0.55)
-	key.light_energy = 2.0
-	key.omni_range = 8.0
-	add_child(key)
-	# Suelo de piedra
-	MeshUtil.box(self, Vector3(60, 0.2, 60), Vector3(0, -0.1, 0), Color(0.32, 0.28, 0.25))
-	# Pedestal giratorio (dos discos con borde dorado)
-	pedestal = Node3D.new()
-	add_child(pedestal)
-	_disc(pedestal, 1.3, 0.3, 0.15, Color(0.35, 0.33, 0.38))
-	_disc(pedestal, 1.15, 0.08, 0.34, GOLD)
-	# Fondo: murallas y torres del castillo (Kenney Castle Kit, CC0)
-	for i in range(-4, 5):
-		if i != 0:
-			_prop("wall.glb", Vector3(i * 2.5, 0, -10.0), 0.0, 2.5)
-	_prop("gate.glb", Vector3(0, 0, -10.0), 0.0, 2.5)
-	for x: float in [-11.5, 11.5]:
-		_prop("tower-hexagon-base.glb", Vector3(x, 0, -10.0), 0.0, 2.5)
-		_prop("tower-hexagon-mid.glb", Vector3(x, 2.5, -10.0), 0.0, 2.5)
-		_prop("tower-hexagon-top.glb", Vector3(x, 5.0, -10.0), 0.0, 2.5)
-	_prop("rocks-small.glb", Vector3(-3.5, 0, -1.5), 0.6, 1.5)
-	_prop("siege-ballista.glb", Vector3(5.5, 0, -3.0), -0.6, 1.2)
-	var cam := Camera3D.new()
-	cam.fov = 50.0
-	add_child(cam)
-	cam.look_at_from_position(Vector3(0.9, 1.9, 5.6), Vector3(0.9, 1.15, 0), Vector3.UP)
-	cam.current = true
-
-func _disc(parent: Node3D, r: float, h: float, y: float, c: Color) -> void:
-	var mi := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = r
-	cm.bottom_radius = r
-	cm.height = h
-	mi.mesh = cm
-	var m := StandardMaterial3D.new()
-	m.albedo_color = c
-	m.metallic = 0.5 if c == GOLD else 0.0
-	m.roughness = 0.4
-	mi.material_override = m
-	mi.position.y = y
-	parent.add_child(mi)
-
-func _prop(file: String, pos: Vector3, rot: float, k: float) -> void:
-	var n := (load(PROPS + file) as PackedScene).instantiate() as Node3D
-	n.position = pos
-	n.rotation.y = rot
-	n.scale = Vector3.ONE * k
-	add_child(n)
-
-func _rebuild_preview() -> void:
-	if preview:
-		preview.queue_free()
-	preview = KnightVisual.new()
-	preview.position.y = 0.38
-	preview.scale = Vector3.ONE * 0.9
-	preview.rotation.y = PI # el luchador mira a -Z; en el lobby, de cara a la cámara
-	pedestal.add_child(preview)
-	var w := Catalog.weapon(gs.weapon_id)
-	preview.setup(Color(0.25, 0.45, 1.0), Catalog.character(gs.character_id), w)
-	preview.set_mounted(false, 1.0)
-	preview.set_loadout(1 if w.ranged else 0)
-
-func _process(delta: float) -> void:
-	pedestal.rotation.y += spin_speed * delta
-
 func _unhandled_input(ev: InputEvent) -> void:
-	# Arrastrar con el dedo o el ratón gira el pedestal
+	if stage == null:
+		return
 	if ev is InputEventScreenDrag:
-		pedestal.rotation.y += (ev as InputEventScreenDrag).relative.x * 0.01
+		stage.pedestal.rotation.y += (ev as InputEventScreenDrag).relative.x * 0.01
 	elif ev is InputEventMouseMotion and (ev as InputEventMouseMotion).button_mask & MOUSE_BUTTON_MASK_LEFT:
-		pedestal.rotation.y += (ev as InputEventMouseMotion).relative.x * 0.01
+		stage.pedestal.rotation.y += (ev as InputEventMouseMotion).relative.x * 0.01
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
+		if modal.visible:
+			match (ev as InputEventKey).keycode:
+				KEY_ENTER, KEY_KP_ENTER: _modal_accept()
+				KEY_ESCAPE: close_modal()
+			return
 		match (ev as InputEventKey).keycode:
-			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-				play()
+			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE: play()
 			KEY_1: set_difficulty("facil")
 			KEY_2: set_difficulty("normal")
 			KEY_3: set_difficulty("dificil")
@@ -145,160 +79,288 @@ func _cycle_tab(d: int) -> void:
 
 # ---------------- Interfaz ----------------
 
-func _style(bg: Color, border: Color = Color(0, 0, 0, 0), radius: int = 10) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(2 if border.a > 0.0 else 0)
-	sb.set_corner_radius_all(radius)
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 8
-	return sb
-
-func _button(text: String, size: int = 22) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", size)
-	b.add_theme_stylebox_override("normal", _style(Color(0.1, 0.1, 0.16, 0.85), Color(0.5, 0.42, 0.25)))
-	b.add_theme_stylebox_override("hover", _style(Color(0.2, 0.18, 0.25, 0.95), GOLD))
-	b.add_theme_stylebox_override("pressed", _style(Color(0.45, 0.33, 0.12, 0.95), GOLD))
-	b.add_theme_stylebox_override("focus", _style(Color(0, 0, 0, 0), GOLD))
-	b.add_theme_color_override("font_pressed_color", Color.WHITE)
-	b.toggle_mode = false
-	b.focus_mode = Control.FOCUS_ALL
-	return b
-
-func _label(text: String, size: int, c: Color = Color.WHITE) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", c)
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 4)
-	return l
-
 func _build_ui() -> void:
 	ui = CanvasLayer.new()
 	add_child(ui)
-	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_PASS
-	ui.add_child(root)
+	DarkUI.vignette(ui, 0.85)
+	DarkUI.embers_2d(ui, 30)
+	root_ui = Control.new()
+	root_ui.theme = DarkUI.theme()
+	root_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root_ui.size = Vector2(1280, 720)
+	root_ui.mouse_filter = Control.MOUSE_FILTER_PASS
+	ui.add_child(root_ui)
 	# Barra superior
 	var top := PanelContainer.new()
-	top.position = Vector2(0, 0)
-	top.size = Vector2(1280, 60)
-	top.add_theme_stylebox_override("panel", _style(Color(0.05, 0.05, 0.1, 0.8), Color(0, 0, 0, 0), 0))
-	root.add_child(top)
+	top.size = Vector2(1280, 62)
+	top.add_theme_stylebox_override("panel", DarkUI.box(Color(0.03, 0.02, 0.025, 0.92), DarkUI.GOLD.darkened(0.4), 0, 0, 12))
+	root_ui.add_child(top)
+	var line := ColorRect.new() # filo dorado bajo la barra
+	line.color = DarkUI.GOLD.darkened(0.2)
+	line.position = Vector2(0, 61)
+	line.size = Vector2(1280, 2)
+	root_ui.add_child(line)
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 18)
+	hb.add_theme_constant_override("separation", 14)
 	top.add_child(hb)
-	var avatar := _label("⚔", 30, GOLD)
-	hb.add_child(avatar)
+	hb.add_child(DarkUI.title("⚔", 28))
 	var name_edit := LineEdit.new()
 	name_edit.name = "PlayerName"
 	name_edit.text = gs.player_name
 	name_edit.max_length = 16
-	name_edit.custom_minimum_size = Vector2(240, 0)
-	name_edit.add_theme_font_size_override("font_size", 22)
+	name_edit.custom_minimum_size = Vector2(220, 0)
+	name_edit.add_theme_font_size_override("font_size", 20)
 	name_edit.text_changed.connect(func(t: String) -> void:
 		gs.player_name = t.strip_edges() if t.strip_edges() != "" else "Jugador"
 		gs.save_loadout())
 	hb.add_child(name_edit)
-	hb.add_child(_label("Nivel 1", 18, Color(0.75, 0.75, 0.85)))
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(spacer)
-	hb.add_child(_label("ARENA DE EIKONS", 26, GOLD))
-	var spacer2 := Control.new()
-	spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(spacer2)
-	oro_label = _label("", 24, GOLD)
+	var lv := VBoxContainer.new()
+	lv.add_theme_constant_override("separation", 0)
+	level_label = DarkUI.label("", 15, DarkUI.GOLD)
+	level_label.name = "AccountLevel"
+	lv.add_child(level_label)
+	xp_bar = ProgressBar.new()
+	xp_bar.show_percentage = false
+	xp_bar.custom_minimum_size = Vector2(150, 8)
+	lv.add_child(xp_bar)
+	hb.add_child(lv)
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(sp)
+	hb.add_child(DarkUI.title("ARENA DE EIKONS", 28))
+	var sp2 := Control.new()
+	sp2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(sp2)
+	oro_label = DarkUI.title("", 24, DarkUI.GOLD_BRIGHT)
 	oro_label.name = "Oro"
 	hb.add_child(oro_label)
-	# Pestañas (columna izquierda)
+	# Pestañas
 	var tabs := VBoxContainer.new()
-	tabs.position = Vector2(20, 84)
-	tabs.size = Vector2(210, 400)
-	tabs.add_theme_constant_override("separation", 10)
-	root.add_child(tabs)
+	tabs.position = Vector2(20, 82)
+	tabs.add_theme_constant_override("separation", 8)
+	root_ui.add_child(tabs)
 	for t: String in TABS:
-		var b := _button(t, 24)
+		var b := DarkUI.button(t, 21)
 		b.name = "Tab_" + t
-		b.custom_minimum_size = Vector2(210, 62)
+		b.custom_minimum_size = Vector2(210, 58)
 		b.toggle_mode = true
 		b.pressed.connect(set_tab.bind(t))
 		tabs.add_child(b)
 		tab_buttons[t] = b
-	# Nombre y rol bajo el pedestal
-	name_label = _label("", 34, Color.WHITE)
-	name_label.position = Vector2(250, 560)
-	name_label.size = Vector2(560, 44)
+	# Nombre bajo el pedestal
+	name_label = DarkUI.title("", 38)
+	name_label.position = Vector2(250, 556)
+	name_label.size = Vector2(580, 50)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(name_label)
-	role_label = _label("", 20, GOLD)
-	role_label.position = Vector2(250, 604)
-	role_label.size = Vector2(560, 30)
+	root_ui.add_child(name_label)
+	role_label = DarkUI.label("", 19, DarkUI.ASH)
+	role_label.position = Vector2(250, 606)
+	role_label.size = Vector2(580, 30)
 	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(role_label)
-	# Panel derecho: lista + detalle + barras
-	var panel := PanelContainer.new()
+	root_ui.add_child(role_label)
+	# Panel derecho
+	var panel := DarkUI.panel()
 	panel.position = Vector2(850, 76)
-	panel.size = Vector2(410, 452)
-	panel.add_theme_stylebox_override("panel", _style(Color(0.06, 0.06, 0.1, 0.82), Color(0.5, 0.42, 0.25)))
-	root.add_child(panel)
+	panel.size = Vector2(410, 456)
+	panel.custom_minimum_size = Vector2(410, 456)
+	root_ui.add_child(panel)
 	var pv := VBoxContainer.new()
 	pv.add_theme_constant_override("separation", 6)
 	panel.add_child(pv)
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(380, 196)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	pv.add_child(scroll)
+	list_scroll = ScrollContainer.new()
+	list_scroll.custom_minimum_size = Vector2(380, 180)
+	list_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	pv.add_child(list_scroll)
 	list_box = VBoxContainer.new()
 	list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list_box.add_theme_constant_override("separation", 6)
-	scroll.add_child(list_box)
+	list_scroll.add_child(list_box)
+	tree_view = SkillTreeView.new()
+	tree_view.name = "SkillTree"
+	tree_view.custom_minimum_size = Vector2(380, 230)
+	tree_view.size = Vector2(380, 230)
+	tree_view.node_pressed.connect(_on_skill_pressed)
+	pv.add_child(tree_view)
 	detail = RichTextLabel.new()
 	detail.bbcode_enabled = true
 	detail.fit_content = true
-	detail.custom_minimum_size = Vector2(380, 70)
-	detail.add_theme_font_size_override("normal_font_size", 16)
-	detail.add_theme_font_size_override("bold_font_size", 17)
+	detail.custom_minimum_size = Vector2(380, 60)
 	pv.add_child(detail)
 	stats_box = VBoxContainer.new()
 	stats_box.add_theme_constant_override("separation", 2)
 	pv.add_child(stats_box)
 	# Dificultad
 	var dh := HBoxContainer.new()
-	dh.position = Vector2(850, 540)
+	dh.position = Vector2(850, 542)
 	dh.add_theme_constant_override("separation", 8)
-	root.add_child(dh)
+	root_ui.add_child(dh)
 	for d: String in Catalog.DIFFICULTY_NAMES:
-		var b := _button(Catalog.DIFFICULTY_NAMES[d], 20)
+		var b := DarkUI.button(Catalog.DIFFICULTY_NAMES[d], 19)
 		b.name = "Diff_" + d
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(131, 48)
+		b.custom_minimum_size = Vector2(131, 46)
 		b.pressed.connect(set_difficulty.bind(d))
 		dh.add_child(b)
 		diff_buttons[d] = b
-	# JUGAR
-	play_button = _button("JUGAR", 46)
+	play_button = DarkUI.big_button("JUGAR", 46)
 	play_button.name = "Jugar"
 	play_button.position = Vector2(850, 600)
 	play_button.size = Vector2(410, 100)
-	play_button.add_theme_stylebox_override("normal", _style(Color(0.85, 0.55, 0.1), Color(1, 0.9, 0.5), 14))
-	play_button.add_theme_stylebox_override("hover", _style(Color(0.95, 0.65, 0.15), Color.WHITE, 14))
-	play_button.add_theme_stylebox_override("pressed", _style(Color(0.7, 0.4, 0.05), Color.WHITE, 14))
-	play_button.add_theme_color_override("font_color", Color.WHITE)
-	play_button.add_theme_color_override("font_outline_color", Color(0.3, 0.15, 0))
-	play_button.add_theme_constant_override("outline_size", 6)
 	play_button.pressed.connect(play)
-	root.add_child(play_button)
-	var hint := _label("Arrastra para girar · Q/E pestañas · 1-3 dificultad · Enter jugar", 14, Color(0.8, 0.8, 0.85))
-	hint.position = Vector2(20, 690)
-	root.add_child(hint)
+	root_ui.add_child(play_button)
+	var tw := play_button.create_tween().set_loops()
+	tw.tween_property(play_button, "modulate", Color(1.15, 1.0, 0.95), 1.2)
+	tw.tween_property(play_button, "modulate", Color.WHITE, 1.2)
+	var hint := DarkUI.label("Arrastra para girar · Q/E pestañas · 1-3 dificultad · Enter jugar", 14, DarkUI.ASH.darkened(0.2))
+	hint.position = Vector2(20, 692)
+	root_ui.add_child(hint)
+	toast = DarkUI.title("", 24, DarkUI.GOLD_BRIGHT)
+	toast.position = Vector2(250, 90)
+	toast.size = Vector2(580, 40)
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.modulate.a = 0.0
+	root_ui.add_child(toast)
+	_build_modal()
+
+func _build_modal() -> void:
+	modal = Control.new()
+	modal.name = "Modal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.size = Vector2(1280, 720)
+	modal.visible = false
+	root_ui.add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.7)
+	dim.size = Vector2(1280, 720)
+	modal.add_child(dim)
+	var p := DarkUI.panel()
+	p.position = Vector2(390, 220)
+	p.custom_minimum_size = Vector2(500, 260)
+	p.size = Vector2(500, 260)
+	modal.add_child(p)
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 14)
+	p.add_child(v)
+	modal_title = DarkUI.title("", 30)
+	modal_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(modal_title)
+	modal_text = DarkUI.label("", 19)
+	modal_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	modal_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	modal_text.custom_minimum_size = Vector2(460, 0)
+	v.add_child(modal_text)
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_theme_constant_override("separation", 20)
+	v.add_child(h)
+	modal_ok = DarkUI.big_button("Confirmar", 22)
+	modal_ok.name = "ModalOk"
+	modal_ok.custom_minimum_size = Vector2(180, 52)
+	modal_ok.pressed.connect(_modal_accept)
+	h.add_child(modal_ok)
+	var no := DarkUI.button("Cancelar", 20)
+	no.name = "ModalCancel"
+	no.custom_minimum_size = Vector2(160, 52)
+	no.pressed.connect(close_modal)
+	h.add_child(no)
+
+func open_modal(title_t: String, text: String, ok_text: String, cb: Callable, can_ok: bool = true) -> void:
+	modal_title.text = title_t
+	modal_text.text = text
+	modal_ok.text = ok_text
+	modal_ok.disabled = not can_ok
+	_modal_cb = cb
+	modal.visible = true
+	modal.modulate.a = 0.0
+	modal.create_tween().tween_property(modal, "modulate:a", 1.0, 0.15)
+
+func close_modal() -> void:
+	modal.visible = false
+	if view_char != gs.character_id:
+		view_char = gs.character_id
+		_refresh_all()
+
+func _modal_accept() -> void:
+	if modal_ok.disabled:
+		return
+	modal.visible = false
+	if _modal_cb.is_valid():
+		_modal_cb.call()
+
+func show_toast(t: String) -> void:
+	toast.text = t
+	toast.modulate.a = 1.0
+	var tw := toast.create_tween()
+	tw.tween_interval(1.4)
+	tw.tween_property(toast, "modulate:a", 0.0, 0.6)
+
+# ---------------- Compras ----------------
+
+func _item_name(kind: String, id: String) -> String:
+	match kind:
+		"character": return Catalog.character(id).display_name
+		"weapon": return Catalog.weapon(id).display_name
+		"eikon": return (load(Catalog.EIKONS[id]) as EikonData).eikon_name
+		"mount": return (load(Catalog.MOUNTS[id]) as MountData).mount_name
+	return id
+
+func _lock_text(kind: String, id: String) -> String:
+	var r := Progression.req(kind, id)
+	if gs.account_level() < int(r[0]):
+		return "Nivel %d" % r[0]
+	return "%d oro" % r[1] if int(r[1]) > 0 else "Gratis"
+
+## Abre la confirmación de compra (o explica por qué no se puede).
+func request_purchase(kind: String, id: String) -> void:
+	var r := Progression.req(kind, id)
+	var nm := _item_name(kind, id)
+	var why: String = gs.can_buy(kind, id)
+	match why:
+		"ok":
+			var price_t := "%d de oro" % r[1] if int(r[1]) > 0 else "gratis"
+			open_modal("Desbloquear", "¿Desbloquear %s (%s) por %s?\nTe quedarán %d de oro." % [nm, KIND_NAME[kind], price_t, gs.oro - int(r[1])],
+				"Comprar", confirm_purchase.bind(kind, id))
+		"nivel":
+			open_modal("Bloqueado", "%s requiere nivel de cuenta %d (tienes %d). Gana partidas para subir." % [nm, r[0], gs.account_level()], "Comprar", Callable(), false)
+		"oro":
+			open_modal("Oro insuficiente", "%s cuesta %d de oro y tienes %d. Gana partidas para conseguir más." % [nm, r[1], gs.oro], "Comprar", Callable(), false)
+
+func confirm_purchase(kind: String, id: String) -> void:
+	if gs.buy(kind, id) != "ok":
+		return
+	DarkUI.sfx("confirm")
+	show_toast("¡%s desbloqueado!" % _item_name(kind, id))
+	match kind:
+		"character":
+			gs.set_character(id)
+			view_char = id
+		"weapon": gs.set_weapon(id)
+		"eikon": gs.eikon_id = id
+		"mount": gs.mount_id = id
+	gs.save_loadout()
+	_refresh_all()
+
+func _on_skill_pressed(sid: String) -> void:
+	var s := Progression.skill(sid)
+	var have: bool = sid in gs.char_skills()
+	if have:
+		detail.text = "[b]%s[/b] (aprendida)\n%s" % [s["name"], s["desc"]]
+		return
+	var req_ok: bool = s["req"] == "" or s["req"] in gs.char_skills()
+	var pts: int = gs.skill_points()
+	var txt := "%s\nCoste: %d punto(s). Tienes %d." % [s["desc"], s["cost"], pts]
+	if not req_ok:
+		txt += "\nRequiere antes: %s." % Progression.skill(s["req"])["name"]
+	open_modal(s["name"], txt, "Aprender", learn_skill.bind(sid), req_ok and pts >= int(s["cost"]))
+
+func learn_skill(sid: String) -> void:
+	if gs.learn_skill(sid) == "ok":
+		DarkUI.sfx("levelup")
+		show_toast("Habilidad aprendida: " + Progression.skill(sid)["name"])
+		_refresh_all(false)
+
+# ---------------- Contenido ----------------
 
 func set_tab(t: String) -> void:
 	tab = t
@@ -310,42 +372,63 @@ func set_difficulty(d: String) -> void:
 	_refresh_all(false)
 
 func _refresh_all(rebuild: bool = true) -> void:
+	var c := Catalog.character(view_char)
+	var locked: bool = not gs.is_unlocked("character", view_char)
 	if rebuild:
-		_rebuild_preview()
+		var w := Catalog.weapon(gs.weapon_id) if not locked else Catalog.weapon(c.default_weapon)
+		stage.show_character(c, w, locked)
 	for t: String in tab_buttons:
 		(tab_buttons[t] as Button).button_pressed = t == tab
 	for d: String in diff_buttons:
 		(diff_buttons[d] as Button).button_pressed = d == gs.difficulty
-	oro_label.text = "Oro: %d" % gs.oro
-	var c := Catalog.character(gs.character_id)
+	oro_label.text = "%d oro" % gs.oro
+	var lp := Progression.level_progress(gs.account_xp)
+	level_label.text = "Nivel de cuenta %d  ·  %d/%d XP" % [gs.account_level(), lp.x, lp.y]
+	xp_bar.max_value = lp.y
+	xp_bar.value = lp.x
+	var cur := Catalog.character(gs.character_id)
 	name_label.text = c.display_name
-	role_label.text = "%s · %s" % [c.role, Catalog.weapon(gs.weapon_id).display_name]
+	role_label.text = ("%s · Nivel %d · %s" % [c.role, gs.char_level(c.id), Catalog.weapon(gs.weapon_id).display_name]) if not locked else "%s · Bloqueado (%s)" % [c.role, _lock_text("character", c.id)]
 	for ch in list_box.get_children():
 		ch.queue_free()
 	for ch in stats_box.get_children():
 		ch.queue_free()
+	list_scroll.visible = tab != "Habilidades"
+	tree_view.visible = tab == "Habilidades"
 	match tab:
 		"Personajes":
 			for cd in Catalog.characters():
-				_card("%s  —  %s" % [cd.display_name, cd.role], cd.id == gs.character_id, func() -> void:
-					gs.set_character(cd.id)
-					gs.save_loadout()
-					_refresh_all())
-			detail.text = "[b]%s[/b]\n%s\n[color=#f2c75a]Pasiva · %s:[/color] %s" % [c.display_name, c.description, c.passive_name, c.passive_desc]
-			_stat("Vida", c.vida, STAT_MAX["vida"], str(int(c.vida)))
-			_stat("Estamina", c.estamina, STAT_MAX["estamina"], str(int(c.estamina)))
-			_stat("Velocidad", c.velocidad, STAT_MAX["velocidad"], "x%.2f" % c.velocidad)
-			_stat("Poise", c.poise, STAT_MAX["poise"], str(int(c.poise)))
-			_stat("Daño", c.dano, STAT_MAX["dano"], "x%.2f" % c.dano)
+				var unl: bool = gs.is_unlocked("character", cd.id)
+				var t := "%s — %s" % [cd.display_name, cd.role] if unl else "%s — %s" % [cd.display_name, _lock_text("character", cd.id)]
+				_card(t, cd.id == gs.character_id, not unl, func() -> void:
+					if unl:
+						gs.set_character(cd.id)
+						view_char = cd.id
+						gs.save_loadout()
+						_refresh_all()
+					else:
+						view_char = cd.id
+						_refresh_all()
+						request_purchase("character", cd.id))
+			detail.text = "[b]%s[/b]\n%s\n[color=#c9a35a]Pasiva · %s:[/color] %s" % [c.display_name, c.description, c.passive_name, c.passive_desc]
+			var m := Progression.combine_mods(gs.char_skills(c.id))
+			_stat("Vida", c.vida + m["vida"], STAT_MAX["vida"], str(int(c.vida + m["vida"])))
+			_stat("Estamina", c.estamina + m["estamina"], STAT_MAX["estamina"], str(int(c.estamina + m["estamina"])))
+			_stat("Velocidad", c.velocidad * m["velocidad"], STAT_MAX["velocidad"], "x%.2f" % (c.velocidad * m["velocidad"]))
+			_stat("Poise", c.poise + m["poise"], STAT_MAX["poise"], str(int(c.poise + m["poise"])))
+			_stat("Daño", c.dano * m["dano"], STAT_MAX["dano"], "x%.2f" % (c.dano * m["dano"]))
 		"Armas":
-			for w in Catalog.weapons_for(c):
-				_card(w.display_name, w.id == gs.weapon_id, func() -> void:
-					gs.set_weapon(w.id)
-					gs.save_loadout()
-					_refresh_all())
+			for w in Catalog.weapons_for(cur):
+				var own: bool = gs.is_unlocked("weapon", w.id)
+				_card(w.display_name if own else "%s — %s" % [w.display_name, _lock_text("weapon", w.id)], w.id == gs.weapon_id, not own, func() -> void:
+					if own:
+						gs.set_weapon(w.id)
+						gs.save_loadout()
+						_refresh_all()
+					else:
+						request_purchase("weapon", w.id))
 			var cw := Catalog.weapon(gs.weapon_id)
-			var shield_txt := "Sí" if cw.allows_shield else "No"
-			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, shield_txt, cw.max_combo]
+			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, "Sí" if cw.allows_shield else "No", cw.max_combo]
 			if cw.ranged:
 				_stat("Daño flecha", cw.arrow_damage, 15.0, str(cw.arrow_damage))
 			else:
@@ -353,16 +436,17 @@ func _refresh_all(rebuild: bool = true) -> void:
 				_stat("Daño", cw.light_damage, 22.0, "%d / %d" % [cw.light_damage, cw.heavy_damage])
 				_stat("Velocidad", 1.0 / cw.light_windup, 1.0 / 0.25, "%.2f s" % cw.light_windup)
 				_stat("Coste aguante", cw.light_stamina, 22.0, "%d / %d" % [cw.light_stamina, cw.heavy_stamina])
-			var others := Catalog.weapons().filter(func(w: WeaponDef) -> bool: return not c.allows(w.id))
-			if not others.is_empty():
-				detail.text += "\n[color=#999999]No compatibles con %s: %s[/color]" % [c.display_name, ", ".join(others.map(func(w: WeaponDef) -> String: return w.display_name))]
 		"Eikons":
 			for id: String in Catalog.EIKONS:
 				var ed: EikonData = load(Catalog.EIKONS[id])
-				_card(ed.eikon_name, id == gs.eikon_id, func() -> void:
-					gs.eikon_id = id
-					gs.save_loadout()
-					_refresh_all(false))
+				var own: bool = gs.is_unlocked("eikon", id)
+				_card(ed.eikon_name if own else "%s — %s" % [ed.eikon_name, _lock_text("eikon", id)], id == gs.eikon_id, not own, func() -> void:
+					if own:
+						gs.eikon_id = id
+						gs.save_loadout()
+						_refresh_all(false)
+					else:
+						request_purchase("eikon", id))
 			var e: EikonData = load(Catalog.EIKONS[gs.eikon_id])
 			detail.text = "[b]%s[/b]\nInvocación (medidor lleno). %s. Dura %d s." % [e.eikon_name, "Vuela" if e.flying else "Terrestre", e.duration]
 			_stat("Vida", e.max_health, 200.0, str(int(e.max_health)))
@@ -371,65 +455,55 @@ func _refresh_all(rebuild: bool = true) -> void:
 		"Monturas":
 			for id: String in Catalog.MOUNTS:
 				var md: MountData = load(Catalog.MOUNTS[id])
-				_card(md.mount_name, id == gs.mount_id, func() -> void:
-					gs.mount_id = id
-					gs.save_loadout()
-					_refresh_all(false))
-			var m: MountData = load(Catalog.MOUNTS[gs.mount_id])
-			detail.text = "[b]%s[/b]\n%s" % [m.mount_name, "+%d de vida al jinete." % m.health_bonus if m.health_bonus > 0 else "Montura de guerra."]
-			_stat("Velocidad", m.speed, 18.0, "%.0f" % m.speed)
-			_stat("Aceleración", m.acceleration, 24.0, "%.0f" % m.acceleration)
-			_stat("Giro", m.turn_speed, 4.0, "%.1f" % m.turn_speed)
-			_stat("Dash", m.dash_speed, 40.0, "%.0f" % m.dash_speed)
+				var own: bool = gs.is_unlocked("mount", id)
+				_card(md.mount_name if own else "%s — %s" % [md.mount_name, _lock_text("mount", id)], id == gs.mount_id, not own, func() -> void:
+					if own:
+						gs.mount_id = id
+						gs.save_loadout()
+						_refresh_all(false)
+					else:
+						request_purchase("mount", id))
+			var mo: MountData = load(Catalog.MOUNTS[gs.mount_id])
+			detail.text = "[b]%s[/b]\n%s" % [mo.mount_name, "+%d de vida al jinete." % mo.health_bonus if mo.health_bonus > 0 else "Montura de guerra."]
+			_stat("Velocidad", mo.speed, 18.0, "%.0f" % mo.speed)
+			_stat("Aceleración", mo.acceleration, 24.0, "%.0f" % mo.acceleration)
+			_stat("Giro", mo.turn_speed, 4.0, "%.1f" % mo.turn_speed)
+			_stat("Dash", mo.dash_speed, 40.0, "%.0f" % mo.dash_speed)
+		"Habilidades":
+			tree_view.build(gs.character_id, gs.char_skills(), gs.skill_points())
+			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
+			detail.text = "[b]Árbol de %s[/b] · Nivel %d\nPuntos disponibles: [color=#e0bf6e]%d[/color] (1 por nivel del personaje). Toca un nodo para aprenderlo." % [cur.display_name, gs.char_level(), gs.skill_points()]
+			_stat("XP personaje", cl.x, cl.y, "%d/%d" % [cl.x, cl.y])
 		"Inventario":
 			var e2: EikonData = load(Catalog.EIKONS[gs.eikon_id])
 			var m2: MountData = load(Catalog.MOUNTS[gs.mount_id])
-			for line: String in ["Personaje: " + c.display_name, "Arma: " + Catalog.weapon(gs.weapon_id).display_name,
-					"Eikon: " + e2.eikon_name, "Montura: " + m2.mount_name, "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty]]:
-				list_box.add_child(_label(line, 20))
+			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + Catalog.weapon(gs.weapon_id).display_name,
+					"Eikon: " + e2.eikon_name, "Montura: " + m2.mount_name, "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty],
+					"Desbloqueados: %d/5 personajes, %d armas" % [gs.unlocked_chars.size(), gs.owned_weapons.size()]]:
+				list_box.add_child(DarkUI.label(ln, 19))
 			detail.text = "[b]Equipamiento actual[/b]\nSe guarda automáticamente en este dispositivo. El rival recibe un equipamiento aleatorio."
-			var reset := _button("Restablecer", 18)
-			reset.pressed.connect(func() -> void:
-				gs.reset_defaults()
-				gs.save_loadout()
-				_refresh_all())
-			stats_box.add_child(reset)
 
-func _card(text: String, selected: bool, cb: Callable) -> void:
-	var b := _button(("✔ " if selected else "") + text, 19)
+func _card(text: String, selected: bool, locked: bool, cb: Callable) -> void:
+	var b := DarkUI.button(("✦ " if selected else "") + text, 18)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.custom_minimum_size = Vector2(370, 46)
+	b.custom_minimum_size = Vector2(370, 44)
 	if selected:
-		b.add_theme_stylebox_override("normal", _style(Color(0.4, 0.3, 0.1, 0.95), GOLD))
+		b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.38, 0.05, 0.07, 0.95), DarkUI.GOLD_BRIGHT, 2, 3, 6))
+	elif locked:
+		b.add_theme_color_override("font_color", DarkUI.ASH.darkened(0.15))
+		b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.04, 0.04, 0.045, 0.92), DarkUI.ASH.darkened(0.55), 2, 3, 0))
 	b.pressed.connect(cb)
 	list_box.add_child(b)
 
-func _stat(label: String, v: float, vmax: float, txt: String) -> void:
-	var h := HBoxContainer.new()
-	var l := _label(label, 15)
-	l.custom_minimum_size = Vector2(120, 0)
-	h.add_child(l)
-	var bar := ProgressBar.new()
-	bar.show_percentage = false
-	bar.max_value = vmax
-	bar.value = v
-	bar.custom_minimum_size = Vector2(170, 14)
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = GOLD
-	fill.set_corner_radius_all(4)
-	bar.add_theme_stylebox_override("fill", fill)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.2, 0.2, 0.25)
-	bg.set_corner_radius_all(4)
-	bar.add_theme_stylebox_override("background", bg)
-	h.add_child(bar)
-	h.add_child(_label("  " + txt, 15, Color(0.85, 0.85, 0.9)))
-	stats_box.add_child(h)
+func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
+	stats_box.add_child(DarkUI.stat_row(label_t, v, vmax, txt))
 
 ## Empieza la partida 1v1 con el equipamiento elegido (rival aleatorio).
 func play() -> void:
+	if modal.visible:
+		return
 	gs.from_lobby = true
 	gs.random_rival = true
 	gs.save_loadout()
-	get_tree().change_scene_to_file("res://scenes/arena.tscn")
+	DarkUI.sfx("confirm")
+	DarkUI.go("res://scenes/arena.tscn")

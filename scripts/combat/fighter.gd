@@ -102,6 +102,10 @@ const FALLBACK_MELEE := preload("res://resources/weapons/dagas.tres") ## cuerpo 
 var stamina_max: float = STAMINA_MAX
 var poise_max: float = POISE_MAX
 var heals: float = 0.0 ## vida curada por la pasiva (pruebas)
+## Ronda 11: modificadores de las habilidades desbloqueadas (Progression.combine_mods).
+var mods: Dictionary = Progression.combine_mods([])
+var parry_window: float = PARRY_WINDOW
+var hits_landed: int = 0 ## golpes conectados en la partida (XP)
 var team: int = 0
 var color: Color = Color(0.2, 0.4, 1.0)
 var display_name: String = "Jugador"
@@ -199,12 +203,21 @@ static func _neutral() -> CharacterDef:
 	c.weapons = PackedStringArray(["espada_escudo", "espada_larga", "hacha_2m", "dagas", "lanza", "arco"])
 	return c
 
+## Habilidades del árbol del personaje (antes de añadir al árbol o seguido de _apply_character()).
+func set_skills(skills: Array) -> void:
+	mods = Progression.combine_mods(skills)
+
+## Potencia de la pasiva (1.0 = base; las habilidades la suben).
+func passive_k() -> float:
+	return 1.0 + float(mods["passive"])
+
 func _apply_character() -> void:
-	max_health = character.vida + (mount.health_bonus if mount else 0.0)
+	max_health = character.vida + float(mods["vida"]) + (mount.health_bonus if mount else 0.0)
 	health = max_health
-	stamina_max = character.estamina
+	stamina_max = character.estamina + float(mods["estamina"])
 	stamina = stamina_max
-	poise_max = character.poise
+	poise_max = character.poise + float(mods["poise"])
+	parry_window = PARRY_WINDOW + float(mods["parry_window"])
 	poise = poise_max
 	if weapon.ranged:
 		loadout = Loadout.BOW
@@ -220,7 +233,7 @@ func stats() -> MountData:
 	return mount_node.data if mounted and mount_node else foot_stats
 
 func speed_mult() -> float:
-	return character.velocidad
+	return character.velocidad * float(mods["velocidad"])
 
 func sword_range() -> float:
 	return melee().reach_mounted if mounted else melee().reach_foot
@@ -232,7 +245,7 @@ func max_combo() -> int:
 	return melee().max_combo
 
 func roll_iframe_end() -> float:
-	return ROLL_IFRAME_END + character.roll_iframe_bonus / ROLL_FPS
+	return ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"])) / ROLL_FPS
 
 ## "none", "startup", "iframes" o "recovery".
 func roll_phase() -> String:
@@ -382,7 +395,7 @@ func _physics_process(delta: float) -> void:
 		poise = minf(poise + POISE_REGEN * delta, poise_max)
 	# Pasiva "Luz sanadora": se cura si lleva 3 s sin recibir golpes
 	if character.passive_id == "luz_sanadora" and alive and _since_hit > 3.0 and health < max_health:
-		var hv := minf(2.0 * delta, max_health - health)
+		var hv := minf(2.0 * passive_k() * delta, max_health - health)
 		health += hv
 		heals += hv
 		health_changed.emit(health, max_health)
@@ -592,11 +605,11 @@ func _atk_data() -> Dictionary:
 
 ## Multiplicador de daño cuerpo a cuerpo: personaje, lanza a caballo y pasiva "Furia".
 func damage_mult() -> float:
-	var k := character.dano
+	var k := character.dano * float(mods["dano"])
 	if mounted:
 		k *= melee().mounted_damage_mult
 	if character.passive_id == "furia" and health < max_health * 0.4:
-		k *= 1.25
+		k *= 1.0 + 0.25 * passive_k()
 	return k
 
 func _request_attack(heavy: bool) -> bool:
@@ -655,7 +668,7 @@ func _update_parry(delta: float) -> void:
 	if parry_state == Parry.NONE:
 		return
 	parry_t += delta
-	if parry_state == Parry.ACTIVE and parry_t >= PARRY_WINDOW:
+	if parry_state == Parry.ACTIVE and parry_t >= parry_window:
 		parry_state = Parry.RECOVERY # parry fallido: expuesto
 		parry_t = 0.0
 	elif parry_state == Parry.RECOVERY and parry_t >= PARRY_RECOVERY:
@@ -729,6 +742,8 @@ func _strike_frame(d: Dictionary) -> void:
 			add_meter(18.0 if atk_heavy else 12.0)
 		elif res == "block":
 			add_meter(3.0)
+		if res == "hit":
+			hits_landed += 1
 		landed_hit.emit(t, res, was_open)
 
 # ---------------- Armas: espada+escudo O arco ----------------
@@ -763,7 +778,7 @@ func shoot() -> bool:
 	p.team = team
 	p.shooter = self
 	p.direction = dir
-	p.damage = 8.0 * (1.3 if character.passive_id == "ojo_de_halcon" else 1.0)
+	p.damage = 8.0 * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0)
 	p.color = Color(0.9, 0.8, 0.5)
 	get_parent().add_child(p)
 	p.global_position = origin
@@ -802,7 +817,7 @@ func _start_roll(st: MountData) -> bool:
 	dash_cd = maxf(st.dash_cooldown, ROLL_TOTAL)
 	invuln = 0.0
 	_dash_hit = true # la voltereta no embiste
-	spend_stamina(COST_ROLL * character.roll_cost_mult)
+	spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]))
 	return true
 
 func _roll_velocity() -> Vector3:
@@ -931,7 +946,8 @@ func blocked_hit_cost(amount: float, from: Node3D) -> float:
 		c *= (from as Fighter).melee().guard_break_mult
 	c *= character.guardia
 	if character.passive_id == "guardia_firme":
-		c *= 0.8
+		c *= 1.0 - 0.2 * passive_k()
+	c *= float(mods["block_cost"])
 	if not has_shield():
 		c *= 1.5
 	return c

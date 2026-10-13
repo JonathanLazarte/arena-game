@@ -19,6 +19,8 @@ var timer_label: Label
 var message: Label
 var end_panel: PanelContainer
 var end_label: Label
+var results_box: VBoxContainer
+var level_up_label: Label
 var swap_bar: ProgressBar
 var loadout_label: Label
 var _player: Fighter
@@ -29,13 +31,15 @@ func _ready() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.theme = DarkUI.theme()
+	DarkUI.vignette(self, 0.55) # viñeta suave (no tapa la lectura del combate)
 	add_child(root)
-	p_health = _bar(root, Vector2(20, 20), Color(0.2, 0.85, 0.3))
-	p_meter = _bar(root, Vector2(20, 52), Color(1.0, 0.6, 0.1), 14)
-	e_health = _bar(root, Vector2(1280 - 420, 20), Color(0.9, 0.2, 0.2))
-	e_meter = _bar(root, Vector2(1280 - 420, 52), Color(0.4, 0.8, 1.0), 14)
-	p_stamina = _bar(root, Vector2(20, 70), Color(0.95, 0.9, 0.3), 10)
-	e_stamina = _bar(root, Vector2(1280 - 420, 70), Color(0.95, 0.9, 0.3), 10)
+	p_health = _bar(root, Vector2(20, 20), Color(0.78, 0.12, 0.12))
+	p_meter = _bar(root, Vector2(20, 52), Color(0.95, 0.6, 0.18), 14)
+	e_health = _bar(root, Vector2(1280 - 420, 20), Color(0.55, 0.07, 0.1))
+	e_meter = _bar(root, Vector2(1280 - 420, 52), Color(0.45, 0.75, 0.95), 14)
+	p_stamina = _bar(root, Vector2(20, 70), Color(0.86, 0.8, 0.62), 10)
+	e_stamina = _bar(root, Vector2(1280 - 420, 70), Color(0.86, 0.8, 0.62), 10)
 	name_p = _label(root, "Jugador", Vector2(20, 84), 18)
 	name_e = _label(root, "Rival", Vector2(1280 - 420, 84), 18)
 	loadout_label = _label(root, "Espada y escudo", Vector2(20, 108), 18)
@@ -65,29 +69,40 @@ func _ready() -> void:
 	_touch_button("Galope", "sprint", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
 	_touch_button("Parry", "parry", Vector2(925, 530), 40, Color(0.3, 0.9, 1.0))
 	_touch_button("Dash", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
-	# Panel final
-	end_panel = PanelContainer.new()
-	end_panel.position = Vector2(440, 220)
-	end_panel.size = Vector2(400, 220)
+	for l: Label in [round_label, timer_label, message]:
+		l.add_theme_font_override("font", DarkUI.display_font())
+		l.add_theme_color_override("font_color", DarkUI.GOLD_BRIGHT)
+	# Panel final / pantalla de resultados
+	end_panel = DarkUI.panel()
+	end_panel.name = "Results"
+	end_panel.position = Vector2(390, 110)
+	end_panel.custom_minimum_size = Vector2(500, 0)
+	end_panel.size = Vector2(500, 200)
 	root.add_child(end_panel)
 	var vb := VBoxContainer.new()
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_theme_constant_override("separation", 8)
 	end_panel.add_child(vb)
-	end_label = Label.new()
+	end_label = DarkUI.title("", 50)
 	end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	end_label.add_theme_font_size_override("font_size", 40)
 	vb.add_child(end_label)
-	var btn := Button.new()
-	btn.text = "Reiniciar"
-	btn.add_theme_font_size_override("font_size", 28)
+	results_box = VBoxContainer.new()
+	results_box.name = "ResultsBox"
+	results_box.add_theme_constant_override("separation", 4)
+	vb.add_child(results_box)
+	var hb := HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_theme_constant_override("separation", 16)
+	vb.add_child(hb)
+	var btn := DarkUI.button("Revancha", 24)
+	btn.custom_minimum_size = Vector2(190, 56)
 	btn.pressed.connect(func() -> void: restart_requested.emit())
-	vb.add_child(btn)
-	var lb := Button.new()
+	hb.add_child(btn)
+	var lb := DarkUI.big_button("Volver al lobby", 24)
 	lb.name = "LobbyButton"
-	lb.text = "Volver al lobby"
-	lb.add_theme_font_size_override("font_size", 28)
+	lb.custom_minimum_size = Vector2(230, 56)
 	lb.pressed.connect(func() -> void: lobby_requested.emit())
-	vb.add_child(lb)
+	hb.add_child(lb)
 	end_panel.visible = false
 
 func _bar(parent: Control, pos: Vector2, c: Color, h: float = 26) -> ProgressBar:
@@ -95,10 +110,12 @@ func _bar(parent: Control, pos: Vector2, c: Color, h: float = 26) -> ProgressBar
 	b.position = pos
 	b.size = Vector2(400, h)
 	b.show_percentage = false
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = c
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0, 0, 0, 0.5)
+	var fill := DarkUI.box(c, Color(0, 0, 0, 0), 0, 2, 0)
+	fill.content_margin_top = 0
+	fill.content_margin_bottom = 0
+	var bg := DarkUI.box(Color(0.02, 0.01, 0.01, 0.7), DarkUI.GOLD.darkened(0.3), 1, 2, 4)
+	bg.content_margin_top = 0
+	bg.content_margin_bottom = 0
 	b.add_theme_stylebox_override("fill", fill)
 	b.add_theme_stylebox_override("background", bg)
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -115,6 +132,13 @@ func _label(parent: Control, t: String, pos: Vector2, fs: int) -> Label:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(l)
 	return l
+
+## Oculta/muestra los controles táctiles (no tapan la pantalla de resultados).
+func set_touch_visible(v: bool) -> void:
+	joystick.visible = v
+	for c in get_children():
+		if c is TouchScreenButton:
+			(c as TouchScreenButton).visible = v
 
 func _touch_button(text: String, action: String, center: Vector2, r: float, c: Color) -> void:
 	var tb := TouchScreenButton.new()
@@ -206,3 +230,65 @@ func show_message(t: String, secs: float = 2.0) -> void:
 	var tw := create_tween()
 	tw.tween_interval(secs)
 	tw.tween_property(message, "modulate:a", 0.0, 0.4)
+
+## Pantalla de resultados: desglose de XP y oro, barra de nivel y subidas de nivel.
+func show_results(won: bool, res: Dictionary) -> void:
+	end_label.text = "¡VICTORIA!" if won else "DERROTA"
+	end_label.add_theme_color_override("font_color", DarkUI.GOLD_BRIGHT if won else DarkUI.BLOOD.lightened(0.2))
+	for c in results_box.get_children():
+		c.queue_free()
+	level_up_label = null
+	if not res.is_empty():
+		for l: Array in res["lines"]:
+			var h := HBoxContainer.new()
+			var a := DarkUI.label(l[0], 19, DarkUI.BONE)
+			a.custom_minimum_size = Vector2(230, 0)
+			h.add_child(a)
+			h.add_child(DarkUI.label("+%d XP" % l[1], 19, DarkUI.GOLD))
+			var g := DarkUI.label("   +%d oro" % l[2] if l[2] > 0 else "", 19, DarkUI.GOLD_BRIGHT)
+			h.add_child(g)
+			results_box.add_child(h)
+		if absf(float(res["mult"]) - 1.0) > 0.01:
+			results_box.add_child(DarkUI.label("Dificultad ×%.1f" % res["mult"], 17, DarkUI.ASH))
+		if int(res["level_bonus"]) > 0:
+			results_box.add_child(DarkUI.label("Bonus por subir de nivel: +%d oro" % res["level_bonus"], 17, DarkUI.GOLD_BRIGHT))
+		var tot := DarkUI.title("Total: +%d XP · +%d oro" % [res["xp"], res["gold"]], 24)
+		tot.name = "Total"
+		tot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		results_box.add_child(tot)
+		var lp := Progression.level_progress(int(res["account_xp"]))
+		var bar := ProgressBar.new()
+		bar.name = "XPBar"
+		bar.show_percentage = false
+		bar.custom_minimum_size = Vector2(440, 14)
+		bar.max_value = lp.y
+		var lp0 := Progression.level_progress(int(res["account_xp_before"]))
+		bar.value = lp0.x if res["account_before"] == res["account_after"] else 0
+		results_box.add_child(bar)
+		bar.create_tween().tween_property(bar, "value", float(lp.x), 1.2).set_delay(0.3)
+		results_box.add_child(DarkUI.label("Nivel de cuenta %d · %d/%d XP" % [res["account_after"], lp.x, lp.y], 17, DarkUI.ASH))
+		var ups: Array[String] = []
+		if res["account_after"] > res["account_before"]:
+			ups.append("¡Cuenta nivel %d!" % res["account_after"])
+		if res["char_after"] > res["char_before"]:
+			ups.append("¡%s nivel %d! +%d punto(s) de habilidad" % [Catalog.character(res["character"]).display_name, res["char_after"], res["char_after"] - res["char_before"]])
+		if not ups.is_empty():
+			level_up_label = DarkUI.title(" · ".join(ups), 22, Color(1.0, 0.75, 0.3))
+			level_up_label.name = "LevelUp"
+			level_up_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			level_up_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			level_up_label.custom_minimum_size = Vector2(460, 0)
+			results_box.add_child(level_up_label)
+			var tw := level_up_label.create_tween().set_loops(4)
+			tw.tween_property(level_up_label, "modulate", Color(1.4, 1.2, 0.8), 0.35)
+			tw.tween_property(level_up_label, "modulate", Color.WHITE, 0.35)
+			DarkUI.sfx("levelup")
+	end_panel.visible = true
+	set_touch_visible(false)
+	end_panel.size = Vector2(520, 0)
+	end_panel.reset_size()
+	await get_tree().process_frame
+	end_panel.reset_size()
+	end_panel.position = Vector2((1280 - end_panel.size.x) * 0.5, maxf((720 - end_panel.size.y) * 0.5, 10))
+	end_panel.modulate.a = 0.0
+	end_panel.create_tween().tween_property(end_panel, "modulate:a", 1.0, 0.4)

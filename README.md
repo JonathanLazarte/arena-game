@@ -135,3 +135,30 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
 - Al acabar la partida: **Volver al lobby** (o Reiniciar).
 - Si se abre `arena.tscn` directamente (pruebas), se usa el luchador neutro clásico con espada y escudo, sin pasiva.
 - Pruebas nuevas: `test_defs`, `test_loadout`, `test_weapons`. Captura: `godot --path . --rendering-driver opengl3 -s res://tests/screenshot_lobby.gd -- out.png [personaje] [pestaña]`.
+
+## Ronda 11 — Primera elección, progresión y estilo dark fantasy
+
+- **Primera ejecución** (`scenes/first_run.tscn`): «ELIGE TU DESTINO». Presenta los 5 roles con modelo, descripción, pasiva y estadísticas, y pide confirmación («Sellar pacto» → «Jurar lealtad»). Solo el elegido queda desbloqueado; los demás se compran con oro en el lobby, con confirmación.
+- **Progresión** (`scripts/data/progression.gd`):
+  - Curva de XP: 100·n^1.4 por nivel (100, 260, 470, 700, 950…), tope en nivel 30.
+  - La XP va a la cuenta y al personaje usado. 1 punto de habilidad por nivel de personaje.
+  - Recompensas: victoria 120 XP/150 oro, derrota 50/60, +25 XP/+20 oro por ronda ganada, +3 XP por golpe (máximo 30 golpes), +10 XP/+5 oro por parry. Multiplicador ×0,8 en fácil y ×1,3 en difícil. +100 oro por cada nivel de cuenta.
+  - Precios de personajes: Caballero y Arquero 1200, Berserker 1500, Paladín y Asesino 1800 (cuenta nueva: 300 oro).
+  - Armas: Espada larga nivel 2 + 350, Lanza nivel 4 + 600.
+  - Eikons: Lobo nivel 3 + 800, Gólem nivel 6 + 1400.
+  - Monturas: Unicornio nivel 2 + 500, Grifo nivel 5 + 1200.
+  - Árbol de 4 nodos por rol (pestaña **Habilidades**).
+- **Resultados** al acabar la partida: desglose de XP y oro, barra de nivel animada y avisos de subida de nivel.
+- **Guardado v2** en `user://loadout.cfg` (`[meta] version=2`). Un guardado v1 (ronda 10) se migra:
+  - Se desbloquea el personaje que usaba y se conserva lo que tenía equipado.
+  - Se conservan el nombre y el oro.
+  - No se vuelve a pedir la elección.
+- **Estilo dark fantasy:**
+  - Paleta negra, carmesí, oro deslustrado y ceniza.
+  - Fuentes Cinzel e IM Fell (OFL).
+  - Paneles con marco ornamentado, viñeta y brasas.
+  - Lobby de noche con antorchas parpadeantes, niebla roja y foco sobre el pedestal.
+  - Botones con animación y sonido (Kenney, CC0) y fundidos entre escenas.
+  - La arena es un crepúsculo con niebla y 8 braseros.
+- Pruebas nuevas: `test_first_run`, `test_purchase`, `test_progression`, `test_migration`.
+- Capturas: `tests/screenshot_lobby.gd -- <png> first_run|lobby|results [personaje] [pestaña]`.

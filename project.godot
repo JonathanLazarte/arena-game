@@ -10,6 +10,8 @@ config/features=PackedStringArray("4.7", "Mobile")
 
 InputSetup="*res://scripts/input_setup.gd"
 GameState="*res://scripts/game_state.gd"
+Sfx="*res://scripts/sfx.gd"
+Fade="*res://scripts/fade.gd"
 
 [display]
 

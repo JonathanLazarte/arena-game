@@ -1,11 +1,13 @@
 extends SceneTree
 ## Simulación: el jugador deambula (sin lock-on); se mide que la IA no se pegue
-## a su espalda (<20% del tiempo detrás) y que nunca se solape (<1.8 m).
+## a su espalda (<20% del tiempo detrás, sin contar sus pausas para respirar) y que nunca se solape (<1.8 m).
 
 func _initialize() -> void:
 	_run()
 
 func _run() -> void:
+	var seed_arg0 := OS.get_cmdline_user_args()
+	seed(int(seed_arg0[0]) if seed_arg0.size() > 0 else 12345) # también el eikon del rival
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -44,7 +46,10 @@ func _run() -> void:
 		frames += 1
 		var rel := MeshUtil.flat(e.global_position - p.global_position)
 		min_d = minf(min_d, rel.length())
-		if rel.length() > 0.1 and p.facing.dot(rel.normalized()) < -0.3:
+		# Las pausas para respirar (ronda 9) dejan a la IA quieta mientras el jugador se aleja:
+		# eso no es "pegarse a la espalda", así que no cuentan como detrás.
+		var resting := arena.ai.phase in [AIController.Phase.BREATHE, AIController.Phase.REST]
+		if rel.length() > 0.1 and p.facing.dot(rel.normalized()) < -0.3 and not resting:
 			behind += 1
 		if e.is_attacking():
 			swords += 1
