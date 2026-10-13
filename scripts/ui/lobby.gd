@@ -7,7 +7,7 @@ extends Node3D
 ## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
 ## Ronda 20: pestañas Herrero y Ajustes; cada panel tiene «✕» (y Esc / Atrás) para cerrarlo.
 const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Herrero", "Tienda", "Inventario", "Ajustes"]
-const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales"]
+const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Artes"]
 const BUS_NAMES := {"Master": "General", "Música": "Música", "Efectos": "Efectos", "UI": "Interfaz"}
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
 const KIND_NAME := {"weapon": "arma", "eikon": "eikon", "armor": "armadura"}
@@ -525,6 +525,16 @@ func _refresh_all(rebuild: bool = true) -> void:
 					else:
 						request_purchase("weapon", w.id))
 			list_box.add_child(UIKit.label("Más armas en la Tienda.", 15, UIKit.MUTED))
+			# Ronda 21: arte de arma intercambiable (colección)
+			if WeaponArts.compatible(Catalog.weapon(gs.weapon_id)):
+				var ab := UIKit.button("Arte: %s  ↻" % WeaponArts.name_of(gs.weapon_art()), 17, UIKit.BLUE)
+				ab.name = "ArtBtn"
+				ab.custom_minimum_size = Vector2(370, 42)
+				ab.pressed.connect(func() -> void:
+					gs.cycle_weapon_art()
+					gs.save_loadout()
+					_refresh_all(false))
+				list_box.add_child(ab)
 			var cw: WeaponDef = gs.eff_weapon(gs.weapon_id)
 			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, "Sí" if cw.allows_shield else "No", cw.max_combo]
 			# Ronda 18: escalado (S-E) y requisitos
@@ -541,6 +551,9 @@ func _refresh_all(rebuild: bool = true) -> void:
 				_stat("Daño", cw.light_damage, 22.0, "%d / %d" % [cw.light_damage, cw.heavy_damage])
 				_stat("Velocidad", 1.0 / cw.light_windup, 1.0 / 0.25, "%.2f s" % cw.light_windup)
 				_stat("Coste aguante", cw.light_stamina, 22.0, "%d / %d" % [cw.light_stamina, cw.heavy_stamina])
+				var art := WeaponArts.art(gs.weapon_art())
+				if not art.is_empty():
+					detail.text += "\n[color=#f2dc99]Arte:[/color] %s — %s (%d Energía)%s" % [art["name"], art["desc"], int(art["cost"]), "" if cur.special_id == "" else " · tu Habilidad propia tiene prioridad"]
 		"Eikons":
 			for id: String in Catalog.EIKONS:
 				var ed: EikonData = load(Catalog.EIKONS[id])
@@ -567,6 +580,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 				_stat("Vida", e.max_health, 200.0, str(int(e.max_health)))
 				_stat("Daño", e.attack_damage, 20.0, str(e.attack_damage))
 				_stat("Alcance", e.attack_range, 12.0, "%.1f m" % e.attack_range)
+			_build_spell_slots()
 		"Habilidades":
 			tree_view.build(gs.character_id, gs.char_skills(), gs.skill_points())
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
@@ -586,6 +600,28 @@ func _refresh_all(rebuild: bool = true) -> void:
 					"Piedras: " + " · ".join(Smithing.STONES.map(func(sid: String) -> String: return "%s ×%d" % [Smithing.STONE_NAMES[sid].replace("Piedra de forja", "P."), gs.material(sid)]))]:
 				list_box.add_child(UIKit.label(ln, 19))
 			detail.text = "[b]Equipamiento actual[/b]\nSe guarda automáticamente en este dispositivo. El rival recibe un equipamiento aleatorio."
+
+## Ronda 21: ranuras de hechizos de eikon (toca una ranura para cambiar de hechizo).
+func _build_spell_slots() -> void:
+	var sl: Array = gs.equipped_spells()
+	list_box.add_child(UIKit.label("Hechizos de eikon · %d ranuras (Sabiduría/Devoción)" % sl.size(), 16, Color(0.95, 0.86, 0.6)))
+	for i in sl.size():
+		var b := UIKit.button("Ranura %d: %s  ↻" % [i + 1, EikonSpells.name_of(String(sl[i]))], 17, UIKit.BLUE)
+		b.name = "Spell_%d" % i
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(370, 40)
+		b.pressed.connect(func() -> void:
+			gs.cycle_spell(i)
+			gs.save_loadout()
+			_refresh_all(false))
+		list_box.add_child(b)
+	var ad: Dictionary = Attributes.derived(gs.character_id, gs.char_attrs())
+	var lines: Array = []
+	for id in sl:
+		if String(id) != "":
+			var d := EikonSpells.spell(id)
+			lines.append("%s: %s (%d Energía, x%.2f)" % [d["name"], d["desc"], int(d["cost"]), EikonSpells.power(id, ad)])
+	detail.text += "\n[color=#f2dc99]Hechizos[/color] (a pie: X lanza, T cambia):\n" + ("\n".join(lines) if not lines.is_empty() else "Ninguno equipado.")
 
 func _card(text: String, selected: bool, locked: bool, cb: Callable, coin: bool = true) -> Button:
 	var b := UIKit.button(text, 18, UIKit.ORANGE if selected else (Color(0.3, 0.36, 0.48) if locked else UIKit.BLUE))
@@ -610,7 +646,7 @@ func _build_shop(cur: CharacterDef) -> void:
 	for ct: String in SHOP_CATS:
 		var b := UIKit.button(ct, 14, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
 		b.name = "Cat_" + ct
-		b.custom_minimum_size = Vector2(89, 40)
+		b.custom_minimum_size = Vector2(70, 40)
 		b.pressed.connect(func() -> void:
 			shop_cat = ct
 			_refresh_all(false))
@@ -648,6 +684,17 @@ func _build_shop(cur: CharacterDef) -> void:
 				var b := _card(t, false, true, buy_stone.bind(sid))
 				b.name = "Buy_stone_" + sid
 			detail.text = "[b]Tienda · Materiales[/b]\nPiedras de forja para mejorar armas en el Herrero. También se ganan en cada partida (más si ganas)."
+		"Artes":
+			for aid: String in WeaponArts.ORDER:
+				var a := WeaponArts.art(aid)
+				var own: bool = aid in gs.owned_arts
+				var b := _card("%s%s" % [a["name"], "  ✔" if own else " — %d oro" % int(a["price"])], false, not own, func() -> void:
+					if gs.buy_art(aid):
+						UIKit.audio("purchase")
+					_refresh_all(false))
+				b.name = "Buy_art_" + aid
+				b.disabled = own
+			detail.text = "[b]Tienda · Artes de arma[/b]\nTu colección: cambia el arte de cada arma cuerpo a cuerpo en la pestaña Armas."
 
 ## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
 func _update_dots() -> void:

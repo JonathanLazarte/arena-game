@@ -7,7 +7,7 @@ extends Node
 ## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 7
+const SAVE_VERSION := 8
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -35,6 +35,10 @@ var weapon_up: Dictionary = {} ## ronda 20: id arma -> nivel de mejora (+0..+10)
 var weapon_inf: Dictionary = {} ## ronda 20: id arma -> infusión ("" = normal)
 var materials: Dictionary = {} ## ronda 20: id piedra -> cantidad
 var smith_migrated: bool = false ## v<7: se regalaron piedras de bienvenida
+var spells: Array = [] ## ronda 21: hechizos de eikon equipados (por ranura de personaje)
+var owned_arts: Array = WeaponArts.STARTER.duplicate() ## ronda 21: colección de artes de arma
+var art_eq: Dictionary = {} ## ronda 21: id arma -> id arte
+var magic_migrated: bool = false ## v<8: se equipó el hechizo del eikon y la estocada impulsada
 const SMITH_WELCOME := {"piedra_1": 3}
 var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
 var active_slot: int = 0
@@ -329,7 +333,70 @@ func set_character(id: String) -> bool:
 func slot_data() -> Dictionary:
 	return {"character_id": character_id, "weapon_id": weapon_id,
 		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills(), "attrs": char_attrs(),
-		"armor": armor_eq, "weapon2": weapon2_id}
+		"armor": armor_eq, "weapon2": weapon2_id, "spells": spells}
+
+# ---------------- Ronda 21: magia de eikon y artes de arma ----------------
+
+func spell_slots() -> int:
+	return EikonSpells.slots_for(char_attrs())
+
+func equipped_spells() -> Array:
+	spells = EikonSpells.sanitize(spells, spell_slots(), owned_eikons)
+	return spells
+
+func set_spell(slot: int, id: String) -> bool:
+	var cur := equipped_spells()
+	if slot < 0 or slot >= cur.size():
+		return false
+	if id != "" and not id in EikonSpells.available(owned_eikons):
+		return false
+	var other := cur.find(id)
+	if id != "" and other >= 0 and other != slot:
+		cur[other] = cur[slot] # intercambio si ya estaba en otra ranura
+	cur[slot] = id
+	spells = cur
+	return true
+
+## Siguiente hechizo disponible para una ranura (botón del menú).
+func cycle_spell(slot: int) -> String:
+	var opts: Array = [""] + EikonSpells.available(owned_eikons)
+	var cur := equipped_spells()
+	if slot < 0 or slot >= cur.size():
+		return ""
+	var i := opts.find(cur[slot])
+	set_spell(slot, String(opts[(i + 1) % opts.size()]))
+	return String(spells[slot])
+
+func weapon_art(wid: String = "") -> String:
+	if wid == "": wid = weapon_id
+	if not WeaponArts.compatible(Catalog.weapon(wid)):
+		return ""
+	var a := String(art_eq.get(wid, WeaponArts.STARTER[0]))
+	return a if a in owned_arts else ""
+
+func set_weapon_art(wid: String, aid: String) -> bool:
+	if not WeaponArts.compatible(Catalog.weapon(wid)) or (aid != "" and not aid in owned_arts):
+		return false
+	art_eq[wid] = aid
+	return true
+
+func cycle_weapon_art(wid: String = "") -> String:
+	if wid == "": wid = weapon_id
+	var opts: Array = owned_arts.duplicate() + [""]
+	var i := opts.find(weapon_art(wid))
+	set_weapon_art(wid, String(opts[(i + 1) % opts.size()]))
+	return weapon_art(wid)
+
+func buy_art(aid: String) -> bool:
+	if not WeaponArts.DEFS.has(aid) or aid in owned_arts:
+		return false
+	var price := int(WeaponArts.DEFS[aid]["price"])
+	if oro < price:
+		return false
+	oro -= price
+	owned_arts.append(aid)
+	save_loadout()
+	return true
 
 func set_weapon(id: String) -> bool:
 	if not Catalog.character(character_id).allows(id) or (first_run_done and not id in owned_weapons):
@@ -382,6 +449,8 @@ func save_loadout() -> void:
 	cfg.set_value("herreria", "niveles", weapon_up)
 	cfg.set_value("herreria", "infusiones", weapon_inf)
 	cfg.set_value("herreria", "materiales", materials)
+	cfg.set_value("artes", "coleccion", owned_arts)
+	cfg.set_value("artes", "equipadas", art_eq)
 	cfg.save(save_path)
 
 func load_loadout() -> void:
@@ -459,6 +528,19 @@ func load_loadout() -> void:
 		smith_migrated = true
 		if migrated_from == 0:
 			migrated_from = ver
+	magic_migrated = false
+	if ver >= 8:
+		spells = cfg.get_value(sec, "spells", [])
+		owned_arts = cfg.get_value("artes", "coleccion", WeaponArts.STARTER.duplicate())
+		art_eq = cfg.get_value("artes", "equipadas", {})
+	else:
+		spells = []
+		owned_arts = WeaponArts.STARTER.duplicate()
+		art_eq = {}
+		if first_run_done:
+			magic_migrated = true
+			if migrated_from == 0:
+				migrated_from = ver
 	attr_migrated = false
 	if ver < 5:
 		_migrate_attrs()
@@ -466,6 +548,9 @@ func load_loadout() -> void:
 			migrated_from = ver
 	set_character(character_id)
 	if first_run_done and not eikon_id in owned_eikons: eikon_id = "fenix"
+	if magic_migrated:
+		spells = EikonSpells.default_for(eikon_id) # v<8: el hechizo de tu eikon en la ranura 1
+	equipped_spells()
 	if migrated_from > 0:
 		save_loadout()
 
@@ -556,6 +641,10 @@ func reset_defaults() -> void:
 	weapon_inf = {}
 	materials = {}
 	smith_migrated = false
+	spells = []
+	owned_arts = WeaponArts.STARTER.duplicate()
+	art_eq = {}
+	magic_migrated = false
 	unlocked_chars = []
 	owned_weapons = []
 	owned_eikons = ["fenix"]

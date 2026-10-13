@@ -624,9 +624,11 @@ Ordenada por impacto en la sensación de combate y por dependencias.
 
 ## 18. Preguntas abiertas
 
-1. **Artes de arma (Cenizas de guerra):** ¿una habilidad **fija por arma** (más simple, ideal para móvil) o **intercambiable** con una colección (más profundidad y economía)? ¿Reemplazan al especial del personaje (el Golpe sísmico del Berserker) o conviven (dos botones)?
-2. **Botones en móvil:** ya hay 12 botones táctiles. Para Curar y Arte, ¿agregamos botones o hacemos un **anillo contextual** (Habilidad ↔ Arte según el arma; Curar en un gesto del joystick)?
-3. **Magia:** ¿la queremos? Si sí, ¿**magia de eikon** (recomendada) o escuelas clásicas (hechicería y encantamiento) con catalizadores?
+1. ✅ **Decidido (Ronda 21) — Artes de arma:** **intercambiables** desde una colección (no fijas). Implementado: `WeaponArts` con *Estocada impulsada* (inicial) y *Torbellino* (Tienda → Artes, 300 de oro); se cambian por arma en Armas → «Arte». Usan el botón Habilidad cuando el personaje no tiene habilidad propia (el Golpe sísmico del Berserker tiene prioridad). **Curación/lágrimas: pospuesto** (decisión del usuario: todavía no).
+2. 🟡 **Botones en móvil:** resuelto en parte con botones **contextuales** (Ronda 21): Parry desaparece montado, «Objetivo» solo con 2+ objetivos, «Hechizo»/«↻» solo a pie con hechizos equipados, Habilidad pasa a «Arte». Pendiente: ¿anillo contextual si se suman más acciones?
+3. ✅ **Decidido (Ronda 21) — Magia = magia de eikon:** varias **ranuras** configurables en Eikons → «Hechizos» (2 base, +1 con Sabiduría o Devoción ≥ 18, +1 con ≥ 30). Cada eikon poseído enseña un hechizo (Fénix: Chispa ígnea; Lobo: Aliento helado; Grifo: Saeta del vendaval; Gólem: Piel de piedra). Ofensivos escalan con Sabiduría, protecciones con Devoción. Se lanzan a pie (X / «Hechizo»), cuestan Energía. Pendiente: más hechizos por eikon y uso por la IA.
+3b. ✅ **Decidido (Ronda 21) — Montado sin parry:** la opción de parry se elimina montado (botón oculto y entrada bloqueada).
+3c. ✅ **Decidido (Ronda 21) — Botón de cambio de objetivo:** solo visible con más de un objetivo válido.
 4. **Críticos y puñaladas por la espalda:** ¿te parecen bien en un 1v1 con cámara de móvil, o preferís solo la riposta (parry y rotura de postura) para evitar frustración?
 5. **Estados nuevos:** ¿sueño y locura entran, o nos quedamos con 3-4 estados y los hacemos más distintos entre sí?
 6. **Curación:** ¿1 lágrima por ronda para todos, o que sea una ventaja del Paladín (más cargas) para preservar su identidad?

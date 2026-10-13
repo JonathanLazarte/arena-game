@@ -41,6 +41,7 @@ func _ready() -> void:
 		player = _make_fighter(gs.player_name, 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2()})
+		player.set_magic(gs.equipped_spells(), gs.weapon_art()) # ronda 21
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
 	if gs and gs.random_rival:

@@ -19,6 +19,8 @@ const ACTIONS := {
 	"sprint": [KEY_SHIFT], ## mantener: correr a pie / galope montado
 	"run_toggle": [KEY_V, KEY_CAPSLOCK], ## Ronda 15: alternar correr a pie (táctil: «Correr»)
 	"swap_weapon": [KEY_R],
+	"spell": [KEY_X], ## Ronda 21: lanzar hechizo de eikon (a pie)
+	"spell_next": [KEY_T], ## Ronda 21: siguiente ranura de hechizo
 }
 
 func _enter_tree() -> void:

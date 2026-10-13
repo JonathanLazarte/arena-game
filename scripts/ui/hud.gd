@@ -68,7 +68,7 @@ func _ready() -> void:
 	_touch_button("Atacar", "attack_sword", Vector2(1160, 600), 62, Color(0.85, 0.85, 0.9))
 	_touch_button("Escudo", "block", Vector2(1030, 640), 52, Color(0.4, 0.5, 0.9))
 	_touch_button("Cambiar", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
-	_touch_button("Eikon", "summon", Vector2(1050, 500), 48, Color(1.0, 0.5, 0.1))
+	_touch_button("Eikon", "summon", Vector2(640, 600), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
 	_touch_button("Objetivo", "target_next", Vector2(1190, 255), 34, Color(0.95, 0.8, 0.35))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
@@ -79,6 +79,9 @@ func _ready() -> void:
 	# Ronda 14: salto y habilidad del personaje
 	_touch_button("Saltar", "jump", Vector2(805, 535), 40, Color(0.75, 0.85, 1.0))
 	_touch_button("Habilidad", "special", Vector2(930, 415), 40, Color(1.0, 0.45, 0.25))
+	# Ronda 21: magia de eikon (a pie)
+	_touch_button("Hechizo", "spell", Vector2(800, 420), 40, Color(0.7, 0.5, 1.0))
+	_touch_button("↻", "spell_next", Vector2(722, 360), 24, Color(0.7, 0.5, 1.0))
 	for l: Label in [round_label, timer_label, message]:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
@@ -158,8 +161,13 @@ func set_touch_visible(v: bool) -> void:
 		if c is TouchScreenButton:
 			(c as TouchScreenButton).visible = v
 
+var btns: Dictionary = {} ## ronda 21: acción -> TouchScreenButton
+var btn_labels: Dictionary = {}
+
 func _touch_button(text: String, action: String, center: Vector2, r: float, c: Color) -> void:
 	var tb := TouchScreenButton.new()
+	tb.name = "Btn_" + action
+	btns[action] = tb
 	if action == "summon":
 		_summon_btn = tb
 		tb.modulate = Color(1, 1, 1, 0.55)
@@ -186,6 +194,7 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 5)
 	tb.add_child(l)
+	btn_labels[action] = l
 	if action == "summon":
 		_summon_label = l
 	if action == "run_toggle":
@@ -283,8 +292,32 @@ func _process(_d: float) -> void:
 		_run_label.text = "Galope" if _player.mounted else ("Correr ✔" if on else "Correr")
 		_run_btn.modulate = Color(1.5, 1.4, 0.9) if (on or _player.sprinting) else Color.WHITE
 	if _special_btn:
-		_special_btn.visible = _player.has_special() and joystick.visible
-		_special_btn.modulate = Color.WHITE if _player.special_cd <= 0.0 else Color(1, 1, 1, 0.45)
+		_special_btn.visible = (_player.has_special() or _player.weapon_art_id != "") and joystick.visible
+		var cd := _player.special_cd if _player.has_special() else _player.art_cd
+		_special_btn.modulate = Color.WHITE if cd <= 0.0 else Color(1, 1, 1, 0.45)
+		if not _player.has_special() and btn_labels.has("special"):
+			(btn_labels["special"] as Label).text = "Arte"
+	_update_contextual_buttons()
+
+## Ronda 21: botones según el contexto. Parry desaparece montado; «Objetivo» solo con 2+ objetivos;
+## «Hechizo» solo a pie y con hechizos equipados.
+func _update_contextual_buttons() -> void:
+	var tv := joystick.visible
+	(btns["parry"] as TouchScreenButton).visible = tv and not _player.mounted
+	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
+	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
+	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)
+	# Montar: solo con un eikon activo en la arena
+	(btns["mount"] as TouchScreenButton).visible = tv and _player.has_active_eikon()
+	(btns["target_next"] as TouchScreenButton).visible = tv and controller != null and controller.can_cycle_target()
+	var magic := _player.has_spells() and not _player.mounted
+	(btns["spell"] as TouchScreenButton).visible = tv and magic
+	(btns["spell_next"] as TouchScreenButton).visible = tv and magic and _player.spells.filter(func(x) -> bool: return String(x) != "").size() > 1
+	if magic:
+		var id := _player.current_spell()
+		var cd := _player.spell_cd_left()
+		(btn_labels["spell"] as Label).text = (EikonSpells.name_of(id).split(" ")[0] + ("\n%.0f" % ceilf(cd) if cd > 0.0 else ""))
+		(btns["spell"] as TouchScreenButton).modulate = Color.WHITE if _player.can_cast() else Color(1, 1, 1, 0.45)
 
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
@@ -327,7 +360,7 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 			sb.modulate = Color(1, 0.4, 0.4) if ex else Color.WHITE)
 
 	# Ronda 18: barra de Energía (Concentración) para las habilidades (Golpe sísmico)
-	if player.has_special():
+	if player.has_special() or player.has_spells() or player.weapon_art_id != "":
 		energy_bar = _bar(root_control(), Vector2(20, 82), Color(0.62, 0.45, 1.0), 6)
 		energy_bar.name = "EnergyBar"
 		energy_bar.max_value = player.energy_max

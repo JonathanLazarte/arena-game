@@ -440,3 +440,33 @@ Las armas se mejoran en una copia del recurso (`Smithing.effective`); +0 normal 
 **Cierre de paneles.** Personaje, Armas, Eikons, Habilidades, Herrero, Tienda, Inventario y Ajustes tienen un «✕» arriba a la derecha. La pantalla de Atributos y el selector de equipo tienen el suyo. Esc y el botón Atrás de Android cierran lo que esté encima: la confirmación, luego Atributos, luego el selector y luego la pestaña. Al cerrar se vuelve al escaparate sin ninguna pestaña elegida.
 
 Pruebas nuevas: `test_status.gd`, `test_smithing.gd` (incluye la migración de v6 a v7) y `test_ui_audio.gd` (botones de cierre, Esc y Atrás, buses, volúmenes guardados y efectos 3D).
+
+## Ronda 21 — Montado sin parry, objetivo contextual, magia de eikon y artes de arma
+
+**Montado sin parry.** Montado, el parry no existe: el botón táctil «Parry» se oculta y la tecla Q no hace nada (`Fighter.parry()` lo rechaza también). Al desmontar vuelve.
+
+**Botón «Objetivo».** Solo aparece cuando hay más de un objetivo válido para fijar (rival + eikon enemigo, montura sin jinete, etc.). Con 0 o 1 objetivos se oculta (`PlayerController.can_cycle_target()`).
+
+**Botones Eikon y Montar.** «Eikon» pasa a ser el botón de combate más a la izquierda y solo aparece cuando se puede invocar (medidor lleno, sin eikon activo, sin aturdir) o cuando vas montado en tu eikon (su Especial). «Montar» solo aparece con un eikon activo en la arena; montar/desmontar el caballo sigue en la tecla F.
+
+**Magia de eikon.** Eikons → «Hechizos»: ranuras que se tocan para cambiar de hechizo (equipar uno que ya está en otra ranura los intercambia).
+
+| Hechizo | Eikon | Tipo | Efecto | Energía | Enfr. | Escala |
+|---|---|---|---|---|---|---|
+| Chispa ígnea | Fénix | proyectil | 9 de fuego | 14 | 1,4 s | Sabiduría |
+| Aliento helado | Lobo de Hielo | cono 5,5 m / 60° | 6 de hielo + 30 de congelación | 20 | 4 s | Sabiduría |
+| Saeta del vendaval | Grifo | proyectil rápido | 7 de rayo | 12 | 1,1 s | Sabiduría |
+| Piel de piedra | Gólem | protección | 6 s: −15 % daño, +50 % equilibrio | 24 | 12 s | Devoción |
+
+Ranuras: 2 base, +1 con Sabiduría o Devoción ≥ 18, +1 con ≥ 30 (máx. 4): los magos se apoyan más en los eikons. Solo a pie: X lanza, T pasa a la siguiente ranura (táctil: «Hechizo» y «↻»). El lanzamiento inmoviliza 0,25–0,5 s y un golpe que aturde lo interrumpe (la Energía se pierde).
+
+**Artes de arma (colección intercambiable).** Armas → «Arte» cambia el arte del arma cuerpo a cuerpo equipada entre las que poseés; Tienda → Artes vende las nuevas. Se usan con Habilidad (G) si tu personaje no tiene habilidad propia; el Berserker conserva el Golpe sísmico.
+
+| Arte | Efecto | Energía | Enfr. | Precio |
+|---|---|---|---|---|
+| Estocada impulsada | embestida hacia el objetivo, x1,5 de daño | 18 | 5 s | inicial |
+| Torbellino | giro de 360°, radio 3 m, x1,2 | 22 | 7 s | 300 de oro |
+
+Curación (lágrimas) queda pospuesta por decisión del usuario. Guardado **v8**: `spells` por ranura de personaje y `[artes]` (colección y arte por arma). Al migrar desde v7 se equipa el hechizo de tu eikon y la Estocada impulsada. La IA del rival todavía no usa hechizos ni artes.
+
+Prueba nueva: `test_magic.gd` (parry montado, botón Objetivo, ranuras, hechizos en combate, artes, Tienda, persistencia y migración v7→v8).

@@ -247,6 +247,24 @@ var _status_flash: float = 0.0
 var _status_flash_c: Color = Color.WHITE
 var _aura: CPUParticles3D
 signal energy_changed(value: float, max_value: float)
+## Ronda 21: magia de eikon (ranuras) y artes de arma
+signal spell_changed(idx: int, id: String)
+var spells: Array = [] ## ids de EikonSpells equipados ("" = ranura vacía)
+var spell_idx: int = 0
+var spell_cd: Dictionary = {}
+var cast_t: float = 0.0
+var _cast_id: String = ""
+var spells_cast: int = 0
+var stoneskin_t: float = 0.0
+var _stoneskin: Dictionary = {}
+var weapon_art_id: String = ""
+var art_cd: float = 0.0
+var arts_used: int = 0
+var _art_mult: float = 1.0
+var incoming_element: String = "" ## lo fija el proyectil/hechizo justo antes de impactar
+var incoming_status: Dictionary = {}
+var _hit_element: String = ""
+var _hit_status: Dictionary = {}
 var special_t: float = 0.0 ## anticipación del golpe sísmico
 var specials_used: int = 0
 var eikon_specials: int = 0
@@ -431,6 +449,8 @@ func _update_aura() -> void:
 
 ## Tipo de daño de un golpe recibido.
 func _damage_type(from: Node3D, kind: String) -> String:
+	if _hit_element != "":
+		return _hit_element
 	if kind == "melee" or kind == "arrow":
 		return "fisico"
 	var eid := ""
@@ -749,6 +769,7 @@ func _physics_process(delta: float) -> void:
 	land_t = maxf(land_t - delta, 0.0)
 	if special_t > 0.0:
 		special_t = maxf(special_t - delta, 0.0)
+	_update_magic(delta)
 	var was_dashing := dash_time > 0.0
 	dash_time = maxf(dash_time - delta, 0.0)
 	if roll_t >= 0.0:
@@ -768,7 +789,7 @@ func _physics_process(delta: float) -> void:
 	invuln = maxf(invuln - delta, 0.0)
 	var st := stats()
 	var inp := move_input
-	if not alive or stun > 0.0 or special_t > 0.0:
+	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0:
 		inp = Vector3.ZERO
 	var wb := want_block and alive and stun <= 0.0 and roll_t < 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
@@ -999,7 +1020,7 @@ func add_meter(v: float) -> void:
 	meter_changed.emit(meter)
 
 func _can_act() -> bool:
-	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0
+	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0
 
 ## ¿Está t dentro del arco de la espada?
 func in_sword_arc(t: Node3D) -> bool:
@@ -1033,7 +1054,7 @@ func _atk_data() -> Dictionary:
 
 ## Multiplicador de daño cuerpo a cuerpo: personaje, lanza a caballo y pasiva "Furia".
 func damage_mult() -> float:
-	var k := character.dano * float(mods["dano"]) * weapon_attr_mult(melee()) * melee().upgrade_dmg_mult
+	var k := character.dano * float(mods["dano"]) * weapon_attr_mult(melee()) * melee().upgrade_dmg_mult * _art_mult
 	if mounted:
 		k *= melee().mounted_damage_mult
 	if character.passive_id == "furia" and health < max_health * 0.4:
@@ -1071,6 +1092,7 @@ func _request_attack(heavy: bool) -> bool:
 	return true
 
 func _start_attack(heavy: bool, chained: bool) -> void:
+	_art_mult = 1.0
 	atk_heavy = heavy
 	cur_hit = null
 	if not heavy and not atk_dash and not atk_jump:
@@ -1103,6 +1125,8 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 
 ## Parry dedicado (tecla Q / botón Parry). Solo con espada+escudo.
 func parry() -> bool:
+	if mounted: # ronda 21: sin parry montado
+		return false
 	if loadout != Loadout.SWORD_SHIELD or not _can_act() or swap_t > 0.0 or roll_t >= 0.0:
 		return false
 	if atk_state != Atk.NONE or parry_state != Parry.NONE or stamina <= 0.0:
@@ -1412,8 +1436,11 @@ func has_special() -> bool:
 	return character.special_id != ""
 
 ## Habilidad del personaje (G / botón "Habilidad"). Berserker: golpe sísmico.
+## Ronda 21: sin habilidad propia, el botón usa el arte del arma equipada.
 func special() -> bool:
-	if not has_special() or not _can_act() or special_cd > 0.0 or airborne or mounted or roll_t >= 0.0:
+	if not has_special():
+		return use_weapon_art()
+	if not _can_act() or special_cd > 0.0 or airborne or mounted or roll_t >= 0.0:
 		return false
 	if atk_state != Atk.NONE or parry_state != Parry.NONE or swap_t > 0.0 or stamina <= 0.0:
 		return false
@@ -1476,6 +1503,14 @@ func eikon_special() -> bool:
 						t.apply_knockback((d.normalized() if d.length() > 0.1 else facing) * 14.0, r == "hit")
 	impact.emit(0.6)
 	return true
+
+## Ronda 21: se puede invocar ya (medidor lleno, sin eikon activo, sin aturdir).
+func can_summon() -> bool:
+	return alive and eikon != null and not is_instance_valid(active_eikon) and meter >= METER_MAX and stun <= 0.0
+
+## Hay un eikon activo en la arena (el botón Montar solo tiene sentido entonces).
+func has_active_eikon() -> bool:
+	return is_instance_valid(active_eikon) or (mounted and mount_node != null and mount_node.eikon != null)
 
 func summon() -> bool:
 	if not alive or eikon == null:
@@ -1545,6 +1580,10 @@ func apply_stun(t: float) -> void:
 
 ## Devuelve "hit", "block", "parry", "dodge" o "none".
 func take_hit(amount: float, from: Node3D, _kind: String) -> String:
+	_hit_element = incoming_element
+	_hit_status = incoming_status
+	incoming_element = ""
+	incoming_status = {}
 	if not alive:
 		return "none"
 	if invuln > 0.0:
@@ -1605,20 +1644,22 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if _kind == "aoe":
 		amount *= EquipStats.resist_mult("inmunidad", eq, eq_ref) # Inmunidad: daño de área
 	amount *= status_fx.damage_taken_mult() # congelación: más daño recibido
+	if stoneskin_t > 0.0:
+		amount *= 1.0 - float(_stoneskin.get("reduction", 0.0)) # Piel de piedra
 	_damage(amount)
 	add_meter(5.0)
 	_kv.event("hit")
 	if _kind == "arrow":
 		_snd("arrow_hit")
 	_snd("hit_armor" if not eq.is_empty() and float(eq["absorcion"].get("fisico", 0.0)) >= 0.3 else "hit_flesh")
-	var stx := _status_from(from, _kind)
+	var stx := _hit_status if not _hit_status.is_empty() else _status_from(from, _kind)
 	for sk: String in stx:
 		add_status(sk, float(stx[sk]))
 	if _kind == "melee":
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis
 	_since_hit = 0.0
-	poise -= amount * 2.0 * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
+	poise -= amount * 2.0 / (float(_stoneskin.get("poise", 1.0)) if stoneskin_t > 0.0 else 1.0) * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
 	if poise <= 0.0:
 		poise = poise_max
 		apply_stun((0.6 + (0.3 if amount >= HEAVY_HIT else 0.0)) * EquipStats.resist_mult("concentracion", eq, eq_ref))
@@ -1689,6 +1730,12 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	land_t = 0.0
 	special_t = 0.0
 	special_cd = 0.0
+	cast_t = 0.0
+	_cast_id = ""
+	spell_cd = {}
+	stoneskin_t = 0.0
+	art_cd = 0.0
+	_art_mult = 1.0
 	energy = energy_max
 	energy_changed.emit(energy, energy_max)
 	_roll_atk_buffer = false
@@ -1734,3 +1781,158 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	health_changed.emit(health, max_health)
 	meter_changed.emit(meter)
 	stamina_changed.emit(stamina, false)
+
+
+# ---------------- Ronda 21: magia de eikon y artes de arma ----------------
+
+func set_magic(sp: Array, art: String) -> void:
+	spells = sp.duplicate()
+	spell_idx = 0
+	for i in spells.size():
+		if String(spells[i]) != "":
+			spell_idx = i
+			break
+	weapon_art_id = art
+
+func has_spells() -> bool:
+	for s in spells:
+		if String(s) != "":
+			return true
+	return false
+
+func current_spell() -> String:
+	return String(spells[spell_idx]) if spell_idx < spells.size() else ""
+
+## Siguiente ranura con hechizo (T / botón «↻»).
+func cycle_spell() -> String:
+	if not has_spells():
+		return ""
+	for k in range(1, spells.size() + 1):
+		var i := (spell_idx + k) % spells.size()
+		if String(spells[i]) != "":
+			spell_idx = i
+			break
+	spell_changed.emit(spell_idx, current_spell())
+	return current_spell()
+
+func spell_cd_left(id: String = "") -> float:
+	return float(spell_cd.get(current_spell() if id == "" else id, 0.0))
+
+func can_cast() -> bool:
+	var id := current_spell()
+	if id == "" or mounted or airborne or not _can_act() or roll_t >= 0.0 or swap_t > 0.0 or is_shooting():
+		return false
+	if atk_state != Atk.NONE or parry_state != Parry.NONE:
+		return false
+	return spell_cd_left(id) <= 0.0 and energy >= float(EikonSpells.spell(id)["cost"])
+
+## Lanza el hechizo de la ranura activa (X / botón «Hechizo»). Solo a pie.
+func cast_spell() -> bool:
+	if not can_cast():
+		return false
+	var id := current_spell()
+	var d := EikonSpells.spell(id)
+	energy -= float(d["cost"])
+	energy_changed.emit(energy, energy_max)
+	spell_cd[id] = float(d["cooldown"])
+	cast_t = float(d["cast"])
+	_cast_id = id
+	blocking = false
+	spells_cast += 1
+	_snd("eikon_summon", -6.0)
+	_kv.event("shoot")
+	return true
+
+func _update_magic(delta: float) -> void:
+	for k: String in spell_cd.keys():
+		spell_cd[k] = maxf(float(spell_cd[k]) - delta, 0.0)
+	art_cd = maxf(art_cd - delta, 0.0)
+	stoneskin_t = maxf(stoneskin_t - delta, 0.0)
+	if cast_t > 0.0:
+		if not alive or stun > 0.0: # interrumpido: se pierde la Energía
+			cast_t = 0.0
+			_cast_id = ""
+			return
+		cast_t -= delta
+		if cast_t <= 0.0:
+			cast_t = 0.0
+			var id := _cast_id
+			_cast_id = ""
+			_fire_spell(id)
+
+func _spell_dir() -> Vector3:
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	if tgt:
+		var dd := MeshUtil.flat(tgt.global_position - global_position)
+		if dd.length() > 0.1:
+			return dd.normalized()
+	return facing
+
+func _fire_spell(id: String) -> void:
+	var d := EikonSpells.spell(id)
+	if d.is_empty():
+		return
+	var pw := EikonSpells.power(id, ad)
+	facing = _spell_dir()
+	match String(d["type"]):
+		"proyectil":
+			var p := Projectile.new()
+			p.team = team
+			p.shooter = self
+			p.kind = "eikon"
+			p.element = String(d["element"])
+			p.status = d.get("status", {})
+			p.direction = facing
+			p.speed = float(d["speed"])
+			p.damage = float(d["damage"]) * pw
+			p.color = Color(1.0, 0.55, 0.2) if d["element"] == "fuego" else Color(0.75, 0.9, 1.0)
+			get_parent().add_child(p)
+			p.global_position = get_hit_center() + Vector3(0, 0.6, 0) + facing * 1.2
+			_snd("eikon_fire" if d["element"] == "fuego" else "eikon_wind")
+		"cono":
+			_snd("eikon_ice")
+			var half := deg_to_rad(float(d["arc"]) * 0.5)
+			for t in MeshUtil.enemies_of(get_tree(), team):
+				var dd := MeshUtil.flat(t.global_position - global_position)
+				if dd.length() > float(d["range"]) + float(t.hit_radius):
+					continue
+				if dd.length() > 0.2 and facing.angle_to(dd.normalized()) > half:
+					continue
+				if t is Fighter:
+					(t as Fighter).incoming_element = String(d["element"])
+					(t as Fighter).incoming_status = d.get("status", {})
+				t.take_hit(float(d["damage"]) * pw, self, "eikon")
+			_burst_particles(Color(0.7, 0.9, 1.0))
+		"buff":
+			_stoneskin = d
+			stoneskin_t = float(d["duration"]) * pw
+			_burst_particles(Color(0.75, 0.65, 0.5))
+			_snd("eikon_slam", -4.0)
+
+## Arte de arma (Habilidad sin habilidad propia). Cuerpo a cuerpo, a pie.
+func use_weapon_art() -> bool:
+	var a := WeaponArts.art(weapon_art_id)
+	if a.is_empty() or mounted or airborne or not _can_act() or art_cd > 0.0 or roll_t >= 0.0:
+		return false
+	if loadout != Loadout.SWORD_SHIELD or atk_state != Atk.NONE or parry_state != Parry.NONE or swap_t > 0.0 or stamina <= 0.0:
+		return false
+	if energy < float(a["cost"]):
+		return false
+	energy -= float(a["cost"])
+	energy_changed.emit(energy, energy_max)
+	art_cd = float(a["cooldown"])
+	arts_used += 1
+	blocking = false
+	match weapon_art_id:
+		"estocada_impulsada":
+			dash_dir = _spell_dir()
+			spend_stamina(melee().light_stamina)
+			_start_dash_strike()
+			_art_mult = float(a["mult"])
+		"torbellino":
+			special_t = 0.3
+			spend_stamina(melee().heavy_stamina)
+			GroundAoE.spawn(get_parent(), self, team, global_position, float(a["radius"]), 0.3, melee().light_damage * float(a["mult"]) * damage_mult())
+			_kv.event("slam")
+			_snd("swing_heavy")
+	return true

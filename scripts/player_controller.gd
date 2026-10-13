@@ -29,6 +29,10 @@ func targets() -> Array[Node3D]:
 		return me.global_position.distance_squared_to(a.global_position) < me.global_position.distance_squared_to(b.global_position))
 	return out
 
+## Ronda 21: el botón «Objetivo» solo tiene sentido con 2+ objetivos válidos.
+func can_cycle_target() -> bool:
+	return me != null and targets().size() > 1
+
 func cycle_target() -> Node3D:
 	_update_target(true)
 	return target
@@ -95,6 +99,8 @@ func _physics_process(delta: float) -> void:
 	var mt := _pressed_edge("mount")
 	var jp := _pressed_edge("jump")
 	var sp := _pressed_edge("special")
+	var cs := _pressed_edge("spell")
+	var cn := _pressed_edge("spell_next")
 	if not enabled:
 		return
 	if swp: me.swap_loadout()
@@ -115,7 +121,9 @@ func _physics_process(delta: float) -> void:
 		if not _heavy_fired:
 			me.attack_light()
 		_atk_hold = -1.0
-	if pr: me.parry()
+	if pr and not me.mounted: me.parry() # ronda 21: sin parry montado
+	if cn: me.cycle_spell()
+	if cs: me.cast_spell()
 	if sm: me.summon()
 	if ds: me.dash()
 	if mt: me.toggle_mount()

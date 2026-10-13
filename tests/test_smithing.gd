@@ -93,7 +93,7 @@ func _run() -> void:
 	check(gs.migrated_from == 6 and gs.smith_migrated and gs.weapon_level("espada_escudo") == 0 and gs.material("piedra_1") == 3, "v6 -> v7: armas a +0 y 3 Piedras I de bienvenida")
 	var c2 := ConfigFile.new()
 	c2.load(gs.save_path)
-	check(int(c2.get_value("meta", "version")) == GameState.SAVE_VERSION and GameState.SAVE_VERSION == 7, "se reescribe como v7")
+	check(int(c2.get_value("meta", "version")) == GameState.SAVE_VERSION and GameState.SAVE_VERSION == 8, "se reescribe como v8")
 	check(gs.character_id == "caballero" and gs.armor_eq.size() > 0, "la migración conserva personaje y armadura")
 	# --- Herrero en el lobby (clics reales) ---
 	gs.oro = 100000
