@@ -100,6 +100,9 @@ func _physics_process(delta: float) -> void:
 
 func _detonate() -> void:
 	detonated = true
+	var au := get_node_or_null("/root/Audio")
+	if au:
+		au.sfx3d("eikon_slam", global_position)
 	_fill.scale = Vector3.ONE
 	_fill_mat.albedo_color = Color(1.0, 0.85, 0.5, 0.8)
 	for n in MeshUtil.enemies_of(get_tree(), team):

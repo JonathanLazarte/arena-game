@@ -17,6 +17,7 @@ signal impact(strength: float)
 signal mount_changed(mounted: bool)
 signal loadout_changed(loadout: int)
 signal landed_hit(target: Node3D, result: String, target_was_open: bool)
+signal status_proc(kind: String) ## ronda 20: estallido de un estado alterado
 
 const METER_MAX := 100.0
 const METER_PASSIVE := 1.2 ## por segundo en combate (sin eikon activo); con golpes se llena en ~35-45 s
@@ -238,6 +239,13 @@ var secondary: WeaponDef = null
 var eq: Dictionary = {}
 var eq_ref: Dictionary = {}
 var energy: float = 50.0
+## Ronda 20: estados alterados y audio
+var status_fx: StatusFx = StatusFx.new()
+const LOBO_FROST := 30.0 ## acumulación de congelación por golpe del Lobo de Hielo
+var _step_d: float = 0.0
+var _status_flash: float = 0.0
+var _status_flash_c: Color = Color.WHITE
+var _aura: CPUParticles3D
 signal energy_changed(value: float, max_value: float)
 var special_t: float = 0.0 ## anticipación del golpe sísmico
 var specials_used: int = 0
@@ -310,6 +318,116 @@ func roll_mod() -> Dictionary:
 ## Duración total de la voltereta (la recuperación se alarga con carga pesada).
 func roll_total() -> float:
 	return roll_iframe_end() + ROLL_RECOVERY_FRAMES * float(roll_mod()["rec"]) / ROLL_FPS
+
+## Ronda 20: efecto de sonido posicional (no hace nada sin el autoload Audio).
+func _snd(n: String, db: float = 0.0) -> void:
+	var a := get_node_or_null("/root/Audio")
+	if a and is_inside_tree():
+		a.sfx3d(n, global_position + Vector3(0, 1.0, 0), 0.08, db)
+
+## Umbral de un estado (10 + resistencia de la ficha: Robustez o Inmunidad).
+func status_threshold(k: String) -> float:
+	var r := 60.0
+	if not eq.is_empty():
+		r = float(eq["resist"].get(StatusFx.RESIST[k], 60.0))
+	return StatusFx.threshold_for(r)
+
+func status_fraction(k: String) -> float:
+	return status_fx.fraction(k, status_threshold(k))
+
+## Suma acumulación de un estado; si se llena, estallido (sangrado/congelación) o veneno.
+func add_status(k: String, amount: float) -> bool:
+	if not alive or amount <= 0.0:
+		return false
+	if not status_fx.add(k, amount, status_threshold(k)):
+		return false
+	match k:
+		"sangrado": _damage(max_health * StatusFx.BLEED_PCT + StatusFx.BLEED_FLAT)
+		"congelacion": _damage(max_health * StatusFx.FROST_PCT + StatusFx.FROST_FLAT)
+	_status_flash = 0.5
+	_status_flash_c = StatusFx.COLORS[k]
+	_snd("status_" + k, 2.0)
+	_burst_particles(StatusFx.COLORS[k])
+	status_proc.emit(k)
+	return true
+
+## Acumulación que trae un golpe recibido.
+func _status_from(from: Node3D, kind: String) -> Dictionary:
+	if from is Fighter and is_instance_valid(from):
+		var f := from as Fighter
+		if kind == "melee":
+			return f.melee().status
+		if kind == "arrow":
+			return f.ranged().status
+		if kind == "eikon" and f.eikon and f.eikon.id == "lobo":
+			return {"congelacion": LOBO_FROST}
+	if from is Mount and (from as Mount).eikon and (from as Mount).eikon.id == "lobo":
+		return {"congelacion": LOBO_FROST}
+	if from is Eikon and (from as Eikon).data and (from as Eikon).data.id == "lobo":
+		return {"congelacion": LOBO_FROST}
+	return {}
+
+func _burst_particles(c: Color) -> void:
+	if not is_inside_tree():
+		return
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.amount = 28
+	p.lifetime = 0.7
+	p.explosiveness = 0.9
+	p.direction = Vector3.UP
+	p.spread = 70.0
+	p.initial_velocity_min = 2.0
+	p.initial_velocity_max = 4.5
+	p.gravity = Vector3(0, -6, 0)
+	p.scale_amount_min = 0.6
+	var m := SphereMesh.new()
+	m.radius = 0.06
+	m.height = 0.12
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = c
+	mat.emission_enabled = true
+	mat.emission = c
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.material = mat
+	p.mesh = m
+	add_child(p)
+	p.position = Vector3(0, 1.2, 0)
+	p.emitting = true
+	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
+
+## Aura continua mientras dura el veneno o la congelación.
+func _update_aura() -> void:
+	var c := Color.TRANSPARENT
+	if status_fx.poison_t > 0.0:
+		c = StatusFx.COLORS["veneno"]
+	elif status_fx.frost_t > 0.0:
+		c = StatusFx.COLORS["congelacion"]
+	if c.a == 0.0:
+		if _aura:
+			_aura.emitting = false
+		return
+	if _aura == null:
+		_aura = CPUParticles3D.new()
+		_aura.amount = 10
+		_aura.lifetime = 1.0
+		_aura.direction = Vector3.UP
+		_aura.spread = 25.0
+		_aura.initial_velocity_min = 0.5
+		_aura.initial_velocity_max = 1.2
+		_aura.gravity = Vector3.ZERO
+		_aura.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_aura.emission_sphere_radius = 0.5
+		var m := SphereMesh.new()
+		m.radius = 0.05
+		m.height = 0.1
+		m.material = StandardMaterial3D.new()
+		(m.material as StandardMaterial3D).shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_aura.mesh = m
+		add_child(_aura)
+		_aura.position = Vector3(0, 1.0, 0)
+	((_aura.mesh as SphereMesh).material as StandardMaterial3D).albedo_color = c
+	_aura.emitting = true
 
 ## Tipo de daño de un golpe recibido.
 func _damage_type(from: Node3D, kind: String) -> String:
@@ -585,13 +703,22 @@ func _update_stamina(delta: float, idle: bool) -> void:
 	if exhausted > 0.0:
 		exhausted = maxf(exhausted - delta, 0.0)
 	if _since_spend >= REGEN_DELAY and stamina < stamina_max:
-		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * float(roll_mod()["regen"]) * delta, stamina_max)
+		stamina = minf(stamina + (REGEN_IDLE if idle else REGEN) * float(roll_mod()["regen"]) * status_fx.regen_mult() * delta, stamina_max)
 		stamina_changed.emit(stamina, exhausted > 0.0)
 
 # ---------------- Bucle principal ----------------
 
 func _physics_process(delta: float) -> void:
 	riposte_t = maxf(riposte_t - delta, 0.0)
+	if alive:
+		var pd := status_fx.tick(delta)
+		if pd > 0.0:
+			health = maxf(health - pd, 0.0)
+			health_changed.emit(health, max_health)
+			if health <= 0.0:
+				alive = false
+				died.emit(self)
+	_status_flash = maxf(_status_flash - delta, 0.0)
 	_since_hit += delta
 	if _since_hit > 1.5:
 		poise = minf(poise + POISE_REGEN * delta, poise_max)
@@ -758,6 +885,11 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta * (1.8 if atk_jump else 1.0)
 	move_and_slide()
+	if not mounted and not airborne and alive and roll_t < 0.0:
+		_step_d += MeshUtil.flat(velocity).length() * delta
+		if _step_d >= (2.2 if sprinting else 1.5):
+			_step_d = 0.0
+			_snd("step")
 	if airborne:
 		_air_t += delta
 		if _air_t > 0.08 and (is_on_floor() or global_position.y < 0.02) and velocity.y <= 0.0:
@@ -772,10 +904,25 @@ func _physics_process(delta: float) -> void:
 	var bc := color
 	if _flash > 0.0:
 		bc = Color.WHITE
+	elif _status_flash > 0.0:
+		bc = color.lerp(_status_flash_c, 0.75)
+	elif status_fx.frost_t > 0.0:
+		bc = color.lerp(StatusFx.COLORS["congelacion"], 0.45)
+	elif status_fx.poison_t > 0.0:
+		bc = color.lerp(StatusFx.COLORS["veneno"], 0.4)
 	elif exhausted > 0.0:
 		bc = color.lerp(Color(0.5, 0.5, 0.5), 0.6)
 	(_body.material_override as StandardMaterial3D).albedo_color = bc
-	_kv.set_tint(bc, _flash > 0.0)
+	var ec := Color.WHITE
+	if _flash <= 0.0:
+		if _status_flash > 0.0:
+			ec = _status_flash_c
+		elif status_fx.frost_t > 0.0:
+			ec = StatusFx.COLORS["congelacion"] * 0.35
+		elif status_fx.poison_t > 0.0:
+			ec = StatusFx.COLORS["veneno"] * 0.3
+	_kv.set_tint(bc, _flash > 0.0 or _status_flash > 0.0 or status_fx.frost_t > 0.0 or status_fx.poison_t > 0.0, ec)
+	_update_aura()
 	_kv.update(self, delta)
 	_rider_root.rotation.x = 0.0 # la voltereta la hace la animación Dodge_*
 	_rider_root.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.2 if stun > 0.0 else 0.0
@@ -886,7 +1033,7 @@ func _atk_data() -> Dictionary:
 
 ## Multiplicador de daño cuerpo a cuerpo: personaje, lanza a caballo y pasiva "Furia".
 func damage_mult() -> float:
-	var k := character.dano * float(mods["dano"]) * weapon_attr_mult(melee())
+	var k := character.dano * float(mods["dano"]) * weapon_attr_mult(melee()) * melee().upgrade_dmg_mult
 	if mounted:
 		k *= melee().mounted_damage_mult
 	if character.passive_id == "furia" and health < max_health * 0.4:
@@ -941,6 +1088,7 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	_buffered = false
 	attacks_started += 1
 	spend_stamina(d["stamina"])
+	_snd("swing_heavy" if heavy or EquipStats.weapon_weight(melee()) >= 8.0 else "swing_light")
 	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
 	if tgt and global_position.distance_to(tgt.global_position) < sword_range() + 1.5:
 		var dd := MeshUtil.flat(tgt.global_position - global_position)
@@ -1025,6 +1173,8 @@ func _update_attack(delta: float) -> void:
 				atk_state = Atk.RECOVERY
 				atk_t = 0.0
 				atk_dur = d["recovery"] + (0.0 if _atk_landed else d["whiff"])
+				if not _atk_landed:
+					_snd("whiff")
 				if combo >= max_combo():
 					atk_dur += FINISHER_EXTRA_RECOVERY
 		Atk.RECOVERY:
@@ -1080,6 +1230,8 @@ func shoot() -> bool:
 	shot_state = Shot.DRAW
 	shot_t = 0.0
 	shot_dur = r.fire_draw / attr_speed()
+	if r.reload_time <= 0.0:
+		_snd("bow_draw")
 	if not mounted:
 		shot_cut_sprint = want_sprint or sprinting
 		sprinting = false
@@ -1106,6 +1258,7 @@ func _update_shot(delta: float) -> void:
 			if r.reload_time > 0.0:
 				shot_state = Shot.RELOAD
 				shot_dur = r.reload_time
+				_snd("xbow_reload")
 			else:
 				shot_state = Shot.NONE
 				bow_cd = r.fire_cooldown
@@ -1130,11 +1283,12 @@ func _release_shot() -> void:
 	p.aimed_at = tgt
 	p.speed = r.projectile_speed
 	p.hitstun = r.ranged_hitstun
-	p.damage = r.arrow_damage * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0) * weapon_attr_mult(r)
+	p.damage = r.arrow_damage * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0) * weapon_attr_mult(r) * r.upgrade_dmg_mult
 	p.color = Color(0.9, 0.8, 0.5) if r.reload_time <= 0.0 else Color(0.75, 0.85, 1.0)
 	get_parent().add_child(p)
 	p.global_position = origin
 	shots_fired += 1
+	_snd("xbow_fire" if r.reload_time > 0.0 else "bow_release")
 	_kv.event("shoot")
 
 ## Dash montado / voltereta a pie.
@@ -1179,6 +1333,7 @@ func _start_roll(st: MountData) -> bool:
 	dash_cd = maxf(st.dash_cooldown, roll_total())
 	invuln = 0.0
 	_dash_hit = true # la voltereta no embiste
+	_snd("roll")
 	spend_stamina(COST_ROLL * character.roll_cost_mult * float(mods["roll_cost"]) * float(ad["roll_cost"]))
 	return true
 
@@ -1241,6 +1396,7 @@ func jump() -> bool:
 	airborne = true
 	_air_t = 0.0
 	jumps += 1
+	_snd("jump", -4.0)
 	return true
 
 func _land() -> void:
@@ -1248,6 +1404,7 @@ func _land() -> void:
 	_air_t = 0.0
 	velocity.y = 0.0
 	land_t = LAND_RECOVERY
+	_snd("land", -4.0)
 	if atk_jump and atk_state == Atk.WINDUP:
 		atk_t = atk_dur # el picado golpea al tocar el suelo
 
@@ -1286,6 +1443,7 @@ func eikon_special() -> bool:
 	var ed := m.eikon
 	m.special_cd = ed.special_cooldown
 	eikon_specials += 1
+	_snd({"llamarada": "eikon_fire", "colmillo": "eikon_ice", "vendaval": "eikon_wind"}.get(ed.special_id, "eikon_fire"))
 	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
 	match ed.special_id:
 		"llamarada":
@@ -1342,6 +1500,7 @@ func summon() -> bool:
 	get_parent().add_child(e)
 	e.global_position = global_position + facing.cross(Vector3.UP) * 3.0 + Vector3(0, 0.2, 0)
 	active_eikon = e
+	_snd("eikon_summon")
 	meter = 0.0
 	meter_changed.emit(meter)
 	summoned.emit(e)
@@ -1364,6 +1523,7 @@ func _summon_mount() -> bool:
 	m.rotation.y = rotation.y
 	owned_mount = m
 	active_eikon = m
+	_snd("eikon_summon")
 	mount_on(m)
 	meter = 0.0
 	meter_changed.emit(meter)
@@ -1404,6 +1564,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		add_meter(15.0)
 		parries_landed += 1
 		parry_state = Parry.NONE # éxito: sin recuperación
+		_snd("parry")
 		return "parry"
 	if parry_state == Parry.RECOVERY:
 		amount *= PARRY_EXPOSED_MULT
@@ -1411,6 +1572,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		if _kind == "arrow":
 			spend_stamina(COST_BLOCKED_ARROW) # flecha anulada por completo
 			_kv.event("block_hit")
+			_snd("block")
 			if stamina <= 0.0:
 				_guard_break()
 			return "block"
@@ -1419,6 +1581,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 			spend_stamina(COST_BLOCKED_EIKON)
 			add_meter(3.0)
 			_kv.event("block_hit")
+			_snd("block")
 			if stamina <= 0.0:
 				_guard_break()
 			return "block"
@@ -1427,6 +1590,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		spend_stamina(blocked_hit_cost(amount, from))
 		add_meter(3.0)
 		_kv.event("block_hit")
+		_snd("block")
 		if stamina <= 0.0:
 			_guard_break()
 		return "block"
@@ -1440,9 +1604,16 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		amount *= 1.0 - float(ad["sagrado"])
 	if _kind == "aoe":
 		amount *= EquipStats.resist_mult("inmunidad", eq, eq_ref) # Inmunidad: daño de área
+	amount *= status_fx.damage_taken_mult() # congelación: más daño recibido
 	_damage(amount)
 	add_meter(5.0)
 	_kv.event("hit")
+	if _kind == "arrow":
+		_snd("arrow_hit")
+	_snd("hit_armor" if not eq.is_empty() and float(eq["absorcion"].get("fisico", 0.0)) >= 0.3 else "hit_flesh")
+	var stx := _status_from(from, _kind)
+	for sk: String in stx:
+		add_status(sk, float(stx[sk]))
 	if _kind == "melee":
 		impact.emit(0.5)
 	# Poise / hit-stun: intercambiar golpes no sale gratis
@@ -1476,6 +1647,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 func _guard_break() -> void:
 	guard_breaks += 1
 	blocking = false
+	_snd("guard_break")
 	apply_stun(GUARD_BREAK_STAGGER * (EquipStats.resist_mult("concentracion", eq, eq_ref) if not eq.is_empty() else 1.0))
 	impact.emit(0.8)
 
@@ -1548,6 +1720,7 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	parry_state = Parry.NONE
 	poise = poise_max
 	riposte_t = 0.0
+	status_fx.reset()
 	var start_l := Loadout.BOW if weapon.ranged else Loadout.SWORD_SHIELD
 	if swap_t > 0.0 or loadout != start_l:
 		swap_t = 0.0

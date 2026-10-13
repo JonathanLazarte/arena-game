@@ -7,10 +7,12 @@ var _players: Dictionary = {}
 var played: Array = [] ## historial (pruebas)
 
 func _ready() -> void:
+	AudioMgrBuses.ensure()
 	for k: String in SOUNDS:
 		var p := AudioStreamPlayer.new()
 		p.stream = load(SOUNDS[k])
 		p.volume_db = -10.0 if k == "hover" else -4.0
+		p.bus = "UI" # ronda 20: bus de interfaz (Ajustes)
 		add_child(p)
 		_players[k] = p
 

@@ -133,6 +133,7 @@ func _build_picker() -> void:
 	c.name = "PickerCancel"
 	c.custom_minimum_size = Vector2(160, 54)
 	c.pressed.connect(func() -> void: picker.visible = false)
+	UIKit.close_x(picker, Vector2(200 + 880 - 50, 78), "PickerX", func() -> void: picker.visible = false) # ronda 20
 	f.add_child(c)
 
 # ---------------- Contenido ----------------

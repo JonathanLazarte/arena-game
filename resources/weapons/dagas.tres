@@ -84,3 +84,4 @@ mesh_left = "Knife_Offhand"
 max_combo = 3
 combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])
 heavy_hitstun = 0.45
+status = {"sangrado": 18.0}

@@ -5,8 +5,10 @@ extends Node3D
 
 ## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
 ## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
-const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Tienda", "Inventario"]
-const SHOP_CATS := ["Armas", "Armaduras", "Eikons"]
+## Ronda 20: pestañas Herrero y Ajustes; cada panel tiene «✕» (y Esc / Atrás) para cerrarlo.
+const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Herrero", "Tienda", "Inventario", "Ajustes"]
+const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales"]
+const BUS_NAMES := {"Master": "General", "Música": "Música", "Efectos": "Efectos", "UI": "Interfaz"}
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
 const KIND_NAME := {"weapon": "arma", "eikon": "eikon", "armor": "armadura"}
 
@@ -48,6 +50,8 @@ var modal_ok: Button
 var _modal_cb: Callable
 var toast: Label
 var view_char: String = "" ## personaje que se está viendo (puede estar bloqueado)
+var close_button: Button
+var smith_sel: String = "" ## arma elegida en el Herrero
 
 func _ready() -> void:
 	gs = get_node("/root/GameState")
@@ -60,7 +64,11 @@ func _ready() -> void:
 	add_child(stage)
 	_build_ui()
 	view_char = gs.character_id
+	smith_sel = gs.weapon_id
 	_refresh_all()
+	var au := get_node_or_null("/root/Audio")
+	if au:
+		au.music("lobby") # ronda 20
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if stage == null:
@@ -75,6 +83,12 @@ func _unhandled_input(ev: InputEvent) -> void:
 				KEY_ENTER, KEY_KP_ENTER: _modal_accept()
 				KEY_ESCAPE: close_modal()
 			return
+		if (ev as InputEventKey).keycode == KEY_ESCAPE:
+			close_top()
+			get_viewport().set_input_as_handled()
+			return
+		if attr_screen.visible or sheet.picker.visible:
+			return
 		match (ev as InputEventKey).keycode:
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE: play()
 			KEY_1: set_difficulty("facil")
@@ -82,6 +96,32 @@ func _unhandled_input(ev: InputEvent) -> void:
 			KEY_3: set_difficulty("dificil")
 			KEY_Q: _cycle_tab(-1)
 			KEY_E, KEY_TAB: _cycle_tab(1)
+
+## Ronda 20: Esc / Atrás cierra lo que esté encima: confirmación, Atributos, selector de equipo
+## o la pestaña abierta (vuelve al escaparate sin pestaña). Devuelve lo que cerró.
+func close_top() -> String:
+	if modal.visible:
+		close_modal()
+		return "modal"
+	if attr_screen.visible:
+		attr_screen.close()
+		return "Atributos"
+	if sheet.picker.visible:
+		sheet.picker.visible = false
+		return "picker"
+	if tab != "":
+		var t := tab
+		set_tab("")
+		return t
+	return ""
+
+func _process(_d: float) -> void:
+	if close_button:
+		close_button.visible = tab != "" and not sheet.picker.visible
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and stage != null:
+		close_top() # botón Atrás de Android
 
 func _cycle_tab(d: int) -> void:
 	var i := TABS.find(tab)
@@ -243,6 +283,7 @@ func _build_ui() -> void:
 	sheet.build(gs)
 	sheet.attributes_requested.connect(open_attributes)
 	sheet.changed.connect(func() -> void: _refresh_all())
+	close_button = UIKit.close_x(root_ui, Vector2(850 + 410 - 50, 82), "CloseX", func() -> void: set_tab(""))
 	_build_modal()
 	attr_screen = AttrScreen.new()
 	attr_screen.visible = false
@@ -379,6 +420,7 @@ func request_set_purchase(set_id: String) -> void:
 func confirm_set_purchase(set_id: String) -> void:
 	if gs.buy_set(set_id) == "ok":
 		UIKit.sfx("confirm")
+		UIKit.audio("purchase")
 		show_toast("¡%s comprado!" % _item_name("set", set_id))
 		_refresh_all(false)
 
@@ -386,6 +428,7 @@ func confirm_purchase(kind: String, id: String) -> void:
 	if gs.buy(kind, id) != "ok":
 		return
 	UIKit.sfx("confirm")
+	UIKit.audio("purchase")
 	show_toast("¡%s desbloqueado!" % _item_name(kind, id))
 	gs.save_loadout() # ronda 19: comprar no equipa (se equipa desde Personaje/Armas/Eikons)
 	_refresh_all(false)
@@ -453,9 +496,13 @@ func _refresh_all(rebuild: bool = true) -> void:
 	for ch in stats_box.get_children():
 		ch.queue_free()
 	list_scroll.visible = tab != "Habilidades"
+	list_scroll.custom_minimum_size.y = 96.0 if tab == "Herrero" else 180.0
 	tree_view.visible = tab == "Habilidades"
 	right_panel.visible = tab != "" and tab != "Personaje"
 	sheet.visible = tab == "Personaje"
+	close_button.visible = tab != ""
+	close_button.position = Vector2(262 + 1000 - 50, 82) if tab == "Personaje" else Vector2(850 + 410 - 50, 82)
+
 	name_label.visible = tab != "Personaje"
 	role_label.visible = tab != "Personaje"
 	match tab:
@@ -478,7 +525,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 					else:
 						request_purchase("weapon", w.id))
 			list_box.add_child(UIKit.label("Más armas en la Tienda.", 15, UIKit.MUTED))
-			var cw := Catalog.weapon(gs.weapon_id)
+			var cw: WeaponDef = gs.eff_weapon(gs.weapon_id)
 			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, "Sí" if cw.allows_shield else "No", cw.max_combo]
 			# Ronda 18: escalado (S-E) y requisitos
 			var at: Dictionary = gs.char_attrs()
@@ -525,13 +572,18 @@ func _refresh_all(rebuild: bool = true) -> void:
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
 			detail.text = "[b]Árbol de %s[/b] · Nivel %d\nPuntos disponibles: [color=#f2dc99]%d[/color] (1 por nivel del personaje). Toca un nodo para aprenderlo." % [cur.display_name, gs.char_level(), gs.skill_points()]
 			_stat("XP personaje", cl.x, cl.y, "%d/%d" % [cl.x, cl.y])
+		"Herrero":
+			_build_smith(cur)
+		"Ajustes":
+			_build_settings()
 		"Tienda":
 			_build_shop(cur)
 		"Inventario":
 			var e2: EikonData = load(Catalog.EIKONS[gs.eikon_id])
-			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + Catalog.weapon(gs.weapon_id).display_name,
+			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + gs.eff_weapon(gs.weapon_id).display_name,
 					"Eikon: %s (%s)" % [e2.eikon_name, "montable" if e2.rideable else "compañero"], "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty],
-					"Armas: %d · Eikons: %d · Piezas de armadura: %d" % [gs.owned_weapons.size(), gs.owned_eikons.size(), gs.owned_armor.size()]]:
+					"Armas: %d · Eikons: %d · Piezas de armadura: %d" % [gs.owned_weapons.size(), gs.owned_eikons.size(), gs.owned_armor.size()],
+					"Piedras: " + " · ".join(Smithing.STONES.map(func(sid: String) -> String: return "%s ×%d" % [Smithing.STONE_NAMES[sid].replace("Piedra de forja", "P."), gs.material(sid)]))]:
 				list_box.add_child(UIKit.label(ln, 19))
 			detail.text = "[b]Equipamiento actual[/b]\nSe guarda automáticamente en este dispositivo. El rival recibe un equipamiento aleatorio."
 
@@ -556,9 +608,9 @@ func _build_shop(cur: CharacterDef) -> void:
 	cats.add_theme_constant_override("separation", 6)
 	list_box.add_child(cats)
 	for ct: String in SHOP_CATS:
-		var b := UIKit.button(ct, 16, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
+		var b := UIKit.button(ct, 14, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
 		b.name = "Cat_" + ct
-		b.custom_minimum_size = Vector2(118, 40)
+		b.custom_minimum_size = Vector2(89, 40)
 		b.pressed.connect(func() -> void:
 			shop_cat = ct
 			_refresh_all(false))
@@ -589,6 +641,13 @@ func _build_shop(cur: CharacterDef) -> void:
 				b.name = "Buy_eikon_" + id
 				b.disabled = own
 			detail.text = "[b]Tienda · Eikons[/b]\nMontables y compañeros."
+		"Materiales":
+			for sid: String in Smithing.STONES:
+				var lv_ok: bool = gs.account_level() >= int(Smithing.STONE_SHOP_LEVEL[sid])
+				var t: String = "%s (tienes %d) — %s" % [Smithing.STONE_NAMES[sid], gs.material(sid), ("%d oro" % Smithing.STONE_PRICES[sid]) if lv_ok else "Nivel %d" % Smithing.STONE_SHOP_LEVEL[sid]]
+				var b := _card(t, false, true, buy_stone.bind(sid))
+				b.name = "Buy_stone_" + sid
+			detail.text = "[b]Tienda · Materiales[/b]\nPiedras de forja para mejorar armas en el Herrero. También se ganan en cada partida (más si ganas)."
 
 ## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
 func _update_dots() -> void:
@@ -616,3 +675,125 @@ func play() -> void:
 	gs.save_loadout()
 	UIKit.sfx("confirm")
 	UIKit.go("res://scenes/arena.tscn")
+
+func buy_stone(sid: String) -> void:
+	match gs.buy_stone(sid):
+		"ok":
+			UIKit.audio("purchase")
+			show_toast("+1 " + Smithing.STONE_NAMES[sid])
+		"nivel":
+			show_toast("Requiere nivel de cuenta %d" % Smithing.STONE_SHOP_LEVEL[sid])
+		"oro":
+			show_toast("Oro insuficiente")
+	_refresh_all(false)
+
+# ---------------- Herrero (ronda 20) ----------------
+
+func _ar_of(w: WeaponDef) -> float:
+	return float(EquipStats.attack_rating(Catalog.character(gs.character_id), w, gs.char_attrs())["total"])
+
+func _status_text(w: WeaponDef) -> String:
+	var parts: Array = []
+	for k: String in w.status:
+		parts.append("%s %d" % [StatusFx.NAMES[k], roundi(float(w.status[k]))])
+	return " · ".join(parts) if not parts.is_empty() else "—"
+
+func _build_smith(cur: CharacterDef) -> void:
+	if not smith_sel in gs.owned_weapons or not cur.allows(smith_sel):
+		smith_sel = gs.weapon_id
+	for w in Catalog.weapons_for(cur):
+		if not gs.is_unlocked("weapon", w.id):
+			continue
+		var ew: WeaponDef = gs.eff_weapon(w.id)
+		var b := _card(ew.display_name, w.id == smith_sel, false, func() -> void:
+			smith_sel = w.id
+			_refresh_all(false), false)
+		b.name = "Smith_" + w.id
+	var base: WeaponDef = Catalog.weapon(smith_sel)
+	var lv: int = gs.weapon_level(smith_sel)
+	var inf: String = gs.weapon_infusion(smith_sel)
+	var now := Smithing.effective(base, lv, inf)
+	var nxt := Smithing.effective(base, mini(lv + 1, Smithing.MAX_LEVEL), inf)
+	var ar0 := _ar_of(now)
+	var ar1 := _ar_of(nxt)
+	var t := "[b]%s[/b] · Infusión: %s\n" % [now.display_name, Smithing.INFUSIONS[inf]["name"]]
+	if lv >= Smithing.MAX_LEVEL:
+		t += "Ataque [color=#f2dc99]%d[/color] · Mejora máxima (+%d)\n" % [roundi(ar0), lv]
+	else:
+		var c := Smithing.cost(lv + 1)
+		t += "Ataque [color=#f2dc99]%d[/color] → [color=#7dff8a]%d[/color] (+%d → +%d)\n" % [roundi(ar0), roundi(ar1), lv, lv + 1]
+		t += "Escalado %s → %s\n" % [Attributes.scaling_text(now), Attributes.scaling_text(nxt)]
+		t += "Coste: %d oro + %d× %s (tienes %d)\n" % [c["oro"], c["n"], Smithing.STONE_NAMES[c["piedra"]], gs.material(c["piedra"])]
+	t += "Estado: %s" % _status_text(now)
+	detail.text = t
+	var up := UIKit.big_button("Mejorar" if lv < Smithing.MAX_LEVEL else "Máximo", 20)
+	up.name = "SmithUpgrade"
+	up.custom_minimum_size = Vector2(380, 46)
+	up.disabled = gs.can_upgrade(smith_sel) != "ok"
+	up.pressed.connect(upgrade_selected)
+	stats_box.add_child(up)
+	var g := GridContainer.new()
+	g.columns = 3
+	g.add_theme_constant_override("h_separation", 4)
+	g.add_theme_constant_override("v_separation", 4)
+	stats_box.add_child(g)
+	for k: String in Smithing.INFUSION_ORDER:
+		var ib := UIKit.button(Smithing.INFUSIONS[k]["name"], 15, UIKit.ORANGE if k == inf else UIKit.BLUE)
+		ib.name = "Inf_" + (k if k != "" else "normal")
+		ib.custom_minimum_size = Vector2(124, 36)
+		ib.tooltip_text = "Infusión %s (%s)" % [Smithing.INFUSIONS[k]["name"], "gratis" if k == "" else "%d oro" % Smithing.INFUSE_GOLD]
+		ib.pressed.connect(infuse_selected.bind(k))
+		g.add_child(ib)
+
+func upgrade_selected() -> String:
+	var r: String = gs.upgrade_weapon(smith_sel)
+	match r:
+		"ok":
+			UIKit.audio("smith")
+			show_toast("¡%s!" % gs.eff_weapon(smith_sel).display_name)
+		"oro": show_toast("Oro insuficiente")
+		"piedra": show_toast("Faltan piedras de forja (Tienda · Materiales)")
+		"max": show_toast("Mejora máxima")
+	_refresh_all(false)
+	return r
+
+func infuse_selected(k: String) -> String:
+	var r: String = gs.infuse(smith_sel, k)
+	match r:
+		"ok":
+			UIKit.audio("smith")
+			show_toast("Infusión: " + Smithing.INFUSIONS[k]["name"])
+		"oro": show_toast("Oro insuficiente (%d)" % Smithing.INFUSE_GOLD)
+	_refresh_all(false)
+	return r
+
+# ---------------- Ajustes (ronda 20) ----------------
+
+func _build_settings() -> void:
+	var au := get_node_or_null("/root/Audio")
+	list_box.add_child(UIKit.title("Volumen", 22))
+	for bus: String in BUS_NAMES:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var l := UIKit.label(BUS_NAMES[bus], 18)
+		l.custom_minimum_size = Vector2(100, 0)
+		row.add_child(l)
+		var sl := HSlider.new()
+		sl.name = "Vol_" + bus
+		sl.min_value = 0.0
+		sl.max_value = 1.0
+		sl.step = 0.05
+		sl.custom_minimum_size = Vector2(200, 32)
+		sl.value = au.get_volume(bus) if au else 1.0
+		var pl := UIKit.label("%d %%" % roundi(sl.value * 100.0), 16, UIKit.MUTED)
+		pl.custom_minimum_size = Vector2(56, 0)
+		sl.value_changed.connect(func(v: float) -> void:
+			if au:
+				au.set_volume(bus, v)
+			pl.text = "%d %%" % roundi(v * 100.0)
+			if bus == "UI" or bus == "Efectos":
+				UIKit.sfx("click"))
+		row.add_child(sl)
+		row.add_child(pl)
+		list_box.add_child(row)
+	detail.text = "[b]Ajustes de sonido[/b]\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."

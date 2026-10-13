@@ -27,3 +27,19 @@ El arco del jugador, los efectos (arcos de espada, anillos, proyectiles) y la in
 
 El panel con degradado y filos, el cursor de cristal, los iconos de moneda y cristal, la insignia de nivel, el cielo con estrellas y aurora, el cristal flotante y las esquirlas están hechos por código, sin recursos externos. (Lilita One, de la ronda 12, se retiró en la ronda 13.)
 
+
+## Audio (ronda 20, provisional)
+
+Todo CC0 1.0 (dominio público). Licencias comprobadas en la página de cada recurso (OpenGameArt indica «License(s): CC0»; los packs de Kenney incluyen `License.txt` CC0, copiado en `assets/audio/License-Kenney.txt`).
+
+| Recurso | Autor | Fuente | Licencia | Archivos |
+|---|---|---|---|---|
+| Battle Theme A (música del lobby) | cynicmusic (pixelsphere.org) | https://opengameart.org/content/battle-theme-a | CC0 | `assets/audio/music/lobby_battle_theme_a.mp3` |
+| Hope (Orchestral battle music) (combate 1) | MintoDog | https://opengameart.org/content/hopeorchestral-battle-music | CC0 | `assets/audio/music/battle_hope.ogg` |
+| The Final Battle (combate 2) | skrjablin | https://opengameart.org/content/the-final-battle | CC0 | `assets/audio/music/battle_final.ogg` |
+| Music Jingles (Steel 00 victoria, Pizzicato 08 derrota, Hit 00 invocación) | Kenney | https://kenney.nl/assets/music-jingles | CC0 | `assets/audio/music/stinger_*.ogg`, `assets/audio/sfx/eikon_summon.ogg` |
+| Swishes Sound Pack (tajos, fallos, suelta de flecha, viento y fuego con el tono cambiado) | artisticdude | https://opengameart.org/content/swishes-sound-pack | CC0 | `assets/audio/sfx/swing_*`, `whiff_1`, `bow_release`, `eikon_fire`, `eikon_wind` |
+| Impact Sounds (golpes en carne y armadura, bloqueo, parry, rotura de guardia, pisadas, aterrizaje, flecha, hielo, golpe del gólem, golpe a eikon, congelación) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 | `assets/audio/sfx/hit_*`, `block_*`, `parry`, `guard_break`, `step_*`, `land`, `arrow_hit`, `eikon_ice`, `eikon_slam`, `hit_eikon`, `status_congelacion` |
+| RPG Audio (voltereta/tela, salto, tensar el arco, ballesta, monedas, herrero, sangrado y veneno) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 | `assets/audio/sfx/roll_*`, `jump`, `bow_draw`, `xbow_*`, `purchase`, `smith`, `status_sangrado`, `status_veneno` |
+
+Algunos efectos se han convertido de WAV a OGG o se les ha cambiado el tono o el volumen con ffmpeg.

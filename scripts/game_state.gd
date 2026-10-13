@@ -7,7 +7,7 @@ extends Node
 ## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 6
+const SAVE_VERSION := 7
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -31,6 +31,11 @@ var owned_armor: Array = []
 var armor_eq: Dictionary = {} ## slot -> id ("" = nada)
 var weapon2_id: String = "" ## arma secundaria (la del otro tipo: cuerpo a cuerpo / a distancia)
 var armor_migrated: bool = false ## ronda 18: se repartieron los atributos al migrar
+var weapon_up: Dictionary = {} ## ronda 20: id arma -> nivel de mejora (+0..+10)
+var weapon_inf: Dictionary = {} ## ronda 20: id arma -> infusión ("" = normal)
+var materials: Dictionary = {} ## ronda 20: id piedra -> cantidad
+var smith_migrated: bool = false ## v<7: se regalaron piedras de bienvenida
+const SMITH_WELCOME := {"piedra_1": 3}
 var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
 var active_slot: int = 0
 var char_migration: Dictionary = {} ## ronda 15: personajes extra reembolsados al migrar
@@ -129,14 +134,84 @@ func weapon2() -> WeaponDef:
 	if weapon2_id == "":
 		return null
 	var w := Catalog.weapon(weapon2_id)
-	return w if w.id == weapon2_id and w.ranged != Catalog.weapon(weapon_id).ranged else null
+	return eff_weapon(weapon2_id) if w.id == weapon2_id and w.ranged != Catalog.weapon(weapon_id).ranged else null
+
+# ---------------- Herrería (ronda 20) ----------------
+
+func weapon_level(id: String) -> int:
+	return int(weapon_up.get(id, 0))
+
+func weapon_infusion(id: String) -> String:
+	return String(weapon_inf.get(id, ""))
+
+## Arma con su mejora e infusión aplicadas.
+func eff_weapon(id: String) -> WeaponDef:
+	return Smithing.effective(Catalog.weapon(id), weapon_level(id), weapon_infusion(id))
+
+func material(sid: String) -> int:
+	return int(materials.get(sid, 0))
+
+func add_material(sid: String, n: int) -> void:
+	materials[sid] = material(sid) + n
+
+## "ok", "no" (no es suya), "max", "oro" o "piedra".
+func can_upgrade(id: String) -> String:
+	if not id in owned_weapons:
+		return "no"
+	var nx := weapon_level(id) + 1
+	if nx > Smithing.MAX_LEVEL:
+		return "max"
+	var c := Smithing.cost(nx)
+	if oro < int(c["oro"]):
+		return "oro"
+	if material(c["piedra"]) < int(c["n"]):
+		return "piedra"
+	return "ok"
+
+func upgrade_weapon(id: String) -> String:
+	var r := can_upgrade(id)
+	if r != "ok":
+		return r
+	var c := Smithing.cost(weapon_level(id) + 1)
+	oro -= int(c["oro"])
+	materials[c["piedra"]] = material(c["piedra"]) - int(c["n"])
+	weapon_up[id] = weapon_level(id) + 1
+	save_loadout()
+	return "ok"
+
+## Infusión: "ok", "no", "ya" u "oro". Volver a Normal es gratis.
+func infuse(id: String, inf: String) -> String:
+	if not id in owned_weapons or not Smithing.INFUSIONS.has(inf):
+		return "no"
+	if weapon_infusion(id) == inf:
+		return "ya"
+	var price := 0 if inf == "" else Smithing.INFUSE_GOLD
+	if oro < price:
+		return "oro"
+	oro -= price
+	weapon_inf[id] = inf
+	save_loadout()
+	return "ok"
+
+## Compra una piedra en la Tienda: "ok", "nivel" u "oro".
+func buy_stone(sid: String) -> String:
+	if not Smithing.STONE_PRICES.has(sid):
+		return "no"
+	if account_level() < int(Smithing.STONE_SHOP_LEVEL[sid]):
+		return "nivel"
+	if oro < int(Smithing.STONE_PRICES[sid]):
+		return "oro"
+	oro -= int(Smithing.STONE_PRICES[sid])
+	add_material(sid, 1)
+	save_loadout()
+	return "ok"
 
 func armor_pieces() -> Dictionary:
 	return EquipStats.armor_defs(armor_eq)
 
 ## Hoja de estadísticas del personaje equipado.
 func sheet() -> Dictionary:
-	return EquipStats.sheet(Catalog.character(character_id), char_level(), char_attrs(), Catalog.weapon(weapon_id), weapon2(), armor_pieces())
+	return EquipStats.sheet(Catalog.character(character_id), char_level(), char_attrs(), eff_weapon(weapon_id), weapon2(), armor_pieces())
 
 ## Compra todas las piezas que faltan de un conjunto. "ok", "ya", "nivel" u "oro".
 func buy_set(set_id: String) -> String:
@@ -275,10 +350,13 @@ func apply_match_result(stats: Dictionary) -> Dictionary:
 	var acc_up := account_level() - acc0
 	var bonus := acc_up * Progression.GOLD_LEVEL_UP
 	oro += int(rw["gold"]) + bonus
+	var stones := Smithing.match_reward(bool(stats.get("won", false)), char_level())
+	for sid: String in stones:
+		add_material(sid, int(stones[sid]))
 	last_result = {"won": stats.get("won", false), "perfect": stats.get("won", false) and int(stats.get("lost_rounds", 1)) == 0, "xp": rw["xp"], "gold": int(rw["gold"]) + bonus, "level_bonus": bonus,
 		"lines": rw["lines"], "mult": rw["mult"], "account_before": acc0, "account_after": account_level(),
 		"char_before": ch0, "char_after": char_level(), "account_xp_before": acc_xp0, "account_xp": account_xp,
-		"character": character_id}
+		"character": character_id, "stones": stones}
 	save_loadout()
 	return last_result
 
@@ -301,6 +379,9 @@ func save_loadout() -> void:
 	cfg.set_value("progreso", "owned_weapons", owned_weapons)
 	cfg.set_value("progreso", "owned_eikons", owned_eikons)
 	cfg.set_value("progreso", "owned_armor", owned_armor)
+	cfg.set_value("herreria", "niveles", weapon_up)
+	cfg.set_value("herreria", "infusiones", weapon_inf)
+	cfg.set_value("herreria", "materiales", materials)
 	cfg.save(save_path)
 
 func load_loadout() -> void:
@@ -365,6 +446,17 @@ func load_loadout() -> void:
 	if ver < 6 and first_run_done:
 		_give_starter_armor(character_id) # v<6: se regala el equipo inicial del rol
 		armor_migrated = true
+		if migrated_from == 0:
+			migrated_from = ver
+	weapon_up = cfg.get_value("herreria", "niveles", {}) if ver >= 7 else {}
+	weapon_inf = cfg.get_value("herreria", "infusiones", {}) if ver >= 7 else {}
+	materials = cfg.get_value("herreria", "materiales", {}) if ver >= 7 else {}
+	smith_migrated = false
+	if ver < 7 and first_run_done:
+		# v<7: armas a +0 sin infusión y piedras de bienvenida para probar la herrería
+		for sid: String in SMITH_WELCOME:
+			add_material(sid, int(SMITH_WELCOME[sid]))
+		smith_migrated = true
 		if migrated_from == 0:
 			migrated_from = ver
 	attr_migrated = false
@@ -460,6 +552,10 @@ func reset_defaults() -> void:
 	armor_eq = {}
 	weapon2_id = ""
 	armor_migrated = false
+	weapon_up = {}
+	weapon_inf = {}
+	materials = {}
+	smith_migrated = false
 	unlocked_chars = []
 	owned_weapons = []
 	owned_eikons = ["fenix"]

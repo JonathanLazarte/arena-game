@@ -400,3 +400,43 @@ Fórmulas (propias; todo relativo a la referencia del rol: nivel 1, reparto inic
 Elementos de los eikons: fénix fuego, lobo mágico, grifo rayo y gólem físico. Las armaduras son 9 conjuntos de 4 piezas: los 5 iniciales de cada rol y 4 a la venta (Seda del viento, ligera; Malla del vigía, media; Túnica de ceniza, ligera con absorción de fuego; Placas del bastión, pesada). La armadura se ve con piezas sencillas teñidas sobre los huesos del modelo de KayKit. Guardado v6: se regala el equipo inicial. El rival lleva el conjunto de su rol a partir del nivel 3.
 
 Fuentes: Fextralife «Calculating Damage», «Equip Load», «Damage Types», «Robustness»; Eldenpedia «Equip Load», «Immunity», «Vitality», «Poise»; Bandai Namco «ELDEN RING How-To Guide Part 1 – Stats».
+
+## Ronda 20 — Audio, estados alterados, herrería e infusiones, botones de cierre
+
+**Audio provisional (CC0).** El autoload `Audio` (`scripts/audio_manager.gd`) crea los buses Master, Música, Efectos e UI. La música pasa de una pista a otra con un fundido cruzado: el lobby, dos temas de combate (uno al azar en cada partida) y las ráfagas de victoria y derrota. Los efectos suenan con un tono aleatorio de ±8 %; en la arena son posicionales (`AudioStreamPlayer3D`). Tienen sonido el tajo (ligero o pesado según el peso del arma), el golpe en carne o en armadura (según la absorción física), el bloqueo, la rotura de guardia, el parry, el fallo, la voltereta, los pasos, el salto y la caída, tensar y soltar el arco, disparar y recargar la ballesta, el impacto de la flecha, la invocación, los especiales de cada eikon (fuego, mordisco de hielo, vendaval, golpe del gólem y Golpe sísmico), el golpe a un eikon, el estallido de cada estado, la compra y la herrería. Los sonidos de interfaz de siempre van ahora por el bus UI. La pestaña **Ajustes** tiene un deslizador por bus y guarda los valores en `user://ajustes.cfg`. Las fuentes y licencias están en CREDITS.md.
+
+**Estados alterados (acumulación al estilo Elden Ring).** Cada golpe suma puntos a una barra. Al llenarse, se dispara el efecto y la barra vuelve a 0 (con 1,5 s de bloqueo). La barra empieza a bajar a 10 puntos/s tras 1,5 s sin acumular. El umbral es 10 + la resistencia de la ficha. Las barras se ven en el HUD (propias y del rival) y sobre la cabeza del rival. Cada estallido suelta partículas del color del estado y tiñe al personaje; con veneno o congelación hay un aura y un tinte que duran lo que dura el efecto.
+
+| Estado | Resiste | Efecto (valores propios) | Elden Ring (referencia) | Fuentes |
+|---|---|---|---|---|
+| Sangrado | Robustez | 12 % de la vida máx. + 6 de golpe | 15 % + 100/200 (jefes 70 %) | Dagas (18/golpe), infusión Sangrante (20) |
+| Veneno | Inmunidad | 2 de daño/s durante 14 s | 0,07 % + 7/s durante 90 s (mortal: 0,14 % + 14/s, 30 s) | Infusión Venenosa (22) |
+| Congelación | Robustez | 8 % + 4 de golpe; 12 s con +15 % de daño recibido y aguante al 60 % | 10 % + 30 de golpe; +20 % de daño recibido durante 30 s | Lobo de Hielo (30 por golpe de eikon), infusión Gélida (20) |
+
+A nivel 1, el umbral del rival es de unos 100 (6 golpes de dagas para sangrar). Más Aguante o armadura pesada lo suben: el Bastión lo deja en unos 140. Valores de referencia de Fextralife: «Hemorrhage», «Poison», «Frostbite» y «Robustness». En ER la acumulación tampoco tiene enfriamiento; la nuestra lleva un bloqueo corto para que el 1v1 no se vuelva una cadena de estallidos.
+
+**Herrería.** La pestaña **Herrero** tiene la lista de tus armas, el Ataque antes y después de mejorar, el escalado, el coste y el estado del arma; el botón Mejorar; y seis infusiones.
+
+| Mejora | Piedra | Piedras | Oro |
+|---|---|---|---|
+| +1 / +2 / +3 | Piedra de forja I | 1 / 2 / 3 | 120 / 280 / 480 |
+| +4 / +5 / +6 | Piedra de forja II | 1 / 2 / 3 | 720 / 1000 / 1320 |
+| +7 / +8 / +9 | Piedra de forja III | 1 / 2 / 3 | 1680 / 2080 / 2520 |
+| +10 | Piedra de forja antigua | 1 | 3000 |
+
+Cada nivel da +6 % de daño base (+10 = +60 %) y +4 % a los coeficientes de escalado, así que mejorar luce más cuantos más atributos tengas. La acumulación de estado sube un 3 % por nivel (4 % la de la infusión). Las piedras se ganan en cada partida (al ganar, 2 de nivel I, +1 de nivel II desde el nivel 4 y +1 de nivel III desde el 7; al perder, 1 de nivel I) y se compran en Tienda → Materiales (150 / 350 / 700 / 2000 de oro; de nivel de cuenta 1 / 3 / 5 / 8). En ER son 2/4/6 piedras por nivel hasta +25 con la piedra antigua al final (Fextralife «Smithing Stones», «Upgrades»); aquí está comprimido a +10.
+
+| Infusión | Efecto | Coste |
+|---|---|---|
+| Normal | sin cambios | gratis (quita la infusión) |
+| Pesada | FUE ×1,4 + 0,3; DES ×0,3; daño ×1,04 | 500 de oro |
+| Afilada | DES ×1,4 + 0,3; FUE ×0,4 | 500 de oro |
+| Sangrante | +20 de sangrado/golpe; daño ×0,92 | 500 de oro |
+| Venenosa | +22 de veneno/golpe; daño ×0,92 | 500 de oro |
+| Gélida | +20 de congelación/golpe; daño ×0,92 | 500 de oro |
+
+Las armas se mejoran en una copia del recurso (`Smithing.effective`); +0 normal es exactamente el arma de antes, así que el nivel 1 no cambia. El rival lleva su arma a +⌊(nivel − 1)/2⌋. Guardado v7 (`[herreria]`: niveles, infusiones y materiales). Al migrar de v6 o antes, las armas quedan a +0 y se regalan 3 Piedras de forja I.
+
+**Cierre de paneles.** Personaje, Armas, Eikons, Habilidades, Herrero, Tienda, Inventario y Ajustes tienen un «✕» arriba a la derecha. La pantalla de Atributos y el selector de equipo tienen el suyo. Esc y el botón Atrás de Android cierran lo que esté encima: la confirmación, luego Atributos, luego el selector y luego la pestaña. Al cerrar se vuelve al escaparate sin ninguna pestaña elegida.
+
+Pruebas nuevas: `test_status.gd`, `test_smithing.gd` (incluye la migración de v6 a v7) y `test_ui_audio.gd` (botones de cierre, Esc y Atrás, buses, volúmenes guardados y efectos 3D).

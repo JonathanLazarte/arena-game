@@ -115,6 +115,7 @@ func _build() -> void:
 	cl.custom_minimum_size = Vector2(160, 54)
 	cl.pressed.connect(close)
 	foot.add_child(cl)
+	UIKit.close_x(self, Vector2(150 + 980 - 50, 58), "AttrX", close) # ronda 20
 
 func free_points() -> int:
 	return Attributes.free_points(gs.character_id, pending, gs.char_level())

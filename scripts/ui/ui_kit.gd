@@ -380,3 +380,23 @@ static func go(path: String, d: float = 0.35) -> void:
 		f.go(path, d)
 	else:
 		t.change_scene_to_file(path)
+
+## Ronda 20: botón de cierre «✕» (arriba a la derecha de cada panel).
+static func close_x(parent: Node, pos: Vector2, nm: String, cb: Callable) -> Button:
+	var b := button("✕", 22, RED)
+	b.name = nm
+	b.tooltip_text = "Cerrar (Esc)"
+	b.custom_minimum_size = Vector2(42, 42)
+	b.size = Vector2(42, 42)
+	b.position = pos
+	b.pressed.connect(func() -> void:
+		sfx("click")
+		cb.call())
+	parent.add_child(b)
+	return b
+
+static func audio(name: String) -> void:
+	var t := Engine.get_main_loop() as SceneTree
+	var a := t.root.get_node_or_null("Audio") if t else null
+	if a:
+		a.sfx(name, "UI")

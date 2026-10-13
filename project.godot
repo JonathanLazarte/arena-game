@@ -2,6 +2,8 @@ config_version=5
 
 [application]
 
+config/quit_on_go_back=false
+
 config/name="Arena de Eikons"
 run/main_scene="res://scenes/lobby.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
@@ -11,6 +13,7 @@ config/features=PackedStringArray("4.7", "Mobile")
 InputSetup="*res://scripts/input_setup.gd"
 GameState="*res://scripts/game_state.gd"
 Sfx="*res://scripts/sfx.gd"
+Audio="*res://scripts/audio_manager.gd"
 Fade="*res://scripts/fade.gd"
 
 [display]

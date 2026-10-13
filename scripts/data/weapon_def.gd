@@ -58,6 +58,12 @@ extends Resource
 @export var requirements: Dictionary = {}
 ## Ronda 16: cadena de ataques básicos (3 golpes: ida, vuelta y remate). Vacío = ligero genérico.
 @export var combo: Array[Resource] = []
+## Ronda 20: acumulación de estado por golpe {"sangrado"/"veneno"/"congelacion": puntos}
+@export var status: Dictionary = {}
+## Ronda 20: herrería (las fija Smithing.effective en una copia; el recurso base va a +0)
+@export var upgrade_level: int = 0
+@export var infusion: String = ""
+@export var upgrade_dmg_mult: float = 1.0
 
 func combo_hit(i: int, cdef: CharacterDef = null) -> ComboHit:
 	if combo.is_empty():

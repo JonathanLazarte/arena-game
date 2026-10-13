@@ -421,12 +421,12 @@ func _build_tree() -> void:
 	playback = tree.get("parameters/act/playback") as AnimationNodeStateMachinePlayback
 	playback.start("none")
 
-func set_tint(c: Color, flash: bool) -> void:
+func set_tint(c: Color, flash: bool, ec: Color = Color.WHITE) -> void:
 	body_mat.albedo_color = Color.WHITE.lerp(c, 0.25) * _char_tint
 	accent_mat.albedo_color = Color.WHITE.lerp(c, 0.9) * _char_tint
 	for m: StandardMaterial3D in [body_mat, accent_mat]:
 		m.emission_enabled = flash
-		m.emission = Color.WHITE
+		m.emission = ec
 		m.emission_energy_multiplier = 0.8
 
 func set_glow(on: bool, c: Color) -> void:

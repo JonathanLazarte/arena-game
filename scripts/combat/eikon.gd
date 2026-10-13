@@ -152,6 +152,9 @@ func take_hit(amount: float, _from: Node3D, _kind: String) -> String:
 	if not alive:
 		return "none"
 	health -= amount
+	var au := get_node_or_null("/root/Audio")
+	if au:
+		au.sfx3d("hit_eikon", global_position)
 	if health <= 0.0:
 		_dismiss()
 	return "hit"

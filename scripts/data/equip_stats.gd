@@ -78,7 +78,7 @@ static func armor_defs(ids: Dictionary) -> Dictionary:
 static func attack_rating(c: CharacterDef, w: WeaponDef, a: Dictionary, dano_mod: float = 1.0, equipped: bool = true) -> Dictionary:
 	if w == null:
 		return {"base": 0.0, "bonus": 0.0, "total": 0.0, "fisico": 0.0, "sagrado": 0.0, "unmet": []}
-	var base := (w.arrow_damage if w.ranged else w.light_damage) * c.dano * dano_mod
+	var base := (w.arrow_damage if w.ranged else w.light_damage) * c.dano * dano_mod * w.upgrade_dmg_mult
 	var total := base * Attributes.weapon_mult(w, c.id, a, equipped)
 	var holy := 0.0
 	var cdev: float = w.scaling.get("devocion", 0.0)

@@ -272,6 +272,42 @@ func _run() -> void:
 			pp = p.global_position
 			cam.look_at_from_position(pp + p.facing.cross(Vector3.UP) * 6.0 + Vector3(0, 2.6, 0) + p.facing * 3.0, pp + Vector3(0, 1.6, 0) + p.facing * 0.5)
 			await process_frame
+	elif mode == "status":
+		# Ronda 20: barras de acumulación en combate (HUD y sobre el rival), veneno y congelación
+		gs.choose_first_character("asesino")
+		gs.weapon_id = "dagas"
+		gs.eikon_id = "lobo"
+		Arena.start_mounted = false
+		gs.from_lobby = true
+		gs.random_rival = false
+		change_scene_to_file("res://scenes/arena.tscn")
+		await process_frame
+		await process_frame
+		var ar: Arena = current_scene
+		ar.ai.enabled = false
+		ar.controller.set_physics_process(false)
+		ar.time_left = 71.0
+		await create_timer(3.2).timeout
+		var p := ar.player
+		var e := ar.enemy
+		p.global_position = Vector3(0, 0, 5)
+		e.global_position = Vector3(0.8, 0, 1.2)
+		p.facing = Vector3.FORWARD
+		p.face_target = e
+		e.facing = Vector3.BACK
+		e.poise = 1e6
+		e.take_hit(1.0, p, "melee")
+		e.stun = 0.0
+		e.add_status("veneno", 500.0)
+		e.add_status("sangrado", 60.0)
+		e.add_status("congelacion", 45.0)
+		p.add_status("congelacion", 60.0)
+		p.add_status("sangrado", 30.0)
+		var cam := Camera3D.new()
+		ar.add_child(cam)
+		cam.look_at_from_position(Vector3(-1.5, 3.2, 9.5), Vector3(0.5, 1.2, 1.5))
+		cam.current = true
+		await create_timer(0.4).timeout
 	elif mode == "results":
 		gs.choose_first_character("berserker")
 		gs.account_xp = 80
@@ -317,7 +353,14 @@ func _run() -> void:
 			gs.oro = 2400
 			await create_timer(0.6).timeout
 			var steps: Array = {"flow_sheet": ["Tab_Personaje"], "flow_attrs": ["Tab_Personaje", "AtributosButton"],
-				"flow_picker": ["Tab_Personaje", "Slot_pecho"], "flow_shop": ["Tab_Tienda", "Cat_Armaduras"]}[args[3]]
+				"flow_picker": ["Tab_Personaje", "Slot_pecho"], "flow_shop": ["Tab_Tienda", "Cat_Armaduras"],
+				"flow_smith": ["Tab_Herrero"], "flow_settings": ["Tab_Ajustes"], "flow_stones": ["Tab_Tienda", "Cat_Materiales"]}[args[3]]
+			if args[3] == "flow_smith":
+				gs.oro = 5000
+				gs.add_material("piedra_1", 6)
+				gs.upgrade_weapon(gs.weapon_id)
+				gs.upgrade_weapon(gs.weapon_id)
+				gs.infuse(gs.weapon_id, "sangrante")
 			for nm: String in steps:
 				var b := lobby.root_ui.find_child(nm, true, false) as Control
 				var c := b.get_global_rect().get_center()

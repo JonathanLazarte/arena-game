@@ -199,7 +199,7 @@ func _run() -> void:
 	check(Attributes.total(gs.char_attrs()) == 80 + 6, "conserva los atributos")
 	var c6 := ConfigFile.new()
 	c6.load("user://test_equipment_v5.cfg")
-	check(int(c6.get_value("meta", "version", 0)) == 6 and c6.has_section_key("slot_0", "armor"), "se reescribe como v6")
+	check(int(c6.get_value("meta", "version", 0)) >= 6 and c6.has_section_key("slot_0", "armor"), "se reescribe como v6 o posterior")
 	# --- Rival ---
 	check(EquipStats.rival_armor("paladin", 1) == Catalog.starter_armor("paladin") and EquipStats.rival_armor("paladin", 8)["pecho"] == "bastion_pecho" and EquipStats.rival_armor("arquero", 4)["pecho"] == "viento_pecho", "rival: armadura de su rol según nivel")
 	for f: String in ["user://test_equipment.cfg", "user://test_equipment_v5.cfg"]:

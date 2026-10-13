@@ -39,14 +39,14 @@ func _ready() -> void:
 	var gs := get_node_or_null("/root/GameState")
 	if gs and gs.from_lobby:
 		player = _make_fighter(gs.player_name, 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
-			Catalog.character(gs.character_id), Catalog.weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
+			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2()})
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
 	if gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
 		var rc: CharacterDef = r["character"]
-		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["eikon"], rc, r["weapon"], [],
+		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["eikon"], rc, Smithing.effective(r["weapon"], Smithing.rival_level(gs.char_level())), [], # ronda 20: arma mejorada a su nivel
 			Attributes.auto_allocate(rc.id, gs.char_level()), # ronda 18: atributos acordes al nivel
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(rc.id, gs.char_level())}) # ronda 19
 	else:
@@ -55,6 +55,9 @@ func _ready() -> void:
 	player.impact.connect(_on_impact)
 	enemy.impact.connect(func(_s: float) -> void: pass)
 	enemy.opponent = player
+	var au := get_node_or_null("/root/Audio")
+	if au:
+		au.music("combate1" if randi() % 2 == 0 else "combate2") # ronda 20
 	camera = Camera3D.new()
 	camera.fov = 70.0
 	add_child(camera)
@@ -364,6 +367,9 @@ func _on_fighter_died(f: Fighter) -> void:
 		state = "over"
 		controller.enabled = false
 		match_result = _award(winner == 0)
+		var au := get_node_or_null("/root/Audio")
+		if au:
+			au.stinger("victoria" if winner == 0 else "derrota")
 		hud.show_results(winner == 0, match_result)
 		return
 	state = "between"

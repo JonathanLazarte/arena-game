@@ -198,9 +198,71 @@ class _Circle extends Node2D:
 		draw_circle(Vector2.ZERO, r, Color(c, 0.35))
 		draw_arc(Vector2.ZERO, r, 0, TAU, 40, Color(c, 0.8), 3.0)
 
+## Ronda 20: barras de acumulación de estados (HUD propio, del rival y sobre el rival).
+var status_p: Dictionary = {}
+var status_e: Dictionary = {}
+var status_over: Dictionary = {}
+var status_over_box: VBoxContainer
+var _enemy: Fighter
+
+func _status_rows(parent: Control, pos: Vector2, w: float, nm: String) -> Dictionary:
+	var box := VBoxContainer.new()
+	box.name = nm
+	box.position = pos
+	box.add_theme_constant_override("separation", 1)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(box)
+	var out := {"box": box}
+	for k: String in StatusFx.TYPES:
+		var row := HBoxContainer.new()
+		row.name = "Row_" + k
+		row.add_theme_constant_override("separation", 4)
+		var l := UIKit.label(StatusFx.NAMES[k], 12, StatusFx.COLORS[k])
+		l.custom_minimum_size = Vector2(78, 0)
+		row.add_child(l)
+		var b := ProgressBar.new()
+		b.name = "Bar_" + k
+		b.show_percentage = false
+		b.custom_minimum_size = Vector2(w, 7)
+		b.max_value = 1.0
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = StatusFx.COLORS[k]
+		b.add_theme_stylebox_override("fill", fill)
+		var bg := StyleBoxFlat.new()
+		bg.bg_color = Color(0, 0, 0, 0.55)
+		b.add_theme_stylebox_override("background", bg)
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(b)
+		row.visible = false
+		box.add_child(row)
+		out[k] = row
+	return out
+
+func _update_status(rows: Dictionary, f: Fighter) -> void:
+	if rows.is_empty() or f == null:
+		return
+	for k: String in StatusFx.TYPES:
+		var row: HBoxContainer = rows[k]
+		var fr := f.status_fraction(k)
+		var active := (k == "veneno" and f.status_fx.poison_t > 0.0) or (k == "congelacion" and f.status_fx.frost_t > 0.0)
+		row.visible = fr > 0.001 or active
+		var b := row.get_child(1) as ProgressBar
+		b.value = 1.0 if active else fr
+		var l := row.get_child(0) as Label
+		l.text = StatusFx.NAMES[k] + (" %ds" % ceili(f.status_fx.poison_t if k == "veneno" else f.status_fx.frost_t) if active else "")
+
 func _process(_d: float) -> void:
 	if _player == null:
 		return
+	_update_status(status_p, _player)
+	_update_status(status_e, _enemy)
+	_update_status(status_over, _enemy)
+	if status_over_box and is_instance_valid(_enemy):
+		var cam := get_viewport().get_camera_3d()
+		var head := _enemy.global_position + Vector3(0, 3.2 if _enemy.mounted else 2.5, 0)
+		status_over_box.visible = cam != null and not cam.is_position_behind(head)
+		if status_over_box.visible:
+			status_over_box.position = cam.unproject_position(head) - Vector2(70, 30)
 	swap_bar.visible = _player.is_swapping()
 	swap_bar.value = _player.swap_progress()
 	if _player.is_swapping():
@@ -226,6 +288,11 @@ func _process(_d: float) -> void:
 
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
+	_enemy = enemy
+	status_p = _status_rows(root_control(), Vector2(20, 136), 150, "StatusPlayer")
+	status_e = _status_rows(root_control(), Vector2(1280 - 420, 108), 150, "StatusEnemy")
+	status_over = _status_rows(root_control(), Vector2.ZERO, 60, "StatusOverTarget")
+	status_over_box = status_over["box"]
 	name_p.text = player.display_name
 	name_e.text = enemy.display_name
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
@@ -313,6 +380,12 @@ func show_results(won: bool, res: Dictionary) -> void:
 		tot.name = "Total"
 		tot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		results_box.add_child(tot)
+		var stn: Dictionary = res.get("stones", {})
+		if not stn.is_empty():
+			var parts: Array = []
+			for sid: String in stn:
+				parts.append("%d× %s" % [stn[sid], Smithing.STONE_NAMES[sid]])
+			results_box.add_child(_row("Materiales", "", ", ".join(parts), UIKit.CYAN, 15))
 		var lp := Progression.level_progress(int(res["account_xp"]))
 		var lvl := _row("Nivel %d" % res["account_after"], "", "Siguiente: %d" % (lp.y - lp.x), UIKit.TEXT, 16)
 		results_box.add_child(lvl)
