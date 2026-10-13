@@ -8,7 +8,7 @@ const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 
 const KIND_NAME := {"character": "personaje", "weapon": "arma", "eikon": "eikon", "mount": "montura"}
 
 var gs: Node
-var stage: DarkStage
+var stage: ShowcaseStage
 var pedestal: Node3D:
 	get: return stage.pedestal
 var preview: KnightVisual:
@@ -30,6 +30,9 @@ var name_label: Label
 var role_label: Label
 var oro_label: Label
 var level_label: Label
+var level_badge: LevelBadge
+var gem_label: Label
+var dots: Dictionary = {} ## pestaña -> punto de notificación
 var xp_bar: ProgressBar
 var play_button: Button
 var modal: Control
@@ -47,7 +50,7 @@ func _ready() -> void:
 		# Primera vez: antes del lobby hay que elegir el rol
 		get_tree().change_scene_to_file.call_deferred("res://scenes/first_run.tscn")
 		return
-	stage = DarkStage.new()
+	stage = ShowcaseStage.new()
 	add_child(stage)
 	_build_ui()
 	view_char = gs.character_id
@@ -82,10 +85,8 @@ func _cycle_tab(d: int) -> void:
 func _build_ui() -> void:
 	ui = CanvasLayer.new()
 	add_child(ui)
-	DarkUI.vignette(ui, 0.85)
-	DarkUI.embers_2d(ui, 30)
 	root_ui = Control.new()
-	root_ui.theme = DarkUI.theme()
+	root_ui.theme = UIKit.theme()
 	root_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root_ui.size = Vector2(1280, 720)
 	root_ui.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -93,17 +94,20 @@ func _build_ui() -> void:
 	# Barra superior
 	var top := PanelContainer.new()
 	top.size = Vector2(1280, 62)
-	top.add_theme_stylebox_override("panel", DarkUI.box(Color(0.03, 0.02, 0.025, 0.92), DarkUI.GOLD.darkened(0.4), 0, 0, 12))
+	var tsb := UIKit.box(Color(0.04, 0.16, 0.4, 0.88), Color(0.4, 0.8, 1.0, 0.8), 0, 0, 8)
+	tsb.border_width_bottom = 3
+	tsb.corner_radius_bottom_left = 24
+	tsb.corner_radius_bottom_right = 24
+	top.add_theme_stylebox_override("panel", tsb)
 	root_ui.add_child(top)
-	var line := ColorRect.new() # filo dorado bajo la barra
-	line.color = DarkUI.GOLD.darkened(0.2)
-	line.position = Vector2(0, 61)
-	line.size = Vector2(1280, 2)
-	root_ui.add_child(line)
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 14)
+	hb.add_theme_constant_override("separation", 12)
 	top.add_child(hb)
-	hb.add_child(DarkUI.title("⚔", 28))
+	# Insignia de nivel (hexágono naranja con el número)
+	level_badge = LevelBadge.new()
+	level_badge.name = "LevelBadge"
+	level_badge.custom_minimum_size = Vector2(46, 46)
+	hb.add_child(level_badge)
 	var name_edit := LineEdit.new()
 	name_edit.name = "PlayerName"
 	name_edit.text = gs.player_name
@@ -116,50 +120,56 @@ func _build_ui() -> void:
 	hb.add_child(name_edit)
 	var lv := VBoxContainer.new()
 	lv.add_theme_constant_override("separation", 0)
-	level_label = DarkUI.label("", 15, DarkUI.GOLD)
+	level_label = UIKit.label("", 14, UIKit.MUTED)
 	level_label.name = "AccountLevel"
 	lv.add_child(level_label)
 	xp_bar = ProgressBar.new()
 	xp_bar.show_percentage = false
-	xp_bar.custom_minimum_size = Vector2(150, 8)
+	xp_bar.custom_minimum_size = Vector2(170, 12)
 	lv.add_child(xp_bar)
 	hb.add_child(lv)
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(sp)
-	hb.add_child(DarkUI.title("ARENA DE EIKONS", 28))
+	hb.add_child(UIKit.title("ARENA DE EIKONS", 30, UIKit.YELLOW))
 	var sp2 := Control.new()
 	sp2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(sp2)
-	oro_label = DarkUI.title("", 24, DarkUI.GOLD_BRIGHT)
+	oro_label = UIKit.title("", 22)
 	oro_label.name = "Oro"
-	hb.add_child(oro_label)
+	hb.add_child(UIKit.currency_pill("oro", oro_label))
+	gem_label = UIKit.title("", 22)
+	gem_label.name = "Gemas"
+	hb.add_child(UIKit.currency_pill("gema", gem_label))
 	# Pestañas
 	var tabs := VBoxContainer.new()
 	tabs.position = Vector2(20, 82)
 	tabs.add_theme_constant_override("separation", 8)
 	root_ui.add_child(tabs)
 	for t: String in TABS:
-		var b := DarkUI.button(t, 21)
+		var b := UIKit.button(t, 21)
 		b.name = "Tab_" + t
 		b.custom_minimum_size = Vector2(210, 58)
 		b.toggle_mode = true
 		b.pressed.connect(set_tab.bind(t))
 		tabs.add_child(b)
 		tab_buttons[t] = b
+		var d := UIKit.notify_dot(b)
+		d.visible = false
+		dots[t] = d
 	# Nombre bajo el pedestal
-	name_label = DarkUI.title("", 38)
+	name_label = UIKit.title("", 38)
 	name_label.position = Vector2(250, 556)
 	name_label.size = Vector2(580, 50)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ui.add_child(name_label)
-	role_label = DarkUI.label("", 19, DarkUI.ASH)
+	role_label = UIKit.label("", 19, UIKit.MUTED)
 	role_label.position = Vector2(250, 606)
 	role_label.size = Vector2(580, 30)
 	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ui.add_child(role_label)
 	# Panel derecho
-	var panel := DarkUI.panel()
+	var panel := UIKit.panel()
 	panel.position = Vector2(850, 76)
 	panel.size = Vector2(410, 456)
 	panel.custom_minimum_size = Vector2(410, 456)
@@ -195,26 +205,26 @@ func _build_ui() -> void:
 	dh.add_theme_constant_override("separation", 8)
 	root_ui.add_child(dh)
 	for d: String in Catalog.DIFFICULTY_NAMES:
-		var b := DarkUI.button(Catalog.DIFFICULTY_NAMES[d], 19)
+		var b := UIKit.button(Catalog.DIFFICULTY_NAMES[d], 19)
 		b.name = "Diff_" + d
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(131, 46)
 		b.pressed.connect(set_difficulty.bind(d))
 		dh.add_child(b)
 		diff_buttons[d] = b
-	play_button = DarkUI.big_button("JUGAR", 46)
+	play_button = UIKit.big_button("JUGAR", 46)
 	play_button.name = "Jugar"
 	play_button.position = Vector2(850, 600)
 	play_button.size = Vector2(410, 100)
 	play_button.pressed.connect(play)
 	root_ui.add_child(play_button)
 	var tw := play_button.create_tween().set_loops()
-	tw.tween_property(play_button, "modulate", Color(1.15, 1.0, 0.95), 1.2)
-	tw.tween_property(play_button, "modulate", Color.WHITE, 1.2)
-	var hint := DarkUI.label("Arrastra para girar · Q/E pestañas · 1-3 dificultad · Enter jugar", 14, DarkUI.ASH.darkened(0.2))
+	tw.tween_property(play_button, "scale", Vector2.ONE * 1.03, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(play_button, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+	var hint := UIKit.label("Arrastra para girar · Q/E pestañas · 1-3 dificultad · Enter jugar", 14, UIKit.TEXT)
 	hint.position = Vector2(20, 692)
 	root_ui.add_child(hint)
-	toast = DarkUI.title("", 24, DarkUI.GOLD_BRIGHT)
+	toast = UIKit.title("", 24, UIKit.YELLOW)
 	toast.position = Vector2(250, 90)
 	toast.size = Vector2(580, 40)
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -230,10 +240,10 @@ func _build_modal() -> void:
 	modal.visible = false
 	root_ui.add_child(modal)
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.7)
+	dim.color = Color(0.02, 0.06, 0.18, 0.6)
 	dim.size = Vector2(1280, 720)
 	modal.add_child(dim)
-	var p := DarkUI.panel()
+	var p := UIKit.panel()
 	p.position = Vector2(390, 220)
 	p.custom_minimum_size = Vector2(500, 260)
 	p.size = Vector2(500, 260)
@@ -242,10 +252,10 @@ func _build_modal() -> void:
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 14)
 	p.add_child(v)
-	modal_title = DarkUI.title("", 30)
+	modal_title = UIKit.title("", 30)
 	modal_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(modal_title)
-	modal_text = DarkUI.label("", 19)
+	modal_text = UIKit.label("", 19)
 	modal_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	modal_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	modal_text.custom_minimum_size = Vector2(460, 0)
@@ -254,12 +264,12 @@ func _build_modal() -> void:
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_theme_constant_override("separation", 20)
 	v.add_child(h)
-	modal_ok = DarkUI.big_button("Confirmar", 22)
+	modal_ok = UIKit.big_button("Confirmar", 22)
 	modal_ok.name = "ModalOk"
 	modal_ok.custom_minimum_size = Vector2(180, 52)
 	modal_ok.pressed.connect(_modal_accept)
 	h.add_child(modal_ok)
-	var no := DarkUI.button("Cancelar", 20)
+	var no := UIKit.button("Cancelar", 20, Color(0.4, 0.45, 0.55))
 	no.name = "ModalCancel"
 	no.custom_minimum_size = Vector2(160, 52)
 	no.pressed.connect(close_modal)
@@ -272,8 +282,7 @@ func open_modal(title_t: String, text: String, ok_text: String, cb: Callable, ca
 	modal_ok.disabled = not can_ok
 	_modal_cb = cb
 	modal.visible = true
-	modal.modulate.a = 0.0
-	modal.create_tween().tween_property(modal, "modulate:a", 1.0, 0.15)
+	UIKit.pop_in(modal.get_child(1), 0.0, 0.5)
 
 func close_modal() -> void:
 	modal.visible = false
@@ -290,7 +299,7 @@ func _modal_accept() -> void:
 
 func show_toast(t: String) -> void:
 	toast.text = t
-	toast.modulate.a = 1.0
+	UIKit.pop_in(toast, 0.0, 0.4)
 	var tw := toast.create_tween()
 	tw.tween_interval(1.4)
 	tw.tween_property(toast, "modulate:a", 0.0, 0.6)
@@ -329,7 +338,7 @@ func request_purchase(kind: String, id: String) -> void:
 func confirm_purchase(kind: String, id: String) -> void:
 	if gs.buy(kind, id) != "ok":
 		return
-	DarkUI.sfx("confirm")
+	UIKit.sfx("confirm")
 	show_toast("¡%s desbloqueado!" % _item_name(kind, id))
 	match kind:
 		"character":
@@ -356,7 +365,7 @@ func _on_skill_pressed(sid: String) -> void:
 
 func learn_skill(sid: String) -> void:
 	if gs.learn_skill(sid) == "ok":
-		DarkUI.sfx("levelup")
+		UIKit.sfx("levelup")
 		show_toast("Habilidad aprendida: " + Progression.skill(sid)["name"])
 		_refresh_all(false)
 
@@ -381,9 +390,17 @@ func _refresh_all(rebuild: bool = true) -> void:
 		(tab_buttons[t] as Button).button_pressed = t == tab
 	for d: String in diff_buttons:
 		(diff_buttons[d] as Button).button_pressed = d == gs.difficulty
-	oro_label.text = "%d oro" % gs.oro
+		UIKit.button_styles(diff_buttons[d], {"facil": UIKit.GREEN, "normal": UIKit.ORANGE, "dificil": UIKit.RED}[d] if d == gs.difficulty else Color(0.25, 0.35, 0.55))
+	oro_label.text = str(gs.oro)
+	gem_label.text = str(gs.gemas)
+	level_badge.level = gs.account_level()
+	level_badge.queue_redraw()
+	_update_dots()
+	for t: String in tab_buttons:
+		var tbn := tab_buttons[t] as Button
+		UIKit.button_styles(tbn, UIKit.ORANGE if t == tab else UIKit.BLUE)
 	var lp := Progression.level_progress(gs.account_xp)
-	level_label.text = "Nivel de cuenta %d  ·  %d/%d XP" % [gs.account_level(), lp.x, lp.y]
+	level_label.text = "%d/%d XP" % [lp.x, lp.y]
 	xp_bar.max_value = lp.y
 	xp_bar.value = lp.x
 	var cur := Catalog.character(gs.character_id)
@@ -410,7 +427,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 						view_char = cd.id
 						_refresh_all()
 						request_purchase("character", cd.id))
-			detail.text = "[b]%s[/b]\n%s\n[color=#c9a35a]Pasiva · %s:[/color] %s" % [c.display_name, c.description, c.passive_name, c.passive_desc]
+			detail.text = "[b]%s[/b]\n%s\n[color=#ffd84a]Pasiva · %s:[/color] %s" % [c.display_name, c.description, c.passive_name, c.passive_desc]
 			var m := Progression.combine_mods(gs.char_skills(c.id))
 			_stat("Vida", c.vida + m["vida"], STAT_MAX["vida"], str(int(c.vida + m["vida"])))
 			_stat("Estamina", c.estamina + m["estamina"], STAT_MAX["estamina"], str(int(c.estamina + m["estamina"])))
@@ -472,7 +489,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 		"Habilidades":
 			tree_view.build(gs.character_id, gs.char_skills(), gs.skill_points())
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
-			detail.text = "[b]Árbol de %s[/b] · Nivel %d\nPuntos disponibles: [color=#e0bf6e]%d[/color] (1 por nivel del personaje). Toca un nodo para aprenderlo." % [cur.display_name, gs.char_level(), gs.skill_points()]
+			detail.text = "[b]Árbol de %s[/b] · Nivel %d\nPuntos disponibles: [color=#ffd84a]%d[/color] (1 por nivel del personaje). Toca un nodo para aprenderlo." % [cur.display_name, gs.char_level(), gs.skill_points()]
 			_stat("XP personaje", cl.x, cl.y, "%d/%d" % [cl.x, cl.y])
 		"Inventario":
 			var e2: EikonData = load(Catalog.EIKONS[gs.eikon_id])
@@ -480,23 +497,46 @@ func _refresh_all(rebuild: bool = true) -> void:
 			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + Catalog.weapon(gs.weapon_id).display_name,
 					"Eikon: " + e2.eikon_name, "Montura: " + m2.mount_name, "Dificultad: " + Catalog.DIFFICULTY_NAMES[gs.difficulty],
 					"Desbloqueados: %d/5 personajes, %d armas" % [gs.unlocked_chars.size(), gs.owned_weapons.size()]]:
-				list_box.add_child(DarkUI.label(ln, 19))
+				list_box.add_child(UIKit.label(ln, 19))
 			detail.text = "[b]Equipamiento actual[/b]\nSe guarda automáticamente en este dispositivo. El rival recibe un equipamiento aleatorio."
 
 func _card(text: String, selected: bool, locked: bool, cb: Callable) -> void:
-	var b := DarkUI.button(("✦ " if selected else "") + text, 18)
+	var b := UIKit.button(("★ " if selected else "") + text, 18, UIKit.ORANGE if selected else (Color(0.3, 0.36, 0.48) if locked else UIKit.BLUE))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.custom_minimum_size = Vector2(370, 44)
-	if selected:
-		b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.38, 0.05, 0.07, 0.95), DarkUI.GOLD_BRIGHT, 2, 3, 6))
-	elif locked:
-		b.add_theme_color_override("font_color", DarkUI.ASH.darkened(0.15))
-		b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.04, 0.04, 0.045, 0.92), DarkUI.ASH.darkened(0.55), 2, 3, 0))
+	if locked:
+		var ic := CurrencyIcon.new() # candado-moneda: se compra con oro
+		ic.kind = "oro"
+		ic.size = Vector2(24, 24)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+		b.resized.connect(func() -> void: ic.position = Vector2(b.size.x - 34, (b.size.y - 24) * 0.5))
 	b.pressed.connect(cb)
 	list_box.add_child(b)
+	UIKit.pop_in(b, 0.03 * list_box.get_child_count(), 0.85)
+
+## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
+func _update_dots() -> void:
+	dots["Habilidades"].visible = gs.skill_points() > 0
+	var can_char := false
+	for cd in Catalog.characters():
+		can_char = can_char or gs.can_buy("character", cd.id) == "ok"
+	dots["Personajes"].visible = can_char
+	var can_w := false
+	for w in Catalog.weapons_for(Catalog.character(gs.character_id)):
+		can_w = can_w or gs.can_buy("weapon", w.id) == "ok"
+	dots["Armas"].visible = can_w
+	var can_e := false
+	for id: String in Catalog.EIKONS:
+		can_e = can_e or gs.can_buy("eikon", id) == "ok"
+	dots["Eikons"].visible = can_e
+	var can_m := false
+	for id: String in Catalog.MOUNTS:
+		can_m = can_m or gs.can_buy("mount", id) == "ok"
+	dots["Monturas"].visible = can_m
 
 func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
-	stats_box.add_child(DarkUI.stat_row(label_t, v, vmax, txt))
+	stats_box.add_child(UIKit.stat_row(label_t, v, vmax, txt))
 
 ## Empieza la partida 1v1 con el equipamiento elegido (rival aleatorio).
 func play() -> void:
@@ -505,5 +545,5 @@ func play() -> void:
 	gs.from_lobby = true
 	gs.random_rival = true
 	gs.save_loadout()
-	DarkUI.sfx("confirm")
-	DarkUI.go("res://scenes/arena.tscn")
+	UIKit.sfx("confirm")
+	UIKit.go("res://scenes/arena.tscn")

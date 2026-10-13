@@ -1,7 +1,7 @@
 extends SceneTree
 ## Capturas de la ronda 11:
 ## godot --path . --rendering-driver opengl3 -s res://tests/screenshot_lobby.gd -- <ruta.png> <modo> [personaje] [pestaña]
-## modo: lobby | first_run | results
+## modo: lobby | first_run | results | arena
 
 func _initialize() -> void:
 	_run()
@@ -20,6 +20,25 @@ func _run() -> void:
 		await process_frame
 		current_scene.select(2)
 		await create_timer(1.2).timeout
+	elif mode == "arena":
+		gs.choose_first_character("berserker")
+		gs.from_lobby = true
+		gs.random_rival = true
+		change_scene_to_file("res://scenes/arena.tscn")
+		await process_frame
+		await process_frame
+		var ar: Arena = current_scene
+		ar.ai.enabled = false
+		ar.player.dismount()
+		ar.enemy.dismount()
+		ar.enemy.global_position = ar.player.global_position + ar.player.facing * 3.0
+		await create_timer(1.0).timeout
+		var cam := Camera3D.new()
+		ar.add_child(cam)
+		var pp := ar.player.global_position
+		cam.look_at_from_position(pp + ar.player.facing.cross(Vector3.UP) * 4.0 + Vector3(0, 2, 0) + ar.player.facing * 1.5, pp + ar.player.facing * 1.5 + Vector3(0, 1, 0))
+		cam.current = true
+		await create_timer(0.3).timeout
 	elif mode == "results":
 		gs.choose_first_character("berserker")
 		gs.account_xp = 80

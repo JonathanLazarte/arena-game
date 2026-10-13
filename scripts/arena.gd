@@ -53,7 +53,7 @@ func _ready() -> void:
 	add_child(hud)
 	hud.bind(player, enemy)
 	hud.restart_requested.connect(restart_match)
-	hud.lobby_requested.connect(func() -> void: DarkUI.go("res://scenes/lobby.tscn"))
+	hud.lobby_requested.connect(func() -> void: UIKit.go("res://scenes/lobby.tscn"))
 	controller = PlayerController.new()
 	controller.me = player
 	controller.camera = camera
@@ -96,47 +96,25 @@ func _build_environment() -> void:
 	e.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
-	# Ronda 11: crepúsculo sangriento (oscuro pero legible: ambiente frío + sol bajo rojizo)
-	sm.sky_top_color = Color(0.05, 0.04, 0.08)
-	sm.sky_horizon_color = Color(0.45, 0.1, 0.08)
-	sm.ground_horizon_color = Color(0.2, 0.07, 0.05)
-	sm.ground_bottom_color = Color(0.03, 0.02, 0.02)
+	# Ronda 12: día soleado y legible (niebla muy ligera)
+	sm.sky_top_color = Color(0.22, 0.48, 0.92)
+	sm.sky_horizon_color = Color(0.72, 0.86, 1.0)
+	sm.ground_horizon_color = Color(0.68, 0.8, 0.9)
 	sky.sky_material = sm
 	e.sky = sky
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.45, 0.42, 0.5)
-	e.ambient_light_energy = 0.4
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	e.ambient_light_energy = 0.6
 	e.fog_enabled = true
-	e.fog_light_color = Color(0.2, 0.06, 0.06)
-	e.fog_density = 0.022
-	e.glow_enabled = true
-	e.glow_intensity = 0.5
+	e.fog_light_color = Color(0.75, 0.85, 1.0)
+	e.fog_density = 0.002
 	env.environment = e
 	add_child(env)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-38, -30, 0)
+	sun.rotation_degrees = Vector3(-50, -30, 0)
 	sun.shadow_enabled = true
-	sun.light_color = Color(1.0, 0.62, 0.5)
-	sun.light_energy = 0.6
+	sun.light_color = Color(1.0, 0.97, 0.9)
+	sun.light_energy = 1.1
 	add_child(sun)
-	# Braseros en el borde: luz cálida que da ambiente (8 luces: dentro del límite del renderer móvil)
-	for i in 8:
-		var a := TAU * i / 8.0
-		var bp := Vector3(sin(a), 0, cos(a)) * (RADIUS - 1.5)
-		MeshUtil.box(self, Vector3(0.5, 1.4, 0.5), bp + Vector3(0, 0.7, 0), Color(0.15, 0.12, 0.1))
-		var fire := MeshUtil.sphere(self, 0.35, bp + Vector3(0, 1.6, 0), Color(1.0, 0.45, 0.1), true)
-		var fm := fire.material_override as StandardMaterial3D
-		if fm:
-			fm.emission_enabled = true
-			fm.emission = Color(1.0, 0.4, 0.1)
-			fm.emission_energy_multiplier = 3.0
-		var l := OmniLight3D.new()
-		l.position = bp + Vector3(0, 2.2, 0)
-		l.light_color = Color(1.0, 0.5, 0.2)
-		l.light_energy = 2.5
-		l.omni_range = 12.0
-		add_child(l)
 
 ## Malla de un prop de Kenney Castle Kit (CC0); incluye la transformación del nodo.
 func _prop_mesh(file: String) -> Array:
@@ -186,7 +164,7 @@ func _build_arena() -> void:
 	fc.shape = fs
 	fc.position = Vector3(0, -0.5, 0)
 	floor_body.add_child(fc)
-	MeshUtil.cylinder(floor_body, RADIUS + 1.0, 0.2, Vector3(0, -0.1, 0), Color(0.42, 0.36, 0.3)) # arena de tierra oscura (ronda 11)
+	MeshUtil.cylinder(floor_body, RADIUS + 1.0, 0.2, Vector3(0, -0.1, 0), Color(0.62, 0.52, 0.38))
 	MeshUtil.cylinder(floor_body, 6.0, 0.22, Vector3(0, -0.09, 0), Color(0.5, 0.4, 0.3))
 	add_child(floor_body)
 	# Muro circular
@@ -328,7 +306,7 @@ func _award(won: bool) -> Dictionary:
 	var gs := get_node_or_null("/root/GameState")
 	if gs == null or not gs.from_lobby:
 		return {}
-	return gs.apply_match_result({"won": won, "rounds": wins[0], "hits": player.hits_landed,
+	return gs.apply_match_result({"won": won, "rounds": wins[0], "lost_rounds": wins[1], "hits": player.hits_landed,
 		"parries": player.parries_landed, "difficulty": gs.difficulty})
 
 func restart_match() -> void:

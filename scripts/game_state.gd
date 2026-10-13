@@ -7,6 +7,7 @@ const SAVE_VERSION := 2
 var save_path: String = SAVE_PATH ## las pruebas usan otra ruta
 var player_name: String = "Jugador"
 var oro: int = Progression.START_GOLD
+var gemas: int = 50 ## moneda premium de muestra (ronda 12: solo se muestra)
 var character_id: String = "caballero"
 var weapon_id: String = "espada_escudo"
 var eikon_id: String = "fenix"
@@ -143,7 +144,7 @@ func apply_match_result(stats: Dictionary) -> Dictionary:
 	var acc_up := account_level() - acc0
 	var bonus := acc_up * Progression.GOLD_LEVEL_UP
 	oro += int(rw["gold"]) + bonus
-	last_result = {"won": stats.get("won", false), "xp": rw["xp"], "gold": int(rw["gold"]) + bonus, "level_bonus": bonus,
+	last_result = {"won": stats.get("won", false), "perfect": stats.get("won", false) and int(stats.get("lost_rounds", 1)) == 0, "xp": rw["xp"], "gold": int(rw["gold"]) + bonus, "level_bonus": bonus,
 		"lines": rw["lines"], "mult": rw["mult"], "account_before": acc0, "account_after": account_level(),
 		"char_before": ch0, "char_after": char_level(), "account_xp_before": acc_xp0, "account_xp": account_xp,
 		"character": character_id}
@@ -157,6 +158,7 @@ func save_loadout() -> void:
 	cfg.set_value("meta", "version", SAVE_VERSION)
 	cfg.set_value("jugador", "nombre", player_name)
 	cfg.set_value("jugador", "oro", oro)
+	cfg.set_value("jugador", "gemas", gemas)
 	for k: String in ["character_id", "weapon_id", "eikon_id", "mount_id", "difficulty"]:
 		cfg.set_value("loadout", k, get(k))
 	cfg.set_value("progreso", "first_run_done", first_run_done)
@@ -177,6 +179,7 @@ func load_loadout() -> void:
 	var ver: int = cfg.get_value("meta", "version", 1)
 	player_name = cfg.get_value("jugador", "nombre", player_name)
 	oro = cfg.get_value("jugador", "oro", oro)
+	gemas = cfg.get_value("jugador", "gemas", 50)
 	for k: String in ["character_id", "weapon_id", "eikon_id", "mount_id", "difficulty"]:
 		set(k, cfg.get_value("loadout", k, get(k)))
 	if not Catalog.EIKONS.has(eikon_id): eikon_id = "fenix"
@@ -225,6 +228,7 @@ func _migrate_v1() -> void:
 func reset_defaults() -> void:
 	player_name = "Jugador"
 	oro = Progression.START_GOLD
+	gemas = 50
 	character_id = "caballero"
 	weapon_id = "espada_escudo"
 	eikon_id = "fenix"

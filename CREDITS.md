@@ -17,13 +17,12 @@ La postura de montar (a horcajadas) es un ajuste propio por código de los hueso
 
 El arco del jugador, los efectos (arcos de espada, anillos, proyectiles) y la interfaz son primitivas generadas por código (propias).
 
-## Ronda 11 (dark fantasy)
+## Interfaz (ronda 11-12)
 
 | Recurso | Autor | Fuente | Licencia | Archivos |
 |---|---|---|---|---|
-| Cinzel (fuente de títulos) | The Cinzel Project Authors (Natanael Gama) | https://github.com/NDISCOVER/Cinzel · https://github.com/google/fonts/tree/main/ofl/cinzel | SIL Open Font License 1.1 | `assets/fonts/Cinzel.ttf` (licencia en `assets/fonts/OFL-Cinzel.txt`) |
-| IM FELL English (fuente de texto) | Igino Marini | https://github.com/google/fonts/tree/main/ofl/imfellenglish | SIL Open Font License 1.1 | `assets/fonts/IMFellEnglish.ttf` (licencia en `assets/fonts/OFL-IMFell.txt`) |
+| Lilita One (fuente de la interfaz) | Juan Montoreano | https://github.com/google/fonts/tree/main/ofl/lilitaone | SIL Open Font License 1.1 | `assets/fonts/LilitaOne-Regular.ttf` (licencia en `assets/fonts/OFL-LilitaOne.txt`) |
 | UI Audio (click3, rollover2, switch7, switch33) | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | `assets/sfx/*.ogg` (licencia en `assets/sfx/License.txt`) |
 
-Paneles ornamentados, viñeta, brasas, antorchas y niebla son propios (código), sin recursos externos.
+Botones brillantes, iconos de moneda/gema/estrella, insignia de nivel, rayos de luz y destellos están hechos por código, sin recursos externos. (Las fuentes Cinzel e IM FELL de la ronda 11 se retiraron en la ronda 12.)
 

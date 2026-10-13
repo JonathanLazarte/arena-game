@@ -162,3 +162,20 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
   - La arena es un crepúsculo con niebla y 8 braseros.
 - Pruebas nuevas: `test_first_run`, `test_purchase`, `test_progression`, `test_migration`.
 - Capturas: `tests/screenshot_lobby.gd -- <png> first_run|lobby|results [personaje] [pestaña]`.
+
+## Ronda 12 — Estilo móvil comercial (sustituye al dark fantasy)
+
+- Interfaz brillante y saturada:
+  - Paneles azules/cian redondeados y gruesos, acentos naranja/amarillo, texto blanco con contorno oscuro y sombra.
+  - Fuente **Lilita One** (OFL) en toda la interfaz (`scripts/ui/ui_kit.gd`).
+  - Botones con degradado tipo "glossy" (franja de brillo), bisel inferior que se hunde al pulsar, sombra, rebote al pasar o pulsar, y sonido.
+  - **JUGAR** grande y amarillo, con un destello que lo recorre.
+- Barra superior con insignia de nivel (hexágono), barra de XP, píldoras de **oro** (moneda dibujada) y **gemas** (moneda premium de muestra, sin uso). Puntos rojos de notificación en las pestañas cuando hay habilidades por aprender o algo que ya se puede comprar.
+- Escaparate de día:
+  - Cielo azul, césped y castillo claro.
+  - Pedestal azul con aro cian pulsante y contraluz cian/dorado.
+  - Rayos de luz giratorios (planos aditivos) y destellos.
+  - El personaje entra con un rebote.
+- Resultados tipo recompensa: 1-3 estrellas (2-0 = 3, 2-1 = 2, derrota con alguna ronda = 1) y una lluvia de monedas que vuela al contador de oro.
+- Arena de día con niebla muy ligera; se quitan los braseros, la viñeta y las brasas.
+- Se mantienen la elección inicial, la progresión, los árboles, las compras, los resultados y el guardado v2 (con `gemas` añadido sin cambiar la versión).

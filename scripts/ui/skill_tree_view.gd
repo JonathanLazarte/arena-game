@@ -26,7 +26,7 @@ func build(char_id: String, learned: Array, points: int) -> void:
 		var row: Array = rows[d]
 		for i in row.size():
 			var s: Dictionary = row[i]
-			var b := DarkUI.button(s["name"], 15)
+			var b := UIKit.button(s["name"], 15)
 			b.name = "Skill_" + s["id"]
 			b.custom_minimum_size = Vector2(178, 50)
 			b.size = Vector2(178, 50)
@@ -38,19 +38,20 @@ func build(char_id: String, learned: Array, points: int) -> void:
 			var have: bool = s["id"] in learned
 			var avail: bool = not have and (s["req"] == "" or s["req"] in learned)
 			if have:
-				b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.45, 0.06, 0.08), DarkUI.GOLD_BRIGHT, 2, 24, 10))
-				b.text = "✦ " + s["name"]
+				UIKit.button_styles(b, UIKit.ORANGE, 25)
+				b.text = "★ " + s["name"]
 			elif avail:
-				b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.12, 0.05, 0.06), DarkUI.GOLD, 2, 24, 6))
+				UIKit.button_styles(b, UIKit.GREEN if points >= int(s["cost"]) else UIKit.BLUE, 25)
 				b.text = "%s (%d)" % [s["name"], s["cost"]]
 				if points < int(s["cost"]):
-					b.add_theme_color_override("font_color", DarkUI.ASH)
+					b.add_theme_color_override("font_color", UIKit.MUTED)
 			else:
-				b.add_theme_stylebox_override("normal", DarkUI.box(Color(0.05, 0.05, 0.05), DarkUI.ASH.darkened(0.6), 2, 24, 0))
-				b.add_theme_color_override("font_color", DarkUI.ASH.darkened(0.3))
+				UIKit.button_styles(b, Color(0.3, 0.36, 0.48), 25)
+				b.add_theme_color_override("font_color", UIKit.MUTED)
 			b.pressed.connect(func() -> void: node_pressed.emit(s["id"]))
 			add_child(b)
 			nodes[s["id"]] = b
+			UIKit.pop_in(b, 0.06 * nodes.size(), 0.5)
 			if s["req"] != "":
 				_links.append([s["req"], s["id"]])
 	queue_redraw()
@@ -63,5 +64,6 @@ func _draw() -> void:
 		var b: Button = nodes[l[1]]
 		var pa := a.position + Vector2(89, 50)
 		var pb := b.position + Vector2(89, 0)
-		draw_line(pa, pb, Color(DarkUI.GOLD, 0.7), 3.0)
-		draw_circle(pb, 4.0, DarkUI.BLOOD)
+		draw_line(pa, pb, Color(1, 1, 1, 0.85), 5.0)
+		draw_line(pa, pb, UIKit.CYAN, 2.5)
+		draw_circle(pb, 5.0, UIKit.YELLOW)

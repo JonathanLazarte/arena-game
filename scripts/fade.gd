@@ -7,7 +7,7 @@ var busy: bool = false
 func _ready() -> void:
 	layer = 100
 	rect = ColorRect.new()
-	rect.color = Color(0.02, 0.0, 0.0, 0.0)
+	rect.color = Color(0.03, 0.1, 0.25, 0.0)
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rect.size = Vector2(1280, 720)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
