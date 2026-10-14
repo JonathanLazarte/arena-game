@@ -79,7 +79,7 @@ func _ready() -> void:
 	# Ronda 15: a pie es «Correr» (alternar); montado vuelve a ser «Galope» (mantener)
 	_touch_button("Correr", "run_toggle", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
 	_touch_button("Parry", "parry", Vector2(925, 530), 40, Color(0.3, 0.9, 1.0))
-	_touch_button("Dash", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
+	_touch_button("Rodar", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
 	# Ronda 14: salto y habilidad del personaje
 	_touch_button("Saltar", "jump", Vector2(805, 535), 40, Color(0.75, 0.85, 1.0))
 	_touch_button("Habilidad", "special", Vector2(930, 415), 40, Color(1.0, 0.45, 0.25))

@@ -6,6 +6,7 @@ extends SceneTree
 var fails: int = 0
 
 func _initialize() -> void:
+	Fighter.dash_strike_enabled = true # ronda 33: desactivada por defecto
 	_run()
 
 func check(cond: bool, msg: String) -> void:

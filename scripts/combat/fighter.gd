@@ -1528,6 +1528,10 @@ func _release_shot(charged: bool = false) -> void:
 	_kv.event("shoot")
 
 ## Dash montado / voltereta a pie.
+## Ronda 33: el botón de esquiva es la voltereta; la estocada con dash (dash en la anticipación
+## del ligero) queda desactivada pero conservada para el futuro.
+static var dash_strike_enabled: bool = false
+
 func dash() -> bool:
 	_stagger_roll_cancel() # ronda 31
 	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
@@ -1537,7 +1541,7 @@ func dash() -> bool:
 	if atk_state != Atk.NONE:
 		if mounted and atk_state == Atk.WINDUP:
 			_ds_visual = true # montado: el ataque sigue cargándose durante el dash y golpea al final
-		elif not mounted and atk_state == Atk.WINDUP and not atk_heavy and not atk_dash and not atk_jump:
+		elif dash_strike_enabled and not mounted and atk_state == Atk.WINDUP and not atk_heavy and not atk_dash and not atk_jump:
 			# A pie: dash durante la anticipación del ligero = estocada con dash
 			var mi0 := MeshUtil.flat(move_input)
 			dash_dir = mi0.normalized() if mi0.length() > 0.2 else facing
