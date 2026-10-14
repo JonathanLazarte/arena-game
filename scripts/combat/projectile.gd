@@ -24,13 +24,29 @@ var stun_force: float = -1.0 ## ronda 31: fuerza de aturdimiento (-1 = la del ti
 var home_target: Node3D = null
 var home_rate: float = 0.0
 var home_time: float = 0.0
+var slash: bool = false ## ronda 32: espectro de tajo dorado en diagonal (ráfaga)
+var slash_tilt: float = 45.0
 var element: String = "" ## ronda 21: elemento del hechizo ("" = según el tirador)
 var status: Dictionary = {} ## ronda 21: acumulación de estado del hechizo
 var dodged_by: Array = [] ## objetivos que lo esquivaron con i-frames (no les vuelve a golpear)
 
 func _ready() -> void:
 	add_to_group("projectile")
-	if kind == "eikon":
+	if slash:
+		# Media luna de 7 segmentos en el plano perpendicular al vuelo, inclinada en diagonal
+		var piv := Node3D.new()
+		piv.rotation.z = deg_to_rad(slash_tilt)
+		add_child(piv)
+		var gold := Color(1.0, 0.82, 0.3)
+		for i in 7:
+			var a := deg_to_rad(-60.0 + i * 20.0)
+			var seg := MeshUtil.box(piv, Vector3(0.42, 0.07 + 0.05 * (1.0 - absf(i - 3) / 3.0), 0.12), Vector3(sin(a) * radius, cos(a) * radius - radius * 0.6, 0.0), gold)
+			seg.rotation.z = -a
+			seg.material_override = MeshUtil.mat(gold, true)
+		var trail := MeshUtil.box(piv, Vector3(radius * 1.4, 0.04, 0.9), Vector3(0, radius * 0.35, 0.45), gold)
+		trail.material_override = MeshUtil.mat(Color(gold, 0.4), true)
+		trail.transparency = 0.6
+	elif kind == "eikon":
 		# Bola de fuego visible (antes era una varilla fina como una flecha)
 		var core := MeshUtil.sphere(self, 0.35, Vector3.ZERO, color)
 		core.material_override = MeshUtil.mat(color.lightened(0.3), true)
@@ -88,6 +104,7 @@ func _physics_process(delta: float) -> void:
 				(t as Fighter).incoming_stun_force = -1.0
 			if res == "dodge":
 				dodged_by.append(t) # lo atraviesa durante los i-frames y sigue de largo
+				home_time = 0.0 # ronda 32: esquivado, deja de perseguir
 				continue
 			if res == "parry":
 				# Reflejo: la flecha cambia de bando

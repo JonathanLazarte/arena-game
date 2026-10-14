@@ -477,6 +477,38 @@ func set_tint(c: Color, flash: bool, ec: Color = Color.WHITE) -> void:
 		m.emission = ec
 		m.emission_energy_multiplier = 0.8
 
+## Ronda 32: pose de carga del fuerte.
+const PREPOSE_MIN := 0.06
+var _prepose: bool = false
+var _pre_attack: int = -1
+var _ab_hit_key: int = -1
+## Ronda 32: arco/ballesta con carga completa: brillo dorado pulsante.
+var bow_charged: bool = false
+var _bow_glow_mat: StandardMaterial3D
+var _bow_t: float = 0.0
+func set_bow_charged(on: bool) -> void:
+	bow_charged = on
+	if bow == null:
+		return
+	if on:
+		if _bow_glow_mat == null:
+			_bow_glow_mat = StandardMaterial3D.new()
+			_bow_glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_bow_glow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_bow_glow_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			_bow_glow_mat.albedo_color = Color(1.0, 0.8, 0.3, 0.9)
+		bow.material_overlay = _bow_glow_mat
+		_bow_t = 0.0
+	else:
+		bow.material_overlay = null
+
+func _update_bow_glow(delta: float) -> void:
+	if bow_charged and _bow_glow_mat:
+		_bow_t += delta
+		# destello fuerte al cargarse y luego pulso
+		var flash := maxf(1.0 - _bow_t * 4.0, 0.0)
+		_bow_glow_mat.albedo_color.a = clampf(0.45 + 0.35 * sin(_bow_t * 10.0) + flash, 0.0, 1.0)
+
 func set_glow(on: bool, c: Color) -> void:
 	glow_mat.albedo_color = c * 0.8 if on else base_glow
 
@@ -552,6 +584,9 @@ func _ability_state(f: Fighter) -> String:
 
 func update(f: Fighter, delta: float) -> void:
 	oneshot_t = maxf(oneshot_t - delta, 0.0)
+	_update_bow_glow(delta)
+	if bow_charged and not f.bow_charged_ready():
+		set_bow_charged(false)
 	if f.cast_t <= 0.0:
 		_cast_max = 0.0
 	riding.amount = move_toward(riding.amount, 1.0 if _mounted and f.alive else 0.0, delta * 6.0)
@@ -580,6 +615,8 @@ func update(f: Fighter, delta: float) -> void:
 		s = "dash_strike"
 	elif f.atk_state != Fighter.Atk.NONE:
 		s = "heavy" if f.atk_heavy or f.atk_jump else "light%d" % (maxi(f.combo - 1, 0) % 3)
+	elif f.hold_pose_t > PREPOSE_MIN and not f.mounted and f.loadout == Fighter.Loadout.SWORD_SHIELD:
+		s = "heavy" # ronda 32: pose de carga del fuerte desde que se empieza a mantener
 	elif f.special_t > 0.0 or (oneshot == "slam" and oneshot_t > 0.0):
 		s = "slam"
 	elif f.swap_t > 0.0:
@@ -640,7 +677,30 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/%s/ts/scale" % s, maxf(_clip_len(s) / 0.9, 1.0))
 	elif s == "slam":
 		tree.set("parameters/act/slam/ts/scale", _clip_len("slam") * CONTACT / Fighter.SLAM_TELEGRAPH)
+	elif f.ab_id == "combo_falso" and (s == "heavy" or s.begins_with("light")):
+		# Ronda 32: cada golpe lento reinicia su clip y lo encaja con su anticipación
+		var cd: Dictionary = BossAbilities.def("combo_falso")
+		var key := f.ab_fired * 1000 + int(f.ab_uses.get("combo_falso", 0))
+		if key != _ab_hit_key:
+			_ab_hit_key = key
+			playback.start(s, true)
+		var hits: Array = cd["hits"]
+		var wnd := float(cd["hit_windup"]) if f.ab_fired < 3 else float(hits[3][0]) - float(hits[2][0]) - 1.0
+		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(wnd, 0.2))
+	elif s == "heavy" and f.atk_state == Fighter.Atk.NONE:
+		# pose de carga: avanza el clip hasta ~60 % de la anticipación mientras se mantiene
+		if not _prepose:
+			_prepose = true
+			playback.start(s, true)
+		_last_attack_id = f.attacks_started + 1
+		tree.set("parameters/act/heavy/ts/scale", _clip_len(s) * CONTACT * 0.6 / Fighter.HEAVY_HOLD if f.hold_pose_t < Fighter.HEAVY_HOLD else 0.0)
 	elif s == "heavy" or s.begins_with("light"):
+		var from_pre := _prepose and s == "heavy"
+		if _prepose and s != "heavy":
+			_last_attack_id = -999 # se soltó antes: sale el ligero desde el principio
+		_prepose = false
+		if from_pre:
+			_pre_attack = f.attacks_started
 		if f.attacks_started != _last_attack_id:
 			_last_attack_id = f.attacks_started
 			playback.start(s, true)
@@ -648,7 +708,7 @@ func update(f: Fighter, delta: float) -> void:
 		var sc := 1.0
 		match f.atk_state:
 			Fighter.Atk.WINDUP:
-				sc = L * CONTACT / maxf(f.atk_dur, 0.05)
+				sc = L * CONTACT * (0.4 if _pre_attack == f.attacks_started else 1.0) / maxf(f.atk_dur, 0.05)
 			Fighter.Atk.ACTIVE:
 				sc = L * (0.62 - CONTACT) / maxf(f.atk_dur, 0.05)
 			Fighter.Atk.RECOVERY:

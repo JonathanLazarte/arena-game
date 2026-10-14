@@ -18,6 +18,7 @@ var damage: float = 20.0
 var stun_time: float = 0.5 ## (ronda 31: sin uso; ver stun_force)
 var stun_force: float = StunRules.AOE_FORCE ## ronda 31: fuerza acumulada
 var knock: float = 9.0
+var hidden: bool = false ## ronda 32: sin anillo de aviso (salto con caída)
 var t: float = 0.0
 var detonated: bool = false
 ## Resultados por objetivo al detonar (pruebas / IA): nodo -> "hit", "block", "dodge", "air".
@@ -26,8 +27,9 @@ var _fill: MeshInstance3D
 var _ring: MeshInstance3D
 var _fill_mat: StandardMaterial3D
 
-static func spawn(parent: Node, src: Node3D, tm: int, center: Vector3, r: float, warn: float, dmg: float) -> GroundAoE:
+static func spawn(parent: Node, src: Node3D, tm: int, center: Vector3, r: float, warn: float, dmg: float, hide: bool = false) -> GroundAoE:
 	var a := GroundAoE.new()
+	a.hidden = hide
 	a.source = src
 	a.team = tm
 	a.radius = r
@@ -39,6 +41,8 @@ static func spawn(parent: Node, src: Node3D, tm: int, center: Vector3, r: float,
 
 func _ready() -> void:
 	add_to_group("ground_aoe")
+	if hidden:
+		return
 	# Anillo exterior fijo (borde del área) + disco interior que crece hasta el borde = cuenta atrás
 	_ring = _disc(radius, 0.04, Color(1.0, 0.35, 0.15), 0.35)
 	_fill = _disc(radius, 0.05, Color(1.0, 0.55, 0.2), 0.55)
@@ -91,11 +95,13 @@ func _physics_process(delta: float) -> void:
 	t += delta
 	if not detonated:
 		var k := clampf(t / maxf(telegraph, 0.01), 0.0, 1.0)
-		_fill.scale = Vector3(k, 1, k)
+		if _fill:
+			_fill.scale = Vector3(k, 1, k)
 		if t >= telegraph:
 			_detonate()
 	else:
-		_fill_mat.albedo_color.a = maxf(_fill_mat.albedo_color.a - delta * 2.5, 0.0)
+		if _fill_mat:
+			_fill_mat.albedo_color.a = maxf(_fill_mat.albedo_color.a - delta * 2.5, 0.0)
 		if t >= telegraph + 0.4:
 			queue_free()
 
@@ -104,8 +110,9 @@ func _detonate() -> void:
 	var au := get_node_or_null("/root/Audio")
 	if au:
 		au.sfx3d("eikon_slam", global_position)
-	_fill.scale = Vector3.ONE
-	_fill_mat.albedo_color = Color(1.0, 0.85, 0.5, 0.8)
+	if _fill:
+		_fill.scale = Vector3.ONE
+		_fill_mat.albedo_color = Color(1.0, 0.85, 0.5, 0.8)
 	for n in MeshUtil.enemies_of(get_tree(), team):
 		if not contains(n.global_position):
 			continue

@@ -154,6 +154,7 @@ func _physics_process(delta: float) -> void:
 	if swp: _try("swap")
 	# Ataque: pulsar = ligero (al soltar), mantener 0,4 s = fuerte. En modo arco dispara.
 	if me.loadout == Fighter.Loadout.BOW:
+		me.hold_pose_t = 0.0
 		if atk_edge: _try("shoot")
 		me.want_shot_hold = atk_down # ronda 31: mantener = disparo cargado
 		_atk_hold = -1.0
@@ -163,10 +164,12 @@ func _physics_process(delta: float) -> void:
 			_heavy_fired = false
 		else:
 			_atk_hold += delta
+		me.hold_pose_t = _atk_hold if not _heavy_fired else 0.0
 		if _atk_hold >= Fighter.HEAVY_HOLD and not _heavy_fired:
 			_heavy_fired = true
 			_try("heavy")
 	elif _atk_hold >= 0.0:
+		me.hold_pose_t = 0.0
 		if not _heavy_fired:
 			_try("light")
 		_atk_hold = -1.0

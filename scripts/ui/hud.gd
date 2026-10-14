@@ -88,6 +88,19 @@ func _ready() -> void:
 	_touch_button("↻", "spell_next", Vector2(722, 360), 24, Color(0.7, 0.5, 1.0))
 	# Ronda 25: habilidad de jefe
 	_touch_button("Jefe", "boss", Vector2(840, 300), 38, Color(1.0, 0.3, 0.15))
+	# Ronda 32: flecha para cambiar de habilidad de jefe (botón normal: se ve en PC y en Android)
+	boss_next_btn = Button.new()
+	boss_next_btn.name = "BossNext"
+	boss_next_btn.text = "▶"
+	boss_next_btn.tooltip_text = "Siguiente habilidad de jefe (N)"
+	boss_next_btn.focus_mode = Control.FOCUS_NONE
+	boss_next_btn.custom_minimum_size = Vector2(44, 44)
+	boss_next_btn.position = Vector2(884, 278)
+	boss_next_btn.add_theme_font_size_override("font_size", 22)
+	boss_next_btn.pressed.connect(func() -> void:
+		if _player:
+			_player.cycle_boss())
+	add_child(boss_next_btn)
 	for l: Label in [round_label, timer_label, message]:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
@@ -169,6 +182,7 @@ func set_touch_visible(v: bool) -> void:
 
 var btns: Dictionary = {} ## ronda 21: acción -> TouchScreenButton
 var btn_labels: Dictionary = {}
+var boss_next_btn: Button
 
 func _touch_button(text: String, action: String, center: Vector2, r: float, c: Color) -> void:
 	var tb := TouchScreenButton.new()
@@ -328,6 +342,8 @@ func _update_contextual_buttons() -> void:
 	var tv := joystick.visible
 	(btns["parry"] as TouchScreenButton).visible = tv and not _player.mounted
 	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
+	if boss_next_btn:
+		boss_next_btn.visible = not _player.mounted and _player.boss_ids.size() > 1
 	# Ronda 31: sin recarga; habilidad seleccionada y su coste
 	var bid := _player.selected_boss()
 	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if bid != "" and _player.boss_cost_ok(bid) else Color(1, 1, 1, 0.45)

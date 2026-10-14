@@ -182,6 +182,7 @@ func _run() -> void:
 	p.shoot()
 	await create_timer(ranged_draw(p) + Fighter.CHARGE_HOLD + 0.4).timeout
 	p.want_shot_hold = false
+	await create_timer(0.3).timeout # ronda 32: sale al soltar
 	check(p.charged_shots == n0 + 1, "mantener = disparo cargado (%s)" % p.charged_shot_kind())
 	print("RESULT: %d fail(s)" % fails)
 	quit(1 if fails > 0 else 0)

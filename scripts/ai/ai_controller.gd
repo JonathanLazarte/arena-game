@@ -123,9 +123,29 @@ func _physics_process(delta: float) -> void:
 		me.move_input = Vector3.ZERO if dist < 9.0 else dir * 0.4
 		if me.atk_state == Fighter.Atk.NONE:
 			return
-	# --- Ronda 31: huir de la carga en área / la marca del salto; correr de lado ante la ráfaga ---
-	if opp.ab_id == "carga_area" or opp.ab_id == "salto_caida":
-		var c: Vector3 = opp.global_position if opp.ab_id == "carga_area" else opp.ab_lock_pos
+	# --- Ronda 32: ráfaga: rodar cada tajo justo antes de que llegue ---
+	if _roll_slash():
+		return
+	# --- Ronda 32: salto con caída sin marca: al verle empezar a bajar, alejarse; rodar al aterrizar ---
+	if opp.ab_id == "salto_caida" and opp.ab_air:
+		var sd := BossAbilities.def("salto_caida")
+		var land_in := float(sd["land"]) - opp.ab_t
+		if opp.ab_locked:
+			me.want_block = false
+			var away2 := MeshUtil.flat(me.global_position - opp.global_position)
+			var fl := (away2.normalized() if away2.length() > 0.2 else side)
+			if land_in <= 0.22 + _jump_err:
+				me.move_input = (fl + side * 0.5).normalized()
+				if me.dash():
+					jump_dodges += 1
+			else:
+				me.want_sprint = true
+				me.move_input = (side + fl * 0.3).normalized()
+			return
+		_jump_err = randf_range(-0.06, 0.06)
+	# --- Ronda 31: huir de la carga en área ---
+	if opp.ab_id == "carga_area":
+		var c: Vector3 = opp.global_position
 		var rad := float(BossAbilities.def(opp.ab_id)["radius"])
 		var away := MeshUtil.flat(me.global_position - c)
 		if away.length() < rad + 1.5:
@@ -134,11 +154,6 @@ func _physics_process(delta: float) -> void:
 			me.want_sprint = true
 			me.move_input = away.normalized() if away.length() > 0.2 else side
 			return
-	elif opp.ab_id == "rafaga" and dist > 6.0:
-		me.want_block = false
-		me.want_sprint = true
-		me.move_input = side
-		return
 	# --- Ronda 24: crítico frontal si el jugador tiene la postura rota ---
 	if opp.stance_broken_t <= 0.0:
 		_crit_roll = -1.0
@@ -396,7 +411,7 @@ func _incoming_projectile() -> bool:
 func _avoid_aoe(dir: Vector3) -> bool:
 	for n in me.get_tree().get_nodes_in_group("ground_aoe"):
 		var a := n as GroundAoE
-		if a == null or a.detonated or a.team == me.team or _aoe_done.has(a.get_instance_id()):
+		if a == null or a.detonated or a.hidden or a.team == me.team or _aoe_done.has(a.get_instance_id()):
 			continue
 		if not a.contains(me.global_position) or a.time_left() > 0.3:
 			continue
@@ -453,5 +468,33 @@ func _try_boss(dist: float, dir: Vector3, opp: Fighter) -> bool:
 			"salto_caida": ok = dist > 5.0 and dist < 14.0 and me.health > 40.0
 		if ok and me.boss_skill(id):
 			boss_by_id[id] = int(boss_by_id.get(id, 0)) + 1
+			return true
+	return false
+
+
+# ---------------- Ronda 32 ----------------
+var slash_rolls: int = 0
+var jump_dodges: int = 0
+var _jump_err: float = 0.0
+var _rolled: Dictionary = {}
+
+## Tajo de ráfaga que me persigue a punto de llegar: voltereta lateral (i-frames).
+func _roll_slash() -> bool:
+	for n in me.get_tree().get_nodes_in_group("projectile"):
+		var pr := n as Projectile
+		if pr == null or not pr.slash or pr.team == me.team or pr.home_target != me or me in pr.dodged_by:
+			continue
+		var d := me.get_hit_center() - pr.global_position
+		var eta := (d.length() - pr.radius - me.hit_radius) / maxf(pr.speed, 1.0)
+		if eta > 0.16 or _rolled.has(pr.get_instance_id()):
+			continue
+		if randf() > profile.boss_dodge_chance + 0.25:
+			_rolled[pr.get_instance_id()] = true # esta vez no reacciona
+			continue
+		me.want_block = false
+		me.move_input = MeshUtil.flat(pr.direction).cross(Vector3.UP).normalized()
+		if me.dash():
+			_rolled[pr.get_instance_id()] = true
+			slash_rolls += 1
 			return true
 	return false

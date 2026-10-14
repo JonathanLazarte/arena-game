@@ -720,3 +720,11 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - **Arcos**: mantener = disparo cargado (arco potente, ballesta triple).
 - **Calibración**: velocidad de ataque hasta +25 % con curva más cara; la ficha la muestra.
 - `docs/design.md` reescrito como referencia. Pruebas: `tests/test_round31.gd`.
+
+## Ronda 32
+- Fuerte cargado: la pose de carga aparece desde que se mantiene el botón.
+- Combo falso mucho más lento (golpes a ~3 s, pausa falsa final), cada golpe avanza ~3 m siguiendo al rival.
+- Ráfaga: espectros de tajo dorados en diagonal, más anchos, cada 0,9 s y 100 % teledirigidos; solo la voltereta los esquiva. La IA rueda cada uno.
+- Salto con caída sin marca en el suelo; la IA reacciona al verle bajar.
+- Arco/ballesta: mantener tensa sin disparar, dispara al soltar; cargado ≥ 0,9 s con brillo dorado y sonido.
+- Botón ▶ en el HUD para cambiar la habilidad de jefe. Pruebas: `tests/test_round32.gd`.

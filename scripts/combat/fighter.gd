@@ -1449,9 +1449,16 @@ func _update_shot(delta: float) -> void:
 	if shot_t < shot_dur:
 		_hold_t = 0.0
 		return
-	# Ronda 31: tensado completo y botón mantenido: se carga hasta CHARGE_HOLD (sale solo al tope)
-	if shot_state == Shot.DRAW and want_shot_hold and _hold_t < CHARGE_HOLD - 0.001:
+	# Ronda 32: con el botón mantenido se queda tensado y apuntando (sin límite) y dispara al soltar;
+	# pasado CHARGE_HOLD el tiro sale cargado (brillo en el arco + sonido al alcanzarlo).
+	if shot_state == Shot.DRAW and want_shot_hold:
+		var was := _hold_t
 		_hold_t += delta
+		if was < CHARGE_HOLD and _hold_t >= CHARGE_HOLD:
+			charge_ready_events += 1
+			_snd("bow_draw", 6.0)
+			if _kv:
+				_kv.set_bow_charged(true)
 		return
 	var r := ranged()
 	shot_t = 0.0
@@ -1459,6 +1466,9 @@ func _update_shot(delta: float) -> void:
 		Shot.DRAW:
 			# Ronda 31: mantener = espera CHARGE_HOLD s más y sale cargado; soltar antes = normal.
 			shot_charged = _hold_t >= CHARGE_HOLD - 0.001
+			_hold_t = 0.0
+			if _kv:
+				_kv.set_bow_charged(false)
 			_release_shot(shot_charged)
 			shot_state = Shot.RECOVER
 			shot_dur = r.fire_recovery * (1.2 if shot_charged else 1.0)
@@ -2691,6 +2701,12 @@ var want_shot_hold: bool = false ## mantener el botón: disparo cargado
 var shot_charged: bool = false
 var charged_shots: int = 0
 var _hold_t: float = 0.0
+var charge_ready_events: int = 0 ## ronda 32: veces que el arco llegó a carga completa
+## Ronda 32: el controlador indica cuánto lleva mantenido el ataque (pose de carga del fuerte desde el inicio)
+var hold_pose_t: float = 0.0
+
+func bow_charged_ready() -> bool:
+	return shot_state == Shot.DRAW and _hold_t >= CHARGE_HOLD
 const CHARGE_HOLD := 0.9 ## s extra tras tensar para el disparo cargado
 
 func charged_shot_kind() -> String:
@@ -2777,7 +2793,7 @@ func _start_ability(id: String) -> void:
 	ab_from = global_position
 	blocking = false
 	var d := ab_def()
-	var col: Color = {"carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(0.75, 0.35, 1.0), "escudo_mana": Color(0.3, 1.0, 1.0),
+	var col: Color = {"carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(1.0, 0.82, 0.3), "escudo_mana": Color(0.3, 1.0, 1.0),
 		"combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}.get(id, Color.WHITE)
 	if _kv:
 		_kv.set_glow(true, col)
@@ -2792,11 +2808,7 @@ func _start_ability(id: String) -> void:
 		"salto_caida":
 			var tg := _ab_target()
 			ab_lock_pos = tg.global_position if tg else global_position + facing * 6.0
-			ab_marker = Node3D.new()
-			get_parent().add_child(ab_marker)
-			var disc := MeshUtil.cylinder(ab_marker, float(d["radius"]), 0.03, Vector3(0, 0.05, 0), Color(1.0, 0.2, 0.1))
-			disc.transparency = 0.5
-			ab_marker.global_position = Vector3(ab_lock_pos.x, 0.0, ab_lock_pos.z)
+			ab_marker = null # ronda 32: sin marca en el suelo; la única pista es verle en el aire
 	_snd("swing_heavy", 2.0)
 	ability_started.emit(id)
 
@@ -2856,12 +2868,16 @@ func _update_ability(delta: float) -> void:
 				_end_ability()
 		"combo_falso":
 			var hits: Array = d["hits"]
-			if tg and ab_fired < hits.size() and ab_t < float(hits[ab_fired][0]) - 0.08:
-				facing = _turn_toward(facing, _spell_dir(), deg_to_rad(240.0) * delta)
+			# Ronda 32: golpes lentos; cada uno gira hacia el objetivo y avanza ~3 m (menos que la Estocada)
+			if tg and ab_fired < hits.size() and ab_t < float(hits[ab_fired][0]) - 0.1:
+				facing = _turn_toward(facing, _spell_dir(), deg_to_rad(float(d["turn_deg"])) * delta)
 			if ab_fired < hits.size():
 				var th := float(hits[ab_fired][0])
-				if ab_t > th - 0.15 and ab_t < th:
-					ab_vel = facing * 2.5
+				var lt := float(d["lunge_time"])
+				if ab_t > th - lt and ab_t < th + 0.05:
+					var gap := MeshUtil.flat(tg.global_position - global_position).length() if tg else 99.0
+					if gap > float(d["reach"]) * 0.6:
+						ab_vel = facing * float(d["lunge_speed"])
 				if prev < th and ab_t >= th:
 					_combo_strike(d, hits[ab_fired])
 					ab_fired += 1
@@ -2884,7 +2900,7 @@ func _update_ability(delta: float) -> void:
 					if is_instance_valid(ab_marker):
 						ab_marker.queue_free()
 					ab_marker = null
-					ab_aoe = GroundAoE.spawn(get_parent(), self, team, ab_lock_pos, float(d["radius"]), land - lock, ab_damage(ab_id))
+					ab_aoe = GroundAoE.spawn(get_parent(), self, team, ab_lock_pos, float(d["radius"]), land - lock, ab_damage(ab_id), true)
 					ab_aoe.stun_force = ab_force(float(d["force"]), false)
 				if ab_t < rise:
 					ab_hop = hgt * sin(ab_t / rise * PI * 0.5)
@@ -2935,9 +2951,11 @@ func _fire_magic_slash(d: Dictionary, tg: Node3D) -> void:
 	p.aimed_at = tg
 	p.speed = float(d["speed"])
 	p.life = float(d["life"])
-	p.radius = 0.7
+	p.radius = float(d.get("radius", 0.7))
+	p.slash = true
+	p.slash_tilt = 45.0 if ab_fired % 2 == 0 else -45.0
 	p.damage = ab_damage("rafaga")
-	p.color = Color(0.75, 0.35, 1.0)
+	p.color = Color(1.0, 0.82, 0.3)
 	p.stun_force = ab_force(float(d["force"]), true)
 	p.home_target = tg
 	p.home_rate = deg_to_rad(float(d["home_deg"]))
