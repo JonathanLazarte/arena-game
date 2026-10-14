@@ -126,6 +126,16 @@ func _build_ui() -> void:
 	modal_text.custom_minimum_size = Vector2(520, 0)
 	modal_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mv.add_child(modal_text)
+	# Ronda 29: nombre propio del personaje (obligatorio)
+	name_input = LineEdit.new()
+	name_input.name = "CharNameInput"
+	name_input.max_length = 16
+	name_input.placeholder_text = "Nombre del personaje"
+	name_input.add_theme_font_size_override("font_size", 22)
+	name_input.custom_minimum_size = Vector2(320, 44)
+	name_input.text_changed.connect(func(t: String) -> void: accept_button.disabled = t.strip_edges() == "")
+	name_input.text_submitted.connect(func(_t: String) -> void: accept())
+	mv.add_child(name_input)
 	var h := HBoxContainer.new()
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_theme_constant_override("separation", 20)
@@ -166,13 +176,19 @@ func selected() -> CharacterDef:
 
 func confirm_choice() -> void:
 	var c := selected()
-	modal_text.text = "%s será tu personaje inicial. Los otros cuatro se desbloquean con oro en el lobby." % c.display_name
+	modal_text.text = "%s será tu personaje inicial. Ponle nombre. Los otros cuatro se desbloquean con oro en el lobby (‹ ›)." % c.display_name
+	name_input.text = ""
+	accept_button.disabled = true
 	modal.visible = true
+	name_input.grab_focus.call_deferred()
 	UIKit.pop_in(modal.get_child(1), 0.0, 0.5)
 
+var name_input: LineEdit
 func accept() -> void:
+	if gs.clean_name(name_input.text) == "":
+		return
 	modal.visible = false
-	gs.choose_first_character(selected().id)
+	gs.choose_first_character(selected().id, name_input.text)
 	UIKit.sfx("levelup")
 	UIKit.go("res://scenes/lobby.tscn", 0.6)
 

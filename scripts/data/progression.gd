@@ -80,8 +80,12 @@ const EIKON_REQ := {"fenix": [1, 0], "lobo": [3, 800], "grifo": [5, 1200], "gole
 const MOUNT_TO_EIKON := {"grifo": "grifo"}
 const MOUNT_REFUND := {"unicornio": 500}
 
+## Ronda 29: desbloquear otro personaje (nivel de cuenta, oro).
+const CHAR_REQ := [3, 2500]
+
 static func req(kind: String, id: String) -> Array:
 	match kind:
+		"character": return CHAR_REQ
 		"weapon": return WEAPON_REQ.get(id, [1, 0])
 		"eikon": return EIKON_REQ.get(id, [1, 0])
 		"armor":

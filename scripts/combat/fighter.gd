@@ -133,7 +133,7 @@ const JUMP_VELOCITY := 8.0 ## ≈0,8 s en el aire, 1,6 m de altura
 const MOUNT_HOP_MULT := 0.85
 const COST_JUMP := 12.0
 const LAND_RECOVERY := 0.18
-const AIR_CONTROL := 0.35
+const AIR_CONTROL := 0.0 ## ronda 29: sin control en el aire (trayectoria fijada al despegar)
 ## Ataque en salto: picado. Cae rápido y golpea al aterrizar cerca.
 const JUMP_ATTACK := {"windup": 0.22, "chain_windup": 0.22, "active": 0.12, "recovery": 0.45, "whiff": 0.2, "damage": 16.0, "stamina": 14.0}
 ## Habilidad "Golpe sísmico" (Berserker): área en el suelo con aviso.
@@ -899,6 +899,10 @@ func _physics_process(delta: float) -> void:
 	var amount := minf(inp.length(), 1.0)
 	var target_vel := Vector3.ZERO
 	var turn := st.turn_speed * delta
+	# Ronda 29 (regla soulslike): el seguimiento solo existe en la anticipación; en frames activos y
+	# recuperación la dirección del golpe queda comprometida. En el aire tampoco se gira.
+	if turning_locked():
+		turn = 0.0
 	reversing = false
 	var run_req := want_sprint and amount > 0.3 and exhausted <= 0.0 and not blocking and stamina > 0.0
 	if shot_state != Shot.NONE and not mounted:
@@ -969,7 +973,9 @@ func _physics_process(delta: float) -> void:
 	rider_yaw = lerp_angle(rider_yaw, want_yaw, clampf(delta * 10.0, 0.0, 1.0)) if mounted else 0.0
 	_rider_root.rotation.y = rider_yaw
 	_update_stamina(delta, amount < 0.3 or reversing)
-	planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta * (AIR_CONTROL if airborne else 1.0))
+	# Ronda 29: salto comprometido. La trayectoria queda fijada al despegar (sin control aéreo).
+	if not airborne:
+		planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta)
 	var v := planar_vel
 	if atk_dash and not mounted and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE):
 		v = _lunge_velocity()
@@ -1008,6 +1014,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta * (1.8 if atk_jump else 1.0)
 	move_and_slide()
+	_clamp_world()
 	if not mounted and not airborne and alive and roll_t < 0.0:
 		_step_d += MeshUtil.flat(velocity).length() * delta
 		if _step_d >= (2.2 if sprinting else 1.5):
@@ -2289,7 +2296,9 @@ func _update_boss(delta: float) -> void:
 			var step := BOSS_SPEED * delta
 			boss_travel += step
 			velocity = boss_dir * BOSS_SPEED
+			velocity.y = 0.0
 			move_and_slide()
+			_clamp_world()
 			velocity = Vector3.ZERO
 			planar_vel = Vector3.ZERO
 			for t in MeshUtil.enemies_of(get_tree(), team):
@@ -2367,3 +2376,47 @@ func _step_velocity(delta: float) -> Vector3:
 		return Vector3.ZERO
 	step_travel += mv
 	return dir * (mv / delta)
+
+
+## Ronda 29: garantía física de mundo tras cada movimiento (andar, voltereta, estocada, embestida,
+## arremetida de combo, embestida de jefe, empujones). Nunca bajo el suelo (y=0), nunca fuera del
+## muro circular de la arena ni dentro de un pilar, aunque una velocidad alta haga «túnel» en la física.
+const BODY_R := 0.45
+static var world_clamp := true
+var clamps: int = 0 ## correcciones aplicadas (pruebas)
+
+func _clamp_world() -> void:
+	if not world_clamp:
+		return
+	var p := global_position
+	var fixed := false
+	if p.y < 0.0:
+		p.y = 0.0
+		velocity.y = maxf(velocity.y, 0.0)
+		fixed = true
+	var ar: float = Projectile.arena_radius
+	if ar > 0.0:
+		var flat := Vector2(p.x, p.z)
+		var lim := ar - BODY_R
+		if flat.length() > lim:
+			flat = flat.normalized() * lim
+			p.x = flat.x
+			p.z = flat.y
+			fixed = true
+	for o: Vector3 in Projectile.obstacles:
+		var d := Vector2(p.x - o.x, p.z - o.z)
+		var r: float = o.y + BODY_R - 0.3 # o.y = radio del pilar (1.5 ~ colisión 1.3 + margen)
+		if d.length() < r:
+			d = (d.normalized() if d.length() > 0.01 else Vector2(facing.x, facing.z).normalized()) * r
+			p.x = o.x + d.x
+			p.z = o.z + d.y
+			fixed = true
+	if fixed:
+		global_position = p
+		clamps += 1
+
+## Ronda 29: compromiso de orientación (frames activos/recuperación de un ataque a pie, o en el aire).
+func turning_locked() -> bool:
+	if mounted:
+		return false
+	return airborne or atk_state == Atk.ACTIVE or atk_state == Atk.RECOVERY

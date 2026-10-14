@@ -56,11 +56,12 @@ const MX_COMMON := {"dodge_f": "roll_f", "hit": "hit", "stun": "stun", "stance_b
 	"slam": "jump_slam", "boss_charge": "boss_charge", "boss_lunge": "boss_lunge", "cast": "cast"}
 ## Por arma: combos, pesado, guardia, reposo y muerte.
 const MX_WEAPON := {
-	"espada_escudo": {"light0": "sns_light0", "light1": "sns_light1", "light2": "sns_light2", "heavy": "sns_heavy", "death": "death_1h"},
+	"espada_escudo": {"light0": "sns_light0", "light1": "sns_light1", "light2": "sns_light2", "heavy": "sns_heavy", "idle": "sns_idle", "death": "death_1h"},
 	"espada_larga": {"light0": "gs_light0", "light1": "gs_light1", "light2": "gs_light2", "heavy": "gs_heavy", "block": "gs_block", "idle": "gs_idle", "death": "death_2h"},
 	"hacha_2m": {"light0": "gs_light1", "light1": "gs_light0", "light2": "gs_light2", "heavy": "axe_heavy", "block": "gs_block", "idle": "gs_idle", "death": "death_2h"},
 	"lanza": {"death": "death_2h"},
-	"dagas": {"death": "death_1h"},
+	# Ronda 29: dagas = tajos a una mano (Mixamo no trae cuchilladas dobles) (asesino y arquero: su arma cuerpo a cuerpo)
+	"dagas": {"light0": "sns_light0", "light1": "sns_light2", "light2": "sns_light1", "heavy": "sns_heavy", "idle": "light_idle", "death": "death_1h"},
 }
 ## Strafe caminando (KayKit solo trae strafe corriendo): clips Mixamo de espadón.
 const MX_LOCO := {"Walk_Strafe_L": "strafe_a", "Walk_Strafe_R": "strafe_b"}
@@ -659,7 +660,7 @@ func update(f: Fighter, delta: float) -> void:
 			ph = 0.8 + 0.2 * f.atk_t / maxf(f.atk_dur, 0.01)
 		if ph >= 0.0:
 			hop_y = sin(ph * PI) * f.cur_hit.hop
-	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y
+	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y + (0.0 if _mounted else foot_lift())
 	# Locomoción relativa a la mirada
 	var st := f.stats()
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)
@@ -701,3 +702,38 @@ func set_armor(pieces: Dictionary) -> void:
 			var mi := MeshUtil.box(att, d[2] * (1.12 if heavy else 1.0), d[1], a.tint)
 			mi.name = "ArmorMesh"
 			_armor_nodes.append(att)
+
+
+## Ronda 29: garantía visual de suelo. Si un clip (Mixamo retargeteado: estocadas, embestida, salto
+## demoledor...) baja los pies por debajo de su altura de reposo, el modelo se eleva lo justo para
+## que ningún pie/punta atraviese el suelo. La posición física la garantiza Fighter._clamp_world().
+const FOOT_BONES := ["foot.l", "foot.r", "toes.l", "toes.r"]
+var _foot_sk: Skeleton3D
+var _foot_ids: Array[int] = []
+var _foot_rest := INF
+var last_lift := 0.0
+
+func _foot_min(rest: bool) -> float:
+	var lo := INF
+	for i in _foot_ids:
+		var o: Vector3 = (_foot_sk.get_bone_global_rest(i) if rest else _foot_sk.get_bone_global_pose(i)).origin
+		var pm := model.to_local(_foot_sk.to_global(o))
+		lo = minf(lo, (model.transform.basis * pm).y)
+	return lo
+
+func foot_lift() -> float:
+	if model == null or not model.is_inside_tree():
+		return 0.0
+	if _foot_sk == null or not is_instance_valid(_foot_sk):
+		_foot_sk = model.find_child("Skeleton3D", true, false) as Skeleton3D
+		_foot_ids.clear()
+		if _foot_sk:
+			for b: String in FOOT_BONES:
+				var i := _foot_sk.find_bone(b)
+				if i >= 0:
+					_foot_ids.append(i)
+		_foot_rest = _foot_min(true) if not _foot_ids.is_empty() else INF
+	if _foot_ids.is_empty() or _foot_rest == INF:
+		return 0.0
+	last_lift = maxf(0.0, _foot_rest - _foot_min(false))
+	return last_lift

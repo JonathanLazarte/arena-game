@@ -45,8 +45,11 @@ func _ready() -> void:
 	e_meter = _bar(root, Vector2(1280 - 420, 52), UIKit.CYAN, 14)
 	p_stamina = _bar(root, Vector2(20, 70), UIKit.YELLOW, 10)
 	e_stamina = _bar(root, Vector2(1280 - 420, 70), UIKit.YELLOW, 10)
+	# Ronda 29: del rival solo se ve la vida (y sus estados): ni aguante ni barra de eikon
+	e_meter.visible = false
+	e_stamina.visible = false
 	name_p = _label(root, "Jugador", Vector2(20, 84), 18)
-	name_e = _label(root, "Rival", Vector2(1280 - 420, 84), 18)
+	name_e = _label(root, "Rival", Vector2(1280 - 420, 52), 18)
 	loadout_label = _label(root, "Espada y escudo", Vector2(20, 108), 18)
 	swap_bar = _bar(root, Vector2(20, 112), Color(0.8, 0.8, 1.0), 12)
 	swap_bar.size = Vector2(250, 12)
@@ -351,7 +354,7 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
 	_enemy = enemy
 	status_p = _status_rows(root_control(), Vector2(20, 136), 150, "StatusPlayer")
-	status_e = _status_rows(root_control(), Vector2(1280 - 420, 108), 150, "StatusEnemy")
+	status_e = _status_rows(root_control(), Vector2(1280 - 420, 78), 150, "StatusEnemy")
 	status_over = _status_rows(root_control(), Vector2.ZERO, 60, "StatusOverTarget")
 	status_over_box = status_over["box"]
 	name_p.text = player.display_name

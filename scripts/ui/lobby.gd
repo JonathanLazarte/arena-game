@@ -74,7 +74,11 @@ func _unhandled_input(ev: InputEvent) -> void:
 	if stage == null:
 		return
 	if ev is InputEventScreenDrag:
-		stage.pedestal.rotation.y += (ev as InputEventScreenDrag).relative.x * 0.01
+		var sd := ev as InputEventScreenDrag
+		if absf(sd.velocity.x) > SWIPE_SPEED and absf(sd.velocity.x) > absf(sd.velocity.y) * 2.0:
+			_swipe(signf(sd.velocity.x))
+		else:
+			stage.pedestal.rotation.y += sd.relative.x * 0.01
 	elif ev is InputEventMouseMotion and (ev as InputEventMouseMotion).button_mask & MOUSE_BUTTON_MASK_LEFT:
 		stage.pedestal.rotation.y += (ev as InputEventMouseMotion).relative.x * 0.01
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
@@ -94,11 +98,59 @@ func _unhandled_input(ev: InputEvent) -> void:
 			KEY_1: set_difficulty("facil")
 			KEY_2: set_difficulty("normal")
 			KEY_3: set_difficulty("dificil")
+			KEY_LEFT: cycle_character(-1)
+			KEY_RIGHT: cycle_character(1)
 			KEY_Q: _cycle_tab(-1)
 			KEY_E, KEY_TAB: _cycle_tab(1)
 
 ## Ronda 20: Esc / Atrás cierra lo que esté encima: confirmación, Atributos, selector de equipo
 ## o la pestaña abierta (vuelve al escaparate sin pestaña). Devuelve lo que cerró.
+## Ronda 29: deslizar rápido (o ‹ ›, flechas) cambia de personaje: los tuyos se eligen al momento;
+## los bloqueados se ven y se pueden comprar (con nombre propio).
+const SWIPE_SPEED := 1400.0
+var _swipe_cd: int = 0
+func _swipe(dir: float) -> void:
+	if Time.get_ticks_msec() < _swipe_cd or modal.visible:
+		return
+	_swipe_cd = Time.get_ticks_msec() + 450
+	cycle_character(-1 if dir > 0.0 else 1) # deslizar a la derecha = anterior (como un carrusel)
+
+func cycle_character(d: int) -> void:
+	if modal.visible or tab == "Atributos":
+		return
+	var ids: Array = []
+	for c in Catalog.characters():
+		ids.append(c.id)
+	var i := ids.find(view_char)
+	view_char = ids[(i + d + ids.size()) % ids.size()]
+	if gs.is_unlocked("character", view_char):
+		gs.switch_character(view_char)
+		smith_sel = gs.weapon_id
+	_refresh_all()
+
+## Comprar el personaje que se está viendo: pide nombre.
+func request_character(id: String) -> void:
+	var why: String = gs.can_buy("character", id)
+	if why != "ok":
+		request_purchase("character", id)
+		return
+	var r := Progression.req("character", id)
+	open_modal("Nuevo personaje", "Desbloquear %s por %d de oro. Ponle nombre:" % [Catalog.character(id).display_name, r[1]], "Comprar", func() -> void:
+		var res: String = gs.buy_character(id, name_input.text)
+		if res == "ok":
+			UIKit.sfx("confirm")
+			UIKit.audio("purchase")
+			gs.switch_character(id)
+			smith_sel = gs.weapon_id
+			show_toast("¡%s se une a ti!" % gs.char_name(id))
+			_refresh_all()
+		elif res == "nombre":
+			show_toast("Ponle un nombre"))
+	name_input.text = ""
+	name_input.visible = true
+	modal_ok.disabled = true
+	name_input.grab_focus.call_deferred()
+
 func close_top() -> String:
 	if modal.visible:
 		close_modal()
@@ -215,6 +267,14 @@ func _build_ui() -> void:
 	role_label.size = Vector2(580, 30)
 	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ui.add_child(role_label)
+	# Ronda 29: selector de personaje (‹ ›, flechas, deslizar rápido)
+	for d: int in [-1, 1]:
+		var ab := UIKit.button("‹" if d < 0 else "›", 34)
+		ab.name = "CharPrev" if d < 0 else "CharNext"
+		ab.position = Vector2(250 + (-70 if d < 0 else 580 + 10), 556)
+		ab.custom_minimum_size = Vector2(60, 60)
+		ab.pressed.connect(cycle_character.bind(d))
+		root_ui.add_child(ab)
 	# Panel derecho
 	var panel := UIKit.panel()
 	right_panel = panel
@@ -323,6 +383,16 @@ func _build_modal() -> void:
 	modal_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	modal_text.custom_minimum_size = Vector2(460, 0)
 	v.add_child(modal_text)
+	name_input = LineEdit.new()
+	name_input.name = "CharNameInput"
+	name_input.max_length = 16
+	name_input.placeholder_text = "Nombre del personaje"
+	name_input.add_theme_font_size_override("font_size", 22)
+	name_input.custom_minimum_size = Vector2(320, 44)
+	name_input.visible = false
+	name_input.text_changed.connect(func(t: String) -> void: modal_ok.disabled = t.strip_edges() == "")
+	name_input.text_submitted.connect(func(_t: String) -> void: _modal_accept())
+	v.add_child(name_input)
 	var h := HBoxContainer.new()
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_theme_constant_override("separation", 20)
@@ -338,7 +408,10 @@ func _build_modal() -> void:
 	no.pressed.connect(close_modal)
 	h.add_child(no)
 
+var name_input: LineEdit
 func open_modal(title_t: String, text: String, ok_text: String, cb: Callable, can_ok: bool = true) -> void:
+	if name_input:
+		name_input.visible = false
 	modal_title.text = title_t
 	modal_text.text = text
 	modal_ok.text = ok_text
@@ -349,9 +422,7 @@ func open_modal(title_t: String, text: String, ok_text: String, cb: Callable, ca
 
 func close_modal() -> void:
 	modal.visible = false
-	if view_char != gs.character_id:
-		view_char = gs.character_id
-		_refresh_all()
+	pass # ronda 29: se puede seguir viendo un personaje bloqueado (selector)
 
 func _modal_accept() -> void:
 	if modal_ok.disabled:
@@ -489,8 +560,8 @@ func _refresh_all(rebuild: bool = true) -> void:
 	xp_bar.max_value = lp.y
 	xp_bar.value = lp.x
 	var cur := Catalog.character(gs.character_id)
-	name_label.text = c.display_name
-	role_label.text = ("%s · Nivel %d · %s" % [c.role, gs.char_level(c.id), Catalog.weapon(gs.weapon_id).display_name]) if not locked else "%s · Bloqueado (%s)" % [c.role, _lock_text("character", c.id)]
+	name_label.text = gs.char_name(c.id) if not locked else c.display_name
+	role_label.text = ("%s · %s · Nivel %d · %s" % [c.display_name, c.role, gs.char_level(c.id), Catalog.weapon(gs.weapon_id).display_name]) if not locked else "%s · Bloqueado (%s) · toca Jugar para desbloquear" % [c.role, _lock_text("character", c.id)]
 	for ch in list_box.get_children():
 		ch.queue_free()
 	for ch in stats_box.get_children():
@@ -716,6 +787,9 @@ func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
 ## Empieza la partida 1v1 con el equipamiento elegido (rival aleatorio).
 func play() -> void:
 	if modal.visible:
+		return
+	if not gs.is_unlocked("character", view_char):
+		request_character(view_char) # ronda 29: el bloqueado se compra (con nombre)
 		return
 	gs.from_lobby = true
 	gs.random_rival = true

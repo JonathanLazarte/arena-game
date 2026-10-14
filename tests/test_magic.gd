@@ -67,7 +67,7 @@ func _run() -> void:
 	check(gs.magic_migrated and gs.equipped_spells()[0] == "chispa" and gs.owned_arts == ["estocada_impulsada"], "v7→v8: hechizo de tu eikon equipado y arte inicial")
 	var c2 := ConfigFile.new()
 	c2.load(gs.save_path)
-	check(int(c2.get_value("meta", "version", 0)) == 8, "se reescribe como v8")
+	check(int(c2.get_value("meta", "version", 0)) == GameState.SAVE_VERSION, "se reescribe con la versión actual")
 	# --- Lobby ---
 	gs.owned_eikons = ["fenix", "lobo", "golem"]
 	gs.oro = 1000

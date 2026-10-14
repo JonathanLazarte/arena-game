@@ -39,7 +39,7 @@ func _ready() -> void:
 	# Equipamiento: el del lobby (GameState) o el clásico si se carga la arena directamente (pruebas)
 	var gs := get_node_or_null("/root/GameState")
 	if gs and gs.from_lobby:
-		player = _make_fighter(gs.player_name, 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
+		player = _make_fighter(gs.char_name(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2()})
 		player.set_magic(gs.equipped_spells(), gs.weapon_art()) # ronda 21

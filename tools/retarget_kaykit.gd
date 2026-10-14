@@ -29,6 +29,8 @@ const CLIPS := {
 	"gs_heavy": ["greatsword_attack", "contact", 0],
 	"axe_heavy": ["greatsword_high_spin_attack", "contact", 0],
 	"gs_idle": ["greatsword_idle", "loop", 0],
+	"sns_idle": ["paladin_standing_idle", "loop", 0],
+	"light_idle": ["akai_idle", "loop", 0],
 	"gs_block": ["greatsword_blocking", "loop", 0],
 	"roll_f": ["akai_sprinting_forward_roll_inplace", "full", 0],
 	"hit": ["greatsword_impact_4", "full", 0],

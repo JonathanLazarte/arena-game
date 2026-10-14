@@ -21,13 +21,23 @@ func _run() -> void:
 	fresh(gs, "user://test_purchase.cfg")
 	gs.choose_first_character("caballero")
 	check(gs.oro == Progression.START_GOLD, "oro inicial %d" % gs.oro)
-	# Ronda 15: los personajes no se compran ni se cambian
+	# Ronda 29: los personajes se compran (nivel de cuenta + oro) y llevan nombre propio
 	gs.oro = 99999
-	check(gs.can_buy("character", "arquero") == "no_venta" and gs.buy("character", "arquero") == "no_venta" and gs.oro == 99999, "no se puede comprar un personaje aunque sobre oro")
+	check(gs.can_buy("character", "arquero") == "nivel" and gs.oro == 99999, "otro personaje pide nivel de cuenta %d" % Progression.CHAR_REQ[0])
+	gs.account_xp = Progression.xp_at_level(Progression.CHAR_REQ[0])
+	check(gs.buy_character("arquero", "   ") == "nombre" and not gs.is_unlocked("character", "arquero"), "sin nombre no se compra")
+	check(gs.buy_character("arquero", "Legolas") == "ok" and gs.oro == 99999 - Progression.CHAR_REQ[1] and gs.char_name("arquero") == "Legolas", "se compra con nombre (%d oro)" % Progression.CHAR_REQ[1])
 	check(gs.can_buy("character", "caballero") == "ya", "el propio ya está desbloqueado")
-	check(not gs.set_character("arquero") and gs.character_id == "caballero" and gs.unlocked_chars == ["caballero"], "no se puede cambiar de personaje")
+	check(gs.character_id == "caballero" and gs.weapon_id == "espada_escudo", "comprar no cambia de personaje")
+	gs.switch_character("arquero")
+	check(gs.character_id == "arquero" and gs.weapon_id == "arco", "cambiar al nuevo: su arma por defecto")
+	gs.switch_character("caballero")
+	check(gs.character_id == "caballero" and gs.weapon_id == "espada_escudo" and not gs.switch_character("paladin"), "volver conserva el equipo; no se cambia a uno bloqueado")
+	gs.save_loadout()
+	gs.load_loadout()
+	check(gs.unlocked_chars.has("arquero") and gs.char_name("arquero") == "Legolas", "personajes y nombres guardados (v%d)" % gs.SAVE_VERSION)
 	check(not gs.has_method("change_character") and not "CHARACTER_CHANGE_ITEM" in Progression.new().get_script().get_script_constant_map(), "ronda 19: «Cambio de personaje» eliminado")
-	check(not "CHARACTER_PRICE" in Progression.new().get_script().get_script_constant_map(), "sin tabla de precios de personajes")
+	gs.account_xp = 0
 	gs.oro = 5000
 	# Requisito de nivel
 	check(gs.account_level() == 1 and gs.can_buy("weapon", "lanza") == "nivel", "la lanza pide nivel %d" % Progression.WEAPON_REQ["lanza"][0])
@@ -40,7 +50,7 @@ func _run() -> void:
 	check(gs.buy("eikon", "lobo") == "ok" and "lobo" in gs.owned_eikons, "compra eikon montable")
 	gs.reset_defaults()
 	gs.load_loadout()
-	check(gs.unlocked_chars == ["caballero"] and "lanza" in gs.owned_weapons and "lobo" in gs.owned_eikons, "las compras se guardan")
+	check(gs.unlocked_chars == ["caballero", "arquero"] and "lanza" in gs.owned_weapons and "lobo" in gs.owned_eikons, "las compras se guardan")
 	# Flujo en el lobby con confirmación
 	gs.oro = 1300
 	change_scene_to_file("res://scenes/lobby.tscn")

@@ -207,6 +207,7 @@ func _physics_process(delta: float) -> void:
 	velocity.z = v.z
 	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
 	move_and_slide()
+	if global_position.y < 0.0: global_position.y = 0.0 # ronda 29: nunca bajo el suelo
 	if v.length() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-v.x, -v.z), delta * 3.0)
 
@@ -222,6 +223,7 @@ func _companion_step(delta: float) -> void:
 	velocity.z = v.z
 	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
 	move_and_slide()
+	if global_position.y < 0.0: global_position.y = 0.0 # ronda 29: nunca bajo el suelo
 	if dist > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), delta * 6.0)
 	if dist <= eikon.attack_range and attack_cd <= 0.0:
@@ -261,6 +263,7 @@ func _call_step(delta: float) -> void:
 	velocity.z = v.z
 	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
 	move_and_slide()
+	if global_position.y < 0.0: global_position.y = 0.0 # ronda 29: nunca bajo el suelo
 	if dist > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), delta * 8.0)
 	if dist <= CALL_REACH and o.can_mount_now():

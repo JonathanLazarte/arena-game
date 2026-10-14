@@ -7,7 +7,7 @@ extends Node
 ## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 8
+const SAVE_VERSION := 9 ## v9 = ronda 29: varios personajes con nombre propio
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -40,6 +40,10 @@ var owned_arts: Array = WeaponArts.STARTER.duplicate() ## ronda 21: colección d
 var art_eq: Dictionary = {} ## ronda 21: id arma -> id arte
 var magic_migrated: bool = false ## v<8: se equipó el hechizo del eikon y la estocada impulsada
 const SMITH_WELCOME := {"piedra_1": 3}
+# --- Ronda 29: varios personajes ---
+var char_names: Dictionary = {} ## id -> nombre que le puso el jugador
+var other_slots: Dictionary = {} ## id -> equipo del personaje no activo (arma, arma 2, armadura, hechizos)
+const NAME_MAX := 16
 var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
 var active_slot: int = 0
 var char_migration: Dictionary = {} ## ronda 15: personajes extra reembolsados al migrar
@@ -257,9 +261,8 @@ func is_unlocked(kind: String, id: String) -> bool:
 func can_buy(kind: String, id: String) -> String:
 	if is_unlocked(kind, id):
 		return "ya"
-	if kind == "character":
-		return "no_venta" # ronda 15: los personajes no se compran
 	var r := Progression.req(kind, id)
+
 	if account_level() < int(r[0]):
 		return "nivel"
 	if oro < int(r[1]):
@@ -269,8 +272,9 @@ func can_buy(kind: String, id: String) -> String:
 # ---------------- Acciones ----------------
 
 ## Primera vez: el rol elegido queda desbloqueado (gratis) con su arma.
-func choose_first_character(id: String) -> void:
+func choose_first_character(id: String, nm: String = "") -> void:
 	_unlock_char(id)
+	set_char_name(id, nm)
 	character_id = id
 	weapon_id = Catalog.character(id).default_weapon
 	first_run_done = true
@@ -288,13 +292,66 @@ func _unlock_char(id: String) -> void:
 		attrs[id] = Attributes.start_for(id)
 	_give_starter_armor(id)
 
+## Ronda 29: nombre propio del personaje (si no tiene, el de la clase).
+func char_name(id: String = "") -> String:
+	var cid := id if id != "" else character_id
+	var n: String = String(char_names.get(cid, ""))
+	return n if n != "" else Catalog.character(cid).display_name
+
+static func clean_name(nm: String) -> String:
+	return nm.strip_edges().left(NAME_MAX)
+
+func set_char_name(id: String, nm: String) -> void:
+	var n := clean_name(nm)
+	if n != "":
+		char_names[id] = n
+
+## Compra un personaje y le pone nombre (obligatorio). "ok", "nombre" o el motivo de can_buy.
+func buy_character(id: String, nm: String) -> String:
+	if clean_name(nm) == "":
+		return "nombre"
+	var r := buy("character", id)
+	if r == "ok":
+		set_char_name(id, nm)
+		save_loadout()
+	return r
+
+## Ronda 29: cambia al personaje id (debe ser tuyo). Guarda el equipo del actual y recupera el suyo.
+func switch_character(id: String) -> bool:
+	if not id in unlocked_chars:
+		return false
+	if id == character_id:
+		return true
+	other_slots[character_id] = _gear()
+	character_id = id
+	var g: Dictionary = other_slots.get(id, {})
+	other_slots.erase(id)
+	var c := Catalog.character(id)
+	weapon_id = String(g.get("weapon_id", c.default_weapon))
+	weapon2_id = String(g.get("weapon2", ""))
+	armor_eq = g.get("armor", {})
+	spells = g.get("spells", [])
+	if not c.allows(weapon_id) or not weapon_id in owned_weapons:
+		weapon_id = c.default_weapon
+	equipped_spells()
+	save_loadout()
+	return true
+
+func _gear() -> Dictionary:
+	return {"weapon_id": weapon_id, "weapon2": weapon2_id, "armor": armor_eq.duplicate(), "spells": spells.duplicate()}
+
 func buy(kind: String, id: String) -> String:
 	var r := can_buy(kind, id)
 	if r != "ok":
 		return r
 	oro -= int(Progression.req(kind, id)[1])
 	match kind:
-		"character": _unlock_char(id)
+		"character":
+			var keep: Dictionary = armor_eq.duplicate()
+			armor_eq = {}
+			_unlock_char(id) # equipo inicial de su rol para él, no para el actual
+			other_slots[id] = {"weapon_id": Catalog.character(id).default_weapon, "weapon2": "", "armor": armor_eq.duplicate(), "spells": []}
+			armor_eq = keep
 		"weapon": owned_weapons.append(id)
 		"eikon": owned_eikons.append(id)
 		"armor": owned_armor.append(id)
@@ -453,6 +510,18 @@ func save_loadout() -> void:
 	cfg.set_value("herreria", "materiales", materials)
 	cfg.set_value("artes", "coleccion", owned_arts)
 	cfg.set_value("artes", "equipadas", art_eq)
+	# Ronda 29: resto de personajes (nombres, XP, habilidades, atributos y su equipo)
+	cfg.set_value("personajes", "nombres", char_names)
+	cfg.set_value("personajes", "desbloqueados", unlocked_chars)
+	var others := {}
+	for id: String in unlocked_chars:
+		if id != character_id:
+			var g: Dictionary = other_slots.get(id, {}).duplicate()
+			g["xp"] = int(char_xp.get(id, 0))
+			g["skills"] = skills.get(id, [])
+			g["attrs"] = attrs.get(id, Attributes.start_for(id))
+			others[id] = g
+	cfg.set_value("personajes", "otros", others)
 	cfg.save(save_path)
 
 func load_loadout() -> void:
@@ -543,6 +612,22 @@ func load_loadout() -> void:
 			magic_migrated = true
 			if migrated_from == 0:
 				migrated_from = ver
+	char_names = {}
+	other_slots = {}
+	if ver >= 9:
+		char_names = cfg.get_value("personajes", "nombres", {})
+		var others: Dictionary = cfg.get_value("personajes", "otros", {})
+		for id: String in cfg.get_value("personajes", "desbloqueados", []):
+			if Catalog.character(id).id == id and not id in unlocked_chars:
+				unlocked_chars.append(id)
+		for id: String in others:
+			if not id in unlocked_chars or id == character_id:
+				continue
+			var g: Dictionary = others[id]
+			char_xp[id] = int(g.get("xp", 0))
+			skills[id] = g.get("skills", [])
+			attrs[id] = g.get("attrs", Attributes.start_for(id))
+			other_slots[id] = {"weapon_id": g.get("weapon_id", Catalog.character(id).default_weapon), "weapon2": g.get("weapon2", ""), "armor": g.get("armor", {}), "spells": g.get("spells", [])}
 	attr_migrated = false
 	if ver < 5:
 		_migrate_attrs()
@@ -622,6 +707,8 @@ func _migrate_characters() -> void:
 	char_migration = {"removed": extra, "refund": refund}
 
 func reset_defaults() -> void:
+	char_names = {}
+	other_slots = {}
 	player_name = "Jugador"
 	oro = Progression.START_GOLD
 	gemas = 50

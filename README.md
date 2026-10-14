@@ -680,3 +680,13 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - que la carga, la embestida, la rotura de postura y el hechizo usan sus estados.
 
 `tests/test_defs.gd` se adaptó a los nuevos clips del combo. Hoja de poses para revisar a ojo: `tests/posesheet.gd`.
+
+## Ronda 29
+
+- **Personajes con nombre y selector.** Al empezar y al comprar un personaje (nivel de cuenta 3 + 2500 oro) hay que escribirle un nombre (máx. 16). El nombre se guarda (partida v9, sección `personajes`: nombres, desbloqueados y equipo/XP/habilidades/atributos de cada uno) y se ve en el lobby y en el HUD. En el lobby se cambia de personaje con ‹ ›, las flechas ←/→ o deslizando en Android. Un bloqueado se puede ver, y al pulsar Jugar se ofrece comprarlo.
+- **Animaciones Mixamo en todos.** Los 5 personajes (caballero, berserker, asesino, arquero, paladín) usan el rig KayKit y comparten los clips comunes (voltereta, golpe, aturdido, rotura de postura, carga/embestida de jefe, hechizo, salto demoledor). Nuevo: las dagas (asesino y el arma cuerpo a cuerpo del arquero) usan tajos de espada a una mano y guardia `light_idle`, y espada y escudo usa `sns_idle`. La lanza mantiene sus estocadas KayKit.
+- **Suelo, muro y pilares garantizados.** `Fighter._clamp_world()` se ejecuta después de cada movimiento (andar, volteretas, estocadas, arremetidas, embestida de jefe, empujones). Ningún personaje baja de y=0, sale del muro ni entra en un pilar. Las monturas tampoco bajan del suelo. Además, `KnightVisual.foot_lift()` eleva el modelo si un clip mete los pies bajo el suelo.
+- **Salto comprometido.** La trayectoria se fija al despegar: no hay control ni giro en el aire.
+- **Regla soulslike aplicada.** El ataque solo sigue al objetivo durante la anticipación. En los frames activos y en la recuperación su dirección queda fijada.
+- **HUD del rival.** Solo muestra la vida y los estados, sin aguante ni barra de eikon.
+- Pruebas: `tests/test_round29.gd`, más ajustes en test_purchase, test_first_run, test_magic/test_smithing (versión de partida) y test_round25 (el rival ya no puede colocarse fuera de la arena).

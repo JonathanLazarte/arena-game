@@ -37,7 +37,11 @@ func _run() -> void:
 	fr.modal.visible = false
 	check(not gs.first_run_done, "cancelar no elige nada")
 	fr.confirm_choice()
+	fr.accept()
+	check(not gs.first_run_done, "ronda 29: sin nombre no se confirma")
+	fr.name_input.text = "  Ragnar  "
 	fr.accept_button.pressed.emit()
+	check(gs.char_name() == "Ragnar", "ronda 29: el personaje lleva el nombre que puso el jugador (%s)" % gs.char_name())
 	check(gs.first_run_done and gs.unlocked_chars == ["berserker"] and gs.character_id == "berserker", "solo el elegido queda desbloqueado")
 	check(gs.weapon_id == "hacha_2m" and gs.is_unlocked("weapon", "hacha_2m"), "con su arma por defecto")
 	await create_timer(1.6).timeout

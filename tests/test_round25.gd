@@ -162,6 +162,7 @@ func _run() -> void:
 	check(rig._touch_ok(Vector2(1000, 120)), "Android: mitad derecha libre orbita")
 	# Lock-on: la cámara sigue al objetivo; tirón cambia de objetivo
 	c.lock_on = true
+	p.global_position = Vector3(0, 0, 8) # ronda 29: lejos del muro (el rival ya no puede quedar fuera de la arena)
 	e.global_position = p.global_position + Vector3(8, 0, 0)
 	await create_timer(1.0).timeout
 	var cf := MeshUtil.flat(-arena.camera.global_transform.basis.z).normalized()
