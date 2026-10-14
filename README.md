@@ -615,3 +615,21 @@ Las estocadas en carrera y los golpes con salto conservan su propia embestida (m
 
 - El tiempo de física medido (~1,5–3 ms) tiene demasiado ruido en la caja para ver diferencias.
 - El tiempo de GPU y las sombras no se pueden medir sin pantalla: hay que medirlos en el dispositivo.
+
+## Ronda 27 — Animaciones Mixamo (biblioteca reapuntable)
+
+Se importaron **99 animaciones de Mixamo** (vía Souls-Combat; solo animaciones) en `assets/animations/mixamo/`:
+
+| Grupo | Animaciones |
+|---|---|
+| paladin | 15 |
+| greatsword | 51 |
+| akai | 18 |
+| magic | 13 |
+| xbot | 2 |
+
+- Se importan como **AnimationLibrary**, reapuntadas al esqueleto humanoide de Godot (`SkeletonProfileHumanoid`, `%GeneralSkeleton`) con tres `BoneMap` según el rig de origen.
+- Hay bibliotecas `lib_*.res` listas para cualquier modelo humanoide propio (reapuntado con un BoneMap humanoide).
+- Lista, origen, archivos no importados y mapeo sugerido a las acciones del juego: `assets/animations/mixamo/README.md`.
+- **Aún no se usan en el juego** (los modelos actuales son KayKit/Quaternius).
+- Herramienta: `tools/build_mixamo_libs.gd`. Prueba: `tests/test_mixamo_anims.gd`.

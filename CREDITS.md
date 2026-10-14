@@ -43,3 +43,4 @@ Todo CC0 1.0 (dominio público). Licencias comprobadas en la página de cada rec
 | RPG Audio (voltereta/tela, salto, tensar el arco, ballesta, monedas, herrero, sangrado y veneno) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 | `assets/audio/sfx/roll_*`, `jump`, `bow_draw`, `xbow_*`, `purchase`, `smith`, `status_sangrado`, `status_veneno` |
 
 Algunos efectos se han convertido de WAV a OGG o se les ha cambiado el tono o el volumen con ffmpeg.
+- Animaciones de **Mixamo** (Adobe), tomadas del repositorio BrunoGottlieb/Souls-Combat (solo animaciones; ver `assets/animations/mixamo/README.md`).
