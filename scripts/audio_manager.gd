@@ -92,6 +92,9 @@ func save_settings() -> void:
 	for b: String in BUSES:
 		cfg.set_value("audio", b, volumes[b])
 	cfg.set_value("control", "buffer", PlayerController.buffer_window) # ronda 23
+	cfg.set_value("control", "cam_sens", CameraRig.sensitivity) # ronda 25
+	cfg.set_value("control", "cam_invert", CameraRig.invert_y)
+	cfg.set_value("control", "cam_capture", CameraRig.capture_mouse)
 	cfg.save(settings_path)
 
 ## Ronda 23: ventana del búfer de entrada (Ajustes → Controles).
@@ -105,6 +108,9 @@ func load_settings() -> void:
 	if cfg.load(settings_path) == OK:
 		for b: String in BUSES:
 			volumes[b] = float(cfg.get_value("audio", b, volumes[b]))
+		CameraRig.sensitivity = clampf(float(cfg.get_value("control", "cam_sens", 1.0)), 0.2, 3.0)
+		CameraRig.invert_y = bool(cfg.get_value("control", "cam_invert", false))
+		CameraRig.capture_mouse = bool(cfg.get_value("control", "cam_capture", false))
 		PlayerController.buffer_window = clampf(float(cfg.get_value("control", "buffer", PlayerController.BUFFER_WINDOW)), 0.1, 1.5)
 	for b: String in BUSES:
 		set_volume(b, volumes[b], false)

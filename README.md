@@ -530,3 +530,62 @@ Equilibrio extra por subtipo: contundente ×1,15, cortante ×0,95.
 **Pendiente:** curación (pospuesta), animación propia del crítico y del ataque corriendo (necesitan clips), barra de postura en el HUD, estabilidad propia de cada escudo, crítico montado. La contra de guardia y el crítico son solo a pie.
 
 Prueba nueva: `test_exchange.gd`.
+
+## Ronda 25 — Cámara orbital, 8 direcciones y la Estocada de jefe
+
+**Pilar de diseño nuevo** (arriba de `docs/ELDEN_RING_REFERENCIA.md`): mitad PvP, mitad jefe de Dark Souls; habilidades de jefe imparables e invulnerables, pero siempre telegrafiadas: el reto es el ritmo, no los reflejos.
+
+### Diagonal hacia atrás (arreglado)
+A pie (libre o fijado) y montado, las 8 direcciones andando y corriendo. Causa: con `dot < -0,6` el personaje retrocedía en vez de girar, y la cámara vieja seguía su orientación (giraba sin fin). Ahora sólo retrocede montado, sin correr y con atrás casi puro (`dot < -0,92`); si no, gira hacia la entrada. Nota: S+A+Shift en algunos teclados no registra las tres teclas (ghosting de hardware); **V** alterna correr.
+
+### Cámara orbital (`scripts/camera_rig.gd`)
+- **PC:** clic derecho + arrastrar (por defecto, no choca con la UI). Opcional en Ajustes «Ratón capturado (PC)»; **Esc** lo libera.
+- **Android:** arrastrar en la mitad derecha, fuera de los botones (+12 px).
+- El movimiento es relativo a la cámara.
+- **Fijado:** la cámara se pone detrás del jugador mirando al objetivo (distancia 8 + 0,15·d, a la altura del hombro). Un tirón horizontal (140 px en 0,25 s) cambia de objetivo.
+- **Libre:** se recentra tras 1,5 s sin tocar la cámara mientras avanzas.
+- La inclinación se limita a −0,15…1,1 rad; la distancia es 9,5 m. Choca con los pilares y el muro (no los atraviesa).
+- **Ajustes:** sensibilidad 0,2–3, Invertir Y y Ratón capturado (se guardan).
+
+### Estocada de jefe — tecla **B** / botón táctil **«Jefe»**
+Tiene un botón propio, no comparte hueco con Habilidad/Arte: es el hueco para futuras habilidades de jefe. Sólo a pie y con espada; pasa por el búfer. El botón se oscurece y muestra los segundos de enfriamiento.
+
+| Parámetro | Valor |
+|---|---|
+| Carga (pose, brillo de hoja 0,5→6, partículas, sonido creciente) | 2,0 s |
+| Sigue al objetivo / luego fija la dirección | 1,2 s / 0,8 s |
+| Embestida fija | 7,5 m a 24 m/s (para al impactar; si no alcanza, al aire) |
+| Alcance / arco | 1,6 m / 35° |
+| Daño | 1,6 × pesado del arma × multiplicador |
+| Postura | ×3 (no se puede parar; perforante) |
+| Invulnerable e imparable | carga + embestida |
+| Recuperación castigable | 1,0 s si acierta / 1,4 s si falla |
+| Enfriamiento / aguante | 14 s / 25 |
+
+**IA:** deja de bloquear y atacar, rueda en perpendicular con un error de tiempo y luego castiga. También la usa a 3,5–8,5 m si está de cara.
+
+| Dificultad | uso por pensamiento | prob. de esquivar | error de tiempo |
+|---|---|---|---|
+| Fácil | 0,015 | 0,30 | 0,25 s |
+| Normal | 0,03 | 0,60 | 0,12 s |
+| Difícil | 0,05 | 0,85 | 0,05 s |
+
+### Paso adelante en los ataques (estilo ER)
+Cada ataque a pie avanza (en `WeaponDef.step_light` / `step_heavy`). El paso se reparte entre el 45 % final de la preparación y la ventana activa. El pesado cargado suma +0,8 m (no se mueve mientras carga). Tiene **magnetismo** hacia el objetivo fijado o cercano de delante: se detiene al contacto (radio + 0,8 m), no lo atraviesa y respeta las colisiones. El daño no cambia (el nivel 1 sigue igual).
+
+| Arma | ligeros 1/2/3 (m) | pesado (m) |
+|---|---|---|
+| Dagas | 0,6 / 0,6 / 0,9 | 1,0 |
+| Espada y escudo | 0,9 / 0,9 / 1,2 | 1,4 |
+| Espada larga | 1,2 / 1,2 / 1,5 | 1,8 |
+| Lanza | 1,4 / 1,4 / 1,8 | 2,0 |
+| Hacha a dos manos | 0,8 / 0,8 / 1,0 | 2,4 |
+
+Las estocadas en carrera y los golpes con salto conservan su propia embestida (mayor).
+
+**Pruebas:** `tests/test_round25.gd` comprueba:
+- las 8 direcciones (a pie libre, a pie fijado, montado);
+- la órbita, el límite de inclinación, invertir Y, la colisión con pilar y muro, las zonas táctiles, la cámara en fijado, el tirón y que los ajustes se guardan;
+- la Estocada: carga, invulnerabilidad, que no se interrumpe, el seguimiento y luego la dirección fija, la esquiva lateral, los 7,5 m al aire, que para al impactar, la recuperación castigable y el enfriamiento;
+- que la IA la esquiva y la usa;
+- el paso por arma y el magnetismo.

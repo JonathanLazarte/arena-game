@@ -31,3 +31,6 @@ guard_counter_chance = 0.75
 crit_chance = 1.0
 delay_chance = 0.5
 delay_max = 0.55
+boss_use_chance = 0.05
+boss_dodge_chance = 0.85
+boss_dodge_err = 0.05

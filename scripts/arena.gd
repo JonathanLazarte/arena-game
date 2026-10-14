@@ -22,6 +22,7 @@ var ai: AIController
 var controller: PlayerController
 var hud: HUD
 var camera: Camera3D
+var rig: CameraRig
 var round_num: int = 1
 var wins: Array[int] = [0, 0]
 var state: String = "fight" ## fight / between / over
@@ -73,6 +74,15 @@ func _ready() -> void:
 	controller = PlayerController.new()
 	controller.me = player
 	controller.camera = camera
+	rig = CameraRig.new()
+	rig.camera = camera
+	rig.player = player
+	rig.controller = controller
+	rig.hud = hud
+	rig.obstacles = Projectile.obstacles
+	rig.arena_radius = RADIUS
+	add_child(rig)
+	rig.reset_behind()
 	controller.joystick = hud.joystick
 	add_child(controller)
 	hud.controller = controller
@@ -298,22 +308,8 @@ func _physics_process(delta: float) -> void:
 			var pl := player.health / player.max_health
 			var en := enemy.health / enemy.max_health
 			_on_fighter_died(enemy if pl >= en else player)
-	var cam_target: Vector3
-	var look: Vector3
-	if is_instance_valid(player.face_target):
-		# Lock-on: la cámara encuadra a ambos luchadores
-		var d := MeshUtil.flat(player.face_target.global_position - player.global_position)
-		var dist := d.length()
-		var dn := d.normalized() if dist > 0.1 else player.facing
-		cam_target = player.global_position - dn * (8.0 + clampf(dist * 0.15, 0.0, 5.0)) + Vector3(0, 5.0 + clampf(dist * 0.1, 0.0, 3.0), 0) + dn.cross(Vector3.UP) * 2.8 # sobre el hombro
-		look = player.global_position.lerp(player.face_target.global_position, 0.5) + Vector3(0, 1.5, 0)
-	else:
-		var back := player.facing
-		cam_target = player.global_position - back * 9.0 + Vector3(0, 5.0, 0)
-		look = player.global_position + Vector3(0, 2.0, 0) + back * 4.0
-	camera.global_position = camera.global_position.lerp(cam_target, clampf(delta * 4.0, 0.0, 1.0))
-	if camera.global_position.distance_to(look) > 0.5:
-		camera.look_at(look, Vector3.UP)
+	rig.active = state == "fight"
+	rig.update(delta) # ronda 25: cámara orbital (ratón / arrastre táctil), colisión con pilares
 	if shake > 0.0:
 		shake = shake * exp(-7.0 * delta) if shake > 0.01 else 0.0 # ronda 23: caída exponencial (golpe seco, sin temblor largo)
 		camera.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * shake
@@ -370,6 +366,8 @@ func start_round(new_match: bool = false) -> void:
 	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD, not new_match)
 	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK, not new_match)
 	camera.global_position = player.global_position + Vector3(0, 5, 9)
+	if rig:
+		rig.reset_behind()
 	state = "fight"
 	time_left = ROUND_TIME
 	controller.enabled = true

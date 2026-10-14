@@ -82,6 +82,8 @@ func _ready() -> void:
 	# Ronda 21: magia de eikon (a pie)
 	_touch_button("Hechizo", "spell", Vector2(800, 420), 40, Color(0.7, 0.5, 1.0))
 	_touch_button("↻", "spell_next", Vector2(722, 360), 24, Color(0.7, 0.5, 1.0))
+	# Ronda 25: habilidad de jefe
+	_touch_button("Jefe", "boss", Vector2(840, 300), 38, Color(1.0, 0.3, 0.15))
 	for l: Label in [round_label, timer_label, message]:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
@@ -305,6 +307,9 @@ func _process(_d: float) -> void:
 func _update_contextual_buttons() -> void:
 	var tv := joystick.visible
 	(btns["parry"] as TouchScreenButton).visible = tv and not _player.mounted
+	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
+	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if _player.boss_cd <= 0.0 else Color(1, 1, 1, 0.45)
+	(btn_labels["boss"] as Label).text = "Jefe" if _player.boss_cd <= 0.0 else "%d" % ceili(_player.boss_cd)
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
 	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)

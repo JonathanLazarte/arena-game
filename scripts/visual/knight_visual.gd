@@ -488,6 +488,12 @@ func update(f: Fighter, delta: float) -> void:
 		upper = false
 	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE and not (oneshot == "hit" and oneshot_t > 0.0 and f.stun <= f.last_hitstun + 0.01):
 		s = "stun"
+	elif f.boss_phase == Fighter.Boss.CHARGE:
+		s = "block" # ronda 25: pose de carga clara (guardia baja, hoja brillando)
+	elif f.boss_phase == Fighter.Boss.LUNGE:
+		s = "dash_strike"
+	elif f.boss_phase == Fighter.Boss.RECOVER:
+		s = "land"
 	elif f.is_dash_striking():
 		s = "dash_strike"
 	elif f.atk_state != Fighter.Atk.NONE:

@@ -20,7 +20,8 @@ const ACTIONS := {
 	"run_toggle": [KEY_V, KEY_CAPSLOCK], ## Ronda 15: alternar correr a pie (táctil: «Correr»)
 	"swap_weapon": [KEY_R],
 	"spell": [KEY_X], ## Ronda 21: lanzar hechizo de eikon (a pie)
-	"spell_next": [KEY_T], ## Ronda 21: siguiente ranura de hechizo
+	"spell_next": [KEY_T],
+	"boss": [KEY_B], ## Ronda 25: habilidad de jefe (Estocada de jefe) ## Ronda 21: siguiente ranura de hechizo
 }
 
 func _enter_tree() -> void:

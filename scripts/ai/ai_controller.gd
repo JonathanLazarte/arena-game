@@ -49,6 +49,13 @@ var _delay_t: float = -1.0
 var crits_tried: int = 0
 var guard_counters_tried: int = 0
 var delayed_attacks: int = 0
+## Ronda 25
+var _boss_plan: int = -1
+var _boss_dodge: bool = false
+var _boss_err: float = 0.0
+var _boss_done: bool = false
+var boss_dodges: int = 0
+var boss_used: int = 0
 
 func _on_landed(_t: Node3D, res: String, was_open: bool) -> void:
 	if res == "hit" and was_open:
@@ -94,6 +101,28 @@ func _physics_process(delta: float) -> void:
 				return
 	var sword_mode := me.loadout == Fighter.Loadout.SWORD_SHIELD
 	var reach := me.sword_range()
+	# --- Ronda 25: Estocada de jefe del jugador: no atacar al invulnerable; esquivar a tiempo ---
+	if opp.boss_phase == Fighter.Boss.CHARGE or opp.boss_phase == Fighter.Boss.LUNGE:
+		if _boss_plan != opp.boss_uses:
+			_boss_plan = opp.boss_uses
+			_boss_dodge = randf() < profile.boss_dodge_chance
+			_boss_err = randf_range(-profile.boss_dodge_err, profile.boss_dodge_err)
+			_boss_done = false
+		me.want_block = false
+		var eta := opp.boss_charge_left() + maxf(dist - Fighter.BOSS_REACH, 0.0) / Fighter.BOSS_SPEED
+		if _boss_dodge and not _boss_done and dist < Fighter.BOSS_DIST + 3.0 and eta <= 0.22 + _boss_err:
+			var side_d := opp.boss_dir.cross(Vector3.UP)
+			if side_d.dot(me.global_position - opp.global_position) < 0.0:
+				side_d = -side_d
+			me.move_input = side_d
+			if me.dash():
+				_boss_done = true
+				boss_dodges += 1
+				_punish_t = 2.5 # castiga la recuperación
+			return
+		me.move_input = Vector3.ZERO if dist < 9.0 else dir * 0.4
+		if me.atk_state == Fighter.Atk.NONE:
+			return
 	# --- Ronda 24: crítico frontal si el jugador tiene la postura rota ---
 	if opp.stance_broken_t <= 0.0:
 		_crit_roll = -1.0
@@ -185,6 +214,10 @@ func _physics_process(delta: float) -> void:
 		if me.meter >= Fighter.METER_MAX and me.atk_state == Fighter.Atk.NONE:
 			me.summon()
 		_try_specials(dist, dir)
+		# Ronda 25: Estocada de jefe a media distancia
+		if not me.mounted and dist > 3.5 and dist < Fighter.BOSS_DIST + 1.0 and me.facing.dot(dir) > 0.5 and randf() < profile.boss_use_chance and me.boss_skill():
+			boss_used += 1
+			return
 		# Cambio de armas por distancia (~0,4 s, igual que al jugador; se sigue moviendo)
 		if not me.is_swapping() and me.atk_state == Fighter.Atk.NONE and phase != Phase.COMMIT:
 			if sword_mode and dist > 17.0 and randf() < 0.05:

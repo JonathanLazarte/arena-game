@@ -2,6 +2,10 @@
 
 > Documento de diseño de **Arena de Eikons** (1v1 a caballo/eikon, móvil y Windows, Godot 4.7).
 > Resumen con palabras propias de las mecánicas de *Elden Ring* (ER), comparadas con el estado del juego al cierre de la **Ronda 20** (commit `0f40c48`), con propuestas adaptadas y prioridades.
+
+## ⚑ Pilar de diseño principal (Ronda 25)
+
+**Cada duelo es mitad PvP, mitad combate contra un jefe de Dark Souls.** Los personajes tienen habilidades «de jefe»: **imparables e invulnerables mientras se ejecutan**, pero **siempre telegrafiadas** con una preparación inconfundible (pose, brillo/partículas, sonido creciente). El reto es el **ritmo** (leer y esquivar a tiempo), no los reflejos puros. Siempre dejan una **recuperación castigable**, tienen enfriamiento y una trayectoria fija y aprendible. Toda habilidad nueva se diseña contra este pilar. Primera: **Estocada de jefe** (Ronda 25).
 > Los números de ER son de las wikis citadas en cada sección (consultadas en octubre de 2026; parche 1.1x + *Shadow of the Erdtree*). Son **referencia**: en el juego usamos valores propios, normalizados para que el nivel 1 juegue igual.
 
 **Leyenda de estado:** ✅ implementado · 🟡 parcial · ❌ falta.

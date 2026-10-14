@@ -17,6 +17,31 @@ signal impact(strength: float)
 signal hitstop(duration: float) ## ronda 23: congelación breve de impacto
 ## Ronda 24: «El intercambio» — contraataque, contra de guardia, rotura de postura y crítico frontal
 signal counter_landed(target: Node3D)
+## Ronda 25: habilidad de jefe «Estocada de jefe» (telegrafiada, invulnerable, castigable)
+signal boss_started
+enum Boss { NONE, CHARGE, LUNGE, RECOVER }
+const BOSS_CHARGE := 2.0 ## carga visible (pose, brillo y partículas en la hoja, sonido que sube)
+const BOSS_TRACK := 1.2 ## sigue al objetivo los primeros 1,2 s; luego fija la dirección
+const BOSS_DIST := 7.5 ## recorrido fijo de la embestida
+const BOSS_SPEED := 24.0 ## m/s (≈0,31 s de embestida)
+const BOSS_REACH := 1.6
+const BOSS_ARC_DEG := 35.0
+const BOSS_DMG_MULT := 1.6 ## x daño fuerte del arma
+const BOSS_POISE := 3.0
+const BOSS_RECOVER_HIT := 1.0
+const BOSS_RECOVER_MISS := 1.4 ## falló: estocada al aire, recuperación más larga
+const BOSS_COOLDOWN := 14.0
+const BOSS_STAMINA := 25.0
+var boss_phase: int = Boss.NONE
+var boss_t: float = 0.0
+var boss_dir: Vector3 = Vector3.FORWARD
+var boss_cd: float = 0.0
+var boss_travel: float = 0.0
+var boss_hit: bool = false
+var boss_uses: int = 0
+var boss_hits: int = 0
+var _boss_fx: CPUParticles3D
+var _boss_snd: AudioStreamPlayer3D
 signal stance_broken
 signal critical_landed(target: Node3D, damage: float)
 const GUARD_COUNTER_WINDOW := 0.35 ## s tras bloquear en que atacar = contra de guardia
@@ -48,6 +73,15 @@ var crits: int = 0
 var want_charge: bool = false ## lo fija el controlador: botón de ataque mantenido
 var charge_t: float = 0.0
 var running_attacks: int = 0
+## Ronda 25: paso adelante de los ataques con magnetismo hacia el objetivo
+const STEP_WINDOW := 0.45 ## el paso ocupa el último 45 % de la anticipación + el golpe
+const STEP_CHARGE_BONUS := 0.8 ## m extra con el fuerte cargado al máximo
+const MAGNET_RANGE := 1.5 ## m más allá de paso + alcance en que el ataque se imanta
+const CONTACT_GAP := 0.8 ## se detiene a esta distancia del borde del objetivo (no lo atraviesa)
+var _step_left: float = 0.0
+var _step_total: float = 0.0
+var step_travel: float = 0.0 ## recorrido del último paso (pruebas)
+var _charge_added: bool = false
 const HITSTOP_HEAVY := 0.08
 const HITSTOP_PARRY := 0.06
 signal mount_changed(mounted: bool)
@@ -818,6 +852,7 @@ func _physics_process(delta: float) -> void:
 		special_t = maxf(special_t - delta, 0.0)
 	_update_magic(delta)
 	_update_exchange(delta)
+	_update_boss(delta)
 	var was_dashing := dash_time > 0.0
 	dash_time = maxf(dash_time - delta, 0.0)
 	if roll_t >= 0.0:
@@ -837,7 +872,7 @@ func _physics_process(delta: float) -> void:
 	invuln = maxf(invuln - delta, 0.0)
 	var st := stats()
 	var inp := move_input
-	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0 or crit_t >= 0.0:
+	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0 or crit_t >= 0.0 or boss_phase != Boss.NONE:
 		inp = Vector3.ZERO
 	var wb := want_block and alive and stun <= 0.0 and roll_t < 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
@@ -881,7 +916,9 @@ func _physics_process(delta: float) -> void:
 			target_vel = dirn * st.speed * speed_mult() * amount * k
 	elif amount > 0.05:
 		var dirn := inp.normalized()
-		if dirn.dot(facing) < -0.6 and not (run_req and not mounted):
+		# Ronda 25: sin fijar, solo se retrocede (montado, sin galopar) si la entrada es casi
+		# exactamente hacia atrás; en diagonal atrás (S+A / S+D) se gira y anda/corre hacia allí.
+		if mounted and not run_req and dirn.dot(facing) < -0.92:
 			reversing = true
 			target_vel = -facing * st.speed * speed_mult() * REVERSE_FACTOR * amount
 		else:
@@ -926,6 +963,10 @@ func _physics_process(delta: float) -> void:
 	elif cur_hit and cur_hit.lunge > 0.0 and not mounted and _combo_lunging():
 		v = facing * cur_hit.lunge * speed_mult()
 		planar_vel = v * 0.5
+	elif (_step_left > 0.0 or (atk_heavy and charge_t > 0.0 and not _charge_added)) and not mounted and not atk_dash and not atk_jump and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE):
+		v = _step_velocity(delta)
+		if v != Vector3.ZERO:
+			planar_vel = Vector3.ZERO
 	elif roll_t >= 0.0:
 		v = _roll_velocity()
 		planar_vel = v
@@ -1056,7 +1097,7 @@ func swap_progress() -> float:
 	return 1.0 - swap_t / SWAP_TIME if swap_t > 0.0 else 0.0
 
 func in_recovery() -> bool:
-	return atk_state == Atk.RECOVERY
+	return atk_state == Atk.RECOVERY or boss_phase == Boss.RECOVER
 
 func get_hit_center() -> Vector3:
 	return global_position + Vector3(0, 1.6 if mounted else 1.0, 0)
@@ -1068,7 +1109,7 @@ func add_meter(v: float) -> void:
 	meter_changed.emit(meter)
 
 func _can_act() -> bool:
-	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0 and crit_t < 0.0
+	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0 and crit_t < 0.0 and boss_phase == Boss.NONE
 
 ## ¿Está t dentro del arco de la espada?
 func in_sword_arc(t: Node3D) -> bool:
@@ -1164,6 +1205,16 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	_art_mult = 1.0
 	atk_gc = false
 	charge_t = 0.0
+	_step_total = 0.0
+	step_travel = 0.0
+	if not mounted:
+		var w := melee()
+		if heavy:
+			_step_total = w.step_heavy
+		elif not w.step_light.is_empty():
+			_step_total = w.step_light[clampi(combo - 1, 0, w.step_light.size() - 1)]
+	_step_left = _step_total
+	_charge_added = false
 	atk_heavy = heavy
 	cur_hit = null
 	if not heavy and not atk_dash and not atk_jump:
@@ -1654,6 +1705,8 @@ func eikon_time_left() -> float:
 	return 0.0
 
 func apply_stun(t: float) -> void:
+	if boss_phase == Boss.CHARGE or boss_phase == Boss.LUNGE:
+		return # ronda 25: la habilidad de jefe no se interrumpe
 	stun = maxf(stun, t)
 	if atk_state != Atk.NONE:
 		_cancel_attack()
@@ -1676,7 +1729,7 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		var d := MeshUtil.flat(from.global_position - global_position)
 		if d.length() > 0.1:
 			frontal = facing.dot(d.normalized()) > 0.0
-	if parry_state == Parry.ACTIVE and frontal and _kind != "eikon" and _kind != "aoe":
+	if parry_state == Parry.ACTIVE and frontal and _kind != "eikon" and _kind != "aoe" and _kind != "jefe":
 		if from is Fighter and _kind == "melee":
 			(from as Fighter).apply_stun(PARRY_STAGGER)
 			(from as Fighter).riposte_t = PARRY_STAGGER
@@ -1726,6 +1779,8 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	var sub := ""
 	if from is Fighter and is_instance_valid(from) and (_kind == "melee" or _kind == "critico"):
 		sub = (from as Fighter).phys_now()
+	elif _kind == "jefe":
+		sub = "perforante"
 	if from is Fighter and (_kind == "melee" or _kind == "arrow") and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE or cast_t > 0.0):
 		counter = true
 		amount *= float(PhysTypes.COUNTER_DMG.get(sub if sub != "" else "estandar", 1.15))
@@ -1755,6 +1810,8 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	var pd := amount * 2.0 / (float(_stoneskin.get("poise", 1.0)) if stoneskin_t > 0.0 else 1.0) * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
 	if counter:
 		pd *= PhysTypes.COUNTER_POISE
+	if _kind == "jefe":
+		pd *= BOSS_POISE
 	poise -= pd
 	if _kind != "critico":
 		stance -= pd
@@ -1844,6 +1901,8 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	_cast_id = ""
 	crit_t = -1.0
 	_crit_target = null
+	_end_boss()
+	boss_cd = 0.0
 	stance = stance_max
 	stance_broken_t = 0.0
 	guard_counter_t = 0.0
@@ -2114,3 +2173,184 @@ func _start_crit(t: Fighter) -> void:
 
 func is_criticalling() -> bool:
 	return crit_t >= 0.0
+
+
+# ---------------- Ronda 25: Estocada de jefe ----------------
+
+func can_boss() -> bool:
+	return not mounted and not airborne and _can_act() and boss_cd <= 0.0 and atk_state == Atk.NONE \
+		and parry_state == Parry.NONE and roll_t < 0.0 and swap_t <= 0.0 and not is_shooting() \
+		and loadout == Loadout.SWORD_SHIELD and stamina > 0.0
+
+func boss_skill() -> bool:
+	if not can_boss():
+		return false
+	boss_phase = Boss.CHARGE
+	boss_t = 0.0
+	boss_travel = 0.0
+	boss_hit = false
+	boss_cd = BOSS_COOLDOWN
+	boss_uses += 1
+	blocking = false
+	spend_stamina(BOSS_STAMINA)
+	boss_dir = _spell_dir()
+	facing = boss_dir
+	_blade_mat.emission_enabled = true
+	_blade_mat.emission = Color(1.0, 0.25, 0.1)
+	_blade_mat.emission_energy_multiplier = 0.5
+	_kv.set_glow(true, Color(1.0, 0.25, 0.1))
+	if _boss_fx == null:
+		_boss_fx = CPUParticles3D.new()
+		_boss_fx.amount = 40
+		_boss_fx.lifetime = 0.5
+		_boss_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_boss_fx.emission_sphere_radius = 0.6
+		_boss_fx.gravity = Vector3(0, 2.0, 0)
+		_boss_fx.initial_velocity_min = 0.2
+		_boss_fx.initial_velocity_max = 0.8
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(1.0, 0.45, 0.15)
+		m.emission_enabled = true
+		m.emission = Color(1.0, 0.35, 0.1)
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.12, 0.12)
+		qm.material = m
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		_boss_fx.mesh = qm
+		add_child(_boss_fx)
+		_boss_fx.position = Vector3(0.5, 1.2, -0.6)
+	_boss_fx.emitting = true
+	_boss_fx.scale_amount_min = 0.3
+	_boss_fx.scale_amount_max = 0.5
+	# Sonido que sube de tono durante la carga
+	var au := get_node_or_null("/root/Audio")
+	if au and _boss_snd == null:
+		_boss_snd = AudioStreamPlayer3D.new()
+		_boss_snd.bus = "Efectos"
+		_boss_snd.unit_size = 14.0
+		add_child(_boss_snd)
+	if _boss_snd and au:
+		_boss_snd.stream = au._pick("bow_draw")
+		_boss_snd.pitch_scale = 0.55
+		_boss_snd.play()
+	boss_started.emit()
+	return true
+
+func boss_charge_left() -> float:
+	return maxf(BOSS_CHARGE - boss_t, 0.0) if boss_phase == Boss.CHARGE else 0.0
+
+func is_boss_invulnerable() -> bool:
+	return boss_phase == Boss.CHARGE or boss_phase == Boss.LUNGE
+
+func _update_boss(delta: float) -> void:
+	boss_cd = maxf(boss_cd - delta, 0.0)
+	if boss_phase == Boss.NONE:
+		return
+	if not alive:
+		_end_boss()
+		return
+	boss_t += delta
+	if is_boss_invulnerable():
+		invuln = maxf(invuln, 0.05)
+	match boss_phase:
+		Boss.CHARGE:
+			var k := clampf(boss_t / BOSS_CHARGE, 0.0, 1.0)
+			_blade_mat.emission_energy_multiplier = lerpf(0.5, 6.0, k)
+			if _boss_fx:
+				_boss_fx.scale_amount_min = lerpf(0.3, 1.4, k)
+				_boss_fx.scale_amount_max = lerpf(0.5, 2.2, k)
+				_boss_fx.amount = 40
+			if _boss_snd and _boss_snd.playing:
+				_boss_snd.pitch_scale = lerpf(0.55, 1.6, k)
+			if boss_t <= BOSS_TRACK:
+				boss_dir = _spell_dir() # sigue al objetivo...
+				facing = boss_dir
+			# ...y después la dirección queda fija: un paso lateral o una voltereta a tiempo la esquivan
+			if boss_t >= BOSS_CHARGE:
+				boss_phase = Boss.LUNGE
+				boss_t = 0.0
+				_snd("swing_heavy", 4.0)
+				impact.emit(0.4)
+		Boss.LUNGE:
+			var step := BOSS_SPEED * delta
+			boss_travel += step
+			velocity = boss_dir * BOSS_SPEED
+			move_and_slide()
+			velocity = Vector3.ZERO
+			planar_vel = Vector3.ZERO
+			for t in MeshUtil.enemies_of(get_tree(), team):
+				var d := MeshUtil.flat(t.global_position - global_position)
+				var rr: float = BOSS_REACH + float(t.hit_radius)
+				if d.length() > rr:
+					continue
+				if d.length() > 0.2 and rad_to_deg(boss_dir.angle_to(d.normalized())) > BOSS_ARC_DEG:
+					continue
+				var res: String = t.take_hit(melee().heavy_damage * damage_mult() * BOSS_DMG_MULT, self, "jefe")
+				if res == "hit" or res == "block":
+					boss_hit = true
+					boss_hits += 1 if res == "hit" else 0
+					hitstop.emit(0.1)
+					impact.emit(1.1)
+					landed_hit.emit(t, res, false)
+					break
+			if boss_hit or boss_travel >= BOSS_DIST:
+				boss_phase = Boss.RECOVER # recuperación castigable
+				boss_t = 0.0
+				invuln = 0.0
+				_blade_mat.emission_enabled = false
+				_kv.set_glow(false, Color.BLACK)
+				if _boss_fx:
+					_boss_fx.emitting = false
+				if not boss_hit:
+					_snd("whiff")
+		Boss.RECOVER:
+			if boss_t >= (BOSS_RECOVER_HIT if boss_hit else BOSS_RECOVER_MISS):
+				_end_boss()
+
+func _end_boss() -> void:
+	if boss_phase != Boss.NONE and boss_phase != Boss.RECOVER:
+		invuln = 0.0
+	boss_phase = Boss.NONE
+	boss_t = 0.0
+	if _boss_fx:
+		_boss_fx.emitting = false
+	if _boss_snd:
+		_boss_snd.stop()
+	if _blade_mat:
+		_blade_mat.emission_enabled = false
+	if _kv:
+		_kv.set_glow(false, Color.BLACK)
+
+
+# ---------------- Ronda 25: paso de ataque + magnetismo ----------------
+
+## Velocidad del paso de este fotograma: reparte la distancia del arma en la ventana del paso,
+## se imanta al objetivo fijado o cercano que esté delante y se detiene al contacto.
+func _step_velocity(delta: float) -> Vector3:
+	var in_win := atk_state == Atk.ACTIVE or (atk_state == Atk.WINDUP and atk_t >= atk_dur * (1.0 - STEP_WINDOW))
+	if not in_win or delta <= 0.0:
+		return Vector3.ZERO
+	if atk_state == Atk.WINDUP and atk_heavy and charge_t > 0.0:
+		return Vector3.ZERO # cargando: quieto; el paso (más largo) sale al soltar
+	var win := maxf(atk_dur * STEP_WINDOW + float(_atk_data()["active"]), 0.05)
+	var total := _step_total + (STEP_CHARGE_BONUS * charge_t / CHARGE_MAX if atk_heavy else 0.0)
+	if atk_heavy and charge_t > 0.0 and not _charge_added and atk_state == Atk.ACTIVE:
+		_charge_added = true
+		_step_left += STEP_CHARGE_BONUS * charge_t / CHARGE_MAX # el fuerte cargado avanza más
+	var mv := minf(total / win * delta, _step_left)
+	var dir := facing
+	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	if tgt:
+		var d := MeshUtil.flat(tgt.global_position - global_position)
+		var dl := d.length()
+		if dl < total + sword_range() + MAGNET_RANGE and dl > 0.1 and facing.dot(d / dl) > 0.3:
+			dir = d / dl
+			facing = _turn_toward(facing, dir, 0.25)
+			var contact := dl - (float(tgt.get("hit_radius") if tgt.get("hit_radius") != null else 0.6) + CONTACT_GAP)
+			mv = minf(mv, maxf(contact, 0.0))
+	_step_left = maxf(_step_left - mv, 0.0) if mv > 0.0 else 0.0
+	if mv <= 0.0:
+		return Vector3.ZERO
+	step_travel += mv
+	return dir * (mv / delta)

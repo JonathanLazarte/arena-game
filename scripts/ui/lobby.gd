@@ -871,4 +871,47 @@ func _build_settings() -> void:
 	var ct := list_box.get_child(list_box.get_child_count() - 2)
 	list_box.move_child(ct, 0) # Controles arriba, a la vista
 	list_box.move_child(brow, 1)
-	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
+	# Ronda 25: cámara
+	var crow := HBoxContainer.new()
+	crow.add_theme_constant_override("separation", 10)
+	var cl := UIKit.label("Cámara", 18)
+	cl.custom_minimum_size = Vector2(100, 0)
+	crow.add_child(cl)
+	var cs := HSlider.new()
+	cs.name = "CamSens"
+	cs.min_value = 0.2
+	cs.max_value = 3.0
+	cs.step = 0.1
+	cs.custom_minimum_size = Vector2(200, 32)
+	cs.value = CameraRig.sensitivity
+	var cp := UIKit.label("x%.1f" % cs.value, 16, UIKit.MUTED)
+	cp.custom_minimum_size = Vector2(56, 0)
+	cs.value_changed.connect(func(v: float) -> void:
+		CameraRig.sensitivity = v
+		cp.text = "x%.1f" % v
+		if au: au.save_settings())
+	crow.add_child(cs)
+	crow.add_child(cp)
+	list_box.add_child(crow)
+	list_box.move_child(crow, 2)
+	var orow := HBoxContainer.new()
+	orow.add_theme_constant_override("separation", 14)
+	var inv := CheckBox.new()
+	inv.name = "CamInvert"
+	inv.text = "Invertir Y"
+	inv.button_pressed = CameraRig.invert_y
+	inv.toggled.connect(func(on: bool) -> void:
+		CameraRig.invert_y = on
+		if au: au.save_settings())
+	orow.add_child(inv)
+	var cap := CheckBox.new()
+	cap.name = "CamCapture"
+	cap.text = "Ratón capturado (PC)"
+	cap.button_pressed = CameraRig.capture_mouse
+	cap.toggled.connect(func(on: bool) -> void:
+		CameraRig.capture_mouse = on
+		if au: au.save_settings())
+	orow.add_child(cap)
+	list_box.add_child(orow)
+	list_box.move_child(orow, 3)
+	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nCámara: sensibilidad de la órbita, invertir Y y ratón capturado (por defecto se orbita con clic derecho arrastrando; Esc libera el ratón). En Android, arrastra en la mitad derecha.\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."

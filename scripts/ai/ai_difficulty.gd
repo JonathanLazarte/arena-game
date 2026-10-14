@@ -45,3 +45,8 @@ extends Resource
 ## Fase 2: golpes retrasados (espera antes de soltar el primer golpe para romper el ritmo del parry).
 @export var delay_chance: float = 0.35
 @export var delay_max: float = 0.45
+## Ronda 25: Estocada de jefe — probabilidad de usarla (por decisión, a media distancia) y de
+## esquivarla a tiempo (error de tiempo ± s; más error = esquiva antes o tarde).
+@export var boss_use_chance: float = 0.03
+@export var boss_dodge_chance: float = 0.6
+@export var boss_dodge_err: float = 0.12

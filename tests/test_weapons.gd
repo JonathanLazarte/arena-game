@@ -82,9 +82,9 @@ func _run() -> void:
 	r = await setup_pair("asesino", "dagas")
 	p = r[0]; e = r[1]
 	check(p.sword_range() < 2.0 and p.max_combo() == 3 and p.combo_hit_for(1).windup < 0.3, "dagas: alcance corto, combo 3, 1.er golpe rápido")
-	e.global_position = Vector3(0, 0, -2.1) # fuera de alcance de las dagas, dentro del de la espada
+	e.global_position = Vector3(0, 0, -3.0) # fuera de alcance de las dagas incluso con su paso corto (0,6 m)
 	var miss := await hit_damage(p, e, false)
-	check(miss == 0.0, "dagas: a 2.1 m no alcanzan (%.1f)" % miss)
+	check(miss == 0.0, "dagas: a 3 m no alcanzan (%.1f)" % miss)
 	check(p.roll_iframe_end() > Fighter.ROLL_IFRAME_END and is_equal_approx(p.character.roll_cost_mult, 0.75), "Sombra: más i-frames y voltereta más barata")
 	var st0 := p.stamina
 	p.move_input = Vector3(1, 0, 0)

@@ -186,12 +186,12 @@ func _run() -> void:
 	p.want_sprint = true
 	await wait(0.6)
 	check(p.facing.dot(Vector3.BACK) > 0.9 and p.sprinting and not p.reversing, "sin fijar, correr hacia atrás da la vuelta (mira hacia donde corre)")
-	# caminar hacia atrás sin fijar mantiene el retroceso de antes
+	# Ronda 25: a pie, sin fijar, caminar hacia atrás también gira (cámara orbital; arreglo diagonal atrás)
 	await _place()
 	p.face_target = null
 	p.move_input = Vector3.BACK
-	await wait(0.4)
-	check(p.reversing and p.facing.dot(Vector3.FORWARD) > 0.9, "sin correr, sin fijar: retrocede sin girarse (como antes)")
+	await wait(0.6)
+	check(not p.reversing and p.facing.dot(Vector3.BACK) > 0.9, "sin correr, sin fijar, a pie: se gira hacia atrás (Ronda 25)")
 	# --- 4. Gasta aguante y se detiene al agotarse ---
 	await _place()
 	p.face_target = e

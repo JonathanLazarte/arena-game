@@ -102,6 +102,7 @@ func _physics_process(delta: float) -> void:
 	var sp := _pressed_edge("special")
 	var cs := _pressed_edge("spell")
 	var cn := _pressed_edge("spell_next")
+	var bs := _pressed_edge("boss")
 	_update_buffer_hit()
 	if not enabled:
 		_clear_buffer()
@@ -132,6 +133,7 @@ func _physics_process(delta: float) -> void:
 	if mt: _try("mount")
 	if jp: _try("jump")
 	if sp: _try("special")
+	if bs: _try("boss")
 	_update_buffer(delta)
 
 # ---------------- Ronda 23: búfer de entrada ----------------
@@ -157,6 +159,7 @@ func _do(a: String, retry: bool) -> bool:
 		"spell": return me.cast_spell()
 		"special": return not me.mounted and me.special() # sin Habilidad/Arte montado
 		"jump": return me.jump()
+		"boss": return me.boss_skill()
 		"mount": return me.toggle_mount()
 		"dash":
 			# Al reintentar no convierte la anticipación de un ligero en estocada con dash
