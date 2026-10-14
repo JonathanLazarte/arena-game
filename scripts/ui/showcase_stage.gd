@@ -69,7 +69,7 @@ func _build() -> void:
 	add_child(rim)
 	# Suelo de piedra azulada y pedestal con runas
 	var fl := MeshUtil.box(self, Vector3(80, 0.2, 80), Vector3(0, -0.1, 0), Color(0.14, 0.16, 0.24))
-	(fl.material_override as StandardMaterial3D).roughness = 0.6
+	MeshUtil.own(fl).roughness = 0.6
 	pedestal = Node3D.new()
 	add_child(pedestal)
 	_disc(pedestal, 1.35, 0.32, 0.16, Color(0.28, 0.3, 0.4), 0.0)

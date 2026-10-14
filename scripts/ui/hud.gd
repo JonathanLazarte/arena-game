@@ -259,8 +259,18 @@ func _update_status(rows: Dictionary, f: Fighter) -> void:
 		row.visible = fr > 0.001 or active
 		var b := row.get_child(1) as ProgressBar
 		b.value = 1.0 if active else fr
-		var l := row.get_child(0) as Label
-		l.text = StatusFx.NAMES[k] + (" %ds" % ceili(f.status_fx.poison_t if k == "veneno" else f.status_fx.frost_t) if active else "")
+		var secs := ceili(f.status_fx.poison_t if k == "veneno" else f.status_fx.frost_t) if active else -1
+		if _changed(row, secs):
+			(row.get_child(0) as Label).text = StatusFx.NAMES[k] + (" %ds" % secs if active else "")
+
+## Ronda 26: ¿cambió la clave de lo que muestra `n`? (evita formatear cadenas cada fotograma)
+var _keys: Dictionary = {}
+func _changed(n: Object, key: Variant) -> bool:
+	var id := n.get_instance_id()
+	if _keys.has(id) and _keys[id] == key:
+		return false
+	_keys[id] = key
+	return true
 
 func _process(_d: float) -> void:
 	if _player == null:
@@ -276,29 +286,35 @@ func _process(_d: float) -> void:
 			status_over_box.position = cam.unproject_position(head) - Vector2(70, 30)
 	swap_bar.visible = _player.is_swapping()
 	swap_bar.value = _player.swap_progress()
-	if _player.is_swapping():
-		loadout_label.text = "Cambiando de arma..."
-	else:
-		loadout_label.text = _player.melee().display_name if _player.loadout == Fighter.Loadout.SWORD_SHIELD else _player.ranged().display_name
-	# Eikon activo: tiempo restante; montado en él, el botón Eikon lanza su especial
+	# Ronda 26: el texto solo se reconstruye si cambia lo que muestra
+	var ek_on := is_instance_valid(_player.active_eikon)
+	var lkey := [_player.is_swapping(), _player.loadout, _player.melee(), _player.ranged(), ceili(_player.eikon_time_left()) if ek_on else -1]
+	if _changed(loadout_label, lkey):
+		if _player.is_swapping():
+			loadout_label.text = "Cambiando de arma..."
+		else:
+			loadout_label.text = _player.melee().display_name if _player.loadout == Fighter.Loadout.SWORD_SHIELD else _player.ranged().display_name
+		# Eikon activo: tiempo restante; montado en él, el botón Eikon lanza su especial
+		if ek_on:
+			loadout_label.text += "   ·   %s %d s" % [_player.eikon.eikon_name, ceili(_player.eikon_time_left())]
 	var riding_eikon := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
-	if is_instance_valid(_player.active_eikon):
-		loadout_label.text += "   ·   %s %d s" % [_player.eikon.eikon_name, ceili(_player.eikon_time_left())]
 	if _summon_label:
-		_summon_label.text = "Especial" if riding_eikon else "Eikon"
+		if _changed(_summon_label, riding_eikon):
+			_summon_label.text = "Especial" if riding_eikon else "Eikon"
 		if riding_eikon:
 			_summon_btn.modulate = Color(1.6, 1.4, 1.0) if _player.mount_node.special_cd <= 0.0 else Color(1, 1, 1, 0.55)
 	if _run_btn:
 		var on: bool = controller != null and controller.run_toggled
 		_run_btn.action = "sprint" if _player.mounted else "run_toggle"
-		_run_label.text = "Galope" if _player.mounted else ("Correr ✔" if on else "Correr")
+		if _changed(_run_label, [_player.mounted, on]):
+			_run_label.text = "Galope" if _player.mounted else ("Correr ✔" if on else "Correr")
 		_run_btn.modulate = Color(1.5, 1.4, 0.9) if (on or _player.sprinting) else Color.WHITE
 	if _special_btn:
 		# Ronda 22: Habilidad/Arte no se usan montado: se oculta
 		_special_btn.visible = (_player.has_special() or _player.weapon_art_id != "") and joystick.visible and not _player.mounted
 		var cd := _player.special_cd if _player.has_special() else _player.art_cd
 		_special_btn.modulate = Color.WHITE if cd <= 0.0 else Color(1, 1, 1, 0.45)
-		if not _player.has_special() and btn_labels.has("special"):
+		if not _player.has_special() and btn_labels.has("special") and _changed(btn_labels["special"], "Arte"):
 			(btn_labels["special"] as Label).text = "Arte"
 	_update_contextual_buttons()
 
@@ -309,7 +325,9 @@ func _update_contextual_buttons() -> void:
 	(btns["parry"] as TouchScreenButton).visible = tv and not _player.mounted
 	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
 	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if _player.boss_cd <= 0.0 else Color(1, 1, 1, 0.45)
-	(btn_labels["boss"] as Label).text = "Jefe" if _player.boss_cd <= 0.0 else "%d" % ceili(_player.boss_cd)
+	var bsec := ceili(_player.boss_cd) if _player.boss_cd > 0.0 else 0
+	if _changed(btn_labels["boss"], bsec):
+		(btn_labels["boss"] as Label).text = "Jefe" if bsec <= 0 else "%d" % bsec
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
 	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)
@@ -324,7 +342,9 @@ func _update_contextual_buttons() -> void:
 	if magic:
 		var id := _player.current_spell()
 		var cd := _player.spell_cd_left()
-		(btn_labels["spell"] as Label).text = (EikonSpells.name_of(id).split(" ")[0] + ("\n%.0f" % ceilf(cd) if cd > 0.0 else ""))
+		var csec := ceilf(cd) if cd > 0.0 else -1.0
+		if _changed(btn_labels["spell"], [id, csec]):
+			(btn_labels["spell"] as Label).text = (EikonSpells.name_of(id).split(" ")[0] + ("\n%.0f" % csec if cd > 0.0 else ""))
 		(btns["spell"] as TouchScreenButton).modulate = Color.WHITE if _player.can_cast() else Color(1, 1, 1, 0.45)
 
 func bind(player: Fighter, enemy: Fighter) -> void:

@@ -65,7 +65,7 @@ var speed_now: float = 0.0
 
 ## Caballo Quaternius (CC0). AnimationTree: BlendSpace1D Idle/Walk/Gallop por velocidad.
 func _build_model() -> void:
-	model = (load(data.model_path) as PackedScene).instantiate() as Node3D
+	model = ResCache.scene(data.model_path).instantiate() as Node3D
 	# El glTF mira a +Z: lo giramos para que mire a -Z (frente del juego)
 	model.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * data.model_scale)
 	model.position.y = data.hover

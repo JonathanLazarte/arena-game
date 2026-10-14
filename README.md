@@ -589,3 +589,29 @@ Las estocadas en carrera y los golpes con salto conservan su propia embestida (m
 - la Estocada: carga, invulnerabilidad, que no se interrumpe, el seguimiento y luego la dirección fija, la esquiva lateral, los 7,5 m al aire, que para al impactar, la recuperación castigable y el enfriamiento;
 - que la IA la esquiva y la usa;
 - el paso por arma y el magnetismo.
+
+## Ronda 26 — Rendimiento (sin cambios de jugabilidad)
+
+| # | Cambio | Dónde |
+|---|---|---|
+| 1 | Los modelos de eikon y montura se piden en hilo al empezar la arena (`ResCache`); al llegar se calienta una instancia oculta 2 fotogramas (sombreadores y caché). Invocar ya no carga nada. | `scripts/res_cache.gd`, `arena._warm_eikons`, `eikon.gd`, `mount.gd` |
+| 2 | Sombras en móvil: atlas 2048, filtro suave bajo, 2 cortes y 40 m de distancia (solo móvil; PC igual). | `project.godot`, `arena.gd` |
+| 3 | Caché de materiales en `MeshUtil.mat()`. Quien modifica uno usa `MeshUtil.own()` (copia propia): hoja, cuerpo, anillo de fijado, suelo del lobby. | `mesh_util.gd` |
+| 4 | El muro circular es un solo `StaticBody3D` con 56 formas que comparten la misma caja (antes, 56 cuerpos). | `arena.gd` |
+| 5 | La separación entre luchadores usa la lista estática `Fighter.all`, sin pedir el grupo en cada paso de física. | `fighter.gd` |
+| 6 | Grupo de 8 reproductores `AudioStreamPlayer3D` reutilizables. Si los 8 suenan a la vez, se crea uno temporal como antes, así que ningún sonido se corta. | `audio_manager.gd` |
+| 7 | El HUD solo reconstruye un texto cuando cambia lo que muestra (arma y tiempo del eikon, botones Jefe, Hechizo, Correr y Eikon, estados). | `hud.gd` (`_changed`) |
+| 8 | Se quitó `_ring` del eikon, que no se usaba. | `eikon.gd` |
+
+**Medido** con `tests/perf_probe.gd` (headless, en la CPU de la caja; 3 ejecuciones antes y 6 después):
+
+| Métrica | Antes | Después |
+|---|---|---|
+| `summon()` del jugador (eikon montable) | 4,0–4,2 ms | 1,9–2,4 ms |
+| `summon()` del rival (eikon con modelo nuevo) | 7,0–10,0 ms | 1,5–3,3 ms |
+| Nodos en combate | ~500 | ~447 |
+| `StaticBody3D` | 63 | 8 |
+| Materiales únicos | 66–73 | 43–50 |
+
+- El tiempo de física medido (~1,5–3 ms) tiene demasiado ruido en la caja para ver diferencias.
+- El tiempo de GPU y las sombras no se pueden medir sin pantalla: hay que medirlos en el dispositivo.

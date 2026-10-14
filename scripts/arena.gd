@@ -93,7 +93,38 @@ func _ready() -> void:
 	add_child(ai)
 	lock_marker = MeshUtil.sphere(self, 0.22, Vector3.ZERO, Color(1.0, 0.82, 0.35), true)
 	lock_ring = _make_lock_ring()
+	_warm_eikons()
 	start_round()
+
+## Ronda 26: pide en hilo los modelos de los eikons de ambos luchadores y, cuando llegan,
+## calienta una instancia oculta (fuera de cámara, 2 fotogramas) para compilar sombreadores
+## y dejar la escena en caché: invocar ya no carga ni compila nada.
+var warm_done: bool = false
+func _warm_eikons() -> void:
+	var paths: Array[String] = []
+	for f: Fighter in [player, enemy]:
+		for path in ResCache.eikon_paths(f.eikon):
+			if not paths.has(path):
+				paths.append(path)
+	for path in paths:
+		ResCache.request(path)
+	_warm_async(paths)
+
+func _warm_async(paths: Array[String]) -> void:
+	while not ResCache.poll():
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
+	var holder := Node3D.new()
+	holder.name = "WarmUp"
+	holder.position = Vector3(0, -200, 0)
+	add_child(holder)
+	for path in paths:
+		holder.add_child(ResCache.scene(path).instantiate())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	holder.queue_free()
+	warm_done = true
 
 func _on_impact(strength: float) -> void:
 	shake = maxf(shake, SHAKE_SCALE * strength)
@@ -178,6 +209,10 @@ func _build_environment() -> void:
 	sun.shadow_enabled = true
 	sun.light_color = Color(1.0, 0.95, 0.86)
 	sun.light_energy = 1.05
+	if OS.has_feature("mobile"):
+		# Ronda 26: sombras baratas en móvil (2 cortes a 40 m; atlas 2048 y filtro bajo en project.godot)
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.directional_shadow_max_distance = 40.0
 	add_child(sun)
 
 ## Malla de un prop de Kenney Castle Kit (CC0); incluye la transformación del nodo.
@@ -237,10 +272,20 @@ func _build_arena() -> void:
 	var seg_len := TAU * RADIUS / segs + 0.3
 	var walls: Array[Transform3D] = []
 	var studs: Array[Transform3D] = []
+	# Ronda 26: un solo StaticBody3D con las 56 cajas (antes un cuerpo por tramo) y una forma compartida
+	var wall_body := StaticBody3D.new()
+	wall_body.name = "WallBody"
+	var wall_shape := BoxShape3D.new()
+	wall_shape.size = Vector3(seg_len, 4.0, 1.2)
+	add_child(wall_body)
 	for i in segs:
 		var a := TAU * i / segs
 		var p := Vector3(sin(a), 0, cos(a)) * (RADIUS + 0.6)
-		_static_box(Vector3(seg_len, 4.0, 1.2), p + Vector3(0, 2.0, 0), Color.GRAY, a, false)
+		var wc := CollisionShape3D.new()
+		wc.shape = wall_shape
+		wc.position = p + Vector3(0, 2.0, 0)
+		wc.rotation.y = a
+		wall_body.add_child(wc)
 		var b := Basis(Vector3.UP, a)
 		walls.append(Transform3D(b * Basis.from_scale(Vector3(seg_len, 3.2, 1.6)), p))
 		if i % 4 == 0:
@@ -355,7 +400,7 @@ func _make_lock_ring() -> Node3D:
 		var b := MeshUtil.box(root, Vector3(0.12, 0.04, 0.34), Vector3(0, 0, 0), Color(1.0, 0.9, 0.5))
 		b.position = Vector3.FORWARD.rotated(Vector3.UP, i * PI / 2) * 1.0
 		b.rotation.y = i * PI / 2
-		(b.material_override as StandardMaterial3D).no_depth_test = true
+		MeshUtil.own(b).no_depth_test = true
 	root.visible = false
 	return root
 

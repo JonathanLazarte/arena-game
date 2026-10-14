@@ -12,7 +12,6 @@ var hit_radius: float = 1.0
 var life: float = 15.0
 var attack_cd: float = 0.5
 var _body: Node3D
-var _ring: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("damageable")
@@ -57,7 +56,7 @@ var _attack_anim_t: float = 0.0
 
 func _build_model() -> void:
 	var cfg: Array = MODELS.get(data.attack_kind, GOLEM)
-	var m := (load(cfg[0]) as PackedScene).instantiate() as Node3D
+	var m := ResCache.scene(cfg[0]).instantiate() as Node3D
 	m.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * float(cfg[1]))
 	m.position.y = cfg[5]
 	_body.add_child(m)
@@ -94,7 +93,7 @@ func _add_golem_rocks(m: Node3D) -> void:
 	for mi in AnimUtil.meshes(m):
 		mi.material_override = stone
 	_skel = sk
-	var rock_scene := load(ROCK) as PackedScene
+	var rock_scene := ResCache.scene(ROCK)
 	for r: Array in GOLEM_ROCKS:
 		var rock := rock_scene.instantiate() as Node3D
 		var dark := stone.duplicate() as StandardMaterial3D
@@ -197,8 +196,6 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= 20.0 * delta
 	move_and_slide()
 	_update_anim(delta, v.length() > 0.5)
-	if _ring and is_instance_valid(_ring):
-		_ring.scale += Vector3.ONE * delta * 6.0
 
 func _attack(tgt: Node3D) -> void:
 	_ap.play(_anims[2], 0.1)

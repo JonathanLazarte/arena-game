@@ -359,9 +359,22 @@ var _col_shape: BoxShape3D
 var _col: CollisionShape3D
 var _flash: float = 0.0
 
+## Ronda 26: lista de luchadores en el árbol (misma pertenencia que el grupo "fighter",
+## sin crear un Array por fotograma en la separación).
+static var all: Array[Fighter] = []
+
+func _enter_tree() -> void:
+	if is_node_ready() and not all.has(self):
+		all.append(self)
+
+func _exit_tree() -> void:
+	all.erase(self)
+
 func _ready() -> void:
 	add_to_group("damageable")
 	add_to_group("fighter")
+	if not all.has(self):
+		all.append(self)
 	_apply_character()
 	_build_visuals()
 	_apply_mount_visuals()
@@ -681,6 +694,7 @@ func _build_visuals() -> void:
 	_kv.setup(color, character, weapon)
 	_kv.set_armor(armor_pieces())
 	_body = MeshUtil.box(_prim, Vector3(0.6, 1.0, 0.45), Vector3(0, 1.0, 0.1), color)
+	MeshUtil.own(_body) # se tiñe con los estados
 	MeshUtil.sphere(_prim, 0.25, Vector3(0, 1.75, 0.1), Color(0.95, 0.8, 0.65))
 	for x: float in [-0.15, 0.15]:
 		_legs.append(MeshUtil.box(_prim, Vector3(0.2, 0.55, 0.25), Vector3(x, 0.27, 0.1), color.darkened(0.4)))
@@ -689,7 +703,7 @@ func _build_visuals() -> void:
 	_prim.add_child(_sword_pivot)
 	_blade = MeshUtil.box(_sword_pivot, Vector3(0.1, 0.1, 1.0), Vector3(0, 0, -0.5), Color(0.85, 0.85, 0.95))
 	MeshUtil.box(_sword_pivot, Vector3(0.4, 0.08, 0.08), Vector3(0, 0, 0), Color(0.6, 0.5, 0.2)) # guarda
-	_blade_mat = _blade.material_override as StandardMaterial3D
+	_blade_mat = MeshUtil.own(_blade)
 	# Armas visibles: espada y escudo del KayKit (BoneAttachment3D handslot.r / handslot.l) y arco propio
 	_bow = _kv.bow
 	_shield = _kv.shield
@@ -977,9 +991,8 @@ func _physics_process(delta: float) -> void:
 	v += knock
 	knock = knock.move_toward(Vector3.ZERO, 40.0 * delta)
 	var my_sep := SEPARATION if mounted else SEPARATION_FOOT
-	for n in get_tree().get_nodes_in_group("fighter"):
-		if n != self:
-			var other := n as Fighter
+	for other: Fighter in all:
+		if other != self:
 			var min_sep := maxf(my_sep, SEPARATION if other.mounted else SEPARATION_FOOT)
 			var sep := MeshUtil.flat(global_position - other.global_position)
 			var sl := sep.length()

@@ -1,7 +1,25 @@
 class_name MeshUtil
 ## Utilidades para crear arte de placeholder con primitivas.
 
+## Ronda 26: materiales compartidos por (color, emisivo). ¡No modificar el devuelto!
+## Quien vaya a cambiarlo debe usar own() (copia propia).
+static var _mats: Dictionary = {}
 static func mat(c: Color, emissive: bool = false) -> StandardMaterial3D:
+	var key := Vector2i(c.to_rgba32(), int(emissive))
+	var cached: StandardMaterial3D = _mats.get(key)
+	if cached:
+		return cached
+	var m := _new_mat(c, emissive)
+	_mats[key] = m
+	return m
+
+## Copia propia del material de `mi` (para modificarlo sin tocar a los demás).
+static func own(mi: GeometryInstance3D) -> StandardMaterial3D:
+	var m := (mi.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
+	mi.material_override = m
+	return m
+
+static func _new_mat(c: Color, emissive: bool) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
 	if emissive:

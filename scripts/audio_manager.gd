@@ -186,17 +186,38 @@ func sfx3d(name: String, pos: Vector3, pitch_var: float = 0.08, db: float = 0.0)
 	var scene := get_tree().current_scene
 	if st == null or scene == null or not scene is Node3D:
 		return
-	var p := AudioStreamPlayer3D.new()
+	var p := _pool3d_get(scene)
 	p.stream = st
+	p.volume_db = BASE_DB.get(name, 0.0) + db
+	p.pitch_scale = randf_range(1.0 - pitch_var, 1.0 + pitch_var)
+	p.global_position = pos
+	p.play()
+
+## Ronda 26: grupo de 8 reproductores 3D reutilizables por escena (antes uno nuevo por efecto).
+## Si los 8 suenan a la vez se crea uno temporal como antes (no se corta ningún sonido).
+const POOL3D := 8
+var _pool3d: Array[AudioStreamPlayer3D] = []
+var _pool_scene: Node = null
+
+func _pool3d_get(scene: Node) -> AudioStreamPlayer3D:
+	if _pool_scene != scene:
+		_pool_scene = scene
+		_pool3d.clear()
+	for q in _pool3d:
+		if is_instance_valid(q) and not q.playing:
+			return q
+	var p := AudioStreamPlayer3D.new()
 	p.bus = "Efectos"
 	p.unit_size = 12.0
 	p.max_distance = 70.0
-	p.volume_db = BASE_DB.get(name, 0.0) + db
-	p.pitch_scale = randf_range(1.0 - pitch_var, 1.0 + pitch_var)
 	scene.add_child(p)
-	p.global_position = pos
-	p.finished.connect(p.queue_free)
-	p.play()
+	_pool3d = _pool3d.filter(func(q: AudioStreamPlayer3D) -> bool: return is_instance_valid(q))
+	if _pool3d.size() < POOL3D:
+		p.name = "Sfx3D_%d" % _pool3d.size()
+		_pool3d.append(p)
+	else:
+		p.finished.connect(p.queue_free)
+	return p
 
 func count(name: String) -> int:
 	return played.count(name)
