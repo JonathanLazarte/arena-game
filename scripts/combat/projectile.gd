@@ -24,6 +24,7 @@ var stun_force: float = -1.0 ## ronda 31: fuerza de aturdimiento (-1 = la del ti
 var home_target: Node3D = null
 var home_rate: float = 0.0
 var home_time: float = 0.0
+var home_cone_deg: float = 90.0 ## ronda 33: si el objetivo queda a más de esto del rumbo, deja de perseguir
 var slash: bool = false ## ronda 32: espectro de tajo dorado en diagonal (ráfaga)
 var slash_tilt: float = 45.0
 var element: String = "" ## ronda 21: elemento del hechizo ("" = según el tirador)
@@ -75,7 +76,9 @@ func _physics_process(delta: float) -> void:
 		if want.length() > 0.2:
 			var ang := direction.angle_to(want.normalized())
 			var ax := direction.cross(want.normalized())
-			if ang > 0.001 and ax.length() > 0.0001:
+			if ang > deg_to_rad(home_cone_deg):
+				home_time = 0.0 # ronda 33: lo rebasó; sigue recto (sin forzar el impacto)
+			elif ang > 0.001 and ax.length() > 0.0001:
 				direction = direction.rotated(ax.normalized(), minf(ang, home_rate * delta)).normalized()
 				_orient()
 	global_position += direction * speed * delta

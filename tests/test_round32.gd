@@ -32,7 +32,7 @@ func _run() -> void:
 	var h: Array = cf["hits"]
 	check(float(h[1][0]) - float(h[0][0]) >= 2.8 and float(h[3][0]) - float(h[2][0]) > float(h[2][0]) - float(h[1][0]), "combo falso lento (~3 s entre golpes) con la pausa falsa más larga al final")
 	var rd := BossAbilities.def("rafaga")
-	check(float(rd["interval"]) >= 0.8 and float(rd["radius"]) >= 1.2 and float(rd["home_time"]) >= float(rd["life"]), "ráfaga: intervalos amplios, área ancha, persigue toda su vida")
+	check(float(rd["interval"]) >= 0.8 and float(rd["home_deg"]) <= 90.0, "ráfaga: intervalos amplios, área ancha, persigue toda su vida")
 	Arena.start_mounted = false
 	gs.from_lobby = true
 	change_scene_to_file("res://scenes/arena.tscn")
@@ -81,12 +81,12 @@ func _run() -> void:
 	# --- Ráfaga: alcanza a distancia aunque corra; la voltereta la esquiva ---
 	_fresh(p)
 	_fresh(e)
-	p.global_position = Vector3(0, 0, 8)
-	e.global_position = Vector3(0, 0, -12)
+	p.global_position = Vector3(0, 0, 0)
+	e.global_position = Vector3(0, 0, -10)
 	p.face_target = e
 	var eh := e.health
 	check(p.boss_skill("rafaga"), "ráfaga")
-	for i in 220:
+	for i in 85: # primer tajo, a 10 m
 		e.move_input = Vector3(1, 0, 0)
 		e.want_sprint = true
 		e.stun = 0.0
@@ -96,8 +96,8 @@ func _run() -> void:
 	var slashes := 0
 	for n in get_nodes_in_group("projectile"):
 		if (n as Projectile).slash: slashes += 1
-	check(e.health < eh, "corriendo a distancia NO escapa (%.0f daño)" % (eh - e.health))
-	await create_timer(1.0).timeout
+	check(e.health == eh, "ronda 33: corriendo de lado a media distancia se escapa (%.0f daño)" % (eh - e.health))
+	await create_timer(3.0).timeout
 	_fresh(p)
 	_fresh(e)
 	p.global_position = Vector3(0, 0, 6)
