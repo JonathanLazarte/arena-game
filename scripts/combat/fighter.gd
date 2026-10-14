@@ -2766,8 +2766,9 @@ func ab_resist() -> float:
 	var d := ab_def()
 	if ab_id == "combo_falso":
 		var hits: Array = d["hits"]
-		if ab_fired == 3 and ab_t < float(hits[3][0]):
-			return 1.0 # anticipación alzada del 4.º golpe
+		var last := hits.size() - 1
+		if ab_fired == last and ab_t < float(hits[last][0]):
+			return 1.0 # anticipación alzada del golpe final
 	return float(d.get("resist", 0.0))
 
 ## Daño: fuerte (o ligero) del arma x multiplicador; las mágicas escalan con la magia.

@@ -30,7 +30,7 @@ func _run() -> void:
 	gs.reset_defaults()
 	var cf := BossAbilities.def("combo_falso")
 	var h: Array = cf["hits"]
-	check(float(h[1][0]) - float(h[0][0]) >= 2.8 and float(h[3][0]) - float(h[2][0]) > float(h[2][0]) - float(h[1][0]), "combo falso lento (~3 s entre golpes) con la pausa falsa más larga al final")
+	check(float(h[1][0]) - float(h[0][0]) >= 2.8 and h.size() == 3 and float(h[2][0]) - float(h[1][0]) > float(h[1][0]) - float(h[0][0]), "combo falso lento (~3 s entre golpes) con la pausa falsa más larga al final")
 	var rd := BossAbilities.def("rafaga")
 	check(float(rd["interval"]) >= 0.8 and float(rd["home_deg"]) <= 90.0, "ráfaga: intervalos amplios, área ancha, persigue toda su vida")
 	Arena.start_mounted = false

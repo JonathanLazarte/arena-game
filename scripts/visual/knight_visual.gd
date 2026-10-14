@@ -685,7 +685,8 @@ func update(f: Fighter, delta: float) -> void:
 			_ab_hit_key = key
 			playback.start(s, true)
 		var hits: Array = cd["hits"]
-		var wnd := float(cd["hit_windup"]) if f.ab_fired < 3 else float(hits[3][0]) - float(hits[2][0]) - 1.0
+		var nl := hits.size() - 1
+		var wnd := float(cd["hit_windup"]) if f.ab_fired < nl else float(hits[nl][0]) - float(hits[nl - 1][0]) - 1.0
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(wnd, 0.2))
 	elif s == "heavy" and f.atk_state == Fighter.Atk.NONE:
 		# pose de carga: avanza el clip hasta ~60 % de la anticipación mientras se mantiene
