@@ -751,7 +751,7 @@ func update(f: Fighter, delta: float) -> void:
 			ph = 0.8 + 0.2 * f.atk_t / maxf(f.atk_dur, 0.01)
 		if ph >= 0.0:
 			hop_y = sin(ph * PI) * f.cur_hit.hop
-	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y + f.ab_hop + (0.0 if _mounted else foot_lift())
+	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y + f.ab_hop + (0.0 if _mounted else ground_lift())
 	# Locomoción relativa a la mirada
 	var st := f.stats()
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)
@@ -828,3 +828,49 @@ func foot_lift() -> float:
 		return 0.0
 	last_lift = maxf(0.0, _foot_rest - _foot_min(false))
 	return last_lift
+
+
+# ---------------- Ronda 33: la voltereta no se hunde en el suelo ----------------
+## En volteretas/derribos el clip baja la cadera y el tronco por debajo de los pies: se eleva el
+## modelo para que ningún hueso del cuerpo (con su grosor) quede bajo el suelo.
+const BODY_BONES := {"hips": 0.14, "spine": 0.14, "chest": 0.16, "head": 0.16, "hand.l": 0.05, "hand.r": 0.05,
+	"lowerarm.l": 0.06, "lowerarm.r": 0.06, "upperarm.l": 0.08, "upperarm.r": 0.08,
+	"upperleg.l": 0.09, "upperleg.r": 0.09, "lowerleg.l": 0.07, "lowerleg.r": 0.07}
+const LIFT_STATES := ["dodge_f", "dodge_b", "dodge_l", "dodge_r", "down", "getup", "death"]
+var _body_ids: Dictionary = {}
+var last_body_lift := 0.0
+
+func body_lift() -> float:
+	if _foot_sk == null or not is_instance_valid(_foot_sk):
+		foot_lift()
+	if _foot_sk == null:
+		return 0.0
+	if _body_ids.is_empty():
+		for b: String in BODY_BONES:
+			var i := _foot_sk.find_bone(b)
+			if i >= 0:
+				_body_ids[i] = float(BODY_BONES[b])
+	var need := 0.0
+	for i: int in _body_ids:
+		var o: Vector3 = _foot_sk.get_bone_global_pose(i).origin
+		var y := (model.transform.basis * model.to_local(_foot_sk.to_global(o))).y
+		need = maxf(need, float(_body_ids[i]) - y)
+	last_body_lift = need
+	return need
+
+## Altura extra del modelo: pies en el suelo y, en volteretas/derribos, todo el cuerpo por encima.
+func ground_lift() -> float:
+	var l := foot_lift()
+	if state in LIFT_STATES:
+		l = maxf(l, body_lift())
+	return l
+
+## Altura mínima (en el espacio del visual) de los huesos del cuerpo, con el modelo colocado (pruebas).
+func lowest_body_y() -> float:
+	if _foot_sk == null or _body_ids.is_empty():
+		body_lift()
+	var lo := INF
+	for i: int in _body_ids:
+		var o: Vector3 = _foot_sk.get_bone_global_pose(i).origin
+		lo = minf(lo, _foot_sk.to_global(o).y - float(_body_ids[i]))
+	return lo
