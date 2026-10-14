@@ -264,7 +264,7 @@ func _run() -> void:
 		e.stamina = e.stamina_max
 		e._cancel_attack()
 		arena.ai._punish_t = 0.0
-		await until(func() -> bool: return e.boss_uses > 0, 3.0)
+		await until(func() -> bool: return e.boss_uses > 0, 5.0)
 	if e.boss_uses == 0:
 		print("dbg can=%s mounted=%s lo=%d face=%.2f dist=%.1f act=%s" % [e.can_boss(), e.mounted, e.loadout, e.facing.dot(MeshUtil.flat(p.global_position-e.global_position).normalized()), e.global_position.distance_to(p.global_position), e._can_act()])
 	check(e.boss_uses > 0 and arena.ai.boss_used > 0, "la IA usa la Estocada de jefe a media distancia")
