@@ -633,3 +633,50 @@ Se importaron **99 animaciones de Mixamo** (vía Souls-Combat; solo animaciones)
 - Lista, origen, archivos no importados y mapeo sugerido a las acciones del juego: `assets/animations/mixamo/README.md`.
 - **Aún no se usan en el juego** (los modelos actuales son KayKit/Quaternius).
 - Herramienta: `tools/build_mixamo_libs.gd`. Prueba: `tests/test_mixamo_anims.gd`.
+
+## Ronda 28 — Animaciones Mixamo en el juego (rig KayKit)
+
+Las animaciones Mixamo de la Ronda 27 se **reapuntan al esqueleto KayKit**. Lo comparten Caballero, Bárbaro/Berserker, Mago, Asesino/Pícaro, Paladín y Arquero, así que todos las usan.
+
+**Cómo funciona:**
+- `tools/retarget_kaykit.gd` reapunta cada clip con un delta de rotación global por hueso: `D = Gpose · Grest⁻¹` en el humanoide, aplicado al reposo KayKit. El resultado es `assets/animations/mixamo/lib_kaykit.res` (24 clips).
+- **Movimiento de raíz:** se elimina la traslación horizontal de las caderas y solo se conserva la altura, escalada. El desplazamiento lo siguen dando el juego (pasos de ataque, embestidas, voltereta), así que las hitboxes y las pruebas no cambian.
+- Los ataques se recortan para que el **pico de velocidad de la mano derecha** caiga en `CONTACT` (0,42), igual que los clips KayKit. Así el golpe visual coincide con la ventana activa.
+- `KnightVisual` añade la biblioteca `mx` y sustituye clips por tablas (`MX_COMMON`, `MX_WEAPON`, `MX_LOCO`). Si un clip no existe, se usa el de KayKit.
+
+| Acción (estado) | Clip | Origen |
+|---|---|---|
+| Espada y escudo: ligero 1 / 2 / 3, pesado | `sns_light0/1/2`, `sns_heavy` | xbot Sword And Shield Slash (1), paladin Sword And Shield Attack (2) / Attack, Sword And Shield Slash |
+| Espada larga: ligero 1 / 2 / 3, pesado | `gs_light0/1/2`, `gs_heavy` | great sword slash, slash 5, slash 4, attack |
+| Hacha a dos manos: ligeros / pesado | `gs_light1/0/2` / `axe_heavy` | great sword slash 5/1/4 / high spin attack |
+| Guardia (espada larga, hacha) | `gs_block` (bucle) | great sword blocking |
+| Reposo (espada larga, hacha) | `gs_idle` | great sword idle |
+| Voltereta hacia delante | `roll_f` | akai Sprinting Forward Roll InPlace |
+| Golpe recibido / aturdido | `hit` / `stun` | great sword impact 4 / impact 2 |
+| **Rotura de postura** (nuevo estado `stance_break`) | `stance_break`, escalado a 1,2 s | akai Tripping |
+| **Estocada de jefe: carga** (nuevo estado `boss_charge`, 2 s) | `boss_charge` | paladin Sword Scream (0–2 s) |
+| **Estocada de jefe: embestida** (`boss_lunge`) | `boss_lunge`: el golpe del clip cae al final de la embestida | great sword slide attack |
+| Salto con impacto (`slam`) | `jump_slam` | great sword jump attack |
+| Hechizos (nuevo estado `cast`, ajustado a la duración del lanzamiento) | `cast` | Standing 1H Magic Attack 01 |
+| Strafe caminando | `strafe_a` (izquierda), `strafe_b` (derecha) | great sword strafe, strafe 2 |
+| Muerte | `death_1h` (espada y escudo, dagas), `death_2h` (espada larga, hacha, lanza) | akai Sword And Shield Death / two handed sword death |
+
+**Se queda con KayKit, porque encaja mejor o porque Mixamo no tiene un equivalente:**
+- arco y ballesta: apuntar, disparar, recargar;
+- dagas y lanza: sus ataques;
+- parada, golpe en guardia;
+- voltereta lateral y hacia atrás;
+- andar, correr y strafe corriendo;
+- salto;
+- ataque en carrera (`Dash_Strike`, compuesto);
+- montar (Sit_Chair_Pose y RidingPose);
+- cambiar de arma.
+
+La contra de guardia usa los clips del combo de cada arma, igual que antes.
+
+**Pruebas:** `tests/test_round28.gd` comprueba:
+- que las pistas son huesos KayKit y no hay traslación horizontal;
+- que cada personaje y arma usa los clips correctos (el arquero conserva los suyos);
+- que la carga, la embestida, la rotura de postura y el hechizo usan sus estados.
+
+`tests/test_defs.gd` se adaptó a los nuevos clips del combo. Hoja de poses para revisar a ojo: `tests/posesheet.gd`.

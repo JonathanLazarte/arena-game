@@ -26,8 +26,10 @@ const STATES := {
 	# Ronda 14
 	"dash_strike": DASH_STRIKE_ANIM, "jump_up": "Jump_Start", "jump_air": "Jump_Idle", "land": "Jump_Land",
 	"slam": "2H_Melee_Attack_Chop",
+	# Ronda 28 (por defecto KayKit; con la biblioteca Mixamo se sustituyen, ver MX_*)
+	"boss_charge": "Blocking", "boss_lunge": DASH_STRIKE_ANIM, "stance_break": "Hit_B", "cast": "Use_Item",
 }
-const SCALED := ["reload", "aim", "light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
+const SCALED := ["boss_charge", "boss_lunge", "stance_break", "cast", "hit", "stun", "reload", "aim", "light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
 ## Animación propia (KayKit no trae una estocada en carrera): se compone en Godot a partir de
 ## Dodge_Forward (piernas y cadera: el impulso de la zancada) y 1H_Melee_Attack_Slice_Horizontal
 ## (tronco y brazos: el tajo), con el tronco inclinado hacia delante durante la arremetida.
@@ -45,6 +47,25 @@ const LOCO_SPEEDS := {
 	"Run_Strafe_L": ["Running_Strafe_Left", Vector2(-1.35, 0), 1.2],
 	"Run_Strafe_R": ["Running_Strafe_Right", Vector2(1.35, 0), 1.2],
 }
+## Ronda 28: animaciones Mixamo (vía Souls-Combat) reapuntadas al rig KayKit sin traslación
+## horizontal de caderas (tools/retarget_kaykit.gd). Sustituyen a los clips KayKit donde encajan mejor.
+const MX_LIB := preload("res://assets/animations/mixamo/lib_kaykit.res")
+const MX := "mx/"
+## Comunes a todos los personajes a pie.
+const MX_COMMON := {"dodge_f": "roll_f", "hit": "hit", "stun": "stun", "stance_break": "stance_break",
+	"slam": "jump_slam", "boss_charge": "boss_charge", "boss_lunge": "boss_lunge", "cast": "cast"}
+## Por arma: combos, pesado, guardia, reposo y muerte.
+const MX_WEAPON := {
+	"espada_escudo": {"light0": "sns_light0", "light1": "sns_light1", "light2": "sns_light2", "heavy": "sns_heavy", "death": "death_1h"},
+	"espada_larga": {"light0": "gs_light0", "light1": "gs_light1", "light2": "gs_light2", "heavy": "gs_heavy", "block": "gs_block", "idle": "gs_idle", "death": "death_2h"},
+	"hacha_2m": {"light0": "gs_light1", "light1": "gs_light0", "light2": "gs_light2", "heavy": "axe_heavy", "block": "gs_block", "idle": "gs_idle", "death": "death_2h"},
+	"lanza": {"death": "death_2h"},
+	"dagas": {"death": "death_1h"},
+}
+## Strafe caminando (KayKit solo trae strafe corriendo): clips Mixamo de espadón.
+const MX_LOCO := {"Walk_Strafe_L": "strafe_a", "Walk_Strafe_R": "strafe_b"}
+var idle_clip: String = "Idle"
+
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
 const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap", "reload"]
 
@@ -153,7 +174,29 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 		for i in 3:
 			var h := melee_w.combo_hit(i, cdef)
 			states["light%d" % i] = author_combo_clip(ap, h)
+	_apply_mixamo(melee_w)
 	_build_tree()
+
+## Ronda 28: clips Mixamo reapuntados (biblioteca «mx») para las acciones donde encajan mejor.
+func _apply_mixamo(melee_w: WeaponDef) -> void:
+	if MX_LIB == null or ap == null:
+		return
+	if not ap.has_animation_library(&"mx"):
+		ap.add_animation_library(&"mx", MX_LIB)
+	var table: Dictionary = MX_COMMON.duplicate()
+	table.merge(MX_WEAPON.get(melee_w.id, {}), true)
+	for k: String in table:
+		var clip: String = MX + String(table[k])
+		if not ap.has_animation(clip):
+			continue
+		if k == "idle":
+			idle_clip = clip
+		elif states.has(k):
+			states[k] = clip
+	for k: String in MX_LOCO:
+		if ap.has_animation(MX + String(MX_LOCO[k])):
+			_loco_clips[k] = MX + String(MX_LOCO[k])
+var _loco_clips: Dictionary = {}
 
 ## Malla de arma: la del propio modelo si existe, o copiada de otro .glb KayKit
 ## (mismo hueso handslot y misma transformación local).
@@ -370,7 +413,7 @@ static func author_dash_strike(player: AnimationPlayer, slice_name: String = "1H
 func _build_tree() -> void:
 	var root := AnimationNodeBlendTree.new()
 	var loco := AnimationNodeBlendSpace2D.new()
-	loco.add_blend_point(AnimUtil.anim_node("Idle"), Vector2(0, 0), -1, &"Idle")
+	loco.add_blend_point(AnimUtil.anim_node(idle_clip), Vector2(0, 0), -1, &"Idle")
 	loco.add_blend_point(AnimUtil.anim_node("Walking_A"), Vector2(0, 0.45), -1, &"Walking_A")
 	loco.add_blend_point(AnimUtil.anim_node("Running_A"), Vector2(0, 1.0), -1, &"Running_A")
 	loco.add_blend_point(AnimUtil.anim_node("Walking_Backwards"), Vector2(0, -0.45), -1, &"Walking_Backwards")
@@ -379,7 +422,8 @@ func _build_tree() -> void:
 	# Ronda 15: locomoción direccional para correr fijado (souls). KayKit no trae carrera hacia
 	# atrás ni strafe caminando: se reutilizan clips acelerados/ralentizados (ver LOCO_SPEEDS).
 	for nm: String in LOCO_SPEEDS:
-		loco.add_blend_point(AnimUtil.scaled_anim(LOCO_SPEEDS[nm][0]), LOCO_SPEEDS[nm][1], -1, StringName(nm))
+		var lc: String = _loco_clips.get(nm, LOCO_SPEEDS[nm][0])
+		loco.add_blend_point(AnimUtil.scaled_anim(lc), LOCO_SPEEDS[nm][1], -1, StringName(nm))
 	loco.min_space = Vector2(-1.4, -1.4)
 	loco.max_space = Vector2(1.4, 1.4)
 	root.add_node("loco", loco)
@@ -417,7 +461,8 @@ func _build_tree() -> void:
 	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	tree.active = true
 	for nm: String in LOCO_SPEEDS:
-		tree.set("parameters/loco/%s/ts/scale" % nm, LOCO_SPEEDS[nm][2])
+		# los strafes Mixamo andan a ~1,2 m/s: velocidad 1 al caminar
+		tree.set("parameters/loco/%s/ts/scale" % nm, 1.0 if _loco_clips.has(nm) else LOCO_SPEEDS[nm][2])
 	playback = tree.get("parameters/act/playback") as AnimationNodeStateMachinePlayback
 	playback.start("none")
 
@@ -475,11 +520,20 @@ func event(e: String) -> void:
 	if e == state:
 		playback.start(e, true)
 
+## Duración del lanzamiento en curso (cast_t cuenta hacia atrás desde el «cast» del hechizo).
+var _cast_max: float = 0.0
+func _cast_total(f: Fighter) -> float:
+	if f.cast_t > _cast_max or _cast_max <= 0.0:
+		_cast_max = f.cast_t
+	return _cast_max
+
 func _clip_len(s: String) -> float:
 	return ap.get_animation(states[s]).length
 
 func update(f: Fighter, delta: float) -> void:
 	oneshot_t = maxf(oneshot_t - delta, 0.0)
+	if f.cast_t <= 0.0:
+		_cast_max = 0.0
 	riding.amount = move_toward(riding.amount, 1.0 if _mounted and f.alive else 0.0, delta * 6.0)
 	var s := "none"
 	var upper: bool = f.mounted
@@ -487,11 +541,13 @@ func update(f: Fighter, delta: float) -> void:
 		s = "death"
 		upper = false
 	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE and not (oneshot == "hit" and oneshot_t > 0.0 and f.stun <= f.last_hitstun + 0.01):
-		s = "stun"
+		s = "stance_break" if f.stance_broken_t > 0.0 and not f.mounted else "stun"
 	elif f.boss_phase == Fighter.Boss.CHARGE:
-		s = "block" # ronda 25: pose de carga clara (guardia baja, hoja brillando)
+		s = "boss_charge" # ronda 25/28: pose de carga clara (grito con la espada, hoja brillando)
 	elif f.boss_phase == Fighter.Boss.LUNGE:
-		s = "dash_strike"
+		s = "boss_lunge"
+	elif f.cast_t > 0.0 and not f.mounted:
+		s = "cast"
 	elif f.boss_phase == Fighter.Boss.RECOVER:
 		s = "land"
 	elif f.is_dash_striking():
@@ -539,6 +595,17 @@ func update(f: Fighter, delta: float) -> void:
 			Fighter.Atk.RECOVERY:
 				scd = Ld * maxf(1.0 - DS_CONTACT - 0.12, 0.05) / maxf(f.atk_dur, 0.05)
 		tree.set("parameters/act/dash_strike/ts/scale", scd)
+	elif s == "boss_charge":
+		tree.set("parameters/act/boss_charge/ts/scale", _clip_len(s) / Fighter.BOSS_CHARGE)
+	elif s == "boss_lunge":
+		# el impacto del clip (CONTACT) coincide con el final de la embestida
+		tree.set("parameters/act/boss_lunge/ts/scale", _clip_len(s) * CONTACT / (Fighter.BOSS_DIST / Fighter.BOSS_SPEED))
+	elif s == "cast":
+		tree.set("parameters/act/cast/ts/scale", _clip_len(s) * CONTACT / maxf(_cast_total(f), 0.1))
+	elif s == "stance_break":
+		tree.set("parameters/act/stance_break/ts/scale", _clip_len(s) / Fighter.STANCE_BREAK_TIME)
+	elif s == "hit" or s == "stun":
+		tree.set("parameters/act/%s/ts/scale" % s, maxf(_clip_len(s) / 0.9, 1.0))
 	elif s == "slam":
 		tree.set("parameters/act/slam/ts/scale", _clip_len("slam") * CONTACT / Fighter.SLAM_TELEGRAPH)
 	elif s == "heavy" or s.begins_with("light"):
@@ -574,7 +641,7 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/parry/ts/scale", _clip_len("parry") / (Fighter.PARRY_WINDOW + Fighter.PARRY_RECOVERY))
 	if s != state:
 		if s != "none":
-			if state == "none" or s in ["death", "stun", "hit", "block_hit", "shoot", "dash_strike", "jump_up", "land", "slam"] or s.begins_with("dodge"):
+			if state == "none" or s in ["boss_charge", "boss_lunge", "stance_break", "cast", "death", "stun", "hit", "block_hit", "shoot", "dash_strike", "jump_up", "land", "slam"] or s.begins_with("dodge"):
 				playback.start(s, true)
 			else:
 				playback.travel(s)

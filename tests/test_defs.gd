@@ -36,7 +36,7 @@ func _run() -> void:
 			root.add_child(kv)
 			kv.setup(Color.BLUE, c, w)
 			var mw := w if not w.ranged else Catalog.weapon("dagas")
-			check(kv.sword != null and kv.ap.has_animation(kv.states["heavy"]) and kv.ap.has_animation(kv.states["light0"]) and kv.states["light0"] == (mw.combo_hit(0, c).clip_name() if not mw.combo.is_empty() else mw.anim_light[0]) and kv.ap.has_animation(kv.states["light1"]) and kv.ap.has_animation(kv.states["light2"]), "visual %s + %s (clips del combo)" % [c.id, w.id])
+			check(kv.sword != null and kv.ap.has_animation(kv.states["heavy"]) and kv.ap.has_animation(kv.states["light0"]) and kv.states["light0"] == (KnightVisual.MX + KnightVisual.MX_WEAPON[mw.id]["light0"] if KnightVisual.MX_WEAPON.get(mw.id, {}).has("light0") else (mw.combo_hit(0, c).clip_name() if not mw.combo.is_empty() else mw.anim_light[0])) and kv.ap.has_animation(kv.states["light1"]) and kv.ap.has_animation(kv.states["light2"]), "visual %s + %s (clips del combo)" % [c.id, w.id])
 			kv.free()
 	print("RESULT: ", "OK" if fails == 0 else "FALLO", " (%d fallos)" % fails)
 	quit(1 if fails > 0 else 0)
