@@ -212,6 +212,8 @@ var poise_max: float = POISE_MAX
 var heals: float = 0.0 ## vida curada por la pasiva (pruebas)
 ## Ronda 11: modificadores de las habilidades desbloqueadas (Progression.combine_mods).
 var mods: Dictionary = Progression.combine_mods([])
+var trinket_ids: Array = [] ## ronda 30: anillos + talismanes equipados
+var tfx: Dictionary = Trinkets.neutral()
 var parry_window: float = PARRY_WINDOW
 var hits_landed: int = 0 ## golpes conectados en la partida (XP)
 var team: int = 0
@@ -400,6 +402,13 @@ func set_attributes(a: Dictionary) -> void:
 	attrs = a.duplicate()
 
 ## Ronda 19: nivel, armadura ({slot: id}; sin llamar = equipo inicial del rol) y arma secundaria.
+## Ronda 30: anillos y talismanes (antes de entrar en escena).
+func set_trinkets(ids: Array) -> void:
+	trinket_ids = ids.duplicate()
+	tfx = Trinkets.combine(ids)
+	if is_inside_tree():
+		_apply_character()
+
 func set_equipment(lv: int, armor: Dictionary, w2: WeaponDef = null) -> void:
 	level = maxi(lv, 1)
 	armor_ids = armor.duplicate()
@@ -570,7 +579,7 @@ func _apply_character() -> void:
 	health = max_health
 	stamina_max = character.estamina + float(mods["estamina"]) + float(ad["estamina"])
 	stamina = stamina_max
-	poise_max = character.poise + float(mods["poise"]) + float(ad["poise"]) + float(eq["armor_poise"]) - float(eq_ref["armor_poise"])
+	poise_max = character.poise + float(mods["poise"]) + float(ad["poise"]) + float(eq["armor_poise"]) - float(eq_ref["armor_poise"]) + float(tfx["poise"])
 	energy_max = float(ad["energia_max"])
 	energy = energy_max
 	parry_window = PARRY_WINDOW + float(mods["parry_window"])
@@ -661,7 +670,7 @@ func is_dash_striking() -> bool:
 	return atk_state != Atk.NONE and (_ds_visual or atk_dash)
 
 func roll_iframe_end() -> float:
-	return maxf(ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"]) + int(ad["iframes"]) + int(roll_mod()["iframes"])) / ROLL_FPS, ROLL_STARTUP)
+	return maxf(ROLL_IFRAME_END + (character.roll_iframe_bonus + int(mods["roll_iframes"]) + int(ad["iframes"]) + int(roll_mod()["iframes"]) + int(tfx["roll_iframes"])) / ROLL_FPS, ROLL_STARTUP)
 
 ## "none", "startup", "iframes" o "recovery".
 func roll_phase() -> String:
@@ -692,6 +701,7 @@ func _build_visuals() -> void:
 	_kv = KnightVisual.new()
 	_rider_root.add_child(_kv)
 	_kv.setup(color, character, weapon)
+	_kv.set_base_glow(Smithing.engraving_glow(melee().upgrade_level)) # ronda 30: grabado +5
 	_kv.set_armor(armor_pieces())
 	_body = MeshUtil.box(_prim, Vector3(0.6, 1.0, 0.45), Vector3(0, 1.0, 0.1), color)
 	MeshUtil.own(_body) # se tiñe con los estados
@@ -806,6 +816,8 @@ func can_mount_now() -> bool:
 # ---------------- Aguante ----------------
 
 func spend_stamina(v: float) -> void:
+	if v > 0.0:
+		v *= float(tfx["stamina_cost"]) # ronda 30: talismanes
 	stamina = maxf(stamina - v, 0.0)
 	_since_spend = 0.0
 	if stamina <= 0.0 and exhausted <= 0.0:
@@ -898,7 +910,8 @@ func _physics_process(delta: float) -> void:
 	inp.y = 0.0
 	var amount := minf(inp.length(), 1.0)
 	var target_vel := Vector3.ZERO
-	var turn := st.turn_speed * delta
+	# Ronda 30: a pie se gira con velocidad angular fija (~800°/s), no a saltos
+	var turn := (deg_to_rad(TURN_RATE_DEG) if fluid and not mounted else st.turn_speed) * delta
 	# Ronda 29 (regla soulslike): el seguimiento solo existe en la anticipación; en frames activos y
 	# recuperación la dirección del golpe queda comprometida. En el aire tampoco se gira.
 	if turning_locked():
@@ -916,7 +929,7 @@ func _physics_process(delta: float) -> void:
 			run_away = true
 	if run_away:
 		var dirn := inp.normalized()
-		facing = _turn_toward(facing, dirn, turn * 2.2)
+		facing = _turn_toward(facing, dirn, turn * (1.0 if fluid and not mounted else 2.2))
 		target_vel = facing * st.speed * speed_mult() * amount
 	elif _lock_valid():
 		var d := MeshUtil.flat(face_target.global_position - global_position)
@@ -941,7 +954,7 @@ func _physics_process(delta: float) -> void:
 			target_vel = -facing * st.speed * speed_mult() * REVERSE_FACTOR * amount
 		else:
 			# Sin fijar, correr gira al personaje con normalidad.
-			facing = _turn_toward(facing, dirn, turn * (1.4 if run_req and not mounted else 1.0))
+			facing = _turn_toward(facing, dirn, turn * (1.4 if run_req and not mounted and not fluid else 1.0))
 			target_vel = facing * st.speed * speed_mult() * amount
 	# Galope (montado, igual que antes) / correr a pie (también de espaldas si va fijado)
 	sprinting = run_req and (not reversing or (not mounted and _lock_valid()) or run_away)
@@ -975,7 +988,7 @@ func _physics_process(delta: float) -> void:
 	_update_stamina(delta, amount < 0.3 or reversing)
 	# Ronda 29: salto comprometido. La trayectoria queda fijada al despegar (sin control aéreo).
 	if not airborne:
-		planar_vel = planar_vel.move_toward(target_vel, st.acceleration * delta)
+		planar_vel = _steer_velocity(planar_vel, target_vel, st.acceleration * delta, deg_to_rad(TURN_RATE_DEG) * 1.15 * delta) if fluid and not mounted else planar_vel.move_toward(target_vel, st.acceleration * delta)
 	var v := planar_vel
 	if atk_dash and not mounted and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE):
 		v = _lunge_velocity()
@@ -1025,6 +1038,12 @@ func _physics_process(delta: float) -> void:
 		if _air_t > 0.08 and (is_on_floor() or global_position.y < 0.02) and velocity.y <= 0.0:
 			_land()
 	rotation.y = atan2(-facing.x, -facing.z)
+	# Ronda 30: inclinación del cuerpo hacia el giro (según velocidad angular y rapidez)
+	var yr := wrapf(rotation.y - _prev_yaw, -PI, PI) / maxf(delta, 0.001)
+	_prev_yaw = rotation.y
+	var spd_k := clampf(MeshUtil.flat(velocity).length() / maxf(stats().speed, 0.1), 0.0, 1.5)
+	var lean_t := clampf(yr * LEAN_K * spd_k, -LEAN_MAX, LEAN_MAX) if not mounted and not airborne else 0.0
+	lean = lerpf(lean, lean_t, clampf(delta * 10.0, 0.0, 1.0))
 	if mounted and mount_node:
 		mount_node.global_transform = global_transform
 	# Visuales
@@ -1055,7 +1074,7 @@ func _physics_process(delta: float) -> void:
 	_update_aura()
 	_kv.update(self, delta)
 	_rider_root.rotation.x = 0.0 # la voltereta la hace la animación Dodge_*
-	_rider_root.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.2 if stun > 0.0 else 0.0
+	_rider_root.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.2 if stun > 0.0 else lean
 	_rider_root.position.y = sy
 	if mounted and mount_node:
 		# Sentado en la silla: la cadera sigue el punto de silla del caballo
@@ -1124,7 +1143,7 @@ func get_hit_center() -> Vector3:
 
 func add_meter(v: float) -> void:
 	if v > 0.0:
-		v *= float(ad["medidor"])
+		v *= float(ad["medidor"]) * float(tfx["eikon_rate"])
 	meter = clampf(meter + v, 0.0, METER_MAX)
 	meter_changed.emit(meter)
 
@@ -1168,7 +1187,7 @@ func damage_mult() -> float:
 		k *= melee().mounted_damage_mult
 	if character.passive_id == "furia" and health < max_health * 0.4:
 		k *= 1.0 + 0.25 * passive_k()
-	return k
+	return k * Trinkets.dmg_mult(tfx, melee().phys_type)
 
 func _request_attack(heavy: bool) -> bool:
 	if roll_t >= 0.0 and not mounted and loadout == Loadout.SWORD_SHIELD and alive and roll_t < roll_iframe_end():
@@ -1755,6 +1774,9 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 			(from as Fighter).riposte_t = PARRY_STAGGER
 		add_meter(15.0)
 		parries_landed += 1
+		if float(tfx["parry_stamina"]) > 0.0:
+			stamina = minf(stamina + float(tfx["parry_stamina"]), stamina_max)
+			stamina_changed.emit(stamina, exhausted > 0.0)
 		parry_state = Parry.NONE # éxito: sin recuperación
 		hitstop.emit(HITSTOP_PARRY)
 		impact.emit(0.7)
@@ -2420,3 +2442,27 @@ func turning_locked() -> bool:
 	if mounted:
 		return false
 	return airborne or atk_state == Atk.ACTIVE or atk_state == Atk.RECOVERY
+
+
+# ---------------- Ronda 30: movimiento fluido ----------------
+const TURN_RATE_DEG := 800.0 ## giro a pie (°/s)
+const LEAN_K := 0.012 ## rad de inclinación por rad/s de giro
+const LEAN_MAX := 0.14
+var lean: float = 0.0
+## Movimiento fluido (giro angular fijo + velocidad que gira). Lo activa la arena para el jugador;
+## la IA conserva su conducción clásica (con la fluida rodea al jugador por la espalda demasiado).
+var fluid: bool = false
+var _prev_yaw: float = 0.0
+
+## La velocidad GIRA hacia la deseada (sin caer a cero en un cambio de dirección) y su módulo se
+## acelera/frena con normalidad. Inversiones casi completas (>150°) sí frenan y arrancan.
+static func _steer_velocity(cur: Vector3, target: Vector3, accel_step: float, turn_step: float) -> Vector3:
+	var lc := cur.length()
+	var lt := target.length()
+	if lc < 0.3 or lt < 0.3:
+		return cur.move_toward(target, accel_step)
+	var a := cur.signed_angle_to(target, Vector3.UP)
+	if absf(a) > deg_to_rad(150.0):
+		return cur.move_toward(target, accel_step)
+	var dir := (cur / lc).rotated(Vector3.UP, clampf(a, -turn_step, turn_step))
+	return dir * move_toward(lc, lt, accel_step)

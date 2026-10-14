@@ -176,7 +176,7 @@ func selected() -> CharacterDef:
 
 func confirm_choice() -> void:
 	var c := selected()
-	modal_text.text = "%s será tu personaje inicial. Ponle nombre. Los otros cuatro se desbloquean con oro en el lobby (‹ ›)." % c.display_name
+	modal_text.text = "%s será tu personaje inicial. Ponle nombre. Más adelante podrás reclutar a otros en el lobby (Reclutar)." % c.display_name
 	name_input.text = ""
 	accept_button.disabled = true
 	modal.visible = true

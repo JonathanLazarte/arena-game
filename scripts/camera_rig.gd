@@ -34,6 +34,7 @@ var _idle_t: float = 99.0
 var _flick: float = 0.0
 var _flick_t: float = 0.0
 var _released: bool = false
+var menu_open: bool = false ## ronda 30: menú de pausa abierto (ratón libre)
 var flicks: int = 0 ## cambios de objetivo con tirón (pruebas)
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -41,7 +42,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		var mb := ev as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_RIGHT:
 			_drag = mb.pressed
-		elif mb.pressed and capture_mouse and _released and mb.button_index == MOUSE_BUTTON_LEFT:
+		elif mb.pressed and capture_mouse and _released and not menu_open and mb.button_index == MOUSE_BUTTON_LEFT:
 			_released = false
 	elif ev is InputEventMouseMotion:
 		var mm := ev as InputEventMouseMotion
@@ -57,8 +58,6 @@ func _unhandled_input(ev: InputEvent) -> void:
 		var sd := ev as InputEventScreenDrag
 		if sd.index == _touch_idx:
 			orbit(sd.relative * TOUCH_K)
-	elif ev is InputEventKey and (ev as InputEventKey).pressed and (ev as InputEventKey).keycode == KEY_ESCAPE and capture_mouse:
-		_released = not _released
 
 ## Toque válido para orbitar: mitad derecha y fuera de los botones táctiles visibles.
 func _touch_ok(pos: Vector2) -> bool:
@@ -97,7 +96,7 @@ func update(delta: float) -> void:
 	if _flick_t <= 0.0:
 		_flick = 0.0
 	if OS.get_name() != "Android" and OS.get_name() != "iOS":
-		var want := capture_mouse and active and not _released
+		var want := capture_mouse and active and not _released and not menu_open
 		var mode := Input.MOUSE_MODE_CAPTURED if want else Input.MOUSE_MODE_VISIBLE
 		if Input.mouse_mode != mode and (want or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED):
 			Input.mouse_mode = mode

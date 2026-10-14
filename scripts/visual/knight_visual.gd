@@ -476,7 +476,14 @@ func set_tint(c: Color, flash: bool, ec: Color = Color.WHITE) -> void:
 		m.emission_energy_multiplier = 0.8
 
 func set_glow(on: bool, c: Color) -> void:
-	glow_mat.albedo_color = c * 0.8 if on else Color.BLACK
+	glow_mat.albedo_color = c * 0.8 if on else base_glow
+
+## Ronda 30: brillo permanente del grabado (+5 o más); los destellos de carga vuelven a él.
+var base_glow: Color = Color.BLACK
+func set_base_glow(c: Color) -> void:
+	base_glow = c
+	if glow_mat:
+		glow_mat.albedo_color = c
 
 ## loadout: 0 espada+escudo, 1 arco, -1 cambiando (manos vacías)
 var _base_scales: Dictionary = {}

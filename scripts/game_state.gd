@@ -7,7 +7,7 @@ extends Node
 ## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 9 ## v9 = ronda 29: varios personajes con nombre propio
+const SAVE_VERSION := 10 ## v9 = ronda 29: varios personajes con nombre propio; v10 = ronda 30: anillos/talismanes y ficha (horas, victorias)
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -44,6 +44,12 @@ const SMITH_WELCOME := {"piedra_1": 3}
 var char_names: Dictionary = {} ## id -> nombre que le puso el jugador
 var other_slots: Dictionary = {} ## id -> equipo del personaje no activo (arma, arma 2, armadura, hechizos)
 const NAME_MAX := 16
+# --- Ronda 30: anillos/talismanes y ficha personal ---
+var owned_trinkets: Array = [] ## colección global (anillos y talismanes)
+var rings_eq: Array = ["", ""] ## del personaje activo
+var talismans_eq: Array = ["", "", ""]
+var char_stats: Dictionary = {} ## id -> {"secs": float, "wins": int, "matches": int}
+var char_titles: Dictionary = {} ## id -> título equipado (Titles)
 var unlocked_chars: Array = [] ## v4: siempre [character_id] (el personaje de la ranura activa)
 var active_slot: int = 0
 var char_migration: Dictionary = {} ## ronda 15: personajes extra reembolsados al migrar
@@ -57,8 +63,41 @@ var last_result: Dictionary = {} ## resultado de la última partida (pantalla de
 var random_rival: bool = false
 var from_lobby: bool = false
 
+## Ronda 30: RECURSOS DE PRUEBA. true = al cargar, el perfil recibe (una sola vez por perfil)
+## mucho oro, cristales, piedras de forja y todos los accesorios. PONER EN false ANTES DE PUBLICAR.
+## También se puede forzar con el argumento `-- --debug-grant` o desactivar con `-- --no-debug-grant`.
+const DEBUG_GRANT := true
+const DEBUG_GOLD := 500000
+const DEBUG_GEMS := 5000
+const DEBUG_STONES := {"piedra_1": 60, "piedra_2": 60, "piedra_3": 60, "piedra_antigua": 15}
+var debug_granted: bool = false
+
+static func debug_grant_enabled() -> bool:
+	var args := OS.get_cmdline_user_args()
+	if "--no-debug-grant" in args:
+		return false
+	return DEBUG_GRANT or "--debug-grant" in args
+
+## Entrega los recursos de prueba si aún no se dieron a este perfil. Devuelve si los dio.
+func apply_debug_grant(force: bool = false) -> bool:
+	if debug_granted and not force:
+		return false
+	oro = maxi(oro, DEBUG_GOLD)
+	gemas = maxi(gemas, DEBUG_GEMS)
+	for sid: String in DEBUG_STONES:
+		materials[sid] = maxi(int(materials.get(sid, 0)), int(DEBUG_STONES[sid]))
+	for id: String in Trinkets.RINGS.keys() + Trinkets.TALISMANS.keys():
+		if not id in owned_trinkets:
+			owned_trinkets.append(id)
+	debug_granted = true
+	save_loadout()
+	return true
+
 func _ready() -> void:
 	load_loadout()
+	# Las pruebas automáticas (tests/) cambian save_path y no deben recibir el regalo
+	if debug_grant_enabled() and save_path == SAVE_PATH and not OS.get_cmdline_args().has("-s"):
+		apply_debug_grant()
 
 # ---------------- Consultas ----------------
 
@@ -255,6 +294,7 @@ func is_unlocked(kind: String, id: String) -> bool:
 		"weapon": return id in owned_weapons
 		"eikon": return id in owned_eikons
 		"armor": return id in owned_armor
+		"trinket": return id in owned_trinkets
 	return false
 
 ## "ok" si se puede comprar, si no el motivo: "ya", "nivel", "oro".
@@ -331,6 +371,8 @@ func switch_character(id: String) -> bool:
 	weapon2_id = String(g.get("weapon2", ""))
 	armor_eq = g.get("armor", {})
 	spells = g.get("spells", [])
+	rings_eq = _fit(g.get("rings", []), Trinkets.RING_SLOTS)
+	talismans_eq = _fit(g.get("talismans", []), Trinkets.TALISMAN_SLOTS)
 	if not c.allows(weapon_id) or not weapon_id in owned_weapons:
 		weapon_id = c.default_weapon
 	equipped_spells()
@@ -338,7 +380,8 @@ func switch_character(id: String) -> bool:
 	return true
 
 func _gear() -> Dictionary:
-	return {"weapon_id": weapon_id, "weapon2": weapon2_id, "armor": armor_eq.duplicate(), "spells": spells.duplicate()}
+	return {"weapon_id": weapon_id, "weapon2": weapon2_id, "armor": armor_eq.duplicate(), "spells": spells.duplicate(),
+		"rings": rings_eq.duplicate(), "talismans": talismans_eq.duplicate()}
 
 func buy(kind: String, id: String) -> String:
 	var r := can_buy(kind, id)
@@ -350,10 +393,11 @@ func buy(kind: String, id: String) -> String:
 			var keep: Dictionary = armor_eq.duplicate()
 			armor_eq = {}
 			_unlock_char(id) # equipo inicial de su rol para él, no para el actual
-			other_slots[id] = {"weapon_id": Catalog.character(id).default_weapon, "weapon2": "", "armor": armor_eq.duplicate(), "spells": []}
+			other_slots[id] = {"weapon_id": Catalog.character(id).default_weapon, "weapon2": "", "armor": armor_eq.duplicate(), "spells": [], "rings": ["", ""], "talismans": ["", "", ""]}
 			armor_eq = keep
 		"weapon": owned_weapons.append(id)
 		"eikon": owned_eikons.append(id)
+		"trinket": owned_trinkets.append(id)
 		"armor": owned_armor.append(id)
 	save_loadout()
 	return "ok"
@@ -390,7 +434,7 @@ func set_character(id: String) -> bool:
 func slot_data() -> Dictionary:
 	return {"character_id": character_id, "weapon_id": weapon_id,
 		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills(), "attrs": char_attrs(),
-		"armor": armor_eq, "weapon2": weapon2_id, "spells": spells}
+		"armor": armor_eq, "weapon2": weapon2_id, "spells": spells, "rings": rings_eq, "talismans": talismans_eq}
 
 # ---------------- Ronda 21: magia de eikon y artes de arma ----------------
 
@@ -479,6 +523,7 @@ func apply_match_result(stats: Dictionary) -> Dictionary:
 	var stones := Smithing.match_reward(bool(stats.get("won", false)), char_level())
 	for sid: String in stones:
 		add_material(sid, int(stones[sid]))
+	record_match(bool(stats.get("won", false)), float(stats.get("secs", 0.0)))
 	last_result = {"won": stats.get("won", false), "perfect": stats.get("won", false) and int(stats.get("lost_rounds", 1)) == 0, "xp": rw["xp"], "gold": int(rw["gold"]) + bonus, "level_bonus": bonus,
 		"lines": rw["lines"], "mult": rw["mult"], "account_before": acc0, "account_after": account_level(),
 		"char_before": ch0, "char_after": char_level(), "account_xp_before": acc_xp0, "account_xp": account_xp,
@@ -522,6 +567,10 @@ func save_loadout() -> void:
 			g["attrs"] = attrs.get(id, Attributes.start_for(id))
 			others[id] = g
 	cfg.set_value("personajes", "otros", others)
+	cfg.set_value("accesorios", "coleccion", owned_trinkets)
+	cfg.set_value("personajes", "fichas", char_stats)
+	cfg.set_value("personajes", "titulos", char_titles)
+	cfg.set_value("depuracion", "regalo_prueba", debug_granted)
 	cfg.save(save_path)
 
 func load_loadout() -> void:
@@ -627,7 +676,24 @@ func load_loadout() -> void:
 			char_xp[id] = int(g.get("xp", 0))
 			skills[id] = g.get("skills", [])
 			attrs[id] = g.get("attrs", Attributes.start_for(id))
-			other_slots[id] = {"weapon_id": g.get("weapon_id", Catalog.character(id).default_weapon), "weapon2": g.get("weapon2", ""), "armor": g.get("armor", {}), "spells": g.get("spells", [])}
+			other_slots[id] = {"weapon_id": g.get("weapon_id", Catalog.character(id).default_weapon), "weapon2": g.get("weapon2", ""), "armor": g.get("armor", {}), "spells": g.get("spells", []),
+				"rings": _fit(g.get("rings", []), Trinkets.RING_SLOTS), "talismans": _fit(g.get("talismans", []), Trinkets.TALISMAN_SLOTS)}
+	# Ronda 30 (v10): accesorios y ficha. Una partida v<10 empieza sin accesorios y con la ficha a cero.
+	owned_trinkets = []
+	rings_eq = ["", ""]
+	talismans_eq = ["", "", ""]
+	char_stats = {}
+	char_titles = {}
+	if ver >= 10:
+		for id in cfg.get_value("accesorios", "coleccion", []):
+			if Trinkets.kind(String(id)) != "" and not id in owned_trinkets:
+				owned_trinkets.append(String(id))
+		rings_eq = _fit(cfg.get_value(sec, "rings", []), Trinkets.RING_SLOTS)
+		talismans_eq = _fit(cfg.get_value(sec, "talismans", []), Trinkets.TALISMAN_SLOTS)
+		char_stats = cfg.get_value("personajes", "fichas", {})
+		char_titles = cfg.get_value("personajes", "titulos", {})
+	debug_granted = bool(cfg.get_value("depuracion", "regalo_prueba", false))
+
 	attr_migrated = false
 	if ver < 5:
 		_migrate_attrs()
@@ -707,6 +773,12 @@ func _migrate_characters() -> void:
 	char_migration = {"removed": extra, "refund": refund}
 
 func reset_defaults() -> void:
+	debug_granted = false
+	char_titles = {}
+	owned_trinkets = []
+	rings_eq = ["", ""]
+	talismans_eq = ["", "", ""]
+	char_stats = {}
 	char_names = {}
 	other_slots = {}
 	player_name = "Jugador"
@@ -749,3 +821,84 @@ static func random_loadout() -> Dictionary:
 	var ws := Catalog.weapons_for(c).filter(func(w: WeaponDef) -> bool: return not w.ranged) # la IA lucha cuerpo a cuerpo
 	var es: Array = Catalog.EIKONS.values()
 	return {"character": c, "weapon": ws[randi() % ws.size()], "eikon": es[randi() % es.size()]}
+
+
+# ---------------- Ronda 30: anillos, talismanes y ficha personal ----------------
+
+## Ajusta una lista de ids a n ranuras: solo accesorios tuyos y del tipo correcto, sin repetir.
+func _fit(ids: Array, n: int) -> Array:
+	var out: Array = []
+	var k := "ring" if n == Trinkets.RING_SLOTS else "talisman"
+	for i in n:
+		var id := String(ids[i]) if i < ids.size() else ""
+		if id != "" and (Trinkets.kind(id) != k or id in out or not id in owned_trinkets):
+			id = ""
+		out.append(id)
+	return out
+
+## Equipa (o quita con id = "") un anillo/talismán en la ranura i. Si ya estaba en otra ranura, se mueve.
+func equip_trinket(kind: String, i: int, id: String) -> bool:
+	var arr: Array = rings_eq if kind == "ring" else talismans_eq
+	if i < 0 or i >= arr.size():
+		return false
+	if id != "" and (Trinkets.kind(id) != kind or not id in owned_trinkets):
+		return false
+	var j := arr.find(id) if id != "" else -1
+	if j >= 0:
+		arr[j] = ""
+	arr[i] = id
+	save_loadout()
+	return true
+
+func equipped_trinkets() -> Array:
+	var out: Array = []
+	if title_id() != "":
+		out.append(title_id()) # ronda 30: el título suma su bonificación pequeña
+	for id in rings_eq + talismans_eq:
+		if String(id) != "":
+			out.append(String(id))
+	return out
+
+func char_stat(id: String = "") -> Dictionary:
+	var d: Dictionary = char_stats.get(id if id != "" else character_id, {})
+	return {"secs": float(d.get("secs", 0.0)), "wins": int(d.get("wins", 0)), "matches": int(d.get("matches", 0))}
+
+func record_match(won: bool, secs: float) -> void:
+	var d := char_stat()
+	d["secs"] += maxf(secs, 0.0)
+	d["matches"] += 1
+	if won:
+		d["wins"] += 1
+	char_stats[character_id] = d
+
+static func hours_text(secs: float) -> String:
+	var m := int(secs / 60.0)
+	return "%d h %02d min" % [m / 60, m % 60]
+
+## Títulos ganados por el personaje activo (o id).
+func earned_titles(id: String = "") -> Array:
+	var cid := id if id != "" else character_id
+	var st := char_stat(cid)
+	st["level"] = char_level(cid)
+	var out: Array = []
+	for t: String in Titles.ORDER:
+		if Titles.earned(t, st):
+			out.append(t)
+	return out
+
+func title_id(id: String = "") -> String:
+	var cid := id if id != "" else character_id
+	var t := String(char_titles.get(cid, ""))
+	return t if t in earned_titles(cid) else ""
+
+func set_title(t: String) -> bool:
+	if t != "" and not t in earned_titles():
+		return false
+	char_titles[character_id] = t
+	save_loadout()
+	return true
+
+## Nombre con el título: «Ragnar · Vencedor».
+func display_name_with_title(id: String = "") -> String:
+	var t := title_id(id)
+	return char_name(id) + ("  «%s»" % Titles.def(t)["name"] if t != "" else "")

@@ -33,15 +33,16 @@ var lock_marker: MeshInstance3D
 var lock_ring: Node3D
 var match_result: Dictionary = {}
 
+var _t0_ms: int = Time.get_ticks_msec() ## ronda 30: tiempo jugado (ficha del personaje)
 func _ready() -> void:
 	_build_environment()
 	_build_arena()
 	# Equipamiento: el del lobby (GameState) o el clásico si se carga la arena directamente (pruebas)
 	var gs := get_node_or_null("/root/GameState")
 	if gs and gs.from_lobby:
-		player = _make_fighter(gs.char_name(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
+		player = _make_fighter(gs.display_name_with_title(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
-			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2()})
+			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "trinkets": gs.equipped_trinkets()})
 		player.set_magic(gs.equipped_spells(), gs.weapon_art()) # ronda 21
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
@@ -71,6 +72,7 @@ func _ready() -> void:
 	hud.bind(player, enemy)
 	hud.restart_requested.connect(restart_match)
 	hud.lobby_requested.connect(func() -> void: UIKit.go("res://scenes/lobby.tscn"))
+	player.fluid = true # ronda 30: movimiento fluido del jugador
 	controller = PlayerController.new()
 	controller.me = player
 	controller.camera = camera
@@ -86,6 +88,7 @@ func _ready() -> void:
 	controller.joystick = hud.joystick
 	add_child(controller)
 	hud.controller = controller
+	hud.menu_opened.connect(func(o: bool) -> void: rig.menu_open = o)
 	ai = AIController.new()
 	ai.me = enemy
 	if gs and gs.from_lobby:
@@ -159,6 +162,7 @@ func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 	f.set_attributes(at)
 	if not eqp.is_empty():
 		f.set_equipment(int(eqp.get("level", 1)), eqp.get("armor", {}), eqp.get("w2", null))
+		f.set_trinkets(eqp.get("trinkets", [])) # ronda 30
 	f.display_name = n
 	f.team = team
 	f.color = c
@@ -449,7 +453,7 @@ func _award(won: bool) -> Dictionary:
 	var gs := get_node_or_null("/root/GameState")
 	if gs == null or not gs.from_lobby:
 		return {}
-	return gs.apply_match_result({"won": won, "rounds": wins[0], "lost_rounds": wins[1], "hits": player.hits_landed,
+	return gs.apply_match_result({"secs": (Time.get_ticks_msec() - _t0_ms) / 1000.0, "won": won, "rounds": wins[0], "lost_rounds": wins[1], "hits": player.hits_landed,
 		"parries": player.parries_landed, "difficulty": gs.difficulty})
 
 func restart_match() -> void:
@@ -460,3 +464,14 @@ func restart_match() -> void:
 	hud.end_panel.visible = false
 	hud.set_touch_visible(true)
 	start_round(true)
+
+
+## Ronda 30: Esc / Atrás abre o cierra el menú (el combate NO se pausa).
+func _unhandled_input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and not ev.echo and (ev as InputEventKey).keycode == KEY_ESCAPE:
+		hud.toggle_pause()
+		get_viewport().set_input_as_handled()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and hud:
+		hud.toggle_pause()

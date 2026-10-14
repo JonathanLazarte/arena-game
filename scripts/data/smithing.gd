@@ -5,6 +5,15 @@ class_name Smithing
 ## piedra y un nivel final con piedra antigua; ver README).
 
 const MAX_LEVEL := 10
+## Ronda 30: el nivel de mejora es el «grabado» del arma (+1, +2...). Desde +5 la hoja brilla.
+const GLOW_LEVEL := 5
+
+## Color del brillo del grabado (más intenso cuanto más alto); negro = sin brillo.
+static func engraving_glow(lvl: int) -> Color:
+	if lvl < GLOW_LEVEL:
+		return Color.BLACK
+	var k := 0.35 + 0.65 * float(lvl - GLOW_LEVEL) / float(MAX_LEVEL - GLOW_LEVEL)
+	return Color(0.55, 0.75, 1.0) * k
 const DMG_PER_LEVEL := 0.06 ## +6 % de daño base por nivel (+10 = +60 %)
 const SCALE_PER_LEVEL := 0.04 ## +4 % de los coeficientes de escalado por nivel
 const STONES := ["piedra_1", "piedra_2", "piedra_3", "piedra_antigua"]

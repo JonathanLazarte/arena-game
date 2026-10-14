@@ -7,6 +7,8 @@ var me: Fighter
 var camera: Camera3D
 var joystick: TouchStick
 var enabled: bool = true
+## Ronda 30: menú abierto (sin pausar): quieto y en guardia, sin acciones.
+var menu_hold: bool = false
 var lock_on: bool = true
 var _prev: Dictionary = {}
 var _atk_hold: float = -1.0
@@ -50,6 +52,32 @@ func _update_target(cycle: bool) -> void:
 	if cycle:
 		target = list[(idx + 1) % list.size()]
 
+const STICK_DEADZONE := 0.18
+const STICK_CURVE := 1.5 ## >1: más precisión cerca del centro
+const INPUT_SMOOTH := 0.08 ## s para completar un cambio de dirección de 90°
+var _smooth: Vector2 = Vector2.ZERO
+
+## Zona muerta radial (no por eje) y curva de respuesta: conserva la dirección exacta del stick.
+static func shape_stick(raw: Vector2, dz: float = STICK_DEADZONE, curve: float = STICK_CURVE) -> Vector2:
+	var l := raw.length()
+	if l <= dz:
+		return Vector2.ZERO
+	var n := clampf((l - dz) / (1.0 - dz), 0.0, 1.0)
+	return raw / l * pow(n, curve)
+
+## Interpola la entrada: gira la dirección (90° en INPUT_SMOOTH) y ajusta la magnitud, sin pasar
+## por cero salvo en inversiones casi completas (>135°) o al soltar.
+static func smooth_input(cur: Vector2, target: Vector2, delta: float) -> Vector2:
+	var rate := delta / INPUT_SMOOTH
+	var lc := cur.length()
+	var lt := target.length()
+	if lc < 0.05 or lt < 0.05 or absf(cur.angle_to(target)) > deg_to_rad(135.0):
+		return cur.move_toward(target, rate * 1.5)
+	var a := cur.angle_to(target)
+	var step := PI * 0.5 * rate
+	var dir := (cur / lc).rotated(clampf(a, -step, step))
+	return dir * move_toward(lc, lt, rate)
+
 func _unhandled_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseButton and ev.pressed:
 		var mb := ev as InputEventMouseButton
@@ -71,10 +99,25 @@ func _physics_process(delta: float) -> void:
 	_wheel = 0
 	_update_target(cyc)
 	me.face_target = target if lock_on else null
-	var v := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	if menu_hold:
+		me.move_input = Vector3.ZERO
+		me.want_block = enabled and not me.mounted
+		me.want_sprint = false
+		me.want_charge = false
+		_smooth = Vector2.ZERO
+		_atk_hold = -1.0
+		_clear_buffer()
+		for k: String in _prev:
+			_prev[k] = Input.is_action_pressed(k) # al cerrar no se dispara lo pulsado en el menú
+		return
+	# Ronda 30: entrada fluida. Stick (mando o táctil): zona muerta RADIAL + curva de respuesta (girar
+	# el stick dibuja un círculo perfecto). Teclado: el vector se interpola ~0,08 s girando (W→D pasa
+	# por las diagonales) en vez de saltar de golpe.
+	var v := shape_stick(Input.get_vector("move_left", "move_right", "move_forward", "move_back", 0.0))
 	if joystick:
-		v += joystick.axis
-	v = v.limit_length(1.0)
+		v = (v + shape_stick(joystick.axis)).limit_length(1.0)
+	_smooth = smooth_input(_smooth, v, delta)
+	v = _smooth
 	var fwd := Vector3.FORWARD
 	if me.face_target:
 		# Movimiento relativo al rival (strafe)

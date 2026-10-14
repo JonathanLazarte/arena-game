@@ -6,11 +6,11 @@ extends Node3D
 ## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
 ## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
 ## Ronda 20: pestañas Herrero y Ajustes; cada panel tiene «✕» (y Esc / Atrás) para cerrarlo.
-const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Herrero", "Tienda", "Inventario", "Ajustes"]
-const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Artes"]
+const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Herrero", "Tienda", "Reclutar", "Inventario", "Ajustes"]
+const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Artes", "Accesorios"]
 const BUS_NAMES := {"Master": "General", "Música": "Música", "Efectos": "Efectos", "UI": "Interfaz"}
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
-const KIND_NAME := {"weapon": "arma", "eikon": "eikon", "armor": "armadura"}
+const KIND_NAME := {"weapon": "arma", "eikon": "eikon", "armor": "armadura", "trinket": "accesorio"}
 
 var gs: Node
 var stage: ShowcaseStage
@@ -118,17 +118,66 @@ func _swipe(dir: float) -> void:
 func cycle_character(d: int) -> void:
 	if modal.visible or tab == "Atributos":
 		return
-	var ids: Array = []
-	for c in Catalog.characters():
-		ids.append(c.id)
-	var i := ids.find(view_char)
+	# Ronda 30: solo tus personajes (sin escaparate de bloqueados); se recluta en «Reclutar»
+	var ids: Array = gs.unlocked_chars.duplicate()
+	if ids.size() < 2:
+		return
+	var i := maxi(ids.find(gs.character_id), 0)
 	view_char = ids[(i + d + ids.size()) % ids.size()]
-	if gs.is_unlocked("character", view_char):
-		gs.switch_character(view_char)
-		smith_sel = gs.weapon_id
+	gs.switch_character(view_char)
+	smith_sel = gs.weapon_id
 	_refresh_all()
 
-## Comprar el personaje que se está viendo: pide nombre.
+## Ronda 30: reclutar (pestaña «Reclutar»): clase elegida + nombre obligatorio.
+var recruit_sel: String = ""
+var recruit_name: LineEdit
+func recruit(id: String, nm: String) -> String:
+	var res: String = gs.buy_character(id, nm)
+	if res == "ok":
+		UIKit.sfx("confirm")
+		UIKit.audio("purchase")
+		gs.switch_character(id)
+		view_char = id
+		smith_sel = gs.weapon_id
+		recruit_sel = ""
+		show_toast("¡%s se une a ti!" % gs.char_name(id))
+		set_tab("")
+	else:
+		show_toast({"nombre": "Ponle un nombre", "nivel": "Necesitas nivel de cuenta %d" % Progression.CHAR_REQ[0], "oro": "Te falta oro", "ya": "Ya está contigo"}.get(res, res))
+	return res
+
+func _build_recruit() -> void:
+	var free: Array = []
+	for c in Catalog.characters():
+		if not gs.is_unlocked("character", c.id):
+			free.append(c)
+	if free.is_empty():
+		detail.text = "[b]Reclutar[/b]\nYa tienes a todos los combatientes."
+		return
+	if recruit_sel == "" or gs.is_unlocked("character", recruit_sel):
+		recruit_sel = free[0].id
+	for c: CharacterDef in free:
+		var b := _card("%s · %s" % [c.display_name, c.role], c.id == recruit_sel, false, func() -> void:
+			recruit_sel = c.id
+			_refresh_all(false))
+		b.name = "Recruit_" + c.id
+	recruit_name = LineEdit.new()
+	recruit_name.name = "RecruitName"
+	recruit_name.max_length = 16
+	recruit_name.placeholder_text = "Nombre del recluta"
+	recruit_name.custom_minimum_size = Vector2(370, 42)
+	list_box.add_child(recruit_name)
+	var rb := UIKit.big_button("Reclutar", 22)
+	rb.name = "RecruitOk"
+	rb.custom_minimum_size = Vector2(370, 52)
+	rb.disabled = true
+	recruit_name.text_changed.connect(func(t: String) -> void: rb.disabled = gs.clean_name(t) == "")
+	rb.pressed.connect(func() -> void: recruit(recruit_sel, recruit_name.text))
+	list_box.add_child(rb)
+	var c := Catalog.character(recruit_sel)
+	var r := Progression.req("character", recruit_sel)
+	detail.text = "[b]Reclutar · %s[/b] (%s)\n%s\nPasiva: %s\nCoste: %d oro · nivel de cuenta %d. Empieza en nivel 1 con su equipo inicial." % [c.display_name, c.role, c.passive_desc, c.passive_name, r[1], r[0]]
+
 func request_character(id: String) -> void:
 	var why: String = gs.can_buy("character", id)
 	if why != "ok":
@@ -257,9 +306,10 @@ func _build_ui() -> void:
 		d.visible = false
 		dots[t] = d
 	# Nombre bajo el pedestal
-	name_label = UIKit.title("", 38)
-	name_label.position = Vector2(250, 556)
-	name_label.size = Vector2(580, 50)
+	name_label = UIKit.title("", 30)
+	name_label.position = Vector2(370, 560)
+	name_label.size = Vector2(340, 44)
+	name_label.clip_text = true
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ui.add_child(name_label)
 	role_label = UIKit.label("", 19, UIKit.MUTED)
@@ -269,10 +319,12 @@ func _build_ui() -> void:
 	root_ui.add_child(role_label)
 	# Ronda 29: selector de personaje (‹ ›, flechas, deslizar rápido)
 	for d: int in [-1, 1]:
-		var ab := UIKit.button("‹" if d < 0 else "›", 34)
+		# Ronda 30: pequeños y pegados al nombre (antes quedaban tapados por el panel derecho)
+		var ab := UIKit.button("‹" if d < 0 else "›", 24)
 		ab.name = "CharPrev" if d < 0 else "CharNext"
-		ab.position = Vector2(250 + (-70 if d < 0 else 580 + 10), 556)
-		ab.custom_minimum_size = Vector2(60, 60)
+		ab.position = Vector2(326 if d < 0 else 714, 562)
+		ab.custom_minimum_size = Vector2(40, 40)
+		ab.size = Vector2(40, 40)
 		ab.pressed.connect(cycle_character.bind(d))
 		root_ui.add_child(ab)
 	# Panel derecho
@@ -446,6 +498,7 @@ func _item_name(kind: String, id: String) -> String:
 		"weapon": return Catalog.weapon(id).display_name
 		"eikon": return (load(Catalog.EIKONS[id]) as EikonData).eikon_name
 		"armor": return Catalog.armor(id).display_name
+		"trinket": return String(Trinkets.def(id).get("name", id))
 		"set":
 			for st: Dictionary in Catalog.armor_sets_for_sale():
 				if st["set_id"] == id: return "Conjunto " + String(st["set_name"])
@@ -537,10 +590,13 @@ func set_difficulty(d: String) -> void:
 
 func _refresh_all(rebuild: bool = true) -> void:
 	var c := Catalog.character(view_char)
-	var locked: bool = not gs.is_unlocked("character", view_char)
+	view_char = gs.character_id # ronda 30: el escaparate solo muestra a tus personajes
+	var locked := false
 	if rebuild:
 		var w := Catalog.weapon(gs.weapon_id) if not locked else Catalog.weapon(c.default_weapon)
 		stage.show_character(c, w, locked)
+		if stage.preview:
+			stage.preview.set_base_glow(Smithing.engraving_glow(int(gs.weapon_up.get(gs.weapon_id, 0)))) # ronda 30: grabado
 	stage.show_eikon(load(Catalog.EIKONS[gs.eikon_id]) if tab == "Eikons" else null)
 	for t: String in tab_buttons:
 		(tab_buttons[t] as Button).button_pressed = t == tab
@@ -560,8 +616,13 @@ func _refresh_all(rebuild: bool = true) -> void:
 	xp_bar.max_value = lp.y
 	xp_bar.value = lp.x
 	var cur := Catalog.character(gs.character_id)
-	name_label.text = gs.char_name(c.id) if not locked else c.display_name
-	role_label.text = ("%s · %s · Nivel %d · %s" % [c.display_name, c.role, gs.char_level(c.id), Catalog.weapon(gs.weapon_id).display_name]) if not locked else "%s · Bloqueado (%s) · toca Jugar para desbloquear" % [c.role, _lock_text("character", c.id)]
+	name_label.text = gs.display_name_with_title()
+	var cst: Dictionary = gs.char_stat()
+	role_label.text = "%s · %s · Nivel %d · %s · %d victorias" % [c.display_name, c.role, gs.char_level(c.id), Catalog.weapon(gs.weapon_id).display_name, cst["wins"]]
+	for ab: String in ["CharPrev", "CharNext"]:
+		var an := root_ui.get_node_or_null(ab)
+		if an:
+			an.visible = gs.unlocked_chars.size() > 1 and tab != "Personaje"
 	for ch in list_box.get_children():
 		ch.queue_free()
 	for ch in stats_box.get_children():
@@ -663,6 +724,8 @@ func _refresh_all(rebuild: bool = true) -> void:
 			_build_settings()
 		"Tienda":
 			_build_shop(cur)
+		"Reclutar":
+			_build_recruit()
 		"Inventario":
 			var e2: EikonData = load(Catalog.EIKONS[gs.eikon_id])
 			for ln: String in ["Personaje: %s (Nv %d)" % [cur.display_name, gs.char_level()], "Arma: " + gs.eff_weapon(gs.weapon_id).display_name,
@@ -711,13 +774,15 @@ func _card(text: String, selected: bool, locked: bool, cb: Callable, coin: bool 
 	return b
 
 func _build_shop(cur: CharacterDef) -> void:
-	var cats := HBoxContainer.new()
-	cats.add_theme_constant_override("separation", 6)
+	var cats := HFlowContainer.new() # ronda 30: 6 categorías, en dos filas si no caben
+	cats.custom_minimum_size = Vector2(370, 0)
+	cats.add_theme_constant_override("h_separation", 6)
+	cats.add_theme_constant_override("v_separation", 4)
 	list_box.add_child(cats)
 	for ct: String in SHOP_CATS:
 		var b := UIKit.button(ct, 12, UIKit.ORANGE if ct == shop_cat else UIKit.BLUE)
 		b.name = "Cat_" + ct
-		b.custom_minimum_size = Vector2(64, 40)
+		b.custom_minimum_size = Vector2(56, 34)
 		b.pressed.connect(func() -> void:
 			shop_cat = ct
 			_refresh_all(false))
@@ -755,6 +820,16 @@ func _build_shop(cur: CharacterDef) -> void:
 				var b := _card(t, false, true, buy_stone.bind(sid))
 				b.name = "Buy_stone_" + sid
 			detail.text = "[b]Tienda · Materiales[/b]\nPiedras de forja para mejorar armas en el Herrero. También se ganan en cada partida (más si ganas)."
+		"Accesorios":
+			for group: Array in [["Anillos", Trinkets.RINGS], ["Talismanes", Trinkets.TALISMANS]]:
+				list_box.add_child(UIKit.label(group[0], 15, UIKit.MUTED))
+				for tid: String in (group[1] as Dictionary):
+					var own: bool = gs.is_unlocked("trinket", tid)
+					var b := _card("%s%s" % [Trinkets.def(tid)["name"], "  ✔" if own else " — " + _lock_text("trinket", tid)], false, not own, request_purchase.bind("trinket", tid))
+					b.name = "Buy_trinket_" + tid
+					b.tooltip_text = String(Trinkets.def(tid)["desc"])
+					b.disabled = own
+			detail.text = "[b]Tienda · Accesorios[/b]\nAnillos (2 ranuras) y talismanes (3 ranuras): se equipan en la ficha del personaje."
 		"Artes":
 			for aid: String in WeaponArts.ORDER:
 				var a := WeaponArts.art(aid)
@@ -787,9 +862,6 @@ func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
 ## Empieza la partida 1v1 con el equipamiento elegido (rival aleatorio).
 func play() -> void:
 	if modal.visible:
-		return
-	if not gs.is_unlocked("character", view_char):
-		request_character(view_char) # ronda 29: el bloqueado se compra (con nombre)
 		return
 	gs.from_lobby = true
 	gs.random_rival = true
@@ -845,6 +917,7 @@ func _build_smith(cur: CharacterDef) -> void:
 		t += "Ataque [color=#f2dc99]%d[/color] → [color=#7dff8a]%d[/color] (+%d → +%d)\n" % [roundi(ar0), roundi(ar1), lv, lv + 1]
 		t += "Escalado %s → %s\n" % [Attributes.scaling_text(now), Attributes.scaling_text(nxt)]
 		t += "Coste: %d oro + %d× %s (tienes %d)\n" % [c["oro"], c["n"], Smithing.STONE_NAMES[c["piedra"]], gs.material(c["piedra"])]
+	t += "Grabado +%d%s\n" % [lv, " · [color=#9cc8ff]la hoja brilla[/color]" if lv >= Smithing.GLOW_LEVEL else " · brilla desde +%d" % Smithing.GLOW_LEVEL]
 	t += "Estado: %s" % _status_text(now)
 	detail.text = t
 	var up := UIKit.big_button("Mejorar" if lv < Smithing.MAX_LEVEL else "Máximo", 20)

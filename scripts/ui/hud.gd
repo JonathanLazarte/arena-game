@@ -4,6 +4,7 @@ extends CanvasLayer
 
 signal restart_requested
 signal lobby_requested
+signal menu_opened(open: bool) ## ronda 30
 var name_p: Label
 var name_e: Label
 
@@ -357,6 +358,7 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 	status_e = _status_rows(root_control(), Vector2(1280 - 420, 78), 150, "StatusEnemy")
 	status_over = _status_rows(root_control(), Vector2.ZERO, 60, "StatusOverTarget")
 	status_over_box = status_over["box"]
+	_build_pause_menu() # ronda 30
 	name_p.text = player.display_name
 	name_e.text = enemy.display_name
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
@@ -506,3 +508,114 @@ func _row(a: String, xp: String, gold: String, c: Color, fs: int) -> HBoxContain
 	return h
 
 
+
+
+# ---------------- Ronda 30: menú de pausa SIN pausa ----------------
+## Esc (o ≡ en Android) abre el menú. El juego NO se detiene (es 1v1 en tiempo real, como en los
+## soulslike): mientras está abierto tu personaje se queda quieto y en guardia.
+var pause_menu: Control
+var pause_settings: VBoxContainer
+var menu_button: Button
+
+func _build_pause_menu() -> void:
+	pause_menu = Control.new()
+	pause_menu.name = "PauseMenu"
+	pause_menu.visible = false
+	pause_menu.size = Vector2(1280, 720)
+	pause_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	root_control().add_child(pause_menu)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0.02, 0.08, 0.35)
+	dim.size = Vector2(1280, 720)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pause_menu.add_child(dim)
+	var p := UIKit.panel()
+	p.position = Vector2(440, 150)
+	p.custom_minimum_size = Vector2(400, 0)
+	pause_menu.add_child(p)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	p.add_child(v)
+	v.add_child(UIKit.title("MENÚ", 28, UIKit.YELLOW))
+	v.add_child(UIKit.label("El combate sigue: tu personaje se cubre", 14, UIKit.MUTED))
+	for it: Array in [["Continuar", "PauseContinue", close_pause], ["Ajustes", "PauseSettings", func() -> void: pause_settings.visible = not pause_settings.visible],
+			["Salir al lobby", "PauseExit", func() -> void:
+				close_pause()
+				lobby_requested.emit()]]:
+		var b := UIKit.button(it[0], 20)
+		b.name = it[1]
+		b.custom_minimum_size = Vector2(380, 50)
+		b.pressed.connect(it[2])
+		v.add_child(b)
+	pause_settings = VBoxContainer.new()
+	pause_settings.name = "PauseSettingsBox"
+	pause_settings.visible = false
+	v.add_child(pause_settings)
+	var au := get_node_or_null("/root/Audio")
+	var row := HBoxContainer.new()
+	row.add_child(UIKit.label("Cámara", 16))
+	var cs := HSlider.new()
+	cs.name = "PauseCamSens"
+	cs.min_value = 0.2
+	cs.max_value = 3.0
+	cs.step = 0.1
+	cs.value = CameraRig.sensitivity
+	cs.custom_minimum_size = Vector2(260, 30)
+	cs.value_changed.connect(func(x: float) -> void:
+		CameraRig.sensitivity = x
+		if au: au.save_settings())
+	row.add_child(cs)
+	pause_settings.add_child(row)
+	var vrow := HBoxContainer.new()
+	vrow.add_child(UIKit.label("Volumen", 16))
+	var vs := HSlider.new()
+	vs.name = "PauseVolume"
+	vs.min_value = 0.0
+	vs.max_value = 1.0
+	vs.step = 0.05
+	vs.value = au.get_volume("Master") if au else 1.0
+	vs.custom_minimum_size = Vector2(260, 30)
+	vs.value_changed.connect(func(x: float) -> void:
+		if au: au.set_volume("Master", x))
+	vrow.add_child(vs)
+	pause_settings.add_child(vrow)
+	var inv := CheckBox.new()
+	inv.name = "PauseInvertY"
+	inv.text = "Invertir Y"
+	inv.button_pressed = CameraRig.invert_y
+	inv.toggled.connect(func(on: bool) -> void:
+		CameraRig.invert_y = on
+		if au: au.save_settings())
+	pause_settings.add_child(inv)
+	menu_button = UIKit.button("≡", 22)
+	menu_button.name = "MenuButton"
+	menu_button.position = Vector2(1280 - 56, 100)
+	menu_button.custom_minimum_size = Vector2(44, 44)
+	menu_button.pressed.connect(toggle_pause)
+	root_control().add_child(menu_button)
+
+func is_pause_open() -> bool:
+	return pause_menu != null and pause_menu.visible
+
+func toggle_pause() -> void:
+	if is_pause_open():
+		close_pause()
+	else:
+		open_pause()
+
+func open_pause() -> void:
+	if pause_menu == null or end_panel.visible:
+		return
+	pause_menu.visible = true
+	pause_settings.visible = false
+	if controller:
+		controller.menu_hold = true
+	menu_opened.emit(true)
+
+func close_pause() -> void:
+	if pause_menu == null:
+		return
+	pause_menu.visible = false
+	if controller:
+		controller.menu_hold = false
+	menu_opened.emit(false)

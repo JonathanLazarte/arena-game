@@ -7,9 +7,12 @@ extends Control
 signal attributes_requested
 signal changed
 
-const SLOTS := ["arma", "arma2", "casco", "pecho", "guantes", "piernas", "eikon"]
-const SLOT_NAMES := {"arma": "Arma principal", "arma2": "Arma secundaria", "casco": "Casco", "pecho": "Pecho",
-	"guantes": "Guantes", "piernas": "Piernas", "eikon": "Eikon"}
+const SLOTS := ["titulo", "arma", "arma2", "casco", "pecho", "guantes", "piernas", "eikon"]
+const SLOT_NAMES := {"titulo": "Título", "arma": "Arma principal", "arma2": "Arma secundaria", "casco": "Casco", "pecho": "Pecho",
+	"guantes": "Guantes", "piernas": "Piernas", "eikon": "Eikon",
+	"anillo0": "Anillo 1", "anillo1": "Anillo 2", "talisman0": "Talismán 1", "talisman1": "Talismán 2", "talisman2": "Talismán 3"}
+## Ronda 30: ranuras de accesorio (sin modelo 3D)
+const TRINKET_SLOTS := ["anillo0", "anillo1", "talisman0", "talisman1", "talisman2"]
 
 var gs: Node
 var left: RichTextLabel
@@ -75,12 +78,28 @@ func build(game_state: Node) -> void:
 		var b := UIKit.button("", 15)
 		b.name = "Slot_" + s
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(320, 50)
+		b.custom_minimum_size = Vector2(320, 34)
 		b.clip_text = true
 		b.pressed.connect(open_picker.bind(s))
 		slot_box.add_child(b)
 		slot_buttons[s] = b
+	# Ronda 30: anillos (2) y talismanes (3), botones compactos
+	for row_slots: Array in [["anillo0", "anillo1"], ["talisman0", "talisman1", "talisman2"]]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 4)
+		slot_box.add_child(row)
+		for ts: String in row_slots:
+			var tb := UIKit.button("", 12)
+			tb.name = "Slot_" + ts
+			tb.clip_text = true
+			tb.custom_minimum_size = Vector2((320 - 4 * (row_slots.size() - 1)) / row_slots.size(), 36)
+			tb.pressed.connect(open_picker.bind(ts))
+			row.add_child(tb)
+			slot_buttons[ts] = tb
 	_build_picker()
+
+static func trinket_slot(s: String) -> Array:
+	return ["ring" if s.begins_with("anillo") else "talisman", int(s.right(1))]
 
 func _build_picker() -> void:
 	picker = Control.new()
@@ -143,6 +162,10 @@ func _cur_id(s: String) -> String:
 		"arma": return gs.weapon_id
 		"arma2": return gs.weapon2_id
 		"eikon": return gs.eikon_id
+		"titulo": return gs.title_id()
+	if s in TRINKET_SLOTS:
+		var ks := trinket_slot(s)
+		return String((gs.rings_eq if ks[0] == "ring" else gs.talismans_eq)[ks[1]])
 	return String(gs.armor_eq.get(s, ""))
 
 func _item_name(s: String, id: String) -> String:
@@ -151,6 +174,8 @@ func _item_name(s: String, id: String) -> String:
 	match s:
 		"arma", "arma2": return Catalog.weapon(id).display_name
 		"eikon": return (load(Catalog.EIKONS[id]) as EikonData).eikon_name
+	if s in TRINKET_SLOTS or s == "titulo":
+		return String(Trinkets.def(id).get("name", id))
 	var a := Catalog.armor(id)
 	return a.display_name if a else id
 
@@ -170,6 +195,13 @@ func options(s: String) -> Array:
 		"eikon":
 			for id: String in Catalog.EIKONS:
 				if id in gs.owned_eikons: out.append(id)
+		"titulo":
+			out.append("")
+			out.append_array(gs.earned_titles())
+		"anillo0", "anillo1", "talisman0", "talisman1", "talisman2":
+			out.append("")
+			for id: String in gs.owned_trinkets:
+				if Trinkets.kind(id) == trinket_slot(s)[0]: out.append(id)
 		_:
 			out.append("")
 			for a in Catalog.armors():
@@ -187,7 +219,7 @@ func sheet_with(s: String, id: String) -> Dictionary:
 			w = Catalog.weapon(id)
 			if w2 and w2.ranged == w.ranged: w2 = null
 		"arma2": w2 = Catalog.weapon(id) if id != "" else null
-		"eikon": pass
+		"eikon", "titulo", "anillo0", "anillo1", "talisman0", "talisman1", "talisman2": pass
 		_: arm[s] = id
 	var sh := EquipStats.sheet(c, gs.char_level(), gs.char_attrs(), w, w2, EquipStats.armor_defs(arm))
 	sh["ar"] = EquipStats.attack_rating(c, w, gs.char_attrs(), Progression.combine_mods(gs.char_skills())["dano"])
@@ -238,6 +270,20 @@ func diff_text(s: String, id: String) -> String:
 				t += "[color=#ff8a7a]⚠ No cumples los requisitos (−30 %% de daño)[/color]\n"
 		t += _cmp("Ataque principal", a["ar"]["total"], b["ar"]["total"], "%.1f")
 		t += _cmp("Ataque secundario", a["ar2"]["total"], b["ar2"]["total"], "%.1f")
+	if s == "titulo":
+		t += String(Titles.def(id).get("desc", "Sin título.")) + "\n"
+		for tid: String in Titles.ORDER:
+			if not tid in gs.earned_titles():
+				t += "[color=#8a93a8]🔒 %s — %s[/color]\n" % [Titles.def(tid)["name"], Titles.def(tid)["desc"]]
+		return t
+	if s in TRINKET_SLOTS:
+		var td := Trinkets.def(id)
+		t += String(td.get("desc", "Ranura vacía.")) + "\n"
+		var ks := trinket_slot(s)
+		var other := (gs.rings_eq if ks[0] == "ring" else gs.talismans_eq) as Array
+		if id != "" and other.find(id) >= 0 and other.find(id) != ks[1]:
+			t += "[color=#f2dc99]Ya está en otra ranura: se moverá aquí.[/color]\n"
+		return t
 	if s == "eikon":
 		var ed: EikonData = load(Catalog.EIKONS[id])
 		t += "%s\n%s · elemento %s" % [ed.description, "montable" if ed.rideable else "compañero", EquipStats.TYPE_NAMES[EquipStats.EIKON_ELEMENT.get(id, "fisico")]]
@@ -274,6 +320,10 @@ func equip(s: String, id: String) -> bool:
 				gs.eikon_id = id
 				gs.save_loadout()
 				ok = true
+		"titulo": ok = gs.set_title(id)
+		"anillo0", "anillo1", "talisman0", "talisman1", "talisman2":
+			var ks := trinket_slot(s)
+			ok = gs.equip_trinket(ks[0], ks[1], id)
 		_: ok = gs.equip_armor(s, id)
 	if ok:
 		UIKit.sfx("confirm")
@@ -290,7 +340,10 @@ func refresh() -> void:
 	var pts: int = gs.attr_points()
 	attr_button.text = "ATRIBUTOS  +%d" % pts if pts > 0 else "ATRIBUTOS"
 	attr_dot.visible = pts > 0
-	var t := "[b]%s[/b] · %s\n[color=#f2dc99]Nivel %d[/color] · %d/%d XP\n" % [c.display_name, c.role, gs.char_level(),
+	var cs: Dictionary = gs.char_stat()
+	var t := "[b]%s[/b] · %s %s\n" % [gs.display_name_with_title(), c.display_name, c.role]
+	t += "Jugado %s · Victorias %d / %d\n" % [gs.hours_text(cs["secs"]), cs["wins"], cs["matches"]]
+	t += "[color=#f2dc99]Nivel %d[/color] · %d/%d XP\n" % [gs.char_level(),
 		Progression.level_progress(int(gs.char_xp.get(c.id, 0))).x, Progression.level_progress(int(gs.char_xp.get(c.id, 0))).y]
 	for k: String in Attributes.KEYS:
 		t += "%s [b]%d[/b]%s" % [Attributes.NAMES[k], at[k], "\n" if Attributes.KEYS.find(k) % 2 == 1 else "   "]
@@ -328,5 +381,16 @@ func refresh() -> void:
 	s += "%s\n" % sh["roll"]["name"]
 	s += "Poder mágico %.0f · Curación %.0f %% · Eikon %.0f %%" % [ad["magia"], ad["curacion"] * 100.0, ad["eikon"] * 100.0]
 	stats.text = s
+	for sl: String in TRINKET_SLOTS:
+		var nm := _item_name(sl, _cur_id(sl))
+		(slot_buttons[sl] as Button).text = nm if _cur_id(sl) != "" else SLOT_NAMES[sl] + ": —"
+		(slot_buttons[sl] as Button).tooltip_text = String(Trinkets.def(_cur_id(sl)).get("desc", ""))
+	var tr: Array = gs.equipped_trinkets()
+	if not tr.is_empty():
+		var tn: Array = []
+		for id: String in tr:
+			tn.append(String(Trinkets.def(id)["name"]))
+		s += "\n[color=#f2dc99]Accesorios:[/color] " + ", ".join(tn)
+		stats.text = s
 	for sl: String in SLOTS:
 		(slot_buttons[sl] as Button).text = "%s:  %s" % [SLOT_NAMES[sl], _item_name(sl, _cur_id(sl))]

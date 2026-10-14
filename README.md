@@ -690,3 +690,26 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - **Regla soulslike aplicada.** El ataque solo sigue al objetivo durante la anticipación. En los frames activos y en la recuperación su dirección queda fijada.
 - **HUD del rival.** Solo muestra la vida y los estados, sin aguante ni barra de eikon.
 - Pruebas: `tests/test_round29.gd`, más ajustes en test_purchase, test_first_run, test_magic/test_smithing (versión de partida) y test_round25 (el rival ya no puede colocarse fuera de la arena).
+
+## Ronda 30
+
+- **Movimiento fluido.**
+  - Teclado: el vector de entrada se interpola en unos 0,08 s girando, así que W→D pasa por las diagonales.
+  - Stick (mando o táctil): zona muerta radial y curva de respuesta (`PlayerController.shape_stick`). Al girar el stick se dibuja un círculo perfecto.
+  - A pie se gira con velocidad angular fija (`Fighter.TURN_RATE_DEG` = 800°/s).
+  - La velocidad gira hacia la dirección deseada sin caer a cero (`_steer_velocity`); solo frena en inversiones de más de 150°. El cuerpo se inclina hacia el giro.
+- **Propiedad de personajes.**
+  - Al empezar eliges UNO y le pones nombre.
+  - Los demás se consiguen en la pestaña **Reclutar**: clase y nombre obligatorio, con coste de oro y nivel de cuenta.
+  - El selector ‹ › solo recorre tus personajes; no hay escaparate de bloqueados. Las flechas son pequeñas y están junto al nombre, fuera del panel derecho.
+  - Solo se cambia de personaje en el lobby.
+- **Ficha personal (pestaña Personaje).** Nombre con título, nivel, tiempo jugado, victorias/partidas, estadísticas y equipo.
+- **Menú con Esc (≡ en Android).** Continuar, Ajustes (cámara, volumen, invertir Y) y Salir al lobby. **No pausa el juego**: mientras está abierto tu personaje se queda quieto y en guardia, y el ratón queda libre.
+- **Anillos (2 ranuras) y talismanes (3 ranuras)**, sin modelo 3D. Se compran en Tienda → Accesorios y se equipan en la ficha. Efectos: daño por subtipo físico, equilibrio, aguante al desviar, fotogramas de invulnerabilidad en la voltereta, menos gasto de aguante y medidor de eikon más rápido. Se guardan por personaje.
+- **Títulos.** Se ganan con la ficha (victorias, partidas, nivel, horas). Uno por personaje; se muestra junto al nombre (lobby y HUD) y da una bonificación pequeña.
+- **Grabado del arma.** Es el nivel de mejora de la herrería (+1…+10). Desde **+5** la hoja brilla, con más intensidad cuanto más alto es el nivel.
+- **Partida v10.** Migración desde v9: sin accesorios, ficha y títulos a cero; personajes y equipo intactos.
+- **Recursos de prueba.** `GameState.DEBUG_GRANT = true` (en `scripts/game_state.gd`) da una vez por perfil 500 000 de oro, 5000 cristales, piedras de forja (60/60/60/15) y todos los accesorios. **Ponlo en `false` antes de publicar.** También se puede forzar con `godot -- --debug-grant` o desactivar con `-- --no-debug-grant`. Las pruebas automáticas no lo reciben.
+- **Erika.** No hay ningún modelo «Erika» en el proyecto, en su historial ni en el repositorio de origen de las animaciones, así que no se añadió ese personaje (ver informe).
+- El movimiento fluido es del jugador (`Fighter.fluid`); la IA mantiene su conducción clásica (con la fluida rodeaba por la espalda demasiado: test_ai 23–25 %; así vuelve a 12 %).
+- Pruebas: `tests/test_round30.gd`.

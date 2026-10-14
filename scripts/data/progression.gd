@@ -88,6 +88,9 @@ static func req(kind: String, id: String) -> Array:
 		"character": return CHAR_REQ
 		"weapon": return WEAPON_REQ.get(id, [1, 0])
 		"eikon": return EIKON_REQ.get(id, [1, 0])
+		"trinket":
+			var t := Trinkets.def(id)
+			return [int(t.get("level", 1)), int(t.get("price", 0))] if not t.is_empty() else [1, 0]
 		"armor":
 			var a := Catalog.armor(id)
 			return [a.level, a.price] if a else [1, 0]
