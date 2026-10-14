@@ -15,7 +15,8 @@ var source: Node3D ## quien lo lanza (para take_hit)
 var radius: float = 5.0
 var telegraph: float = 0.6 ## s de aviso antes de detonar
 var damage: float = 20.0
-var stun_time: float = 0.5 ## derribo breve a los alcanzados
+var stun_time: float = 0.5 ## (ronda 31: sin uso; ver stun_force)
+var stun_force: float = StunRules.AOE_FORCE ## ronda 31: fuerza acumulada
 var knock: float = 9.0
 var t: float = 0.0
 var detonated: bool = false
@@ -113,12 +114,15 @@ func _detonate() -> void:
 			if n is Fighter:
 				(n as Fighter).aoe_jumped += 1
 			continue
+		if n is Fighter:
+			(n as Fighter).incoming_stun_force = stun_force
 		var res: String = n.take_hit(damage, source if is_instance_valid(source) else self, "aoe")
+		if n is Fighter:
+			(n as Fighter).incoming_stun_force = -1.0
 		results[n] = res
 		if res == "hit" and n is Fighter:
 			var f := n as Fighter
 			var away := MeshUtil.flat(f.global_position - global_position)
 			f.apply_knockback((away.normalized() if away.length() > 0.1 else f.facing) * knock, false)
-			f.apply_stun(stun_time)
 	if is_instance_valid(source) and source is Fighter:
 		(source as Fighter).impact.emit(1.0)

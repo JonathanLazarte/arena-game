@@ -54,7 +54,7 @@ const CURVES := {
 	"escala": [[20, 0.02], [40, 0.01], [60, 0.004]],     # Fuerza/Destreza/Sabiduría/Devoción (daño de arma)
 	"impacto": [[30, 0.015], [50, 0.006], [60, 0.002]],  # Fuerza: equilibrio/guardia
 	"aturdir": [[30, 0.01], [50, 0.004], [60, 0.001]],   # Fuerza: aturdimiento infligido
-	"velocidad": [[30, 0.006], [50, 0.002], [60, 0.0005]],# Destreza: ataque/disparo
+	"velocidad": [[25, 0.008], [40, 0.005], [60, 0.003]],# Destreza (r31: tope +25 %, cuesta más)
 	"voltereta": [[30, 0.008], [50, 0.003], [60, 0.001]],# Destreza: coste de voltereta
 	"iframes": [[30, 0.07], [50, 0.03], [60, 0.01]],     # Destreza: frames (a 30 fps) de invulnerabilidad
 	"magia": [[30, 4.0], [50, 2.0], [60, 0.5]],          # Sabiduría
@@ -148,7 +148,7 @@ static func derived(char_id: String, a: Dictionary) -> Dictionary:
 		"energia_regen": maxf(5.0 + rel("energia_regen", con, s["concentracion"]), 2.0),
 		"impacto": clampf(1.0 + rel("impacto", fue, s["fuerza"]), 0.85, 1.5),
 		"stun_dealt": clampf(1.0 + rel("aturdir", fue, s["fuerza"]), 0.9, 1.35),
-		"vel": clampf(1.0 + rel("velocidad", des, s["destreza"]), 0.95, 1.16),
+		"vel": clampf(1.0 + rel("velocidad", des, s["destreza"]), 0.95, 1.25),
 		"roll_cost": clampf(1.0 - rel("voltereta", des, s["destreza"]), 0.75, 1.1),
 		"iframes": clampi(int(round(rel("iframes", des, s["destreza"]))), 0, 2),
 		"magia": 100.0 + rel("magia", sab, s["sabiduria"]),

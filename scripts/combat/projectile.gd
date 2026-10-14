@@ -19,6 +19,11 @@ var kind: String = "arrow" ## "arrow" (el escudo la anula) o "eikon" (el escudo 
 ## distancia lo esquiva. Durante los i-frames de la voltereta lo atraviesa (take_hit = "dodge").
 var aimed_at: Node3D = null
 var hitstun: float = 0.0 ## Ronda 17: aturdimiento del proyectil (flecha 0,25 / virote 0,45) ## a quién se apuntó al disparar (solo informativo)
+var stun_force: float = -1.0 ## ronda 31: fuerza de aturdimiento (-1 = la del tirador)
+## Ronda 31: autoseguimiento limitado (tajos mágicos): gira home_rate rad/s durante home_time s.
+var home_target: Node3D = null
+var home_rate: float = 0.0
+var home_time: float = 0.0
 var element: String = "" ## ronda 21: elemento del hechizo ("" = según el tirador)
 var status: Dictionary = {} ## ronda 21: acumulación de estado del hechizo
 var dodged_by: Array = [] ## objetivos que lo esquivaron con i-frames (no les vuelve a golpear)
@@ -47,6 +52,16 @@ func _physics_process(delta: float) -> void:
 	if not _oriented:
 		_oriented = true
 		_orient()
+	if home_time > 0.0 and is_instance_valid(home_target) and home_rate > 0.0:
+		home_time -= delta
+		var want: Vector3 = home_target.get_hit_center() - global_position
+		want.y *= 0.3
+		if want.length() > 0.2:
+			var ang := direction.angle_to(want.normalized())
+			var ax := direction.cross(want.normalized())
+			if ang > 0.001 and ax.length() > 0.0001:
+				direction = direction.rotated(ax.normalized(), minf(ang, home_rate * delta)).normalized()
+				_orient()
 	global_position += direction * speed * delta
 	life -= delta
 	var p := global_position
@@ -66,7 +81,11 @@ func _physics_process(delta: float) -> void:
 			if t is Fighter and (element != "" or not status.is_empty()):
 				(t as Fighter).incoming_element = element
 				(t as Fighter).incoming_status = status
+			if stun_force >= 0.0 and t is Fighter:
+				(t as Fighter).incoming_stun_force = stun_force
 			var res: String = t.take_hit(damage, shooter, kind)
+			if t is Fighter:
+				(t as Fighter).incoming_stun_force = -1.0
 			if res == "dodge":
 				dodged_by.append(t) # lo atraviesa durante los i-frames y sigue de largo
 				continue

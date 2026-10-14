@@ -379,6 +379,7 @@ func refresh() -> void:
 	var filled := int(clampf(pct / 100.0, 0.0, 1.0) * 30.0)
 	s += "[color=%s]%s[/color][color=#3a4660]%s[/color]\n" % [col, "█".repeat(filled), "█".repeat(30 - filled)]
 	s += "%s\n" % sh["roll"]["name"]
+	s += "Vel. de ataque: [b]%.0f %%[/b] (con Destreza)\n" % (ad["vel"] * 100.0) # ronda 31
 	s += "Poder mágico %.0f · Curación %.0f %% · Eikon %.0f %%" % [ad["magia"], ad["curacion"] * 100.0, ad["eikon"] * 100.0]
 	stats.text = s
 	for sl: String in TRINKET_SLOTS:

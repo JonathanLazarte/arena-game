@@ -87,16 +87,18 @@ func _run() -> void:
 	var ch := base - e.health
 	check(is_equal_approx(ch, normal * 1.15) and p.counter_hits == 1, "contraataque: x1,15 de daño (%.2f vs %.2f)" % [ch, normal])
 	await fresh(p, e)
-	e.poise = 1000.0
+	e.poise_max = 1.0e5 # ronda 31: se mide la fuerza acumulada (stun_acc)
+	e._reset_stun_meter()
 	e.take_hit(10.0, p, "melee")
-	var pn := 1000.0 - e.poise
+	var pn := e.stun_acc
 	await fresh(p, e)
-	e.poise = 1000.0
+	e.poise_max = 1.0e5
+	e._reset_stun_meter()
 	e.attack_heavy()
 	await physics_frame
 	e.take_hit(10.0, p, "melee")
-	var pc := 1000.0 - e.poise
-	check(pc > pn * 1.4, "contraataque: x1,3 de equilibrio (y x1,15 del daño): %.1f vs %.1f" % [pc, pn])
+	var pc := e.stun_acc
+	check(pc > pn * 1.25, "contraataque: x1,3 de equilibrio (y x1,15 del daño): %.1f vs %.1f" % [pc, pn])
 	# 2. Contra de guardia
 	await fresh(p, e)
 	p.want_block = true
@@ -135,7 +137,9 @@ func _run() -> void:
 		if e.stance_broken_t > 0.0:
 			break
 		e.stun = 0.0
-		e.poise = maxf(e.poise, 1.0)
+		e.stun_immune_t = 0.0 # ronda 31: sin inmunidad de derribo para medir la postura
+		e.down_t = 0.0
+		e._reset_stun_meter()
 	check(e.stance_broken_t > 0.0 and hits > 3, "postura rota tras %d golpes (x%.1f del equilibrio)" % [hits, Fighter.STANCE_MULT])
 	await physics_frame
 	check(e.stun > 1.0 and e.stance_breaks == 1, "rival expuesto ~1,2 s (%.2f, %d)" % [e.stun, e.stance_breaks])

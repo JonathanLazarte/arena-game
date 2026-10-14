@@ -45,7 +45,7 @@ func _run() -> void:
 	maxed["aguante"] = 60
 	maxed["fuerza"] = 60
 	var mx := Attributes.derived("caballero", maxed)
-	check(mx["vel"] <= 1.16 and mx["iframes"] <= 2 and mx["stun_taken"] >= 0.6 and mx["stun_dealt"] <= 1.35, "topes de seguridad (vel %.2f, i-frames %d, robustez %.2f)" % [mx["vel"], mx["iframes"], mx["stun_taken"]])
+	check(mx["vel"] <= 1.25 and mx["iframes"] <= 2 and mx["stun_taken"] >= 0.6 and mx["stun_dealt"] <= 1.35, "topes de seguridad (vel %.2f, i-frames %d, robustez %.2f)" % [mx["vel"], mx["iframes"], mx["stun_taken"]])
 	check(mx["iframes"] >= 1, "Destreza alta: +1 a +2 frames de invulnerabilidad (%d)" % mx["iframes"])
 	check(hi["vida"] > 0.0, "nivel 30 auto: más vida (%.0f)" % hi["vida"])
 	# --- Escalado y requisitos ---
@@ -140,25 +140,23 @@ func _run() -> void:
 		f.poise = f.poise_max
 		f.max_health = 9999.0
 		f.health = 9999.0
-	p.take_hit(1.0, e, "melee")
-	var base_hs := p.last_hitstun
-	p.stun = 0.0
+	# Ronda 31: el aturdimiento es acumulado; Aguante sube la robustez y Fuerza la fuerza del golpe
+	p.poise_max = 50.0
+	var base_r := p.robustness()
 	var tough := Attributes.start_for("caballero")
 	tough["aguante"] = 35
 	p.set_attributes(tough)
 	p._refresh_derived()
-	p.take_hit(1.0, e, "melee")
-	var tough_hs := p.last_hitstun
-	p.stun = 0.0
-	check(base_hs > 0.0 and tough_hs < base_hs * 0.85, "Aguante acorta el aturdimiento recibido (%.3f -> %.3f s)" % [base_hs, tough_hs])
+	var tough_r := p.robustness()
+	check(tough_r > base_r * 1.15, "Aguante sube la robustez (%.1f -> %.1f)" % [base_r, tough_r])
 	p.set_attributes({})
 	p._refresh_derived()
+	var base_f := e.hit_stun_force()
 	var strong := e.attributes().duplicate()
 	strong["fuerza"] = 35
 	e.set_attributes(strong)
 	e._refresh_derived()
-	p.take_hit(1.0, e, "melee")
-	check(p.last_hitstun > base_hs * 1.15, "Fuerza alarga el aturdimiento infligido (%.3f -> %.3f s)" % [base_hs, p.last_hitstun])
+	check(e.hit_stun_force() > base_f * 1.15, "Fuerza sube la fuerza de aturdimiento (%.1f -> %.1f)" % [base_f, e.hit_stun_force()])
 	p.stun = 0.0
 	var ie0 := p.roll_iframe_end()
 	var rc0: float = p.ad["roll_cost"]

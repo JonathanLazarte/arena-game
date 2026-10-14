@@ -44,6 +44,7 @@ func _ready() -> void:
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "trinkets": gs.equipped_trinkets()})
 		player.set_magic(gs.equipped_spells(), gs.weapon_art()) # ronda 21
+		player.set_boss_abilities(gs.boss_abilities()) # ronda 31
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
 	if gs and gs.random_rival:
@@ -54,6 +55,9 @@ func _ready() -> void:
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(rc.id, gs.char_level())}) # ronda 19
 	else:
 		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), EIKONS[1 + randi() % 2])
+	var pool: Array = BossAbilities.ORDER.duplicate()
+	pool.shuffle()
+	enemy.set_boss_abilities(pool.slice(0, BossAbilities.MAX_EQUIPPED)) # ronda 31: el rival lleva 3 al azar
 	player.opponent = enemy
 	player.impact.connect(_on_impact)
 	enemy.impact.connect(func(_s: float) -> void: pass)

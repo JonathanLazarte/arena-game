@@ -20,11 +20,12 @@ signal counter_landed(target: Node3D)
 ## Ronda 25: habilidad de jefe «Estocada de jefe» (telegrafiada, invulnerable, castigable)
 signal boss_started
 enum Boss { NONE, CHARGE, LUNGE, RECOVER }
-const BOSS_CHARGE := 2.0 ## carga visible (pose, brillo y partículas en la hoja, sonido que sube)
-const BOSS_TRACK := 1.2 ## sigue al objetivo los primeros 1,2 s; luego fija la dirección
-const BOSS_DIST := 7.5 ## recorrido fijo de la embestida
-const BOSS_SPEED := 24.0 ## m/s (≈0,31 s de embestida)
-const BOSS_REACH := 1.6
+const BOSS_CHARGE := 1.6 ## carga visible (pose, brillo y partículas en la hoja, sonido que sube)
+const BOSS_TRACK := 1.6 ## ronda 31: sigue al objetivo TODA la carga (no se esquiva caminando)
+const BOSS_DIST := 12.0 ## ronda 31: más alcance (antes 7,5)
+const BOSS_SPEED := 30.0 ## m/s (0,4 s de embestida)
+const BOSS_HOME_DEG := 140.0 ## ronda 31: corrección de dirección durante la embestida (°/s)
+const BOSS_REACH := 1.8
 const BOSS_ARC_DEG := 35.0
 const BOSS_DMG_MULT := 1.6 ## x daño fuerte del arma
 const BOSS_POISE := 3.0
@@ -278,6 +279,7 @@ var shot_dur: float = 0.0
 var shots_fired: int = 0
 var shot_cut_sprint: bool = false ## el disparo cortó la carrera (el control apaga «Correr»)
 var incoming_arrow_stun: float = 0.0 ## lo fija el proyectil justo antes de impactar
+var incoming_stun_force: float = -1.0 ## ronda 31: fuerza de aturdimiento fijada por quien golpea (-1 = calcular)
 var last_hitstun: float = 0.0
 var rider_yaw: float = 0.0 ## giro del jinete sobre la silla respecto a la montura (rad)
 var run_away: bool = false
@@ -664,7 +666,7 @@ func phys_now() -> String:
 func is_grounded() -> bool:
 	if mounted and mount_node and mount_node.is_flying():
 		return false
-	return not airborne and global_position.y < GroundAoE.GROUND_HEIGHT
+	return not airborne and not ab_air and global_position.y < GroundAoE.GROUND_HEIGHT
 
 func is_dash_striking() -> bool:
 	return atk_state != Atk.NONE and (_ds_visual or atk_dash)
@@ -847,8 +849,7 @@ func _physics_process(delta: float) -> void:
 				died.emit(self)
 	_status_flash = maxf(_status_flash - delta, 0.0)
 	_since_hit += delta
-	if _since_hit > 1.5:
-		poise = minf(poise + POISE_REGEN * delta, poise_max)
+	_update_stun_meter(delta) # ronda 31: ventana de acumulación (sustituye a la regeneración de poise)
 	# Pasiva "Luz sanadora": se cura si lleva 3 s sin recibir golpes
 	if character.passive_id == "luz_sanadora" and alive and _since_hit > 3.0 and health < max_health:
 		var hv := minf(2.0 * passive_k() * float(ad["curacion"]) * delta, max_health - health)
@@ -879,6 +880,7 @@ func _physics_process(delta: float) -> void:
 	_update_magic(delta)
 	_update_exchange(delta)
 	_update_boss(delta)
+	_update_ability(delta)
 	var was_dashing := dash_time > 0.0
 	dash_time = maxf(dash_time - delta, 0.0)
 	if roll_t >= 0.0:
@@ -898,8 +900,10 @@ func _physics_process(delta: float) -> void:
 	invuln = maxf(invuln - delta, 0.0)
 	var st := stats()
 	var inp := move_input
-	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0 or crit_t >= 0.0 or boss_phase != Boss.NONE:
+	if not alive or stun > 0.0 or special_t > 0.0 or cast_t > 0.0 or crit_t >= 0.0 or boss_phase != Boss.NONE or (ab_id != "" and ab_id != "escudo_mana"):
 		inp = Vector3.ZERO
+	elif ab_id == "escudo_mana":
+		inp *= 0.5 # ronda 31: con el escudo de maná te mueves despacio
 	var wb := want_block and alive and stun <= 0.0 and roll_t < 0.0 and loadout == Loadout.SWORD_SHIELD and swap_t <= 0.0 and atk_state == Atk.NONE and parry_state == Parry.NONE
 	if wb and not blocking:
 		block_time = 0.0
@@ -1000,6 +1004,9 @@ func _physics_process(delta: float) -> void:
 		v = _step_velocity(delta)
 		if v != Vector3.ZERO:
 			planar_vel = Vector3.ZERO
+	elif ab_id != "" and ab_id != "escudo_mana":
+		v = ab_vel
+		planar_vel = Vector3.ZERO
 	elif roll_t >= 0.0:
 		v = _roll_velocity()
 		planar_vel = v
@@ -1148,7 +1155,7 @@ func add_meter(v: float) -> void:
 	meter_changed.emit(meter)
 
 func _can_act() -> bool:
-	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0 and crit_t < 0.0 and boss_phase == Boss.NONE
+	return alive and stun <= 0.0 and exhausted <= 0.0 and land_t <= 0.0 and special_t <= 0.0 and cast_t <= 0.0 and crit_t < 0.0 and boss_phase == Boss.NONE and ab_id == ""
 
 ## ¿Está t dentro del arco de la espada?
 func in_sword_arc(t: Node3D) -> bool:
@@ -1440,14 +1447,21 @@ func _update_shot(delta: float) -> void:
 		return
 	shot_t += delta
 	if shot_t < shot_dur:
+		_hold_t = 0.0
+		return
+	# Ronda 31: tensado completo y botón mantenido: se carga hasta CHARGE_HOLD (sale solo al tope)
+	if shot_state == Shot.DRAW and want_shot_hold and _hold_t < CHARGE_HOLD - 0.001:
+		_hold_t += delta
 		return
 	var r := ranged()
 	shot_t = 0.0
 	match shot_state:
 		Shot.DRAW:
-			_release_shot()
+			# Ronda 31: mantener = espera CHARGE_HOLD s más y sale cargado; soltar antes = normal.
+			shot_charged = _hold_t >= CHARGE_HOLD - 0.001
+			_release_shot(shot_charged)
 			shot_state = Shot.RECOVER
-			shot_dur = r.fire_recovery
+			shot_dur = r.fire_recovery * (1.2 if shot_charged else 1.0)
 		Shot.RECOVER:
 			if r.reload_time > 0.0:
 				shot_state = Shot.RELOAD
@@ -1460,7 +1474,7 @@ func _update_shot(delta: float) -> void:
 			shot_state = Shot.NONE
 			bow_cd = r.fire_cooldown
 
-func _release_shot() -> void:
+func _release_shot(charged: bool = false) -> void:
 	var r := ranged()
 	var af := aim_facing()
 	var origin := get_hit_center() + Vector3(0, 0.8, 0) + af * 1.4
@@ -1470,23 +1484,42 @@ func _release_shot() -> void:
 		var d: Vector3 = tgt.get_hit_center() - origin
 		if MeshUtil.flat(d).normalized().dot(af) > -0.2:
 			dir = Projectile.aim_dir(origin, tgt, r.projectile_speed, aim_lead)
-	var p := Projectile.new()
-	p.team = team
-	p.shooter = self
-	p.direction = dir
-	p.aimed_at = tgt
-	p.speed = r.projectile_speed
-	p.hitstun = r.ranged_hitstun
-	p.damage = r.arrow_damage * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0) * weapon_attr_mult(r) * r.upgrade_dmg_mult
-	p.color = Color(0.9, 0.8, 0.5) if r.reload_time <= 0.0 else Color(0.75, 0.85, 1.0)
-	get_parent().add_child(p)
-	p.global_position = origin
-	shots_fired += 1
+	var kind := charged_shot_kind() if charged else ""
+	var dmg_k := 1.0
+	var spd_k := 1.0
+	var stun_k := 1.0
+	var n := 1
+	if charged:
+		charged_shots += 1
+		if kind == "potente":
+			dmg_k = 2.4 if character.passive_id == "ojo_de_halcon" else 2.2
+			spd_k = 1.4
+			stun_k = 2.5
+		else: # triple (ballesta): abanico de 3
+			n = 3
+			dmg_k = 0.7
+			stun_k = 1.2
+	for i in n:
+		var p := Projectile.new()
+		p.team = team
+		p.shooter = self
+		p.direction = dir.rotated(Vector3.UP, (i - 1) * 0.18 if n > 1 else 0.0).normalized()
+		p.aimed_at = tgt if (n == 1 or i == 1) else null
+		p.speed = r.projectile_speed * spd_k
+		p.hitstun = r.ranged_hitstun * stun_k
+		if charged:
+			p.stun_force = arrow_stun_force(p.hitstun)
+		p.damage = r.arrow_damage * dmg_k * (1.0 + 0.3 * passive_k() if character.passive_id == "ojo_de_halcon" else 1.0) * weapon_attr_mult(r) * r.upgrade_dmg_mult
+		p.color = Color(1.0, 0.55, 0.2) if charged else (Color(0.9, 0.8, 0.5) if r.reload_time <= 0.0 else Color(0.75, 0.85, 1.0))
+		get_parent().add_child(p)
+		p.global_position = origin
+	shots_fired += n
 	_snd("xbow_fire" if r.reload_time > 0.0 else "bow_release")
 	_kv.event("shoot")
 
 ## Dash montado / voltereta a pie.
 func dash() -> bool:
+	_stagger_roll_cancel() # ronda 31
 	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
 	if airborne or special_t > 0.0:
@@ -1746,6 +1779,10 @@ func eikon_time_left() -> float:
 func apply_stun(t: float) -> void:
 	if boss_phase == Boss.CHARGE or boss_phase == Boss.LUNGE:
 		return # ronda 25: la habilidad de jefe no se interrumpe
+	if stun_immune_t > 0.0 or ab_immune():
+		return # ronda 31: levantándose de un derribo / escudo de maná
+	if ab_id != "":
+		_end_ability(true) # interrumpida
 	stun = maxf(stun, t)
 	if atk_state != Atk.NONE:
 		_cancel_attack()
@@ -1834,6 +1871,8 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	if _kind == "aoe":
 		amount *= EquipStats.resist_mult("inmunidad", eq, eq_ref) # Inmunidad: daño de área
 	amount *= status_fx.damage_taken_mult() # congelación: más daño recibido
+	if stun_immune_t > 0.0 and knockdowns > 0:
+		amount *= StunRules.GETUP_DMG_MULT # ronda 31: levantándose de un derribo
 	if stoneskin_t > 0.0:
 		amount *= 1.0 - float(_stoneskin.get("reduction", 0.0)) # Piel de piedra
 	_damage(amount)
@@ -1847,48 +1886,34 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		add_status(sk, float(stx[sk]))
 	if _kind == "melee":
 		impact.emit(0.5)
-	# Poise / hit-stun: intercambiar golpes no sale gratis
+	# Ronda 31: la postura (stance) se sigue gastando con el daño; el aturdimiento es ACUMULADO
+	# (StunRules): fuerza del golpe contra la robustez en una ventana de unos segundos.
 	_since_hit = 0.0
 	var pd := amount * 2.0 / (float(_stoneskin.get("poise", 1.0)) if stoneskin_t > 0.0 else 1.0) * ((from as Fighter).poise_mult_now() * float((from as Fighter).ad["impacto"]) if from is Fighter and _kind == "melee" else 1.0)
 	if counter:
 		pd *= PhysTypes.COUNTER_POISE
 	if _kind == "jefe":
 		pd *= BOSS_POISE
-	poise -= pd
 	if _kind != "critico":
 		stance -= pd
+	var sforce := _incoming_force(from, _kind, amount)
+	incoming_arrow_stun = 0.0
+	if counter:
+		sforce *= StunRules.COUNTER_K
 	if stance <= 0.0 and alive and not mounted:
 		# Rotura de postura: expuesto ~1,2 s a un crítico frontal
 		stance = stance_max
-		poise = poise_max
 		stance_broken_t = STANCE_BREAK_TIME
 		stance_breaks += 1
 		blocking = false
 		_cancel_attack()
+		_reset_stun_meter()
 		apply_stun(STANCE_BREAK_TIME)
 		stance_broken.emit()
 		_snd("guard_break")
 		return "hit"
-	if poise <= 0.0:
-		poise = poise_max
-		apply_stun((0.6 + (0.3 if amount >= HEAVY_HIT else 0.0)) * EquipStats.resist_mult("concentracion", eq, eq_ref))
-	elif atk_state == Atk.WINDUP and not atk_heavy:
-		apply_stun(0.2) # los ligeros se interrumpen; el fuerte tiene súper-armadura
-	# Ronda 17: aturdimiento por golpe (según arma y posición en el combo / tipo de proyectil)
-	var hs := 0.0
-	if from is Fighter and is_instance_valid(from):
-		if _kind == "melee":
-			hs = (from as Fighter).current_hitstun()
-		elif _kind == "arrow":
-			hs = incoming_arrow_stun if incoming_arrow_stun > 0.0 else (from as Fighter).ranged().ranged_hitstun
-	incoming_arrow_stun = 0.0
-	if from is Fighter and is_instance_valid(from):
-		hs *= float((from as Fighter).ad["stun_dealt"]) # Fuerza del atacante
-	hs *= float(ad["stun_taken"]) # Aguante (robustez) del defensor
-	hs *= EquipStats.resist_mult("robustez", eq, eq_ref) # Robustez de la armadura
-	if hs > 0.0 and not (atk_state == Atk.WINDUP and atk_heavy):
-		apply_stun(hs)
-		last_hitstun = hs
+	if _kind != "critico":
+		add_stun_force(sforce)
 	if mounted and alive and amount >= HEAVY_HIT and randf() < knockoff_chance_heavy:
 		dismount(true)
 	return "hit"
@@ -1944,6 +1969,14 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	crit_t = -1.0
 	_crit_target = null
 	_end_boss()
+	_end_ability(true)
+	_reset_stun_meter()
+	down_t = 0.0
+	stagger_t = 0.0
+	stun_immune_t = 0.0
+	want_shot_hold = false
+	shot_charged = false
+	charged_shots = 0
 	boss_cd = 0.0
 	stance = stance_max
 	stance_broken_t = 0.0
@@ -2220,21 +2253,55 @@ func is_criticalling() -> bool:
 # ---------------- Ronda 25: Estocada de jefe ----------------
 
 func can_boss() -> bool:
-	return not mounted and not airborne and _can_act() and boss_cd <= 0.0 and atk_state == Atk.NONE \
-		and parry_state == Parry.NONE and roll_t < 0.0 and swap_t <= 0.0 and not is_shooting() \
-		and loadout == Loadout.SWORD_SHIELD and stamina > 0.0
+	return can_use_boss(selected_boss())
 
-func boss_skill() -> bool:
-	if not can_boss():
+## Ronda 31: libre para empezar una habilidad de jefe (sin recarga: solo su coste).
+func can_use_boss(id: String) -> bool:
+	if not id in boss_ids or BossAbilities.def(id).is_empty():
 		return false
+	if mounted or airborne or not _can_act() or atk_state != Atk.NONE or parry_state != Parry.NONE or roll_t >= 0.0 or swap_t > 0.0 or is_shooting():
+		return false
+	if id != "escudo_mana" and loadout != Loadout.SWORD_SHIELD:
+		return false
+	return boss_cost_ok(id)
+
+func boss_cost_ok(id: String) -> bool:
+	var d := BossAbilities.def(id)
+	var c := float(d.get("cost", 0.0))
+	match String(d.get("cost_type", "")):
+		"stamina": return stamina > 0.0 and exhausted <= 0.0
+		"mana": return energy >= c
+		"health": return health - c > 0.0 # no te puede dejar a 0
+	return false
+
+func _pay_boss(id: String) -> void:
+	var d := BossAbilities.def(id)
+	var c := float(d["cost"])
+	match String(d["cost_type"]):
+		"stamina": spend_stamina(c)
+		"mana":
+			energy -= c
+			energy_changed.emit(energy, energy_max)
+		"health":
+			health = maxf(health - c, 1.0)
+			health_changed.emit(health, max_health)
+
+func boss_skill(id: String = "") -> bool:
+	if id == "":
+		id = selected_boss()
+	if not can_use_boss(id):
+		return false
+	_pay_boss(id)
+	ab_uses[id] = int(ab_uses.get(id, 0)) + 1
+	if id != "estocada":
+		_start_ability(id)
+		return true
 	boss_phase = Boss.CHARGE
 	boss_t = 0.0
 	boss_travel = 0.0
 	boss_hit = false
-	boss_cd = BOSS_COOLDOWN
 	boss_uses += 1
 	blocking = false
-	spend_stamina(BOSS_STAMINA)
 	boss_dir = _spell_dir()
 	facing = boss_dir
 	_blade_mat.emission_enabled = true
@@ -2315,6 +2382,9 @@ func _update_boss(delta: float) -> void:
 				_snd("swing_heavy", 4.0)
 				impact.emit(0.4)
 		Boss.LUNGE:
+			# Ronda 31: corrige la dirección hacia el objetivo mientras embiste (caminar de lado no basta)
+			boss_dir = _turn_toward(boss_dir, _spell_dir(), deg_to_rad(BOSS_HOME_DEG) * delta)
+			facing = boss_dir
 			var step := BOSS_SPEED * delta
 			boss_travel += step
 			velocity = boss_dir * BOSS_SPEED
@@ -2466,3 +2536,412 @@ static func _steer_velocity(cur: Vector3, target: Vector3, accel_step: float, tu
 		return cur.move_toward(target, accel_step)
 	var dir := (cur / lc).rotated(Vector3.UP, clampf(a, -turn_step, turn_step))
 	return dir * move_toward(lc, lt, accel_step)
+
+
+# ---------------- Ronda 31: aturdimiento acumulado (3 niveles) ----------------
+var stun_acc: float = 0.0 ## fuerza acumulada en la ventana actual
+var stun_window_t: float = 0.0 ## s que le quedan a la ventana (0 = cerrada)
+var stun_level_reached: int = 0 ## nivel ya provocado en esta ventana
+var stagger_t: float = 0.0 ## tambaleo corto en curso (se puede rodar)
+var down_t: float = 0.0 ## derribo: tiempo total (suelo + levantarse) que queda
+var stun_immune_t: float = 0.0 ## inmune al aturdimiento (al levantarse y un poco después)
+var staggers: int = 0
+var stuns: int = 0
+var knockdowns: int = 0
+var last_stun_level: int = 0
+
+## Robustez: equilibrio (poise del rol + Aguante + armadura + accesorios) y resistencia de la armadura.
+func robustness() -> float:
+	var r := poise_max / maxf(float(ad.get("stun_taken", 1.0)), 0.1)
+	if not eq.is_empty():
+		r /= maxf(EquipStats.resist_mult("robustez", eq, eq_ref), 0.1)
+	return maxf(r, 1.0)
+
+## Súper-armadura de lo que está haciendo ahora (multiplica la robustez por 1 + x).
+func current_stun_resist() -> float:
+	if ab_id != "":
+		return ab_resist()
+	if atk_state == Atk.WINDUP:
+		if atk_heavy:
+			return melee().heavy_stun_resist + StunRules.CHARGE_RESIST * charge_t / CHARGE_MAX
+		if atk_dash or atk_jump:
+			return StunRules.DASH_JUMP_RESIST
+		if cur_hit:
+			return cur_hit.stun_resist
+	if atk_state == Atk.ACTIVE and atk_heavy:
+		return melee().heavy_stun_resist * 0.5
+	return 0.0
+
+func effective_robustness() -> float:
+	return robustness() * (1.0 + current_stun_resist())
+
+## Fuerza de aturdimiento del golpe cuerpo a cuerpo en curso: Fuerza + arma + golpe.
+func hit_stun_force() -> float:
+	var per := -1.0
+	if cur_hit and not atk_heavy and not atk_dash and not atk_jump:
+		per = cur_hit.stun_force
+	if per < 0.0:
+		per = current_hitstun() * StunRules.HITSTUN_TO_FORCE
+	if atk_heavy:
+		per *= 1.0 + 0.5 * charge_t / CHARGE_MAX
+	return (StunRules.str_force(float(attributes().get("fuerza", 10))) + StunRules.weapon_force(melee()) + per) * float(ad.get("stun_dealt", 1.0))
+
+## Fuerza de un proyectil del arco/ballesta (hitstun del proyectil x 40 + arma + media Fuerza).
+func arrow_stun_force(hitstun: float) -> float:
+	return StunRules.str_force(float(attributes().get("fuerza", 10))) * 0.5 + StunRules.weapon_force(ranged()) + hitstun * StunRules.HITSTUN_TO_FORCE
+
+## Fuerza mágica: poder mágico + fuerza asignada a la habilidad.
+func magic_stun_force(assigned: float) -> float:
+	return StunRules.magic_force(float(ad.get("magia", 100.0))) + assigned
+
+func _incoming_force(from: Node3D, kind: String, amount: float) -> float:
+	if incoming_stun_force >= 0.0:
+		var f := incoming_stun_force
+		incoming_stun_force = -1.0
+		return f
+	match kind:
+		"melee":
+			return (from as Fighter).hit_stun_force() if from is Fighter and is_instance_valid(from) else 20.0
+		"arrow":
+			var hs := incoming_arrow_stun
+			if from is Fighter and is_instance_valid(from):
+				return (from as Fighter).arrow_stun_force(hs if hs > 0.0 else (from as Fighter).ranged().ranged_hitstun)
+			return hs * StunRules.HITSTUN_TO_FORCE
+		"aoe": return StunRules.AOE_FORCE
+		"jefe": return StunRules.BOSS_FORCE
+		"eikon": return amount * StunRules.EIKON_K
+	return 0.0
+
+## Suma fuerza de aturdimiento y reacciona si se cruza un umbral nuevo en esta ventana.
+func add_stun_force(force: float) -> int:
+	if force <= 0.0 or not alive or stun_immune_t > 0.0 or invuln > 0.0 or ab_immune():
+		return 0
+	if boss_phase == Boss.CHARGE or boss_phase == Boss.LUNGE:
+		return 0
+	if stun_window_t <= 0.0:
+		stun_acc = 0.0
+		stun_level_reached = 0
+		stun_window_t = StunRules.WINDOW
+	var r := effective_robustness()
+	stun_acc += minf(force, r * StunRules.SINGLE_HIT_CAP) # ningún golpe aturde por sí solo
+	var lv := StunRules.level_for(stun_acc / r)
+	poise = maxf(robustness() - stun_acc, 0.0)
+	if lv <= stun_level_reached:
+		return 0
+	stun_level_reached = lv
+	last_stun_level = lv
+	match lv:
+		1:
+			staggers += 1
+			apply_stun(StunRules.STAGGER_T)
+			stagger_t = StunRules.STAGGER_T
+			last_hitstun = StunRules.STAGGER_T
+		2:
+			stuns += 1
+			stagger_t = 0.0
+			apply_stun(StunRules.STUN_T)
+			last_hitstun = StunRules.STUN_T
+		3:
+			if mounted:
+				stuns += 1
+				apply_stun(StunRules.STUN_T)
+				last_hitstun = StunRules.STUN_T
+			else:
+				knockdowns += 1
+				stagger_t = 0.0
+				blocking = false
+				apply_stun(StunRules.DOWN_T + StunRules.GETUP_T)
+				down_t = StunRules.DOWN_T + StunRules.GETUP_T
+				stun_immune_t = down_t + StunRules.IMMUNE_AFTER
+				last_hitstun = down_t
+				_snd("guard_break")
+			_reset_stun_meter()
+	return lv
+
+func _reset_stun_meter() -> void:
+	stun_acc = 0.0
+	stun_window_t = 0.0
+	stun_level_reached = 0
+	poise = robustness()
+
+func _update_stun_meter(delta: float) -> void:
+	stagger_t = maxf(stagger_t - delta, 0.0)
+	down_t = maxf(down_t - delta, 0.0)
+	stun_immune_t = maxf(stun_immune_t - delta, 0.0)
+	if stun_window_t > 0.0:
+		stun_window_t -= delta
+		if stun_window_t <= 0.0:
+			_reset_stun_meter() # se recupera del todo al instante
+
+func is_knocked_down() -> bool:
+	return down_t > StunRules.GETUP_T
+
+func is_getting_up() -> bool:
+	return down_t > 0.0 and down_t <= StunRules.GETUP_T
+
+## Tambaleo corto: rodar lo cancela (si se reacciona antes del siguiente golpe).
+func _stagger_roll_cancel() -> void:
+	if stagger_t > 0.0 and stun <= stagger_t + 0.001 and down_t <= 0.0:
+		stun = 0.0
+		stagger_t = 0.0
+
+
+# ---------------- Ronda 31: disparo cargado (arcos) ----------------
+var want_shot_hold: bool = false ## mantener el botón: disparo cargado
+var shot_charged: bool = false
+var charged_shots: int = 0
+var _hold_t: float = 0.0
+const CHARGE_HOLD := 0.9 ## s extra tras tensar para el disparo cargado
+
+func charged_shot_kind() -> String:
+	var r := ranged()
+	if r.charged_shot != "":
+		return r.charged_shot
+	return "triple" if r.reload_time > 0.0 else "potente"
+
+# ---------------- Ronda 31: habilidades de jefe (BossAbilities) ----------------
+var boss_ids: Array = BossAbilities.DEFAULT.duplicate() ## equipadas (máx. 3)
+var boss_sel: int = 0
+var ab_id: String = "" ## habilidad en curso (la estocada usa boss_phase)
+var ab_t: float = 0.0
+var ab_vel: Vector3 = Vector3.ZERO
+var ab_air: bool = false
+var ab_hop: float = 0.0 ## altura visual del salto con caída
+var ab_lock_pos: Vector3 = Vector3.ZERO
+var ab_locked: bool = false
+var ab_from: Vector3 = Vector3.ZERO
+var ab_fired: int = 0 ## tajos lanzados / golpes dados
+var ab_marker: Node3D
+var ab_aoe: GroundAoE
+var ab_bubble: MeshInstance3D
+var ab_uses: Dictionary = {}
+var ab_interrupted: int = 0
+var ab_hits_landed: int = 0
+signal ability_started(id: String)
+
+func set_boss_abilities(ids: Array) -> void:
+	boss_ids = []
+	for id in ids:
+		if BossAbilities.DEFS.has(String(id)) and not String(id) in boss_ids and boss_ids.size() < BossAbilities.MAX_EQUIPPED:
+			boss_ids.append(String(id))
+	boss_sel = 0
+
+func selected_boss() -> String:
+	if boss_ids.is_empty():
+		return ""
+	return String(boss_ids[clampi(boss_sel, 0, boss_ids.size() - 1)])
+
+func cycle_boss() -> String:
+	if boss_ids.size() > 1:
+		boss_sel = (boss_sel + 1) % boss_ids.size()
+	return selected_boss()
+
+func ab_def() -> Dictionary:
+	return BossAbilities.def(ab_id)
+
+func ab_immune() -> bool:
+	return (ab_id == "escudo_mana" and ab_t >= float(ab_def()["windup"])) or (ab_id == "salto_caida" and ab_air)
+
+func ab_resist() -> float:
+	var d := ab_def()
+	if ab_id == "combo_falso":
+		var hits: Array = d["hits"]
+		if ab_fired == 3 and ab_t < float(hits[3][0]):
+			return 1.0 # anticipación alzada del 4.º golpe
+	return float(d.get("resist", 0.0))
+
+## Daño: fuerte (o ligero) del arma x multiplicador; las mágicas escalan con la magia.
+func ab_damage(id: String, k: float = 1.0) -> float:
+	var d := BossAbilities.def(id)
+	var base := (melee().light_damage if d.get("light", false) else melee().heavy_damage) * damage_mult() * float(d["dmg"]) * k
+	if d.get("magic", false):
+		base *= float(ad.get("magia", 100.0)) / 100.0
+	return base
+
+func ab_force(assigned: float, magic: bool) -> float:
+	if magic:
+		return magic_stun_force(assigned)
+	return (StunRules.str_force(float(attributes().get("fuerza", 10))) + StunRules.weapon_force(melee()) + assigned) * float(ad.get("stun_dealt", 1.0))
+
+func _ab_target() -> Node3D:
+	return face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+
+func _start_ability(id: String) -> void:
+	ab_id = id
+	ab_t = 0.0
+	ab_vel = Vector3.ZERO
+	ab_air = false
+	ab_hop = 0.0
+	ab_locked = false
+	ab_fired = 0
+	ab_from = global_position
+	blocking = false
+	var d := ab_def()
+	var col: Color = {"carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(0.75, 0.35, 1.0), "escudo_mana": Color(0.3, 1.0, 1.0),
+		"combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}.get(id, Color.WHITE)
+	if _kv:
+		_kv.set_glow(true, col)
+	facing = _spell_dir()
+	match id:
+		"carga_area":
+			ab_aoe = GroundAoE.spawn(get_parent(), self, team, global_position, float(d["radius"]), float(d["windup"]), ab_damage(id))
+			ab_aoe.stun_force = ab_force(float(d["force"]), true)
+		"escudo_mana":
+			ab_bubble = MeshUtil.sphere(self, 1.3, Vector3(0, 1.0, 0), Color(0.3, 1.0, 1.0, 0.25), true)
+			ab_bubble.transparency = 0.7
+		"salto_caida":
+			var tg := _ab_target()
+			ab_lock_pos = tg.global_position if tg else global_position + facing * 6.0
+			ab_marker = Node3D.new()
+			get_parent().add_child(ab_marker)
+			var disc := MeshUtil.cylinder(ab_marker, float(d["radius"]), 0.03, Vector3(0, 0.05, 0), Color(1.0, 0.2, 0.1))
+			disc.transparency = 0.5
+			ab_marker.global_position = Vector3(ab_lock_pos.x, 0.0, ab_lock_pos.z)
+	_snd("swing_heavy", 2.0)
+	ability_started.emit(id)
+
+func _end_ability(interrupted: bool = false) -> void:
+	if ab_id == "":
+		return
+	if interrupted:
+		ab_interrupted += 1
+		if is_instance_valid(ab_aoe) and not ab_aoe.detonated:
+			ab_aoe.queue_free() # la carga cortada no estalla
+	ab_aoe = null
+	if is_instance_valid(ab_marker):
+		ab_marker.queue_free()
+	ab_marker = null
+	if is_instance_valid(ab_bubble):
+		ab_bubble.queue_free()
+	ab_bubble = null
+	if ab_air:
+		global_position.y = 0.0
+	ab_id = ""
+	ab_t = 0.0
+	ab_vel = Vector3.ZERO
+	ab_air = false
+	ab_hop = 0.0
+	if _kv:
+		_kv.set_glow(false, Color.BLACK)
+
+func _update_ability(delta: float) -> void:
+	if ab_id == "":
+		return
+	if not alive:
+		_end_ability(true)
+		return
+	var d := ab_def()
+	var prev := ab_t
+	ab_t += delta
+	ab_vel = Vector3.ZERO
+	var tg := _ab_target()
+	match ab_id:
+		"carga_area":
+			if ab_t >= float(d["windup"]) + float(d["recovery"]):
+				_end_ability()
+		"rafaga":
+			var w := float(d["windup"])
+			if ab_t < w and tg:
+				facing = _turn_toward(facing, _spell_dir(), deg_to_rad(360.0) * delta)
+			while ab_fired < int(d["count"]) and ab_t >= w + ab_fired * float(d["interval"]):
+				_fire_magic_slash(d, tg)
+				ab_fired += 1
+			if ab_t >= w + (int(d["count"]) - 1) * float(d["interval"]) + float(d["recovery"]):
+				_end_ability()
+		"escudo_mana":
+			if ab_t >= float(d["windup"]):
+				invuln = maxf(invuln, 0.05)
+			if ab_t >= float(d["windup"]) + float(d["active"]):
+				invuln = 0.0
+				_end_ability()
+		"combo_falso":
+			var hits: Array = d["hits"]
+			if tg and ab_fired < hits.size() and ab_t < float(hits[ab_fired][0]) - 0.08:
+				facing = _turn_toward(facing, _spell_dir(), deg_to_rad(240.0) * delta)
+			if ab_fired < hits.size():
+				var th := float(hits[ab_fired][0])
+				if ab_t > th - 0.15 and ab_t < th:
+					ab_vel = facing * 2.5
+				if prev < th and ab_t >= th:
+					_combo_strike(d, hits[ab_fired])
+					ab_fired += 1
+			if ab_t >= float(hits[-1][0]) + float(d["recovery"]):
+				_end_ability()
+		"salto_caida":
+			var rise := float(d["rise"])
+			var lock := float(d["lock"])
+			var land := float(d["land"])
+			var hgt := float(d["height"])
+			if ab_t < land:
+				ab_air = ab_t > 0.05
+				if not ab_locked and tg:
+					ab_lock_pos = tg.global_position # la marca sigue al objetivo...
+				if is_instance_valid(ab_marker):
+					ab_marker.global_position = Vector3(ab_lock_pos.x, 0.0, ab_lock_pos.z)
+				if ab_t >= lock and not ab_locked:
+					ab_locked = true # ...hasta aquí: luego queda fija
+					ab_from = global_position
+					if is_instance_valid(ab_marker):
+						ab_marker.queue_free()
+					ab_marker = null
+					ab_aoe = GroundAoE.spawn(get_parent(), self, team, ab_lock_pos, float(d["radius"]), land - lock, ab_damage(ab_id))
+					ab_aoe.stun_force = ab_force(float(d["force"]), false)
+				if ab_t < rise:
+					ab_hop = hgt * sin(ab_t / rise * PI * 0.5)
+				elif ab_t < lock:
+					ab_hop = hgt
+				else:
+					var k := clampf((ab_t - lock) / (land - lock), 0.0, 1.0)
+					ab_hop = hgt * (1.0 - k * k)
+					var pp := ab_from.lerp(Vector3(ab_lock_pos.x, 0.0, ab_lock_pos.z), k)
+					global_position = Vector3(pp.x, 0.0, pp.z)
+					_clamp_world()
+				var dd := MeshUtil.flat(ab_lock_pos - global_position)
+				if dd.length() > 0.1:
+					facing = dd.normalized()
+			else:
+				if ab_air:
+					ab_air = false
+					ab_hop = 0.0
+					impact.emit(1.0)
+				if ab_t >= land + float(d["recovery"]):
+					_end_ability()
+
+func _combo_strike(d: Dictionary, h: Array) -> void:
+	_snd("swing", 0.0)
+	for t in MeshUtil.enemies_of(get_tree(), team):
+		var dv := MeshUtil.flat(t.global_position - global_position)
+		if dv.length() > float(d["reach"]) + float(t.hit_radius):
+			continue
+		if dv.length() > 0.2 and rad_to_deg(facing.angle_to(dv.normalized())) > float(d["arc"]):
+			continue
+		if t is Fighter:
+			(t as Fighter).incoming_stun_force = ab_force(float(h[2]), false)
+		var res: String = t.take_hit(ab_damage("combo_falso", float(h[1])), self, "melee")
+		if t is Fighter:
+			(t as Fighter).incoming_stun_force = -1.0
+		if res == "hit" or res == "block":
+			ab_hits_landed += 1
+			landed_hit.emit(t, res, false)
+			hitstop.emit(0.05)
+
+func _fire_magic_slash(d: Dictionary, tg: Node3D) -> void:
+	var p := Projectile.new()
+	p.team = team
+	p.shooter = self
+	p.kind = "eikon"
+	var origin := get_hit_center() + Vector3(0, 0.3, 0) + facing * 1.0
+	p.direction = (Projectile.aim_dir(origin, tg, float(d["speed"])) if tg else facing)
+	p.aimed_at = tg
+	p.speed = float(d["speed"])
+	p.life = float(d["life"])
+	p.radius = 0.7
+	p.damage = ab_damage("rafaga")
+	p.color = Color(0.75, 0.35, 1.0)
+	p.stun_force = ab_force(float(d["force"]), true)
+	p.home_target = tg
+	p.home_rate = deg_to_rad(float(d["home_deg"]))
+	p.home_time = float(d["home_time"])
+	get_parent().add_child(p)
+	p.global_position = origin
+	_snd("swing_heavy", -2.0)

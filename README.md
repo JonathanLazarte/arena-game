@@ -713,3 +713,10 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - **Erika.** No hay ningún modelo «Erika» en el proyecto, en su historial ni en el repositorio de origen de las animaciones, así que no se añadió ese personaje (ver informe).
 - El movimiento fluido es del jugador (`Fighter.fluid`); la IA mantiene su conducción clásica (con la fluida rodeaba por la espalda demasiado: test_ai 23–25 %; así vuelve a 12 %).
 - Pruebas: `tests/test_round30.gd`.
+
+## Ronda 31
+- **Aturdimiento en 3 niveles** acumulado (ventana de 3 s, ningún golpe aturde solo): tambaleo (se sale rodando), aturdido, derribo con animación de levantarse, inmunidad y ×0,85 de daño. Súper-armadura por ataque (fuertes cargados, habilidades).
+- **Habilidades de jefe** (pestaña «Jefe», máx. 3; B usa, N cambia; sin recargas, cuestan aguante/maná/vida): Estocada (persigue, solo se esquiva rodando, 12 m), Carga en área, Ráfaga de 3 tajos, Escudo de maná, Combo de la pausa falsa, Salto con caída. Enciclopedia en la pestaña; la IA las usa y reacciona. Guardado v11.
+- **Arcos**: mantener = disparo cargado (arco potente, ballesta triple).
+- **Calibración**: velocidad de ataque hasta +25 % con curva más cara; la ficha la muestra.
+- `docs/design.md` reescrito como referencia. Pruebas: `tests/test_round31.gd`.

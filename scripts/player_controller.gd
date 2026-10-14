@@ -146,6 +146,7 @@ func _physics_process(delta: float) -> void:
 	var cs := _pressed_edge("spell")
 	var cn := _pressed_edge("spell_next")
 	var bs := _pressed_edge("boss")
+	var bn := _pressed_edge("boss_next")
 	_update_buffer_hit()
 	if not enabled:
 		_clear_buffer()
@@ -154,6 +155,7 @@ func _physics_process(delta: float) -> void:
 	# Ataque: pulsar = ligero (al soltar), mantener 0,4 s = fuerte. En modo arco dispara.
 	if me.loadout == Fighter.Loadout.BOW:
 		if atk_edge: _try("shoot")
+		me.want_shot_hold = atk_down # ronda 31: mantener = disparo cargado
 		_atk_hold = -1.0
 	elif atk_down:
 		if _atk_hold < 0.0:
@@ -176,6 +178,7 @@ func _physics_process(delta: float) -> void:
 	if mt: _try("mount")
 	if jp: _try("jump")
 	if sp: _try("special")
+	if bn: me.cycle_boss()
 	if bs: _try("boss")
 	_update_buffer(delta)
 

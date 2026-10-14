@@ -33,6 +33,10 @@ extends Resource
 ## Ronda 17: aturdimiento que causa al defensor. Golpes 1 y 2: corto (da tiempo a rodar antes del
 ## siguiente si no se es codicioso); remate: largo (tambaleo).
 @export var hitstun: float = 0.3
+## Ronda 31: fuerza de aturdimiento asignada al golpe (-1 = hitstun x StunRules.HITSTUN_TO_FORCE)
+## y súper-armadura en su anticipación (la robustez se multiplica por 1 + stun_resist).
+@export var stun_force: float = -1.0
+@export var stun_resist: float = 0.0
 
 func attack_dict() -> Dictionary:
 	return {"windup": windup, "chain_windup": windup, "active": active, "recovery": recovery,

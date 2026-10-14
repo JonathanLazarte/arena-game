@@ -28,8 +28,10 @@ const STATES := {
 	"slam": "2H_Melee_Attack_Chop",
 	# Ronda 28 (por defecto KayKit; con la biblioteca Mixamo se sustituyen, ver MX_*)
 	"boss_charge": "Blocking", "boss_lunge": DASH_STRIKE_ANIM, "stance_break": "Hit_B", "cast": "Use_Item",
+	# Ronda 31: derribo y levantarse (clips nativos KayKit)
+	"down": "Lie_Down", "getup": "Lie_StandUp",
 }
-const SCALED := ["boss_charge", "boss_lunge", "stance_break", "cast", "hit", "stun", "reload", "aim", "light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
+const SCALED := ["down", "getup", "boss_charge", "boss_lunge", "stance_break", "cast", "hit", "stun", "reload", "aim", "light0", "light1", "light2", "heavy", "swap", "parry", "dodge_f", "dodge_b", "dodge_l", "dodge_r", "dash_strike", "slam"]
 ## Animación propia (KayKit no trae una estocada en carrera): se compone en Godot a partir de
 ## Dodge_Forward (piernas y cadera: el impulso de la zancada) y 1H_Melee_Attack_Slice_Horizontal
 ## (tronco y brazos: el tajo), con el tronco inclinado hacia delante durante la arremetida.
@@ -538,6 +540,16 @@ func _cast_total(f: Fighter) -> float:
 func _clip_len(s: String) -> float:
 	return ap.get_animation(states[s]).length
 
+## Ronda 31: pose de cada habilidad de jefe.
+func _ability_state(f: Fighter) -> String:
+	match f.ab_id:
+		"carga_area": return "boss_charge"
+		"rafaga": return "cast"
+		"escudo_mana": return "block"
+		"salto_caida": return "jump_air" if f.ab_air else "land"
+		"combo_falso": return "heavy" if f.ab_fired >= 3 else "light%d" % clampi(f.ab_fired, 0, 2)
+	return "none"
+
 func update(f: Fighter, delta: float) -> void:
 	oneshot_t = maxf(oneshot_t - delta, 0.0)
 	if f.cast_t <= 0.0:
@@ -548,6 +560,12 @@ func update(f: Fighter, delta: float) -> void:
 	if not f.alive:
 		s = "death"
 		upper = false
+	elif f.is_knocked_down() and not f.mounted:
+		s = "down"
+	elif f.is_getting_up() and not f.mounted:
+		s = "getup"
+	elif f.ab_id != "":
+		s = _ability_state(f)
 	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE and not (oneshot == "hit" and oneshot_t > 0.0 and f.stun <= f.last_hitstun + 0.01):
 		s = "stance_break" if f.stance_broken_t > 0.0 and not f.mounted else "stun"
 	elif f.boss_phase == Fighter.Boss.CHARGE:
@@ -603,6 +621,12 @@ func update(f: Fighter, delta: float) -> void:
 			Fighter.Atk.RECOVERY:
 				scd = Ld * maxf(1.0 - DS_CONTACT - 0.12, 0.05) / maxf(f.atk_dur, 0.05)
 		tree.set("parameters/act/dash_strike/ts/scale", scd)
+	elif s == "down":
+		tree.set("parameters/act/down/ts/scale", _clip_len(s) / StunRules.DOWN_T)
+	elif s == "getup":
+		tree.set("parameters/act/getup/ts/scale", _clip_len(s) / StunRules.GETUP_T)
+	elif s == "boss_charge" and f.ab_id == "carga_area":
+		tree.set("parameters/act/boss_charge/ts/scale", _clip_len(s) / float(BossAbilities.def("carga_area")["windup"]))
 	elif s == "boss_charge":
 		tree.set("parameters/act/boss_charge/ts/scale", _clip_len(s) / Fighter.BOSS_CHARGE)
 	elif s == "boss_lunge":
@@ -649,7 +673,7 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/parry/ts/scale", _clip_len("parry") / (Fighter.PARRY_WINDOW + Fighter.PARRY_RECOVERY))
 	if s != state:
 		if s != "none":
-			if state == "none" or s in ["boss_charge", "boss_lunge", "stance_break", "cast", "death", "stun", "hit", "block_hit", "shoot", "dash_strike", "jump_up", "land", "slam"] or s.begins_with("dodge"):
+			if state == "none" or s in ["down", "getup", "boss_charge", "boss_lunge", "stance_break", "cast", "death", "stun", "hit", "block_hit", "shoot", "dash_strike", "jump_up", "land", "slam"] or s.begins_with("dodge"):
 				playback.start(s, true)
 			else:
 				playback.travel(s)
@@ -667,7 +691,7 @@ func update(f: Fighter, delta: float) -> void:
 			ph = 0.8 + 0.2 * f.atk_t / maxf(f.atk_dur, 0.01)
 		if ph >= 0.0:
 			hop_y = sin(ph * PI) * f.cur_hit.hop
-	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y + (0.0 if _mounted else foot_lift())
+	model.position.y = (MOUNT_Y if _mounted else 0.0) + hop_y + f.ab_hop + (0.0 if _mounted else foot_lift())
 	# Locomoción relativa a la mirada
 	var st := f.stats()
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)

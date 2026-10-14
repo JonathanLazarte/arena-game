@@ -21,7 +21,8 @@ const ACTIONS := {
 	"swap_weapon": [KEY_R],
 	"spell": [KEY_X], ## Ronda 21: lanzar hechizo de eikon (a pie)
 	"spell_next": [KEY_T],
-	"boss": [KEY_B], ## Ronda 25: habilidad de jefe (Estocada de jefe) ## Ronda 21: siguiente ranura de hechizo
+	"boss": [KEY_B],
+	"boss_next": [KEY_N], ## Ronda 31: siguiente habilidad de jefe equipada ## Ronda 25: habilidad de jefe (Estocada de jefe) ## Ronda 21: siguiente ranura de hechizo
 }
 
 func _enter_tree() -> void:

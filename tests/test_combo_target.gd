@@ -208,6 +208,9 @@ func _run() -> void:
 	# Prioriza eikons enemigos: el jugador invoca su Gólem
 	p.eikon = load("res://resources/eikons/stone_golem.tres")
 	p.meter = Fighter.METER_MAX
+	p.stun = 0.0 # ronda 31: el lobo pudo derribarlo (acumulado)
+	p.down_t = 0.0
+	p.stun_immune_t = 0.0
 	p.summon()
 	await wait(0.3)
 	check(wolf.companion_target == p.active_eikon, "el lobo prioriza al eikon enemigo (gólem)")

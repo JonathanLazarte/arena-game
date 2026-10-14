@@ -210,8 +210,8 @@ func _run() -> void:
 	var hp := e.health
 	await until(func() -> bool: return p.boss_phase == Fighter.Boss.RECOVER, 2.0)
 	var travel := MeshUtil.flat(p.global_position - start).length()
-	check(e.health == hp and not p.boss_hit, "el paso lateral a tiempo la esquiva")
-	check(absf(travel - Fighter.BOSS_DIST) < 0.6, "recorrido fijo al aire: %.1f m" % travel)
+	# Ronda 31: la embestida corrige la dirección: el paso lateral ya no basta (solo la voltereta)
+	check(p.boss_hit or travel <= Fighter.BOSS_DIST + 0.6, "embestida con seguimiento, recorrido ≤ %.0f m (%.1f m, impacto %s)" % [Fighter.BOSS_DIST, travel, p.boss_hit])
 	check(p.take_hit(5.0, e, "melee") == "hit", "recuperación castigable")
 	p.health = p.max_health
 	p.stun = 0.0
@@ -229,6 +229,7 @@ func _run() -> void:
 	check(tr2 < Fighter.BOSS_DIST - 1.0, "se detiene al impactar (%.1f m)" % tr2)
 	await until(func() -> bool: return p.boss_phase == Fighter.Boss.NONE, 3.0)
 	# --- 4. IA: esquiva y usa la Estocada de jefe ---
+	e.set_boss_abilities(["estocada"]) # ronda 31: el rival lleva 3 al azar
 	arena.ai.profile = (load("res://resources/ai/hard.tres") as AIDifficulty).duplicate()
 	arena.ai.profile.boss_dodge_chance = 1.0
 	arena.ai.profile.boss_use_chance = 0.0
@@ -255,7 +256,7 @@ func _run() -> void:
 	p.global_position = Vector3(0, 0.2, 6)
 	e.global_position = Vector3(0, 0.2, 0)
 	e.boss_cd = 0.0
-	for attempt in 4:
+	for attempt in 8:
 		if e.boss_uses > 0:
 			break
 		p.global_position = Vector3(0, 0.2, 6)
@@ -286,7 +287,13 @@ func _run() -> void:
 		p.face_target = null
 		p.stamina = p.stamina_max
 		p.stun = 0.0
-		await physics_frame
+		p.down_t = 0.0 # ronda 31
+		p.stun_immune_t = 0.0
+		p._reset_stun_meter()
+		p.combo = 0
+		p.velocity = Vector3.ZERO
+		p.move_input = Vector3.ZERO
+		await create_timer(0.3).timeout
 		var s0 := p.global_position
 		p.attack_light()
 		await until(func() -> bool: return p.atk_state == Fighter.Atk.NONE)

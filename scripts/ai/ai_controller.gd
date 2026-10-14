@@ -123,6 +123,22 @@ func _physics_process(delta: float) -> void:
 		me.move_input = Vector3.ZERO if dist < 9.0 else dir * 0.4
 		if me.atk_state == Fighter.Atk.NONE:
 			return
+	# --- Ronda 31: huir de la carga en área / la marca del salto; correr de lado ante la ráfaga ---
+	if opp.ab_id == "carga_area" or opp.ab_id == "salto_caida":
+		var c: Vector3 = opp.global_position if opp.ab_id == "carga_area" else opp.ab_lock_pos
+		var rad := float(BossAbilities.def(opp.ab_id)["radius"])
+		var away := MeshUtil.flat(me.global_position - c)
+		if away.length() < rad + 1.5:
+			ab_flee_frames += 1
+			me.want_block = false
+			me.want_sprint = true
+			me.move_input = away.normalized() if away.length() > 0.2 else side
+			return
+	elif opp.ab_id == "rafaga" and dist > 6.0:
+		me.want_block = false
+		me.want_sprint = true
+		me.move_input = side
+		return
 	# --- Ronda 24: crítico frontal si el jugador tiene la postura rota ---
 	if opp.stance_broken_t <= 0.0:
 		_crit_roll = -1.0
@@ -215,7 +231,7 @@ func _physics_process(delta: float) -> void:
 			me.summon()
 		_try_specials(dist, dir)
 		# Ronda 25: Estocada de jefe a media distancia
-		if not me.mounted and dist > 3.5 and dist < Fighter.BOSS_DIST + 1.0 and me.facing.dot(dir) > 0.5 and randf() < profile.boss_use_chance and me.boss_skill():
+		if not me.mounted and _try_boss(dist, dir, opp):
 			boss_used += 1
 			return
 		# Cambio de armas por distancia (~0,4 s, igual que al jugador; se sigue moviendo)
@@ -414,3 +430,28 @@ func _try_specials(dist: float, dir: Vector3) -> void:
 			"vendaval":
 				if dist < 5.0:
 					me.eikon_special()
+
+
+# ---------------- Ronda 31: habilidades de jefe de la IA ----------------
+var ab_flee_frames: int = 0
+var boss_by_id: Dictionary = {}
+
+## Elige una habilidad equipada que tenga sentido a esta distancia y la usa (con probabilidad).
+func _try_boss(dist: float, dir: Vector3, opp: Fighter) -> bool:
+	if randf() >= profile.boss_use_chance:
+		return false
+	var ids: Array = me.boss_ids.duplicate()
+	ids.shuffle()
+	for id: String in ids:
+		var ok := false
+		match id:
+			"estocada": ok = dist > 3.5 and dist < Fighter.BOSS_DIST + 1.0 and me.facing.dot(dir) > 0.5
+			"carga_area": ok = dist < 3.5 and opp.atk_state == Fighter.Atk.NONE
+			"rafaga": ok = dist > 6.0 and dist < 16.0
+			"escudo_mana": ok = dist < 3.5 and opp.atk_state == Fighter.Atk.WINDUP
+			"combo_falso": ok = dist < 2.6 and me.facing.dot(dir) > 0.6
+			"salto_caida": ok = dist > 5.0 and dist < 14.0 and me.health > 40.0
+		if ok and me.boss_skill(id):
+			boss_by_id[id] = int(boss_by_id.get(id, 0)) + 1
+			return true
+	return false

@@ -1,26 +1,41 @@
-# Diseño — pedidos pendientes (archivo vivo)
+# Diseño — referencia (reglas duraderas)
 
-## Habilidades de jefe (pendiente)
-- Concepto: se ve la animación → al salir es inevitable salvo dodge en la ventana justa. Seguimiento durante la preparación; al activarse no se esquiva caminando de costado.
-- Estocada de jefe: arreglar lo anterior y dar más rango.
-- Carga inmóvil: el usuario carga energía, resistencia al stun muy alta (no invulnerable; un combo fuerte, p. ej. martillo con mucha fuerza, la corta). Al terminar, daño en radio coherente. Lección: detectar y huir/cortar, no quedarse pegando.
-- Ráfaga de 3 cortes mágicos desde la espada: bastante rango y autoseguimiento; corriendo y a cierta distancia se escapa, caminando no. Fuerza de stun asignada por corte.
-- Ideas sugeridas (no aprobadas aún): salto con caída marcada, agarre que rompe guardia, combo con pausa falsa, zona que explota, postura de contraataque.
-- Rellenar la enciclopedia de habilidades si falta info.
+Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`, `scripts/data/attributes.gd`.
 
-## Stun en 3 niveles (pendiente)
-- Fuerza de golpe = fuerza del personaje + arma + fuerza asignada al golpe. Habilidades mágicas: magia + fuerza asignada a la habilidad (por cada corte de una ráfaga).
-- Se acumula contra la robustez/resistencia del defensor en una ventana de unos segundos desde el primer golpe; al cerrarse, se recupera del todo al instante. Ningún golpe stunea 100% por sí solo.
-- Niveles: tambaleo corto (se puede esquivar si se reacciona antes del siguiente golpe), stun normal, derribo al suelo.
-- Tras un derribo: invulnerable hasta terminar de levantarse (+ breve resistencia alta).
+## Principios de balance
+- Inspiración souls (curvas tipo Elden Ring, números propios): ganancias por tramos con rendimientos decrecientes (primeros ~25–30 puntos rinden, luego cae).
+- Todo ataque fuerte o de jefe se telegrafía; al soltarse solo se evita con voltereta en la ventana justa (no caminando).
+- Ningún recurso gratis: las habilidades de jefe no tienen recarga pero cuestan aguante, maná (= Energía) o vida.
 
-## Arcos con disparo cargado (pendiente)
-- Soltar rápido = disparo normal. Mantener el tiempo suficiente = disparo potente u otro tipo, según personaje y arco. Si se suelta antes de completar la carga, sale el disparo normal.
+## Aturdimiento (3 niveles acumulados)
+- Fuerza por golpe: `str_force(Fuerza) + fuerza del arma + fuerza del golpe` × `stun_dealt`. Mágico: `magia × 0,1 + fuerza asignada` (por impacto).
+- `str_force`: 0,6/pt hasta 30, 0,3 hasta 50, 0,1 después. Arma: dagas 4, espada+escudo 8, lanza 9, espada larga 11, hacha 14, arco 3, ballesta 6.
+- Robustez del defensor = equilibrio (poise rol + Aguante + armadura) / `stun_taken` / resistencia de armadura, × (1 + súper-armadura actual).
+- Se acumula durante 3 s desde el primer golpe; al cerrar la ventana se recupera todo de golpe. Un golpe aporta como mucho 0,95 × robustez → ninguno aturde solo.
+- Umbrales (acumulado/robustez): 1,0 tambaleo (0,35 s, se cancela rodando) · 1,6 aturdido (0,9 s) · 2,4 derribo (1,1 s suelo + 0,8 s levantarse). Cada nivel una vez por ventana.
+- Tras derribo: inmune al aturdimiento (no al daño) hasta levantarse + 0,6 s, recibiendo ×0,85 de daño. Montado, el derribo se convierte en aturdido.
+- Rotura de postura (stance) sigue aparte y reinicia el medidor; parry y rotura de guardia aturden directo.
+- Súper-armadura: fuerte en anticipación +1,0 (+1,0 más con carga completa), dash/salto +0,5, por golpe `ComboHit.stun_resist`, por arma `WeaponDef.heavy_stun_resist`.
 
-## Calibración general (pendiente)
-- Repasar y calibrar todos los parámetros y stats con referencia a curvas de Elden Ring (sin copiar tablas).
-- Velocidad de ataque: subir el tope máximo (hoy +16%) y que cueste más llegar; el beneficio por punto debe estar equilibrado con un punto en Fuerza.
-- Ficha del lobby: mostrar la velocidad de ataque final con Destreza aplicada.
+## Habilidades de jefe (máx. 3 equipadas por personaje, pestaña «Jefe»; B usa, N cambia)
+| id | coste | daño | fuerza | resist. | clave |
+|---|---|---|---|---|---|
+| estocada | 30 aguante | 1,6× fuerte | 60 | inmune | carga 1,6 s siguiendo; embestida 12 m a 30 m/s con giro 140°/s → solo voltereta |
+| carga_area | 35 maná | 1,4× (mágico) | 45+magia | ×5 | inmóvil 1,8 s, AoE 4,5 m; interrumpible |
+| rafaga | 30 maná | 0,55× ligero c/u | 14+magia c/u | ×1,5 | 3 tajos, 18 m/s, giro 55°/s durante 0,6 s: caminar no escapa, correr a distancia sí |
+| escudo_mana | 25 maná | — | — | inmune | 1,5 s invulnerable total, mitad de velocidad |
+| combo_falso | 38 aguante | 0,7/0,7/0,9/1,7× ligero | 4/4/18/45 | ×1,3 | pausa falsa antes del 4.º (t=1,75 s) |
+| salto_caida | 15 vida | 1,5× fuerte | 50 | inmune en el aire | marca sigue hasta 1,25 s, cae a 1,65 s, AoE 3,5 m |
+- Coste de vida: no se puede usar si dejaría la vida ≤ 0. IA: elige por distancia/situación y huye de marcas/AoE, corre de lado ante la ráfaga, rueda la estocada.
 
-## Otros pendientes
-- Erika: falta el FBX de Mixamo (lo baja el usuario).
+## Arcos
+- Toque = disparo normal. Mantener tras tensar 0,9 s = cargado; soltar antes = normal.
+- Arco «potente»: ×2,2 daño (×2,4 con Ojo de halcón), ×1,4 velocidad, ×2,5 aturdimiento. Ballesta «triple»: 3 virotes en abanico (±0,18 rad), ×0,7 daño. `WeaponDef.charged_shot` lo fuerza.
+
+## Calibración de atributos
+- Velocidad de ataque (Destreza): 0,8 %/pt hasta 25, 0,5 % hasta 40, 0,3 % después; tope +25 % (antes +16 %).
+- Un punto de Destreza ≈ 40 % del daño que da un punto de Fuerza en «escala» (2 %/pt temprano), compensado por velocidad, voltereta e i-frames.
+- La ficha muestra la velocidad de ataque final.
+
+## Pendiente
+- Erika: falta el FBX de Mixamo.

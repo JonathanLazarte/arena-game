@@ -7,7 +7,7 @@ extends Node
 ## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 10 ## v9 = ronda 29: varios personajes con nombre propio; v10 = ronda 30: anillos/talismanes y ficha (horas, victorias)
+const SAVE_VERSION := 11 ## v11 = ronda 31: habilidades de jefe por personaje; v9 = ronda 29: varios personajes con nombre propio; v10 = ronda 30: anillos/talismanes y ficha (horas, victorias)
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -45,6 +45,7 @@ var char_names: Dictionary = {} ## id -> nombre que le puso el jugador
 var other_slots: Dictionary = {} ## id -> equipo del personaje no activo (arma, arma 2, armadura, hechizos)
 const NAME_MAX := 16
 # --- Ronda 30: anillos/talismanes y ficha personal ---
+var char_boss: Dictionary = {} ## ronda 31: personaje -> habilidades de jefe (máx. 3)
 var owned_trinkets: Array = [] ## colección global (anillos y talismanes)
 var rings_eq: Array = ["", ""] ## del personaje activo
 var talismans_eq: Array = ["", "", ""]
@@ -568,6 +569,7 @@ func save_loadout() -> void:
 			others[id] = g
 	cfg.set_value("personajes", "otros", others)
 	cfg.set_value("accesorios", "coleccion", owned_trinkets)
+	cfg.set_value("jefe", "habilidades", char_boss)
 	cfg.set_value("personajes", "fichas", char_stats)
 	cfg.set_value("personajes", "titulos", char_titles)
 	cfg.set_value("depuracion", "regalo_prueba", debug_granted)
@@ -693,6 +695,7 @@ func load_loadout() -> void:
 		char_stats = cfg.get_value("personajes", "fichas", {})
 		char_titles = cfg.get_value("personajes", "titulos", {})
 	debug_granted = bool(cfg.get_value("depuracion", "regalo_prueba", false))
+	char_boss = cfg.get_value("jefe", "habilidades", {}) # v<11: estocada por defecto
 
 	attr_migrated = false
 	if ver < 5:
@@ -902,3 +905,27 @@ func set_title(t: String) -> bool:
 func display_name_with_title(id: String = "") -> String:
 	var t := title_id(id)
 	return char_name(id) + ("  «%s»" % Titles.def(t)["name"] if t != "" else "")
+
+
+# ---------------- Ronda 31: habilidades de jefe ----------------
+func boss_abilities(cid: String = "") -> Array:
+	if cid == "":
+		cid = character_id
+	var a: Array = char_boss.get(cid, BossAbilities.DEFAULT)
+	return a.duplicate()
+
+## Equipa/quita una habilidad (máx. 3, mínimo 1). Devuelve si cambió.
+func toggle_boss_ability(id: String) -> bool:
+	if not BossAbilities.DEFS.has(id):
+		return false
+	var a := boss_abilities()
+	if id in a:
+		if a.size() <= 1:
+			return false
+		a.erase(id)
+	else:
+		if a.size() >= BossAbilities.MAX_EQUIPPED:
+			return false
+		a.append(id)
+	char_boss[character_id] = a
+	return true

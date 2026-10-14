@@ -6,7 +6,7 @@ extends Node3D
 ## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
 ## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
 ## Ronda 20: pestañas Herrero y Ajustes; cada panel tiene «✕» (y Esc / Atrás) para cerrarlo.
-const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Herrero", "Tienda", "Reclutar", "Inventario", "Ajustes"]
+const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Jefe", "Herrero", "Tienda", "Reclutar", "Inventario", "Ajustes"]
 const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Artes", "Accesorios"]
 const BUS_NAMES := {"Master": "General", "Música": "Música", "Efectos": "Efectos", "UI": "Interfaz"}
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
@@ -718,6 +718,8 @@ func _refresh_all(rebuild: bool = true) -> void:
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
 			detail.text = "[b]Árbol de %s[/b] · Nivel %d\nPuntos disponibles: [color=#f2dc99]%d[/color] (1 por nivel del personaje). Toca un nodo para aprenderlo." % [cur.display_name, gs.char_level(), gs.skill_points()]
 			_stat("XP personaje", cl.x, cl.y, "%d/%d" % [cl.x, cl.y])
+		"Jefe":
+			_build_boss()
 		"Herrero":
 			_build_smith(cur)
 		"Ajustes":
@@ -1062,3 +1064,22 @@ func _build_settings() -> void:
 	list_box.add_child(orow)
 	list_box.move_child(orow, 3)
 	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nCámara: sensibilidad de la órbita, invertir Y y ratón capturado (por defecto se orbita con clic derecho arrastrando; Esc libera el ratón). En Android, arrastra en la mitad derecha.\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
+
+
+## Ronda 31: habilidades de jefe (máx. 3 equipadas, sin recarga: cada una cuesta un recurso).
+func _build_boss() -> void:
+	var eq: Array = gs.boss_abilities()
+	list_box.add_child(UIKit.label("Equipadas %d/%d · B usa · N cambia" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.MUTED))
+	for id: String in BossAbilities.ORDER:
+		var on: bool = id in eq
+		var b := UIKit.button(("✔ " if on else "   ") + "%s  (%s)" % [BossAbilities.def(id)["name"], BossAbilities.cost_text(id)], 17, UIKit.ORANGE if on else UIKit.BLUE)
+		b.name = "Boss_" + id
+		b.custom_minimum_size = Vector2(370, 42)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(func() -> void:
+			gs.toggle_boss_ability(id)
+			gs.save_loadout()
+			_refresh_all(false)
+			detail.text = BossAbilities.codex(id))
+		list_box.add_child(b)
+	detail.text = "[b]Habilidades de jefe[/b]\nSin tiempo de recarga: cuestan aguante, maná (Energía) o vida (nunca te dejan a 0).\n\n" + BossAbilities.codex(String(eq[0]))

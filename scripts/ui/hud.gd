@@ -328,10 +328,11 @@ func _update_contextual_buttons() -> void:
 	var tv := joystick.visible
 	(btns["parry"] as TouchScreenButton).visible = tv and not _player.mounted
 	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
-	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if _player.boss_cd <= 0.0 else Color(1, 1, 1, 0.45)
-	var bsec := ceili(_player.boss_cd) if _player.boss_cd > 0.0 else 0
-	if _changed(btn_labels["boss"], bsec):
-		(btn_labels["boss"] as Label).text = "Jefe" if bsec <= 0 else "%d" % bsec
+	# Ronda 31: sin recarga; habilidad seleccionada y su coste
+	var bid := _player.selected_boss()
+	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if bid != "" and _player.boss_cost_ok(bid) else Color(1, 1, 1, 0.45)
+	if _changed(btn_labels["boss"], bid):
+		(btn_labels["boss"] as Label).text = (String(BossAbilities.def(bid)["name"]).split(" ")[0] + "\n" + BossAbilities.cost_text(bid)) if bid != "" else "Jefe"
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
 	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)

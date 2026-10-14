@@ -84,7 +84,7 @@ func _run() -> void:
 	gs.save_loadout()
 	gs.reset_defaults()
 	gs.load_loadout()
-	check(gs.SAVE_VERSION == 10 and gs.rings_eq[0] == "cefiro" and "cefiro" in gs.owned_trinkets and gs.title_id() == "vencedor" and gs.char_stat()["wins"] == 5, "v10: accesorios, título y ficha persisten")
+	check(gs.SAVE_VERSION >= 10 and gs.rings_eq[0] == "cefiro" and "cefiro" in gs.owned_trinkets and gs.title_id() == "vencedor" and gs.char_stat()["wins"] == 5, "v10: accesorios, título y ficha persisten")
 	# Migración v9 -> v10
 	var cfg := ConfigFile.new()
 	cfg.load(gs.save_path)

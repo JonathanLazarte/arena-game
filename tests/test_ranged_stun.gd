@@ -199,7 +199,7 @@ func _run() -> void:
 	var h0 := e.health
 	p.shoot()
 	await wait(0.6)
-	check(h0 - e.health >= xb.arrow_damage and is_equal_approx(e.last_hitstun, xb.ranged_hitstun), "virote: %.0f de daño y %.2f s de aturdimiento" % [h0 - e.health, e.last_hitstun])
+	check(h0 - e.health >= xb.arrow_damage and (e.stun_acc > 0.0 or e.staggers > 0), "virote: %.0f de daño y suma fuerza de aturdimiento (%.1f, ronda 31: acumulado)" % [h0 - e.health, e.stun_acc])
 	# ---------- Montado: disparo libre y huida parta ----------
 	await _place(14.0)
 	p.meter = Fighter.METER_MAX
@@ -296,8 +296,10 @@ func _run() -> void:
 	e.health = 5000.0
 	var r := await _combo_vs(false)
 	check(r["hits"] >= 2, "si no rueda (codicioso) el 2.º golpe le da (%d golpes)" % r["hits"])
-	check(absf(r["stun1"] - sh1) < 0.05, "golpe 1: aturde %.2f s" % r["stun1"])
-	check(r["fin_stun"] >= sh1 * 2.0, "remate: aturdimiento largo (%.2f s)" % r["fin_stun"])
+	# Ronda 31: un golpe solo no aturde (acumulado); el remate aporta más fuerza que el primero
+	check(r["stun1"] <= StunRules.STAGGER_T + 0.01, "golpe 1: como mucho tambaleo (%.2f s)" % r["stun1"])
+	var fin := p.combo_hit_for(p.melee().combo.size())
+	check(fin.hitstun > sh1 or fin.stun_force > p.combo_hit_for(1).stun_force, "remate: más fuerza de aturdimiento que el 1.º (%.2f vs %.2f)" % [fin.hitstun, sh1])
 	# b) rueda en cuanto acaba el aturdimiento -> esquiva el 2.º
 	await _place(1.8)
 	r = await _combo_vs(true)

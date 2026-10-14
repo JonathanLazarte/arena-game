@@ -61,6 +61,9 @@ extends Resource
 ## Ronda 20: acumulación de estado por golpe {"sangrado"/"veneno"/"congelacion": puntos}
 @export var status: Dictionary = {}
 ## Ronda 20: herrería (las fija Smithing.effective en una copia; el recurso base va a +0)
+@export var stun_force: float = -1.0 ## ronda 31: fuerza de aturdimiento propia (-1 = StunRules.WEAPON_FORCE)
+@export var heavy_stun_resist: float = 1.0 ## ronda 31: súper-armadura del fuerte en su anticipación
+@export var charged_shot: String = "" ## ronda 31 (arcos): "potente" o "triple" ("" = según el arma)
 @export var phys_type: String = "estandar" ## ronda 24: subtipo físico (PhysTypes)
 ## Ronda 25: paso adelante de cada ataque (m), estilo ER: por arma y por golpe del combo.
 @export var step_light: Array[float] = [0.9, 0.9, 1.2]
