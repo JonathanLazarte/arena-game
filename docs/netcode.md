@@ -85,13 +85,13 @@ Rule of thumb: rollback frames ≈ ceil(RTT/2 / 16.7) − input_delay. Real play
 
 Ruleset: sword/shield + bow on foot. Out: mounts, eikons, magic, boss abilities, jump, flask, backstep follow-up strike, dash-strike via dash-in-windup (disabled offline too).
 
-**Files** (`net/sim/`): `fx_math.gd` (256-step sin/cos table ×4096 as constants, integer sqrt, integer atan2 → heading index), `sim_params.gd` (bake), `fight_sim.gd` (state + step), `fight_engine.gd` (RbEngine adapter for `RbSession`), `sim_view.gd` (state → Fighter nodes, input packing).
+**Files** (`net/sim/`): `fx_math.gd` (256-step sin/cos table ×4096 as constants, integer sqrt, integer atan2 → heading index), `sim_params.gd` (bake), `fight_sim.gd` (state + step), `fight_engine.gd` (RbEngine adapter for `RbSession`), `sim_view.gd` (state → Fighter nodes, input packing), `sim_events.gd` + `sim_fx.gd` (presentation events), `sim_match.gd` (local two-player match loop).
 
 **Units:** position µm, velocity µm/tick, HP/stamina/stun force in thousandths, multipliers in ‰, all timers in ticks (60 Hz), heading 0..255.
 
-**State:** one `PackedInt64Array` of 254 ints = 2 × 81 fighter fields + 4 globals (frame, hit-stop freeze counter, xorshift RNG, hit-stop flag) + 8-slot projectile pool × 11. Save/load = `duplicate()` (~0.06 µs). Checksum = FNV-1a over both 32-bit halves of every int.
+**State:** one `PackedInt64Array` of 262 ints = 2 × 81 fighter fields + 4 globals (frame, hit-stop freeze counter, xorshift RNG, hit-stop flag) + 8-slot projectile pool × 12 (3D position/velocity). Save/load = `duplicate()` (~0.06 µs). Checksum = FNV-1a over both 32-bit halves of every int.
 
-**Params (baked, read-only):** computed once per match from the real `Fighter` pair (`SimParams.bake(a, b)`), so character, weapon, attributes, armour and charms feed the same numbers as offline. Matchup-dependent values are pre-resolved per attacker→defender: final damage after the defender's armour (`EquipStats.incoming`), blocked stamina cost (`blocked_hit_cost`), stun force, poise damage factor. Durations go through `tk()`, which replays the offline float accumulation (`t += 1/60` until `t >= d`), e.g. 0.4 s = 25 ticks. Summed timers (recovery + whiff + finisher, guard-counter windup) are baked as one value for the same reason. Peers must compare `params_checksum()` before starting.
+**Params (baked, read-only):** computed once per match from the real `Fighter` pair (`SimParams.bake(a, b)`), so character, weapon, attributes, armour and charms feed the same numbers as offline. Matchup-dependent values are pre-resolved per attacker→defender: raw damage + physical subtype, the defender's armour curve as a table (incoming(a)/a in ppm for a = 0..400 per subtype, applied in the sim *after* counter/riposte/charge/rage multipliers, same order as offline), blocked stamina cost (`blocked_hit_cost`), stun force, poise damage factor. Durations go through `tk()`, which replays the offline float accumulation (`t += 1/60` until `t >= d`), e.g. 0.4 s = 25 ticks. Summed timers (recovery + whiff + finisher, guard-counter windup) are baked as one value for the same reason. `params_checksum()` is FNV-1a 32 over the UTF-8 `var_to_str` of the params (platform-stable). Conditional runtime factors (rage) are divided out of the baked damage multiplier and applied live.
 
 **Input (int per player per tick):** bits 0–4 world heading (32 steps), 5 move, 6 half stick, 7 attack held, 8 block held, 9 parry, 10 roll, 11 sprint, 12 swap, 13 lock-on. Edges are derived in the sim from the previous input (stored in state), so predicted repeats never re-trigger. The controller layer (tap = light on release, hold 24 ticks = heavy then charge, 24-tick action queue of up to 4 actions, cleared when hit) lives inside the sim, so it rolls back with the rest. Shield-less fighters must not send bit 8 (local controller rule).
 
@@ -99,20 +99,4 @@ Ruleset: sword/shield + bow on foot. Out: mounts, eikons, magic, boss abilities,
 
 **Online/sim mode:** `Fighter.sim_driven` (default false). When true, `_physics_process` only orients the node and updates `KnightVisual`; `SimView.apply(state)` writes the fields the animation/HUD read and emits `health_changed`/`stamina_changed`/`died`. The view never feeds back into the sim, so rollback just re-applies a state.
 
-**Parity (tests/test_net_parity.gd, real Fighter vs FightSim, same scripted actions, 11 scenarios):** damage, stun-level counts, parries, dodges, guard breaks, hits and stance breaks equal in all scenarios; first-hit tick within ±1 tick, stun durations within ±2 ticks (6/11 scenarios fully identical). Remaining differences:
-- arrows land 1 tick earlier in the sim (2D distance vs offline 3D hit-centre distance);
-- charged heavy damage differs < 0.05 (charge time quantised to ticks);
-- stun-tick counts ±1–2 in long exchanges (offline float decrement vs integer ticks).
-
-**Known gaps (not yet modelled):** defence curve applied linearly to multiplied hits (offline applies the armour curve after counter/riposte/charge multipliers), weapon infusions/elemental split, status build-up (bleed/poison/frost), trinket and passive effects that act at runtime (heal-over-time, rage), arena pillars, aim lead, camera-relative stick smoothing (moved to the local controller), 3D arrow height, footstep/meter/energy (cosmetic or out of ruleset).
-
-**Measured cost (dev Xeon, GDScript):** `FightSim.step` 26 µs/tick (both fighters + pool); checksum 12 µs; rollback harness, delay 2 / window 8:
-
-| RTT | avg rollback | max | resim per rollback avg / p99 | sim cost per real tick avg |
-|---|---|---|---|---|
-| 50 ms | 1.0 | 3 | 54 / 103 µs | 48 µs |
-| 100 ms | 1.6 | 4 | 69 / 146 µs | 59 µs |
-| 150 ms | 3.0 | 6 | 115 / 224 µs | 68 µs |
-| 200 ms | 4.6 | 7 | 149 / 278 µs | 75 µs |
-
-Worst case 8-tick rollback ≈ 0.3 ms desktop, ≈ 1.5 ms on a mid phone (×5): well inside the 3–4 ms budget.
+**Parity (tests/test_net_parity.gd, real Fighter vs FightSim, same scripted actions, 22 scenarios incl. sprint attack, crit, crossbow, armour (light/heavy/counter/parry), aim lead, rage, heal passive, parry-stamina charm):** all compared values equal; first-hit tick within ±1, stun durations within ±2 ticks (0 differences beyond the exact tolerance). Remaining sub-tick drift: charged heavy damage < 0.05 (charge time quantised to ticks).
