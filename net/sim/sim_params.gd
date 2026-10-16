@@ -259,4 +259,8 @@ static func defaults() -> Array:
 	return [p, p.duplicate(true)]
 
 static func params_checksum(ps: Array) -> int:
-	return hash(var_to_str(ps)) & 0xFFFFFFFF
+	# FNV-1a de 32 bits sobre el texto UTF-8: estable entre plataformas (hash() no lo garantiza).
+	var h := 2166136261
+	for b in var_to_str(ps).to_utf8_buffer():
+		h = ((h ^ b) * 16777619) & 0xFFFFFFFF
+	return h

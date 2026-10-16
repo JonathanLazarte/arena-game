@@ -14,6 +14,8 @@ var engine_factory: Callable = func() -> RbEngine: return RbEngine.new() ## moto
 var bot_mask := 63 ## bits de entrada que pueden pulsar los bots
 var bot_change := 0.25
 var bot_or := 0 ## bits siempre pulsados (p. ej. fijado)
+var last_peers: Array[RbSession] = [] ## pares de la última ejecución (para inspección en pruebas)
+var params_hash := [0, 0] ## params_checksum de cada par (0 = sin comprobación)
 var corrupt_at := -1 ## prueba negativa: altera el estado del par 1 en ese tick (simula una fuente no determinista)
 
 func run(ticks: int) -> Dictionary:
@@ -24,6 +26,9 @@ func run(ticks: int) -> Dictionary:
 	bots[1].seed = seed_v * 31 + 2
 	var cur_in: Array[int] = [0, 0]
 	var peers: Array[RbSession] = [RbSession.new(0, delay, window, engine_factory.call()), RbSession.new(1, delay, window, engine_factory.call())]
+	last_peers = peers
+	peers[0].params_hash = params_hash[0]
+	peers[1].params_hash = params_hash[1]
 	var wire: Array = [] # [deliver_ms, to, packet]
 	var dt := 1000.0 / RbSim.TICK_HZ
 	var step_usec := 0

@@ -24,6 +24,9 @@ var max_resim: int = 0
 var stalls: int = 0
 var resim_usec: Array[int] = []
 
+var params_hash: int = 0    ## params_checksum local (0 = sin comprobación)
+var peer_hash: int = -1     ## recibido del rival; hasta que coincida no se avanza
+var params_mismatch := false
 var engine: RbEngine ## simulación enchufable (RbSim por defecto; FightEngine para las reglas de combate)
 
 func _init(player: int, delay: int = 2, window: int = 8, eng: RbEngine = null) -> void:
@@ -52,9 +55,13 @@ func make_packet(peer_ack: int) -> Dictionary:
 	var arr: Array[int] = []
 	for t in range(from, last_local + 1):
 		arr.append(int(local_in.get(t, 0)))
-	return {"from": from, "inputs": arr, "ack": last_remote}
+	return {"from": from, "inputs": arr, "ack": last_remote, "ph": params_hash}
 
 func receive_packet(p: Dictionary) -> void:
+	peer_hash = int(p.get("ph", 0))
+	if params_hash != 0 and peer_hash != params_hash:
+		params_mismatch = true # reglas distintas: la partida no puede ser determinista
+		return
 	var from: int = p["from"]
 	var arr: Array = p["inputs"]
 	for i in arr.size():
@@ -88,6 +95,9 @@ func _sim_one() -> void:
 
 ## Un tick de tiempo real. Devuelve false si se detiene (demasiado por delante del rival).
 func tick() -> bool:
+	if params_mismatch or (params_hash != 0 and peer_hash != params_hash):
+		stalls += 1
+		return false
 	if _earliest_wrong >= 0:
 		var t0 := Time.get_ticks_usec()
 		var target := frame
