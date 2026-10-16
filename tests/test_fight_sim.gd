@@ -132,5 +132,32 @@ func _initialize() -> void:
 			if t > 30 and end_t < 0 and sx[S.ATK_STATE] == S.Atk.NONE: end_t = t
 		ends.append(end_t)
 	check(ends[0] - ends[1] == S.HITSTOP_HEAVY, "hit-stop = contador de congelación (+%d ticks)" % (ends[0] - ends[1]))
+	# --- arco ---
+	s = duel(10.0)
+	var arrow_hit := -1
+	for t in 200:
+		var hh: int = s[F + S.HP]
+		S.step(s, P, (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t == 40 else 0), 0)
+		if arrow_hit < 0 and s[F + S.HP] < hh: arrow_hit = t
+	check(s[S.LOADOUT] == S.Load.BOW, "cambio a arco")
+	check(P[1]["hp"] - s[F + S.HP] == P[0]["arrow_dmg"], "flecha: daño (%d) al tick %d" % [P[1]["hp"] - s[F + S.HP], arrow_hit])
+	s = duel(10.0)
+	run(s, 260, func(t: int) -> int: return (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t >= 40 and t < 40 + 30 + 60 else 0))
+	check(P[1]["hp"] - s[F + S.HP] == P[0]["arrow_dmg_ch"] and s[S.SHOT_CHARGED] == 1, "disparo cargado (mantener 0,9 s tras tensar): %d" % (P[1]["hp"] - s[F + S.HP]))
+	s = duel(10.0)
+	run(s, 200, func(t: int) -> int: return (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t == 40 else 0), func(_t: int) -> int: return S.IN_BLOCK)
+	check(s[F + S.HP] == P[1]["hp"] and s[F + S.BLOCKS] == 1 and s[F + S.ST] < P[1]["st_max"], "flecha bloqueada: sin daño, cuesta aguante")
+	s = duel(10.0)
+	var pool_max := 0
+	for t in 400:
+		S.step(s, P, (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t > 30 and t % 2 == 0 else 0), 0)
+		var live := 0
+		for j in S.PROJ_MAX: live += int(s[S.PROJ_BASE + j * S.PR_FIELDS + S.PR_ON])
+		pool_max = maxi(pool_max, live)
+	check(pool_max >= 1 and pool_max <= S.PROJ_MAX and s[S.SHOTS] > 3, "proyectiles en piscina fija (máx. vivos %d, disparos %d)" % [pool_max, s[S.SHOTS]])
+	# parry de flecha: la refleja
+	s = duel(10.0)
+	run(s, 200, func(t: int) -> int: return (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t == 40 else 0), func(t: int) -> int: return S.IN_PARRY if t == 78 else 0)
+	check(s[F + S.PARRIES] == 1 and s[F + S.HP] == P[1]["hp"], "parry refleja la flecha (vida tirador %d)" % s[S.HP])
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
