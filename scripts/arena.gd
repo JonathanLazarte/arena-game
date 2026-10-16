@@ -122,7 +122,30 @@ func _ready() -> void:
 	lock_marker = MeshUtil.sphere(self, 0.22, Vector3.ZERO, Color(1.0, 0.82, 0.35), true)
 	lock_ring = _make_lock_ring()
 	_warm_eikons()
+	if sim_mode:
+		_setup_sim_match()
 	start_round()
+
+## Modo sim: sin IA ni PlayerController; la sim decide y los Fighter solo se dibujan.
+func _setup_sim_match() -> void:
+	ai.set_physics_process(false); ai.set_process(false)
+	controller.enabled = false
+	controller.set_physics_process(false); controller.set_process(false)
+	sim_match = SimMatch.new()
+	sim_match.name = "SimMatch"
+	sim_match.camera = camera
+	add_child(sim_match)
+	sim_match.setup(player, enemy, self)
+	sim_match.on_event = _on_sim_event
+	enemy.face_target = player
+	player.face_target = enemy
+
+func _on_sim_event(ev: Dictionary) -> void:
+	match String(ev["kind"]):
+		"hit", "crit", "guard_break", "stance_break":
+			shake = maxf(shake, 0.18 if ev["kind"] == "hit" else 0.3)
+		"parry":
+			shake = maxf(shake, 0.12)
 
 ## Ronda 26: pide en hilo los modelos de los eikons de ambos luchadores y, cuando llegan,
 ## calienta una instancia oculta (fuera de cámara, 2 fotogramas) para compilar sombreadores
@@ -164,9 +187,12 @@ func _on_execution_cinematic(attacker: Fighter, target: Fighter, duration: float
 ## Ronda 23: hit-stop (el tiempo casi se detiene unos milisegundos, en tiempo real).
 const SHAKE_SCALE := 0.3
 static var hitstop_enabled: bool = true
+## Modo sim (fase online): ambos luchadores los mueve FightSim con dos entradas locales. Por defecto apagado.
+static var sim_mode: bool = false
+var sim_match: SimMatch
 var hitstops: int = 0
 func _on_hitstop(d: float) -> void:
-	if not hitstop_enabled or _hs_prev > 0.0 or Engine.time_scale <= 0.0:
+	if sim_mode or not hitstop_enabled or _hs_prev > 0.0 or Engine.time_scale <= 0.0:
 		return
 	hitstops += 1
 	if is_instance_valid(player):
@@ -463,7 +489,9 @@ func start_round(new_match: bool = false) -> void:
 	state = "fight"
 	champion_phase2_started = false
 	time_left = ROUND_TIME
-	controller.enabled = true
+	controller.enabled = not sim_mode
+	if sim_match:
+		sim_match.reset_round()
 	_update_round_label()
 	hud.show_message("Ronda %d - ¡Lucha!" % round_num, 1.2)
 
@@ -500,6 +528,8 @@ func _on_fighter_died(f: Fighter) -> void:
 	if state != "fight":
 		return
 	var winner := 1 if f == player else 0
+	if sim_match:
+		sim_match.running = false
 	wins[winner] += 1
 	_update_round_label()
 	player.dismiss_eikon()
