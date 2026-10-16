@@ -62,10 +62,10 @@ func receive_packet(p: Dictionary) -> void:
 	if params_hash != 0 and peer_hash != params_hash:
 		params_mismatch = true # reglas distintas: la partida no puede ser determinista
 		return
-	var from: int = p["from"]
-	var arr: Array = p["inputs"]
+	var from: int = int(p["from"])
+	var arr: Variant = p["inputs"]
 	for i in arr.size():
-		var t := from + i
+		var t: int = from + i
 		if remote_in.has(t):
 			continue
 		remote_in[t] = arr[i]

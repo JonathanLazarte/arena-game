@@ -39,7 +39,8 @@ enum {
 	F_FIELDS
 }
 const P_BASE := 2 * F_FIELDS
-enum { G_FRAME, G_FREEZE, G_RNG, G_HITSTOP_ON, G_FIELDS }
+enum { G_FRAME, G_FREEZE, G_RNG, G_HITSTOP_ON, G_WINS0, G_WINS1, G_ROUND, G_END_T, G_FIELDS }
+## G_END_T: ticks desde que cayó un luchador en esta ronda (0 = ronda en curso). FightEngine reinicia la ronda.
 const PROJ_BASE := P_BASE + G_FIELDS
 const PROJ_MAX := 8
 enum { PR_ON, PR_OWNER, PR_X, PR_Z, PR_Y, PR_VX, PR_VZ, PR_VY, PR_LIFE, PR_RAW, PR_FORCE, PR_DODGED, PR_FIELDS }
@@ -140,6 +141,8 @@ static func step(s: PackedInt64Array, params: Array, in0: int, in1: int) -> void
 	if s[g + G_FREEZE] > 0:
 		s[g + G_FREEZE] -= 1 # hit-stop: todo congelado (las pulsaciones se conservan como flancos)
 		s[g + G_FRAME] += 1
+		if s[g + G_END_T] > 0:
+			s[g + G_END_T] += 1
 		return
 	_control(s, params, 0, in0)
 	_control(s, params, 1, in1)
@@ -147,6 +150,8 @@ static func step(s: PackedInt64Array, params: Array, in0: int, in1: int) -> void
 	_update(s, params, 1, in1)
 	_projectiles(s, params)
 	s[g + G_FRAME] += 1
+	if s[g + G_END_T] > 0:
+		s[g + G_END_T] += 1
 
 # ---------------- Capa de control (PlayerController, determinista) ----------------
 static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
@@ -492,6 +497,9 @@ static func _damage(s: PackedInt64Array, a: int, b: int, amount: int) -> void:
 	s[a + DMG_DEALT] += dealt
 	if s[b + HP] <= 0:
 		s[b + ALIVE] = 0
+		if s[P_BASE + G_END_T] == 0:
+			s[P_BASE + G_END_T] = 1
+			s[P_BASE + G_WINS0 + a / F_FIELDS] += 1
 
 ## take_hit. kind: 0 cuerpo a cuerpo, 1 flecha, 2 crítico. raw = daño bruto (bloqueo), fin = tras defensa.
 ## Devuelve 0 nada, 1 golpe, 2 bloqueo, 3 parry, 4 esquiva.
