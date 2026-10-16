@@ -62,6 +62,7 @@ step_heavy = 2.4
 display_name = "Hacha a dos manos"
 description = "Lenta y devastadora. Rompe guardias: bloquearla cuesta el doble de aguante."
 allows_shield = false
+two_handed = true
 reach_foot = 2.5
 reach_mounted = 3.6
 half_arc_foot_deg = 80.0

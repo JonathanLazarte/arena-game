@@ -8,6 +8,8 @@ enum Phase { CIRCLE, COMMIT, RETREAT, REST, BREATHE }
 
 var me: Fighter
 var enabled: bool = true
+var champion_phase_two: bool = false
+var champion_style: Dictionary = {}
 ## Perfil de dificultad (por defecto el rival es nivel 1 "easy").
 var profile: AIDifficulty = preload("res://resources/ai/easy.tres")
 var _react_t: float = -1.0 ## reacción pendiente (retraso de reacción)
@@ -57,6 +59,11 @@ var _boss_done: bool = false
 var boss_dodges: int = 0
 var boss_used: int = 0
 
+func configure_champion(champion: Dictionary) -> void:
+	var style: Dictionary = champion.get("style", {})
+	champion_style = style.duplicate()
+	_pref_dist = float(champion_style.get("distance", 7.5))
+
 func _on_landed(_t: Node3D, res: String, was_open: bool) -> void:
 	if res == "hit" and was_open:
 		punish_hits += 1
@@ -84,6 +91,14 @@ func _physics_process(delta: float) -> void:
 	# --- Golpe de área en el suelo que le va a alcanzar: a veces lo salta (o rueda fuera) ---
 	if _avoid_aoe(dir):
 		return
+	# Normal y Difícil castigan el frasco con una estocada o un proyectil durante su animación.
+	if opp.flask_t > 0.0 and profile.profile_name != "easy" and not me.mounted:
+		me.want_block = false
+		if me.loadout == Fighter.Loadout.SWORD_SHIELD and dist > 3.0 and dist < Fighter.BOSS_DIST + 1.0 and me.boss_skill("estocada"):
+			boss_used += 1
+			return
+		if me.loadout == Fighter.Loadout.BOW and me.shoot():
+			return
 	# --- A pie: volver a montar (su eikon) cuando sea seguro, si no, luchar a pie ---
 	if not me.mounted:
 		var m := me.nearest_free_mount()
@@ -244,6 +259,8 @@ func _physics_process(delta: float) -> void:
 			return
 		if me.meter >= Fighter.METER_MAX and me.atk_state == Fighter.Atk.NONE:
 			me.summon()
+		if _try_magic(dist, dir, opp):
+			return
 		_try_specials(dist, dir)
 		# Ronda 25: Estocada de jefe a media distancia
 		if not me.mounted and _try_boss(dist, dir, opp):
@@ -312,7 +329,9 @@ func _physics_process(delta: float) -> void:
 		return
 	match phase:
 		Phase.CIRCLE:
-			_orbit += _orbit_dir * delta * profile.orbit_speed
+			if not champion_style.is_empty():
+				_pref_dist = float(champion_style.get("distance", _pref_dist))
+			_orbit += _orbit_dir * delta * profile.orbit_speed * float(champion_style.get("orbit", 1.0))
 			if absf(_orbit) > MAX_ORBIT:
 				_orbit = clampf(_orbit, -MAX_ORBIT, MAX_ORBIT)
 				_orbit_dir = -_orbit_dir
@@ -333,7 +352,7 @@ func _physics_process(delta: float) -> void:
 			elif _phase_t <= 0.0 and not _is_behind(opp) and me.stamina > profile.commit_min_stamina and sword_mode and not me.is_swapping():
 				phase = Phase.COMMIT
 				_delay_t = -1.0
-				_phase_t = 2.5
+				_phase_t = 2.5 * float(champion_style.get("commit", 1.0))
 				_swings = 1 + randi() % maxi(profile.max_chain, 1)
 				_started = false
 				_dash_in = dist > 4.5 and randf() < profile.dash_in_chance
@@ -409,6 +428,22 @@ func _incoming_projectile() -> bool:
 	return false
 
 func _avoid_aoe(dir: Vector3) -> bool:
+	
+	for n in me.get_tree().get_nodes_in_group("ground_wave"):
+		var gw := n as GroundWave
+		if gw == null or gw.team == me.team or _aoe_done.has(gw.get_instance_id()):
+			continue
+		var rel := MeshUtil.flat(me.global_position - gw.global_position)
+		var along := rel.dot(gw.direction)
+		var lat := absf(rel.dot(gw.direction.cross(Vector3.UP)))
+		if along > 0.0 and along < 6.0 and lat < gw.width * 0.5 + me.hit_radius + 0.5:
+			_aoe_done[gw.get_instance_id()] = true
+			if randf() < profile.jump_aoe_chance and me.jump():
+				aoe_jumps += 1
+				return true
+			me.move_input = gw.direction.cross(Vector3.UP).normalized()
+			if me.dash():
+				return true
 	for n in me.get_tree().get_nodes_in_group("ground_aoe"):
 		var a := n as GroundAoE
 		if a == null or a.detonated or a.hidden or a.team == me.team or _aoe_done.has(a.get_instance_id()):
@@ -429,7 +464,7 @@ func _avoid_aoe(dir: Vector3) -> bool:
 
 ## Habilidad del personaje (golpe sísmico) y especial del eikon montado.
 func _try_specials(dist: float, dir: Vector3) -> void:
-	if randf() > profile.special_chance:
+	if randf() > minf(profile.special_chance * float(champion_style.get("special", 1.0)), 0.9):
 		return
 	if me.has_special() and me.special_cd <= 0.0 and not me.mounted and dist < Fighter.SLAM_RADIUS - 1.0 and me.stamina > 35.0:
 		me.special()
@@ -446,14 +481,46 @@ func _try_specials(dist: float, dir: Vector3) -> void:
 				if dist < 5.0:
 					me.eikon_special()
 
+## Ronda 35: hechizo del Eikon y arte de arma según distancia y oportunidad.
+func _try_magic(dist: float, dir: Vector3, opp: Fighter) -> bool:
+	var special_chance := minf(profile.special_chance * (1.5 if champion_phase_two else 1.0) * float(champion_style.get("special", 1.0)), 0.8)
+	if randf() < special_chance and me.can_cast():
+		var id := me.current_spell()
+		var d := EikonSpells.spell(id)
+		var safe_to_cast := dist > 5.0 or (opp.atk_state != Fighter.Atk.WINDUP and opp.boss_phase == Fighter.Boss.NONE)
+		var useful := false
+		match String(d.get("type", "")):
+			"proyectil": useful = dist > 5.0 and dist < 18.0
+			"cono": useful = dist < float(d.get("range", 5.5)) and me.facing.dot(dir) > 0.55
+			"buff": useful = me.health < me.max_health * 0.72 and dist < 9.0
+		if safe_to_cast and useful and me.cast_spell():
+			return true
+	if not me.has_special() and me.weapon_art_id != "" and randf() < special_chance:
+		var art_ok := false
+		match me.weapon_art_id:
+			"estocada_impulsada": art_ok = dist > me.sword_range() + 0.8 and dist < 9.0 and me.facing.dot(dir) > 0.55
+			"torbellino": art_ok = dist < 3.3
+		if art_ok and me.special():
+			return true
+	return false
+
 
 # ---------------- Ronda 31: habilidades de jefe de la IA ----------------
 var ab_flee_frames: int = 0
 var boss_by_id: Dictionary = {}
 
+func enter_champion_phase_two() -> void:
+	champion_phase_two = true
+	phase = Phase.COMMIT
+	_phase_t = 3.0 * float(champion_style.get("phase2", 1.0))
+	_started = false
+	_swings = 2
+	_dash_in = true
+
 ## Elige una habilidad equipada que tenga sentido a esta distancia y la usa (con probabilidad).
 func _try_boss(dist: float, dir: Vector3, opp: Fighter) -> bool:
-	if randf() >= profile.boss_use_chance:
+	var use_chance := minf(profile.boss_use_chance * (2.5 if champion_phase_two else 1.0) * float(champion_style.get("boss", 1.0)), 0.45)
+	if randf() >= use_chance:
 		return false
 	var ids: Array = me.boss_ids.duplicate()
 	ids.shuffle()
@@ -461,10 +528,17 @@ func _try_boss(dist: float, dir: Vector3, opp: Fighter) -> bool:
 		var ok := false
 		match id:
 			"estocada": ok = dist > 3.5 and dist < Fighter.BOSS_DIST + 1.0 and me.facing.dot(dir) > 0.5
+			"tajo_retardado", "presa_verdugo", "danza_cisne": ok = dist < 3.2 and me.facing.dot(dir) > 0.6
+			"giro_martillo": ok = dist < 3.5
+			"paso_espectral": ok = dist > 3.5 and dist < 12.0
+			"onda_rastrera", "rayos_trazadores", "lluvia_meteoros": ok = dist > 4.5 and dist < 15.0
+			"aliento_dragon": ok = dist > 2.5 and dist < 7.0 and me.facing.dot(dir) > 0.5
+			"furia_fase": ok = dist > 4.0 and me.health > 50.0 and me.rage_t <= 0.0
+			"postura_contra": ok = dist < 3.5 and opp.atk_state == Fighter.Atk.WINDUP
 			"carga_area": ok = dist < 3.5 and opp.atk_state == Fighter.Atk.NONE
 			"rafaga": ok = dist > 6.0 and dist < 16.0
 			"escudo_mana": ok = dist < 3.5 and opp.atk_state == Fighter.Atk.WINDUP
-			"combo_falso": ok = dist < 2.6 and me.facing.dot(dir) > 0.6
+			"combo_falso": ok = dist < float(BossAbilities.def("combo_falso").get("range", 9.0)) and me.facing.dot(dir) > 0.3
 			"salto_caida": ok = dist > 5.0 and dist < 14.0 and me.health > 40.0
 		if ok and me.boss_skill(id):
 			boss_by_id[id] = int(boss_by_id.get(id, 0)) + 1

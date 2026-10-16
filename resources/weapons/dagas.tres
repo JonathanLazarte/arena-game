@@ -1,11 +1,10 @@
-[gd_resource type="Resource" script_class="WeaponDef" format=3]
+[gd_resource type="Resource" script_class="WeaponDef" format=3 uid="uid://yscnvaer3sc7"]
 
-[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/data/combo_hit.gd" id="ch"]
+[ext_resource type="Script" uid="uid://wqw2i6w2i426" path="res://scripts/data/weapon_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://bu6771h2n7p8l" path="res://scripts/data/combo_hit.gd" id="ch"]
 
 [sub_resource type="Resource" id="combo_0"]
 script = ExtResource("ch")
-hitstun = 0.18
 name = "Puñalada izquierda"
 anim = "Dualwield_Melee_Attack_Slice"
 direction = "izq→der"
@@ -17,14 +16,13 @@ active = 0.1
 recovery = 0.35
 stamina = 8.0
 window = 0.4
+hitstun = 0.18
 
 [sub_resource type="Resource" id="combo_1"]
 script = ExtResource("ch")
-hitstun = 0.18
 name = "Puñalada derecha"
 anim = "Dualwield_Melee_Attack_Slice"
 mirror = true
-direction = "der→izq"
 damage = 7.0
 reach = 1.7
 arc_deg = 60.0
@@ -33,10 +31,10 @@ active = 0.1
 recovery = 0.35
 stamina = 8.0
 window = 0.4
+hitstun = 0.18
 
 [sub_resource type="Resource" id="combo_2"]
 script = ExtResource("ch")
-hitstun = 0.55
 name = "Doble estocada"
 anim = "Dualwield_Melee_Attack_Stab"
 direction = "estocada"
@@ -44,20 +42,15 @@ damage = 14.0
 reach = 2.0
 arc_deg = 35.0
 windup = 0.34
-active = 0.12
-recovery = 0.55
 stamina = 12.0
 poise_mult = 1.8
 lunge = 7.0
 finisher = true
+hitstun = 0.55
 
 [resource]
 script = ExtResource("1")
-scaling = {"fuerza": 0.2, "destreza": 1.8}
-requirements = {"destreza": 12}
 id = "dagas"
-step_light = Array[float]([0.6, 0.6, 0.9])
-step_heavy = 1.0
 display_name = "Dagas dobles"
 description = "Muy rápidas y baratas, poco alcance. Combos de 4."
 allows_shield = false
@@ -65,7 +58,6 @@ reach_foot = 1.7
 reach_mounted = 2.6
 half_arc_foot_deg = 60.0
 half_arc_mounted_deg = 85.0
-phys_type = "cortante"
 light_damage = 8.0
 heavy_damage = 18.0
 light_windup = 0.28
@@ -76,15 +68,26 @@ light_recovery = 0.4
 heavy_recovery = 0.6
 light_stamina = 9.0
 heavy_stamina = 20.0
-poise_damage_mult = 0.6
 guard_break_mult = 0.7
+poise_damage_mult = 0.6
 no_shield_block_chip = 0.55
 anim_light = PackedStringArray("Dualwield_Melee_Attack_Slice", "Dualwield_Melee_Attack_Stab", "Dualwield_Melee_Attack_Chop")
 anim_heavy = "Dualwield_Melee_Attack_Stab"
 mesh_source = "res://assets/models/Rogue.glb"
 mesh_right = "Knife"
 mesh_left = "Knife_Offhand"
-max_combo = 3
-combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])
 heavy_hitstun = 0.45
-status = {"sangrado": 18.0}
+scaling = {
+"destreza": 1.8,
+"fuerza": 0.2
+}
+requirements = {
+"destreza": 12
+}
+combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])
+status = {
+"sangrado": 18.0
+}
+phys_type = "cortante"
+step_light = Array[float]([0.6, 0.6, 0.9])
+step_heavy = 1.0

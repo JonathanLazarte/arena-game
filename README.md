@@ -728,3 +728,30 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - Salto con caída sin marca en el suelo; la IA reacciona al verle bajar.
 - Arco/ballesta: mantener tensa sin disparar, dispara al soltar; cargado ≥ 0,9 s con brillo dorado y sonido.
 - Botón ▶ en el HUD para cambiar la habilidad de jefe. Pruebas: `tests/test_round32.gd`.
+
+## Ronda 35 — Primer paso del Duelo de Campeones
+
+- La IA equipa el hechizo de su Eikon y un arte de arma; usa proyectiles a media distancia, conos de cerca, mejoras cuando está herida, estocadas para entrar y giros si el jugador se acerca.
+- Se definió una escalera de cinco campeones con personaje, arma, Eikon, hechizo y tres habilidades de jefe fijos. El lobby permite activar el modo y guarda el avance de la escalera.
+- Cada campeón empieza con dos habilidades. Al bajar del 50 % de vida, desbloquea la tercera, recibe 0,85 s de invulnerabilidad de transición y 9 s de Furia; un destello teñido por su Eikon, breve hitstop, sacudida de cámara y aviso anuncian la fase. Gorath invoca al Gólem.
+- La primera victoria contra cada campeón entrega un Sello de Eikon único. El primer sello se equipa automáticamente; desde Eikons se puede cambiar o quitar. El sello modifica daño, duración, vida o ritmo de ataque de la invocación.
+- Cambiar o quitar un sello guarda el loadout al instante. El aura de la Fase II se limpia al iniciar la siguiente ronda, y el resultado indica si el nuevo sello quedó equipado automáticamente.
+- Cada campeón usa ajustes tácticos propios además de la dificultad general: distancia, velocidad de rodeo, frecuencia de recursos, compromiso y presión de Fase II. Vael presiona de cerca, Lyra juega alrededor de las respuestas defensivas, Gorath se compromete con ataques pesados, Nysera prioriza movilidad y recursos a distancia, y Draven acelera el cierre.
+- El lobby muestra el campeón actual, su introducción y la recompensa; el botón principal nombra el enfrentamiento. La pantalla de victoria anticipa al próximo campeón y su sello.
+- Pendiente del bloque: afinar los valores de cada perfil con observaciones de combate en fácil, normal y difícil.
+
+## Fase E — Claridad y respuesta del combate (rondas 42–43)
+
+- Los ataques cuerpo a cuerpo dibujan una estela 3D continua entre la empuñadura y la punta de la espada, teñida por la infusión; las habilidades de jefe pueden darle un color propio.
+- El HUD muestra una barra fina de postura para cada luchador y cambia a tonos cálidos cuando queda menos del 25 %. Los contraataques, críticos, roturas de postura y roturas de guardia generan avisos flotantes junto al luchador involucrado.
+- Los contraataques y críticos tienen respuesta de audio; las roturas conservan el sonido de guardia rota.
+- Los críticos frontales y «Presa verdugo» activan durante 0,8 s una aproximación de cámara con FOV reducido y encuadre de perfil de ambos luchadores.
+
+## Fase F — Controladores internos (rondas 44–45)
+
+- `FighterCombat` agrupa el inicio, encadenamiento, actualización y resolución de los ataques cuerpo a cuerpo, el parry, la postura y los críticos.
+- `FighterMount` agrupa montar/desmontar, selección de montura cercana, daño y recuperación de postura de montura.
+- `FighterMagic` agrupa hechizos, sus tiempos de recarga y las artes de arma. `Fighter` conserva sus propiedades y métodos fachada para mantener los puntos de integración existentes.
+- «Ráfaga» reproduce un tajo del personaje por cada proyectil; la fase de contacto de cada animación coincide con la emisión del corte espectral.
+- La preparación para PvP queda limitada a esta modularización: faltan reglas de combate, salas y sincronización de red por definir antes de implementar un modo PvP.
+- A pie, la aceleración normal es más rápida; el impulso de carrera entra con una respuesta exponencial de 0,14 s y cae con una cola más suave de 0,28 s al soltarla. El frenado de dirección sigue siendo ágil; las monturas mantienen su aceleración propia y comparten la entrada/salida gradual del galope.

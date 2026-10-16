@@ -90,9 +90,9 @@ static func attack_rating(c: CharacterDef, w: WeaponDef, a: Dictionary, dano_mod
 	return {"base": base, "bonus": total - base, "total": total, "fisico": total - holy, "sagrado": holy, "unmet": Attributes.unmet(w, a)}
 
 ## Hoja completa (lo que muestra la ficha y usa el combate).
-static func sheet(c: CharacterDef, lv: int, a: Dictionary, w: WeaponDef, w2: WeaponDef, armor: Dictionary) -> Dictionary:
+static func sheet(c: CharacterDef, lv: int, a: Dictionary, w: WeaponDef, w2: WeaponDef, armor: Dictionary, offhand: WeaponDef = null) -> Dictionary:
 	var ad := Attributes.derived(c.id, a)
-	var weight := weapon_weight(w) + weapon_weight(w2)
+	var weight := weapon_weight(w) + weapon_weight(w2) + weapon_weight(offhand)
 	var apoise := 0.0
 	for s: String in armor:
 		var p: ArmorDef = armor[s]

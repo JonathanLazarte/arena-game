@@ -32,6 +32,8 @@ var lock_marker: MeshInstance3D
 ## Ronda 16: anillo de objetivo fijado (estilo FF: dorado con borde azul) en el suelo del objetivo.
 var lock_ring: Node3D
 var match_result: Dictionary = {}
+var champion_id: String = ""
+var champion_phase2_started: bool = false
 
 var _t0_ms: int = Time.get_ticks_msec() ## ronda 30: tiempo jugado (ficha del personaje)
 func _ready() -> void:
@@ -42,12 +44,23 @@ func _ready() -> void:
 	if gs and gs.from_lobby:
 		player = _make_fighter(gs.display_name_with_title(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
-			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "trinkets": gs.equipped_trinkets()})
-		player.set_magic(gs.equipped_spells(), gs.weapon_art()) # ronda 21
+			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "left_hand": gs.left_hand(), "offhand": gs.offhand_weapon(), "shield": gs.weapon2_id == "escudo", "trinkets": gs.equipped_trinkets()})
+		player.set_magic(gs.equipped_spells(), gs.weapon_art(), gs.equipped_eikon_seal) # ronda 35
 		player.set_boss_abilities(gs.boss_abilities()) # ronda 31
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
-	if gs and gs.random_rival:
+	if gs and gs.from_lobby and gs.champion_mode:
+		var ch := ChampionCatalog.at(gs.champion_progress)
+		champion_id = ChampionCatalog.ORDER[mini(gs.champion_progress, ChampionCatalog.ORDER.size() - 1)]
+		var cd := Catalog.character(String(ch["character"]))
+		var wd := Catalog.weapon(String(ch["weapon"]))
+		var eid := String(ch["eikon"])
+		enemy = _make_fighter(ChampionCatalog.display_name(ch), 1, Color(0.85, 0.15, 0.15), Catalog.EIKONS[eid], cd,
+			Smithing.effective(wd, Smithing.rival_level(gs.char_level())), [], Attributes.auto_allocate(cd.id, gs.char_level()),
+			{"level": gs.char_level(), "armor": EquipStats.rival_armor(cd.id, gs.char_level())})
+		enemy.set_boss_abilities(ch["boss"].slice(0, 2))
+		enemy.set_magic([String(ch["spell"])], String(ch["art"]))
+	elif gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
 		var rc: CharacterDef = r["character"]
 		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["eikon"], rc, Smithing.effective(r["weapon"], Smithing.rival_level(gs.char_level())), [], # ronda 20: arma mejorada a su nivel
@@ -55,9 +68,13 @@ func _ready() -> void:
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(rc.id, gs.char_level())}) # ronda 19
 	else:
 		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), EIKONS[1 + randi() % 2])
-	var pool: Array = BossAbilities.ORDER.duplicate()
-	pool.shuffle()
-	enemy.set_boss_abilities(pool.slice(0, BossAbilities.MAX_EQUIPPED)) # ronda 31: el rival lleva 3 al azar
+	if champion_id == "":
+		var pool: Array = BossAbilities.ORDER.duplicate()
+		pool.shuffle()
+		enemy.set_boss_abilities(pool.slice(0, BossAbilities.MAX_EQUIPPED)) # ronda 31: el rival lleva 3 al azar
+		# Ronda 35: rivales aleatorios equipan hechizo de Eikon y arte de arma.
+		var rival_arts: Array = WeaponArts.ORDER
+		enemy.set_magic(EikonSpells.default_for(enemy.eikon.id), String(rival_arts[randi() % rival_arts.size()]))
 	player.opponent = enemy
 	player.impact.connect(_on_impact)
 	enemy.impact.connect(func(_s: float) -> void: pass)
@@ -89,6 +106,8 @@ func _ready() -> void:
 	rig.arena_radius = RADIUS
 	add_child(rig)
 	rig.reset_behind()
+	player.execution_cinematic.connect(_on_execution_cinematic)
+	enemy.execution_cinematic.connect(_on_execution_cinematic)
 	controller.joystick = hud.joystick
 	add_child(controller)
 	hud.controller = controller
@@ -97,6 +116,8 @@ func _ready() -> void:
 	ai.me = enemy
 	if gs and gs.from_lobby:
 		ai.profile = load(Catalog.DIFFICULTIES[gs.difficulty])
+	if champion_id != "":
+		ai.configure_champion(ChampionCatalog.by_id(champion_id))
 	add_child(ai)
 	lock_marker = MeshUtil.sphere(self, 0.22, Vector3.ZERO, Color(1.0, 0.82, 0.35), true)
 	lock_ring = _make_lock_ring()
@@ -136,6 +157,10 @@ func _warm_async(paths: Array[String]) -> void:
 func _on_impact(strength: float) -> void:
 	shake = maxf(shake, SHAKE_SCALE * strength)
 
+func _on_execution_cinematic(attacker: Fighter, target: Fighter, duration: float) -> void:
+	if rig and is_instance_valid(attacker) and is_instance_valid(target):
+		rig.play_execution(attacker, target, duration)
+
 ## Ronda 23: hit-stop (el tiempo casi se detiene unos milisegundos, en tiempo real).
 const SHAKE_SCALE := 0.3
 static var hitstop_enabled: bool = true
@@ -144,6 +169,10 @@ func _on_hitstop(d: float) -> void:
 	if not hitstop_enabled or _hs_prev > 0.0 or Engine.time_scale <= 0.0:
 		return
 	hitstops += 1
+	if is_instance_valid(player):
+		player.apply_local_hitstop(d)
+	if is_instance_valid(enemy):
+		enemy.apply_local_hitstop(d)
 	_hs_prev = Engine.time_scale # respeta la escala previa (pruebas aceleradas, capturas)
 	Engine.time_scale = _hs_prev * 0.05
 	await get_tree().create_timer(d, true, false, true).timeout
@@ -165,7 +194,7 @@ func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 	f.set_skills(sk)
 	f.set_attributes(at)
 	if not eqp.is_empty():
-		f.set_equipment(int(eqp.get("level", 1)), eqp.get("armor", {}), eqp.get("w2", null))
+		f.set_equipment(int(eqp.get("level", 1)), eqp.get("armor", {}), eqp.get("w2", null), String(eqp.get("left_hand", "")), eqp.get("offhand", null), bool(eqp.get("shield", false)))
 		f.set_trinkets(eqp.get("trinkets", [])) # ronda 30
 	f.display_name = n
 	f.team = team
@@ -361,6 +390,8 @@ func _physics_process(delta: float) -> void:
 			var pl := player.health / player.max_health
 			var en := enemy.health / enemy.max_health
 			_on_fighter_died(enemy if pl >= en else player)
+		if state == "fight" and champion_id != "" and not champion_phase2_started and enemy.alive and enemy.health <= enemy.max_health * 0.5:
+			_begin_champion_phase_two()
 	rig.active = state == "fight"
 	rig.update(delta) # ronda 25: cámara orbital (ratón / arrastre táctil), colisión con pilares
 	if shake > 0.0:
@@ -413,19 +444,54 @@ func _make_lock_ring() -> Node3D:
 	return root
 
 func start_round(new_match: bool = false) -> void:
-	for g: String in ["projectile", "ground_aoe"]:
+	for g: String in ["projectile", "ground_aoe", "ground_wave"]:
 		for n in get_tree().get_nodes_in_group(g):
 			n.queue_free()
 	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD, not new_match)
 	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK, not new_match)
+	enemy.rage_t = 0.0
+	if champion_id != "":
+		# El aura de Fase II no debe quedar pegada al reiniciar la ronda.
+		if enemy._kv:
+			enemy._kv.set_glow(false, Color.BLACK)
+		enemy.set_boss_abilities(ChampionCatalog.by_id(champion_id)["boss"].slice(0, 2))
+	if ai:
+		ai.champion_phase_two = false
 	camera.global_position = player.global_position + Vector3(0, 5, 9)
 	if rig:
 		rig.reset_behind()
 	state = "fight"
+	champion_phase2_started = false
 	time_left = ROUND_TIME
 	controller.enabled = true
 	_update_round_label()
 	hud.show_message("Ronda %d - ¡Lucha!" % round_num, 1.2)
+
+func _begin_champion_phase_two() -> void:
+	champion_phase2_started = true
+	var ch := ChampionCatalog.by_id(champion_id)
+	enemy.set_boss_abilities(ch.get("boss", [])) # desbloquea la tercera habilidad al 50 %
+	enemy.rage_t = 9.0
+	enemy.invuln = 0.85
+	var phase_color := Color(1.0, 0.12, 0.04)
+	match String(ch.get("eikon", "")):
+		"lobo": phase_color = Color(0.35, 0.8, 1.0)
+		"grifo": phase_color = Color(0.95, 0.8, 0.2)
+		"golem": phase_color = Color(0.6, 0.75, 0.5)
+	if bool(ch.get("phase2_summon", false)):
+		enemy.meter = Fighter.METER_MAX
+		enemy.meter_changed.emit(enemy.meter)
+	enemy._burst_particles(phase_color)
+	if enemy._kv:
+		enemy._kv.set_glow(true, phase_color)
+	if ai:
+		ai.enter_champion_phase_two()
+		if bool(ch.get("phase2_summon", false)) and enemy.can_summon():
+			enemy.summon()
+	shake = maxf(shake, 0.32)
+	player.apply_local_hitstop(0.12)
+	enemy.apply_local_hitstop(0.12)
+	hud.show_message("¡Fase II! %s libera su poder" % ch.get("name", "El campeón"), 2.4)
 
 func _update_round_label() -> void:
 	hud.round_label.text = "Ronda %d   %d - %d" % [round_num, wins[0], wins[1]]
@@ -458,7 +524,8 @@ func _award(won: bool) -> Dictionary:
 	if gs == null or not gs.from_lobby:
 		return {}
 	return gs.apply_match_result({"secs": (Time.get_ticks_msec() - _t0_ms) / 1000.0, "won": won, "rounds": wins[0], "lost_rounds": wins[1], "hits": player.hits_landed,
-		"parries": player.parries_landed, "difficulty": gs.difficulty})
+		"parries": player.parries_landed, "difficulty": gs.difficulty,
+		"champion_mode": champion_id != "", "champion_id": champion_id})
 
 func restart_match() -> void:
 	player.hits_landed = 0

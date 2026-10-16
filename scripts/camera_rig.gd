@@ -36,6 +36,21 @@ var _flick_t: float = 0.0
 var _released: bool = false
 var menu_open: bool = false ## ronda 30: menú de pausa abierto (ratón libre)
 var flicks: int = 0 ## cambios de objetivo con tirón (pruebas)
+var _execution_left: float = 0.0
+var _execution_duration: float = 0.8
+var _execution_attacker: Fighter
+var _execution_target: Fighter
+var _home_fov: float = 70.0
+
+func play_execution(attacker: Fighter, target: Fighter, duration: float = 0.8) -> void:
+	if not is_instance_valid(attacker) or not is_instance_valid(target):
+		return
+	if _execution_left <= 0.0 and camera:
+		_home_fov = camera.fov
+	_execution_attacker = attacker
+	_execution_target = target
+	_execution_duration = maxf(duration, 0.1)
+	_execution_left = _execution_duration
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseButton:
@@ -118,6 +133,30 @@ func update(delta: float) -> void:
 		var fwd := MeshUtil.flat(-camera.global_transform.basis.z).normalized()
 		if player.facing.dot(fwd) > 0.3:
 			yaw = lerp_angle(yaw, atan2(-player.facing.x, -player.facing.z), clampf(delta * RECENTER_RATE, 0.0, 1.0))
+	var cinematic_weight := 0.0
+	if _execution_left > 0.0 and is_instance_valid(_execution_attacker) and is_instance_valid(_execution_target):
+		_execution_left = maxf(_execution_left - delta, 0.0)
+		var progress := 1.0 - _execution_left / _execution_duration
+		cinematic_weight = smoothstep(0.0, 0.18, progress) * (1.0 - smoothstep(0.72, 1.0, progress))
+		var duel_axis := MeshUtil.flat(_execution_target.global_position - _execution_attacker.global_position).normalized()
+		if duel_axis.length() > 0.1:
+			var side := Vector3(duel_axis.z, 0.0, -duel_axis.x)
+			var side_yaw := atan2(side.x, side.z)
+			var other_side_yaw := side_yaw + PI
+			if absf(wrapf(yaw - other_side_yaw, -PI, PI)) < absf(wrapf(yaw - side_yaw, -PI, PI)):
+				side_yaw = other_side_yaw
+			yaw = lerp_angle(yaw, side_yaw, cinematic_weight)
+		pitch = lerpf(pitch, 0.24, cinematic_weight)
+		var center := _execution_attacker.global_position.lerp(_execution_target.global_position, 0.5)
+		var focus := center + Vector3(0.0, 1.55, 0.0)
+		pivot = pivot.lerp(focus, cinematic_weight)
+		look = look.lerp(focus, cinematic_weight)
+		dist = lerpf(dist, 6.4, cinematic_weight)
+	else:
+		_execution_left = 0.0
+		_execution_attacker = null
+		_execution_target = null
+	camera.fov = lerpf(_home_fov, 52.0, cinematic_weight)
 	var want_pos := pivot + _offset(yaw, pitch, dist)
 	camera.global_position = camera.global_position.lerp(_collide(pivot, want_pos), clampf(delta * 10.0, 0.0, 1.0))
 	if camera.global_position.distance_to(look) > 0.5:

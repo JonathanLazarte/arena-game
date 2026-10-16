@@ -1,0 +1,242 @@
+class_name FighterBossExt
+extends RefCounted
+## Módulo auxiliar de Fighter para ejecutar las habilidades de BossAbilitiesExt
+## (timeline, wave, rain, breath, rage, counter) manteniendo fighter.gd limpio.
+
+static func start(f: Fighter, id: String, d: Dictionary) -> void:
+	f.ab_ext_hit_landed = false
+	f.ab_counter_triggered = false
+	f.ab_vanished = false
+	f.ab_breath_tick = 0.0
+	var col: Color = d.get("color", Color.WHITE)
+	if f._kv:
+		f._kv.set_glow(true, col)
+
+static func update(f: Fighter, delta: float, d: Dictionary, prev: float) -> void:
+	var tk: float = f.telegraph_k
+	var tg: Node3D = f._ab_target()
+	var typ := String(d.get("type", ""))
+	match typ:
+		"timeline":
+			_update_timeline(f, delta, d, prev, tk, tg)
+		"wave":
+			_update_wave(f, delta, d, prev, tk, tg)
+		"rain":
+			_update_rain(f, delta, d, prev, tk, tg)
+		"breath":
+			_update_breath(f, delta, d, prev, tk, tg)
+		"rage":
+			_update_rage(f, delta, d, prev, tk)
+		"counter":
+			_update_counter(f, delta, d, prev, tk, tg)
+
+static func _update_timeline(f: Fighter, delta: float, d: Dictionary, prev: float, tk: float, tg: Node3D) -> void:
+	var hits: Array = d["hits"]
+	var track_deg := float(d.get("track", 180.0))
+	# Amague visual (flicker) en Tajo Retardado
+	if d.has("flicker"):
+		var fl: Array = d["flicker"]
+		var f0 := float(fl[0]) * tk
+		var f1 := float(fl[1]) * tk
+		if prev < f0 and f.ab_t >= f0:
+			f._snd("whiff", -2.0)
+			if f._kv:
+				f._kv.set_glow(true, Color.WHITE)
+		elif prev < f1 and f.ab_t >= f1 and f._kv:
+			f._kv.set_glow(true, d.get("color", Color(1.0, 0.8, 0.3)))
+	# Paso Espectral: desaparece y reaparece a la espalda antes del golpe
+	if d.has("vanish"):
+		var vt := float(d["vanish"]) * tk
+		var hit_t := float(hits[0][0]) * tk
+		var reappear_t := hit_t - 0.2
+		if f.ab_t >= vt and f.ab_t < reappear_t:
+			f.invuln = maxf(f.invuln, 0.08)
+			if not f.ab_vanished:
+				f.ab_vanished = true
+				f._rider_root.visible = false
+				f._burst_particles(d.get("color", Color(0.7, 0.4, 1.0)))
+		elif f.ab_vanished and f.ab_t >= reappear_t:
+			f.ab_vanished = false
+			f._rider_root.visible = true
+			if tg:
+				var back_dir := -tg.facing if "facing" in tg else -f.facing
+				var dest := tg.global_position + back_dir * float(d.get("blink_dist", 2.4))
+				f.global_position = Vector3(dest.x, 0.0, dest.z)
+				f._clamp_world()
+				var to_tg := MeshUtil.flat(tg.global_position - f.global_position)
+				if to_tg.length() > 0.1:
+					f.facing = to_tg.normalized()
+			f._burst_particles(d.get("color", Color(0.7, 0.4, 1.0)))
+	# Seguimiento y arremetida de cada golpe de la lista
+	if f.ab_fired < hits.size():
+		var h: Array = hits[f.ab_fired]
+		var th := float(h[0]) * tk
+		var lunge_spd := float(h[3]) if h.size() > 3 else 0.0
+		if tg and f.ab_t < th - 0.06:
+			f.facing = Fighter._turn_toward(f.facing, f._spell_dir(), deg_to_rad(track_deg) * delta)
+		if lunge_spd > 0.0 and f.ab_t > th - 0.25 and f.ab_t < th + 0.04:
+			var gap := MeshUtil.flat(tg.global_position - f.global_position).length() if tg else 99.0
+			if gap > float(d.get("reach", 2.6)) * 0.55:
+				f.ab_vel = f.facing * lunge_spd
+		if prev < th and f.ab_t >= th:
+			if d.get("hit_iframes", false):
+				f.invuln = maxf(f.invuln, 0.14)
+			var landed := _strike_timeline_hit(f, d, h)
+			f.ab_fired += 1
+			if not landed and d.get("abort_on_miss", false) and f.ab_fired == 1:
+				# Falló el agarre inicial: aborta el resto y pasa a recuperación alargada
+				f.ab_fired = hits.size()
+				f.ab_t = float(hits[-1][0]) * tk - float(d.get("miss_extra", 0.5))
+	var end_t := float(hits[-1][0]) * tk + float(d.get("recovery", 0.9))
+	if f.ab_t >= end_t:
+		f._end_ability()
+
+static func _strike_timeline_hit(f: Fighter, d: Dictionary, h: Array) -> bool:
+	f._snd("swing_heavy" if float(h[1]) >= 1.2 else "swing")
+	var any_hit := false
+	var reach := float(d.get("reach", 2.8))
+	var arc := float(d.get("arc", 60.0))
+	var unblockable := bool(d.get("unblockable", false))
+	var kind := "jefe" if unblockable else String(d.get("kind", "melee"))
+	for t in MeshUtil.enemies_of(f.get_tree(), f.team):
+		var dv := MeshUtil.flat(t.global_position - f.global_position)
+		if dv.length() > reach + float(t.hit_radius):
+			continue
+		if dv.length() > 0.2 and rad_to_deg(f.facing.angle_to(dv.normalized())) > arc:
+			continue
+		if t is Fighter:
+			(t as Fighter).incoming_stun_force = f.ab_force(float(h[2]), false)
+		var res: String = t.take_hit(f.ab_damage(f.ab_id, float(h[1])), f, kind)
+		if t is Fighter:
+			(t as Fighter).incoming_stun_force = -1.0
+		if res == "parry" and f.ab_id == "danza_cisne":
+			f._end_ability(true)
+			return false
+		if res == "hit" or res == "block":
+			any_hit = true
+			f.ab_ext_hit_landed = true
+			f.ab_hits_landed += 1
+			f.landed_hit.emit(t, res, false)
+			f.hitstop.emit(0.06)
+			if res == "hit" and d.get("grab", false) and f.ab_fired == 0 and t is Fighter:
+				var tf := t as Fighter
+				tf.apply_stun(float(d.get("grab_stun", 1.1)))
+				tf.global_position = f.global_position + f.facing * 1.1
+				tf._clamp_world()
+	return any_hit
+
+static func _update_wave(f: Fighter, delta: float, d: Dictionary, prev: float, tk: float, tg: Node3D) -> void:
+	var w := float(d["windup"]) * tk
+	if f.ab_t < w and tg:
+		f.facing = Fighter._turn_toward(f.facing, f._spell_dir(), deg_to_rad(240.0) * delta)
+	if prev < w and f.ab_t >= w:
+		var cnt := int(d.get("count", 3))
+		var spread := deg_to_rad(float(d.get("spread_deg", 18.0)))
+		var dmg := f.ab_damage(f.ab_id)
+		var frc := f.ab_force(float(d.get("force", 30.0)), false)
+		for i in cnt:
+			var ang := (i - (cnt - 1) * 0.5) * spread
+			var dir := f.facing.rotated(Vector3.UP, ang).normalized()
+			GroundWave.spawn(f.get_parent(), f, f.team, f.global_position + dir * 1.0, dir,
+				float(d["speed"]), float(d["range"]), float(d["width"]), dmg, frc, float(d["warn"]) * tk)
+		f.ab_fired = cnt
+		f._snd("eikon_slam")
+	if f.ab_t >= w + float(d.get("recovery", 0.8)):
+		f._end_ability()
+
+static func _update_rain(f: Fighter, _delta: float, d: Dictionary, _prev: float, tk: float, tg: Node3D) -> void:
+	var w := float(d["windup"]) * tk
+	var cnt := int(d["count"])
+	var iv := float(d["interval"])
+	while f.ab_fired < cnt and f.ab_t >= w + f.ab_fired * iv:
+		var pos := f.global_position + f.facing * 5.0
+		if String(d.get("mode", "track")) == "track":
+			if tg:
+				pos = tg.global_position
+		else:
+			var sr := float(d.get("scatter_r", 7.5))
+			var ang := randf() * TAU
+			var rad := sqrt(randf()) * sr
+			var center := tg.global_position if tg else f.global_position
+			pos = center + Vector3(cos(ang) * rad, 0.0, sin(ang) * rad)
+		var aoe := GroundAoE.spawn(f.get_parent(), f, f.team, pos, float(d["radius"]), float(d["tele"]) * tk, f.ab_damage(f.ab_id))
+		aoe.stun_force = f.ab_force(float(d.get("force", 25.0)), true)
+		aoe.knock = float(d.get("knock", 6.0))
+		f.ab_fired += 1
+		f._snd("eikon_wind", -3.0)
+	if f.ab_t >= w + (cnt - 1) * iv + float(d.get("recovery", 0.6)):
+		f._end_ability()
+
+static func _update_breath(f: Fighter, delta: float, d: Dictionary, _prev: float, tk: float, tg: Node3D) -> void:
+	var w := float(d["windup"]) * tk
+	var dur := float(d["duration"])
+	if tg and f.ab_t < w + dur:
+		f.facing = Fighter._turn_toward(f.facing, f._spell_dir(), deg_to_rad(float(d.get("turn_deg", 70.0))) * delta)
+	if f.ab_t >= w and f.ab_t < w + dur:
+		f.ab_breath_tick -= delta
+		if f.ab_breath_tick <= 0.0:
+			f.ab_breath_tick = float(d.get("tick", 0.3))
+			f.ab_fired += 1
+			f._snd("eikon_fire", -2.0)
+			f._burst_particles(d.get("color", Color(1.0, 0.4, 0.05)))
+			var rng := float(d.get("range", 7.5))
+			var half_arc := deg_to_rad(float(d.get("arc", 28.0)))
+			for t in MeshUtil.enemies_of(f.get_tree(), f.team):
+				var dv := MeshUtil.flat(t.global_position - f.global_position)
+				if dv.length() > rng + float(t.hit_radius):
+					continue
+				if dv.length() > 0.2 and f.facing.angle_to(dv.normalized()) > half_arc:
+					continue
+				if t is Fighter:
+					(t as Fighter).incoming_element = String(d.get("element", "fuego"))
+					(t as Fighter).incoming_stun_force = f.ab_force(float(d.get("force", 8.0)), true)
+				var res: String = t.take_hit(f.ab_damage(f.ab_id), f, "eikon")
+				if t is Fighter:
+					(t as Fighter).incoming_stun_force = -1.0
+				if res == "hit" or res == "block":
+					f.ab_hits_landed += 1
+	if f.ab_t >= w + dur + float(d.get("recovery", 1.1)):
+		f._end_ability()
+
+static func _update_rage(f: Fighter, _delta: float, d: Dictionary, prev: float, tk: float) -> void:
+	var w := float(d["windup"]) * tk
+	if prev < w and f.ab_t >= w:
+		f.rage_t = float(d.get("duration", 9.0))
+		f._burst_particles(Color(0.95, 0.15, 0.1))
+		f._snd("eikon_summon")
+	if f.ab_t >= w + float(d.get("recovery", 0.3)):
+		f._end_ability()
+
+static func _update_counter(f: Fighter, _delta: float, d: Dictionary, _prev: float, tk: float, _tg: Node3D) -> void:
+	var w := float(d["windup"]) * tk
+	var st := float(d["stance"]) * tk
+	var rec := float(d["recovery_hit"] if f.ab_counter_triggered else d["recovery_miss"])
+	if f.ab_t >= w + st + rec:
+		f._end_ability()
+
+## Se llama desde Fighter.take_hit cuando está en la ventana activa de postura_contra.
+static func trigger_counter(f: Fighter, attacker: Node3D) -> String:
+	var d := f.ab_def()
+	f.ab_counter_triggered = true
+	var w := float(d["windup"]) * f.telegraph_k
+	var st := float(d["stance"]) * f.telegraph_k
+	f.ab_t = w + st # salta directo a la recuperación corta tras el contragolpe
+	f._snd("parry")
+	f._burst_particles(Color(0.4, 0.7, 1.0))
+	if is_instance_valid(attacker) and attacker.has_method("take_hit"):
+		var dv := MeshUtil.flat(attacker.global_position - f.global_position)
+		if dv.length() > 0.1:
+			f.facing = dv.normalized()
+		if dv.length() <= float(d.get("reach", 4.0)) + float(attacker.get("hit_radius")):
+			if attacker is Fighter:
+				(attacker as Fighter).incoming_stun_force = f.ab_force(float(d.get("cforce", 55.0)), false)
+			var dmg := f.melee().heavy_damage * f.damage_mult() * float(d.get("cmult", 1.6))
+			var res: String = attacker.take_hit(dmg, f, "jefe")
+			if attacker is Fighter:
+				(attacker as Fighter).incoming_stun_force = -1.0
+			if res == "hit":
+				f.ab_hits_landed += 1
+				f.landed_hit.emit(attacker, res, true)
+				f.hitstop.emit(0.09)
+				f.impact.emit(1.0)
+	return "parry"

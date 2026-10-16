@@ -8,6 +8,7 @@ extends Resource
 @export_multiline var description: String = ""
 @export var ranged: bool = false ## arco: dispara en vez de atacar cuerpo a cuerpo
 @export var allows_shield: bool = true
+@export var two_handed: bool = false ## requiere ambas manos; no admite objetos en la izquierda
 # Alcance
 @export var reach_foot: float = 2.2
 @export var reach_mounted: float = 3.4

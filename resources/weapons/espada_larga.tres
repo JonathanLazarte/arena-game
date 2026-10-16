@@ -60,6 +60,7 @@ step_heavy = 1.8
 display_name = "Espada larga"
 description = "A dos manos: más alcance y daño, sin escudo."
 allows_shield = false
+two_handed = true
 reach_foot = 2.6
 reach_mounted = 3.8
 half_arc_foot_deg = 75.0

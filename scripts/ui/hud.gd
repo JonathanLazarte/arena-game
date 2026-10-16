@@ -15,6 +15,10 @@ var e_health: ProgressBar
 var e_meter: ProgressBar
 var p_stamina: ProgressBar
 var e_stamina: ProgressBar
+var p_stance: ProgressBar
+var e_stance: ProgressBar
+var p_mount_stance: ProgressBar
+var e_mount_stance: ProgressBar
 var round_label: Label
 var timer_label: Label
 var message: Label
@@ -33,9 +37,13 @@ var _meter_full: bool = false
 var _summon_btn: TouchScreenButton
 var _special_btn: TouchScreenButton
 var _summon_label: Label
+var _flask_label: Label
+var _overlay: Control
+var _combat_popups: Array[Dictionary] = []
 
 func _ready() -> void:
 	var root := Control.new()
+	_overlay = root
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UIKit.theme()
@@ -46,13 +54,23 @@ func _ready() -> void:
 	e_meter = _bar(root, Vector2(1280 - 420, 52), UIKit.CYAN, 14)
 	p_stamina = _bar(root, Vector2(20, 70), UIKit.YELLOW, 10)
 	e_stamina = _bar(root, Vector2(1280 - 420, 70), UIKit.YELLOW, 10)
+	p_stance = _bar(root, Vector2(20, 82), Color(0.95, 0.9, 0.7), 6)
+	e_stance = _bar(root, Vector2(1280 - 420, 48), Color(1.0, 0.78, 0.34), 6)
+	p_stance.tooltip_text = "Postura · se agota al recibir golpes"
+	e_stance.tooltip_text = "Postura del rival · puedes quebrarla con presión"
+	p_mount_stance = _bar(root, Vector2(20, 90), Color(0.8, 0.62, 0.28), 6)
+	p_mount_stance.max_value = Fighter.MOUNT_STANCE_MAX
+	p_mount_stance.tooltip_text = "Postura de la montura"
+	e_mount_stance = _bar(root, Vector2(1280 - 420, 56), Color(0.8, 0.62, 0.28), 6)
+	e_mount_stance.max_value = Fighter.MOUNT_STANCE_MAX
+	e_mount_stance.tooltip_text = "Postura de la montura rival"
 	# Ronda 29: del rival solo se ve la vida (y sus estados): ni aguante ni barra de eikon
 	e_meter.visible = false
 	e_stamina.visible = false
-	name_p = _label(root, "Jugador", Vector2(20, 84), 18)
-	name_e = _label(root, "Rival", Vector2(1280 - 420, 52), 18)
-	loadout_label = _label(root, "Espada y escudo", Vector2(20, 108), 18)
-	swap_bar = _bar(root, Vector2(20, 112), Color(0.8, 0.8, 1.0), 12)
+	name_p = _label(root, "Jugador", Vector2(20, 101), 18)
+	name_e = _label(root, "Rival", Vector2(1280 - 420, 66), 18)
+	loadout_label = _label(root, "Espada y escudo", Vector2(20, 127), 18)
+	swap_bar = _bar(root, Vector2(20, 151), Color(0.8, 0.8, 1.0), 12)
 	swap_bar.size = Vector2(250, 12)
 	swap_bar.max_value = 1.0
 	swap_bar.visible = false
@@ -70,16 +88,17 @@ func _ready() -> void:
 	joystick.position = Vector2(150, 570)
 	add_child(joystick)
 	_touch_button("Atacar", "attack_sword", Vector2(1160, 600), 62, Color(0.85, 0.85, 0.9))
-	_touch_button("Escudo", "block", Vector2(1030, 640), 52, Color(0.4, 0.5, 0.9))
-	_touch_button("Cambiar", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
+	_touch_button("Parry /\nEscudo", "left_hand", Vector2(1030, 640), 52, Color(0.4, 0.5, 0.9))
+	_touch_button("Arma\n3ª", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
 	_touch_button("Eikon", "summon", Vector2(150, 400), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
 	_touch_button("Objetivo", "target_next", Vector2(1190, 255), 34, Color(0.95, 0.8, 0.35))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
 	# Ronda 15: a pie es «Correr» (alternar); montado vuelve a ser «Galope» (mantener)
 	_touch_button("Correr", "run_toggle", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
-	_touch_button("Parry", "parry", Vector2(925, 530), 40, Color(0.3, 0.9, 1.0))
 	_touch_button("Rodar", "dash", Vector2(920, 640), 42, Color(0.6, 0.9, 0.6))
+	_touch_button("Frasco", "flask", Vector2(1040, 455), 38, Color(0.85, 0.2, 0.25))
+	_flask_label = btn_labels["flask"]
 	# Ronda 14: salto y habilidad del personaje
 	_touch_button("Saltar", "jump", Vector2(805, 535), 40, Color(0.75, 0.85, 1.0))
 	_touch_button("Habilidad", "special", Vector2(930, 415), 40, Color(1.0, 0.45, 0.25))
@@ -88,6 +107,7 @@ func _ready() -> void:
 	_touch_button("↻", "spell_next", Vector2(722, 360), 24, Color(0.7, 0.5, 1.0))
 	# Ronda 25: habilidad de jefe
 	_touch_button("Jefe", "boss", Vector2(840, 300), 38, Color(1.0, 0.3, 0.15))
+	_touch_button("Estocada", "boss_variation", Vector2(840, 235), 32, Color(1.0, 0.58, 0.2))
 	# Ronda 32: flecha para cambiar de habilidad de jefe (botón normal: se ve en PC y en Android)
 	boss_next_btn = Button.new()
 	boss_next_btn.name = "BossNext"
@@ -296,12 +316,27 @@ func _process(_d: float) -> void:
 	_update_status(status_p, _player)
 	_update_status(status_e, _enemy)
 	_update_status(status_over, _enemy)
+	p_stance.visible = not _player.mounted
+	p_stance.max_value = maxf(_player.stance_max, 1.0)
+	p_stance.value = 0.0 if _player.stance_broken_t > 0.0 else _player.stance
+	p_stance.modulate = Color(1.0, 0.5, 0.28) if _player.stance_broken_t > 0.0 else (Color(1.0, 0.45, 0.3) if _player.stance_fraction() < 0.25 else Color.WHITE)
+	e_stance.visible = is_instance_valid(_enemy) and not _enemy.mounted
+	if is_instance_valid(_enemy):
+		e_stance.max_value = maxf(_enemy.stance_max, 1.0)
+		e_stance.value = 0.0 if _enemy.stance_broken_t > 0.0 else _enemy.stance
+		e_stance.modulate = Color(1.0, 0.5, 0.28) if _enemy.stance_broken_t > 0.0 else (Color(1.0, 0.45, 0.3) if _enemy.stance_fraction() < 0.25 else Color.WHITE)
+	p_mount_stance.visible = _player.mounted
+	p_mount_stance.value = _player.mount_stance
+	e_mount_stance.visible = is_instance_valid(_enemy) and _enemy.mounted
+	if is_instance_valid(_enemy):
+		e_mount_stance.value = _enemy.mount_stance
 	if status_over_box and is_instance_valid(_enemy):
 		var cam := get_viewport().get_camera_3d()
 		var head := _enemy.global_position + Vector3(0, 3.2 if _enemy.mounted else 2.5, 0)
 		status_over_box.visible = cam != null and not cam.is_position_behind(head)
 		if status_over_box.visible:
 			status_over_box.position = cam.unproject_position(head) - Vector2(70, 30)
+	_update_combat_popups(_d)
 	swap_bar.visible = _player.is_swapping()
 	swap_bar.value = _player.swap_progress()
 	# Ronda 26: el texto solo se reconstruye si cambia lo que muestra
@@ -335,13 +370,67 @@ func _process(_d: float) -> void:
 		if not _player.has_special() and btn_labels.has("special") and _changed(btn_labels["special"], "Arte"):
 			(btn_labels["special"] as Label).text = "Arte"
 	_update_contextual_buttons()
+	if _flask_label:
+		_flask_label.text = "Frasco\n%d" % _player.flask_charges
+		(btns["flask"] as TouchScreenButton).modulate = Color.WHITE if _player.flask_charges > 0 and _player.health < _player.max_health else Color(1, 1, 1, 0.45)
+
+func _spawn_combat_popup(target: Node3D, text: String, color: Color) -> void:
+	if target == null or _overlay == null:
+		return
+	var label: Label = UIKit.label(text, 22, color)
+	label.name = "CombatPopup"
+	label.size = Vector2(240, 34)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_outline_color", Color(0.025, 0.025, 0.04, 0.95))
+	label.add_theme_constant_override("outline_size", 5)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.add_child(label)
+	var lift := 2.45
+	if target is Fighter and (target as Fighter).mounted:
+		lift = 3.35
+	_combat_popups.append({"target": target, "anchor": target.global_position + Vector3(0.0, lift, 0.0),
+		"label": label, "age": 0.0, "life": 0.78, "offset": Vector2(randf_range(-18.0, 18.0), 0.0)})
+
+func _update_combat_popups(delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	for i in range(_combat_popups.size() - 1, -1, -1):
+		var popup: Dictionary = _combat_popups[i]
+		var label: Label = popup["label"] as Label
+		var age: float = float(popup["age"]) + delta
+		var life: float = float(popup["life"])
+		if age >= life or not is_instance_valid(label):
+			if is_instance_valid(label):
+				label.queue_free()
+			_combat_popups.remove_at(i)
+			continue
+		popup["age"] = age
+		var target: Node3D = popup["target"] as Node3D
+		var anchor: Vector3 = popup["anchor"]
+		if is_instance_valid(target):
+			var lift: float = 2.45 if not (target is Fighter and (target as Fighter).mounted) else 3.35
+			anchor = target.global_position + Vector3(0.0, lift, 0.0)
+			popup["anchor"] = anchor
+		if cam:
+			label.visible = not cam.is_position_behind(anchor)
+			if label.visible:
+				var rise: float = 34.0 * age / life
+				var offset: Vector2 = popup["offset"]
+				label.position = cam.unproject_position(anchor) - label.size * 0.5 + offset + Vector2(0.0, -rise)
+		var fade_in := clampf(age / 0.07, 0.0, 1.0)
+		var fade_out := clampf((life - age) / 0.18, 0.0, 1.0)
+		label.modulate.a = minf(fade_in, fade_out)
+		_combat_popups[i] = popup
 
 ## Ronda 21: botones según el contexto. Parry desaparece montado; «Objetivo» solo con 2+ objetivos;
 ## «Hechizo» solo a pie y con hechizos equipados.
 func _update_contextual_buttons() -> void:
 	var tv := joystick.visible
-	(btns["parry"] as TouchScreenButton).visible = tv and not _player.mounted
+	(btns["left_hand"] as TouchScreenButton).visible = tv and not _player.mounted
+	(btns["swap_weapon"] as TouchScreenButton).visible = tv and _player.secondary != null
 	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
+	var combo_hits: Array = BossAbilities.def("combo_falso").get("hits", [])
+	(btns["boss_variation"] as TouchScreenButton).visible = tv and not _player.mounted and _player.ab_id == "combo_falso" and _player.ab_fired == combo_hits.size() - 1
 	if boss_next_btn:
 		boss_next_btn.visible = not _player.mounted and _player.boss_ids.size() > 1
 	# Ronda 31: sin recarga; habilidad seleccionada y su coste
@@ -371,8 +460,8 @@ func _update_contextual_buttons() -> void:
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
 	_enemy = enemy
-	status_p = _status_rows(root_control(), Vector2(20, 136), 150, "StatusPlayer")
-	status_e = _status_rows(root_control(), Vector2(1280 - 420, 78), 150, "StatusEnemy")
+	status_p = _status_rows(root_control(), Vector2(20, 170), 150, "StatusPlayer")
+	status_e = _status_rows(root_control(), Vector2(1280 - 420, 88), 150, "StatusEnemy")
 	status_over = _status_rows(root_control(), Vector2.ZERO, 60, "StatusOverTarget")
 	status_over_box = status_over["box"]
 	_build_pause_menu() # ronda 30
@@ -380,11 +469,15 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 	name_e.text = enemy.display_name
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
 	player.summon_failed.connect(_on_summon_failed)
-	# Ronda 24: avisos del intercambio
-	player.counter_landed.connect(func(_t: Node3D) -> void: show_message("¡Contraataque!", 0.5))
-	player.critical_landed.connect(func(_t: Node3D, d: float) -> void: show_message("¡Crítico! %d" % int(d), 0.9))
-	enemy.stance_broken.connect(func() -> void: show_message("¡Postura rota! Ataca de frente", 1.0))
-	player.stance_broken.connect(func() -> void: show_message("¡Tu postura se rompió!", 0.9))
+	# Ronda 42: avisos breves sobre el luchador implicado.
+	player.counter_landed.connect(func(_t: Node3D) -> void: _spawn_combat_popup(player, "¡CONTRAATAQUE!", Color(0.55, 0.9, 1.0)))
+	enemy.counter_landed.connect(func(_t: Node3D) -> void: _spawn_combat_popup(enemy, "¡CONTRAATAQUE!", Color(0.55, 0.9, 1.0)))
+	player.critical_landed.connect(func(t: Node3D, d: float) -> void: _spawn_combat_popup(t, "¡CRÍTICO! %d" % int(d), Color(1.0, 0.82, 0.32)))
+	enemy.critical_landed.connect(func(t: Node3D, d: float) -> void: _spawn_combat_popup(t, "¡CRÍTICO! %d" % int(d), Color(1.0, 0.82, 0.32)))
+	enemy.stance_broken.connect(func() -> void: _spawn_combat_popup(enemy, "¡POSTURA ROTA!", Color(1.0, 0.83, 0.4)))
+	player.stance_broken.connect(func() -> void: _spawn_combat_popup(player, "¡POSTURA ROTA!", Color(1.0, 0.5, 0.3)))
+	enemy.guard_broken.connect(func() -> void: _spawn_combat_popup(enemy, "¡GUARDIA ROTA!", Color(1.0, 0.4, 0.26)))
+	player.guard_broken.connect(func() -> void: _spawn_combat_popup(player, "¡GUARDIA ROTA!", Color(1.0, 0.4, 0.26)))
 	player.summoned.connect(func(e: Node3D) -> void:
 		var ed: EikonData = (e as Mount).eikon if e is Mount else (e as Eikon).data
 		show_message(("¡%s! Montado (E: %s)" % [ed.eikon_name, ed.special_name]) if ed.rideable else "¡%s invocado!" % ed.eikon_name, 1.2))
@@ -454,6 +547,29 @@ func show_results(won: bool, res: Dictionary) -> void:
 		c.queue_free()
 	level_up_label = null
 	if not res.is_empty():
+		if bool(res.get("champion_mode", false)):
+			var defeated := ChampionCatalog.display_name(ChampionCatalog.by_id(String(res.get("champion_id", ""))))
+			var progress := int(res.get("champion_progress", 0))
+			var total := int(res.get("champion_total", ChampionCatalog.ORDER.size()))
+			var champion_msg := "Escalera completada · %d/%d" % [progress, total] if progress >= total else ("Campeón derrotado: %s · vuelve al lobby para el siguiente (%d/%d)" % [defeated, progress, total] if won else "Reto pendiente: %s · puedes reintentarlo" % defeated)
+			var champion_label := UIKit.label(champion_msg, 17, UIKit.ORANGE if won else UIKit.MUTED)
+			champion_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			champion_label.custom_minimum_size = Vector2(460, 36)
+			champion_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			results_box.add_child(champion_label)
+			if won and String(res.get("next_champion_id", "")) != "":
+				var next_label := UIKit.label("SIGUIENTE RETO · %s\n%s\nRecompensa: %s — %s" % [String(res["next_champion_name"]), String(res["next_champion_intro"]), String(res["next_reward_name"]), String(res["next_reward_desc"])], 14, UIKit.TEXT)
+				next_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				next_label.custom_minimum_size = Vector2(460, 54)
+				next_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				results_box.add_child(next_label)
+			if String(res.get("new_seal", "")) != "":
+				var seal_status := "equipado automáticamente; puedes cambiarlo en Eikons" if bool(res.get("seal_auto_equipped", false)) else "ya puedes equiparlo desde Eikons"
+				var seal_label := UIKit.label("Sello desbloqueado: %s · %s." % [String(res["new_seal_name"]), seal_status], 16, UIKit.YELLOW)
+				seal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				seal_label.custom_minimum_size = Vector2(460, 28)
+				seal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				results_box.add_child(seal_label)
 		results_box.add_child(_row("", "EXP", "Oro", UIKit.MUTED, 15))
 		for l: Array in res["lines"]:
 			results_box.add_child(_row(l[0], "+%d" % l[1], ("+%d" % l[2]) if l[2] > 0 else "—", UIKit.TEXT, 18))

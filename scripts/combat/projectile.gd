@@ -23,6 +23,7 @@ var stun_force: float = -1.0 ## ronda 31: fuerza de aturdimiento (-1 = la del ti
 ## Ronda 31: autoseguimiento limitado (tajos mágicos): gira home_rate rad/s durante home_time s.
 var home_target: Node3D = null
 var home_rate: float = 0.0
+var home_pitch_rate: float = 0.0 ## límite vertical de seguimiento, en rad/s
 var home_time: float = 0.0
 var home_cone_deg: float = 90.0 ## ronda 33: si el objetivo queda a más de esto del rumbo, deja de perseguir
 var slash: bool = false ## ronda 32: espectro de tajo dorado en diagonal (ráfaga)
@@ -72,14 +73,22 @@ func _physics_process(delta: float) -> void:
 	if home_time > 0.0 and is_instance_valid(home_target) and home_rate > 0.0:
 		home_time -= delta
 		var want: Vector3 = home_target.get_hit_center() - global_position
-		want.y *= 0.3
 		if want.length() > 0.2:
 			var ang := direction.angle_to(want.normalized())
-			var ax := direction.cross(want.normalized())
 			if ang > deg_to_rad(home_cone_deg):
 				home_time = 0.0 # ronda 33: lo rebasó; sigue recto (sin forzar el impacto)
-			elif ang > 0.001 and ax.length() > 0.0001:
-				direction = direction.rotated(ax.normalized(), minf(ang, home_rate * delta)).normalized()
+			elif ang > 0.001:
+				var flat := Vector2(direction.x, direction.z)
+				var want_flat := Vector2(want.x, want.z)
+				if flat.length() < 0.001:
+					flat = Vector2(0.0, -1.0)
+				if want_flat.length() < 0.001:
+					want_flat = flat
+				flat = flat.normalized().rotated(clampf(flat.angle_to(want_flat.normalized()), -home_rate * delta, home_rate * delta)).normalized()
+				var pitch := asin(clampf(direction.y, -1.0, 1.0))
+				var want_pitch := asin(clampf(want.normalized().y, -1.0, 1.0))
+				pitch += clampf(want_pitch - pitch, -home_pitch_rate * delta, home_pitch_rate * delta)
+				direction = Vector3(flat.x * cos(pitch), sin(pitch), flat.y * cos(pitch)).normalized()
 				_orient()
 	global_position += direction * speed * delta
 	life -= delta

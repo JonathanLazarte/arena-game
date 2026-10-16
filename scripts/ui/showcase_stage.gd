@@ -251,7 +251,7 @@ func _shards() -> void:
 	p.color_ramp = g
 	add_child(p)
 
-func show_character(cd: CharacterDef, wd: WeaponDef, locked: bool = false) -> void:
+func show_character(cd: CharacterDef, wd: WeaponDef, locked: bool = false, offhand: WeaponDef = null, ranged_weapon: WeaponDef = null, shield_enabled: bool = true) -> void:
 	if preview:
 		preview.queue_free()
 	preview = KnightVisual.new()
@@ -259,9 +259,9 @@ func show_character(cd: CharacterDef, wd: WeaponDef, locked: bool = false) -> vo
 	preview.scale = Vector3.ONE * 0.9
 	preview.rotation.y = PI # el luchador mira a -Z; aquí, de cara a la cámara
 	pedestal.add_child(preview)
-	preview.setup(Color(0.35, 0.5, 0.9), cd, wd)
+	preview.setup(Color(0.35, 0.5, 0.9), cd, wd, offhand, ranged_weapon)
 	preview.set_mounted(false, 1.0)
-	preview.set_loadout(1 if wd.ranged else 0)
+	preview.set_loadout(1 if wd.ranged else 0, shield_enabled)
 	var gs := get_node_or_null("/root/GameState")
 	if gs and not locked and gs.character_id == cd.id:
 		preview.set_armor(gs.armor_pieces()) # ronda 19

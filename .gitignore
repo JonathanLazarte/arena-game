@@ -1,3 +1,5 @@
 .godot/
+assets/
 *.tmp
 .DS_Store
+.idea/

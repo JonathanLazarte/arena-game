@@ -29,8 +29,11 @@ const INFUSIONS := {
 	"sangrante": {"name": "Sangrante", "suffix": " sangrante", "dmg": 0.92, "scale": {}, "status": {"sangrado": 20.0}},
 	"venenoso": {"name": "Venenoso", "suffix": " venenosa", "dmg": 0.92, "scale": {}, "status": {"veneno": 22.0}},
 	"gelido": {"name": "Gélido", "suffix": " gélida", "dmg": 0.92, "scale": {}, "status": {"congelacion": 20.0}},
+	"ardiente": {"name": "Ardiente", "suffix": " ardiente", "dmg": 0.88, "scale": {"sabiduria": [1.0, 0.2]}, "status": {}, "element": "fuego"},
+	"magica": {"name": "Mágica", "suffix": " mágica", "dmg": 0.88, "scale": {"sabiduria": [1.0, 0.2]}, "status": {}, "element": "magico"},
+	"sagrada": {"name": "Sagrada", "suffix": " sagrada", "dmg": 0.88, "scale": {"devocion": [1.0, 0.2]}, "status": {}, "element": "sagrado"},
 }
-const INFUSION_ORDER := ["", "pesado", "afilado", "sangrante", "venenoso", "gelido"]
+const INFUSION_ORDER := ["", "pesado", "afilado", "sangrante", "venenoso", "gelido", "ardiente", "magica", "sagrada"]
 
 ## Piedra necesaria para pasar a `next` (+1..+3 I, +4..+6 II, +7..+9 III, +10 antigua).
 static func stone_for(next: int) -> String:

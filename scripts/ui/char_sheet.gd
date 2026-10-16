@@ -7,8 +7,8 @@ extends Control
 signal attributes_requested
 signal changed
 
-const SLOTS := ["titulo", "arma", "arma2", "casco", "pecho", "guantes", "piernas", "eikon"]
-const SLOT_NAMES := {"titulo": "Título", "arma": "Arma principal", "arma2": "Arma secundaria", "casco": "Casco", "pecho": "Pecho",
+const SLOTS := ["titulo", "arma", "izq1", "arma2", "casco", "pecho", "guantes", "piernas", "eikon"]
+const SLOT_NAMES := {"titulo": "Título", "arma": "Arma principal · derecha", "izq1": "Mano izquierda", "arma2": "Terciario · arco o escudo", "casco": "Casco", "pecho": "Pecho",
 	"guantes": "Guantes", "piernas": "Piernas", "eikon": "Eikon",
 	"anillo0": "Anillo 1", "anillo1": "Anillo 2", "talisman0": "Talismán 1", "talisman1": "Talismán 2", "talisman2": "Talismán 3"}
 ## Ronda 30: ranuras de accesorio (sin modelo 3D)
@@ -18,9 +18,15 @@ var gs: Node
 var left: RichTextLabel
 var stats: RichTextLabel
 var slot_box: VBoxContainer
+var slot_grid: GridContainer
+var item_details: RichTextLabel
+var detail_slot: String = "arma"
 var attr_button: Button
 var attr_dot: Control
+var weapon_art_button: Button
 var slot_buttons: Dictionary = {}
+var slot_labels: Dictionary = {}
+var slot_icons: Dictionary = {}
 # Selector
 var picker: Control
 var picker_title: Label
@@ -40,63 +46,129 @@ func build(game_state: Node) -> void:
 	p.custom_minimum_size = size
 	add_child(p)
 	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 14)
+	h.add_theme_constant_override("separation", 12)
 	p.add_child(h)
-	# Columna 1: personaje, atributos y botón
-	var c1 := VBoxContainer.new()
-	c1.custom_minimum_size = Vector2(300, 0)
-	c1.add_theme_constant_override("separation", 6)
-	h.add_child(c1)
-	left = RichTextLabel.new()
-	left.name = "Summary"
-	left.bbcode_enabled = true
-	left.custom_minimum_size = Vector2(300, 340)
-	left.add_theme_font_size_override("normal_font_size", 15)
-	left.add_theme_font_size_override("bold_font_size", 18)
-	c1.add_child(left)
-	attr_button = UIKit.big_button("ATRIBUTOS", 26)
-	attr_button.name = "AtributosButton"
-	attr_button.custom_minimum_size = Vector2(300, 64)
-	attr_button.pressed.connect(func() -> void: attributes_requested.emit())
-	c1.add_child(attr_button)
-	attr_dot = UIKit.notify_dot(attr_button)
-	# Columna 2: estadísticas derivadas
-	stats = RichTextLabel.new()
-	stats.name = "Stats"
-	stats.bbcode_enabled = true
-	stats.custom_minimum_size = Vector2(330, 420)
-	stats.add_theme_font_size_override("normal_font_size", 14)
-	stats.add_theme_font_size_override("bold_font_size", 16)
-	h.add_child(stats)
-	# Columna 3: equipo
+	# Izquierda: ranuras en cuadrícula, preparadas para iconos de objetos.
 	slot_box = VBoxContainer.new()
-	slot_box.custom_minimum_size = Vector2(320, 0)
+	slot_box.custom_minimum_size = Vector2(330, 0)
 	slot_box.add_theme_constant_override("separation", 5)
 	h.add_child(slot_box)
-	slot_box.add_child(UIKit.title("EQUIPO", 20, UIKit.YELLOW))
+	slot_box.add_child(UIKit.title("EQUIPAMIENTO", 19, UIKit.YELLOW))
+	slot_grid = GridContainer.new()
+	slot_grid.columns = 3
+	slot_grid.add_theme_constant_override("h_separation", 5)
+	slot_grid.add_theme_constant_override("v_separation", 5)
+	slot_box.add_child(slot_grid)
 	for s: String in SLOTS:
-		var b := UIKit.button("", 15)
-		b.name = "Slot_" + s
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(320, 34)
-		b.clip_text = true
+		var b := _equipment_slot(s)
 		b.pressed.connect(open_picker.bind(s))
-		slot_box.add_child(b)
+		slot_grid.add_child(b)
 		slot_buttons[s] = b
-	# Ronda 30: anillos (2) y talismanes (3), botones compactos
+	# Accesorios en dos filas, como ranuras secundarias del inventario.
+	slot_box.add_child(UIKit.label("ACCESORIOS", 12, UIKit.MUTED))
 	for row_slots: Array in [["anillo0", "anillo1"], ["talisman0", "talisman1", "talisman2"]]:
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
+		row.add_theme_constant_override("separation", 5)
 		slot_box.add_child(row)
 		for ts: String in row_slots:
 			var tb := UIKit.button("", 12)
 			tb.name = "Slot_" + ts
 			tb.clip_text = true
-			tb.custom_minimum_size = Vector2((320 - 4 * (row_slots.size() - 1)) / row_slots.size(), 36)
+			tb.custom_minimum_size = Vector2(105, 34)
 			tb.pressed.connect(open_picker.bind(ts))
 			row.add_child(tb)
 			slot_buttons[ts] = tb
+	weapon_art_button = UIKit.button("Arte de arma", 12, UIKit.BLUE)
+	weapon_art_button.custom_minimum_size = Vector2(320, 32)
+	weapon_art_button.pressed.connect(func() -> void:
+		gs.cycle_weapon_art()
+		gs.save_loadout()
+		refresh()
+		changed.emit())
+	slot_box.add_child(weapon_art_button)
+	# Centro: detalles del objeto seleccionado.
+	item_details = RichTextLabel.new()
+	item_details.name = "ItemDetails"
+	item_details.bbcode_enabled = true
+	item_details.custom_minimum_size = Vector2(330, 420)
+	item_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item_details.add_theme_font_size_override("normal_font_size", 15)
+	item_details.add_theme_font_size_override("bold_font_size", 18)
+	h.add_child(item_details)
+	# Derecha: estado del personaje y acceso a atributos.
+	var status_col := VBoxContainer.new()
+	status_col.custom_minimum_size = Vector2(290, 0)
+	status_col.add_theme_constant_override("separation", 5)
+	h.add_child(status_col)
+	status_col.add_child(UIKit.title("ESTADO DEL PERSONAJE", 16, UIKit.YELLOW))
+	left = RichTextLabel.new()
+	left.name = "Summary"
+	left.bbcode_enabled = true
+	left.custom_minimum_size = Vector2(290, 96)
+	left.add_theme_font_size_override("normal_font_size", 13)
+	left.add_theme_font_size_override("bold_font_size", 15)
+	status_col.add_child(left)
+	stats = RichTextLabel.new()
+	stats.name = "Stats"
+	stats.bbcode_enabled = true
+	stats.custom_minimum_size = Vector2(290, 240)
+	stats.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stats.add_theme_font_size_override("normal_font_size", 12)
+	stats.add_theme_font_size_override("bold_font_size", 14)
+	status_col.add_child(stats)
+	attr_button = UIKit.big_button("ATRIBUTOS", 21)
+	attr_button.name = "AtributosButton"
+	attr_button.custom_minimum_size = Vector2(290, 50)
+	attr_button.pressed.connect(func() -> void: attributes_requested.emit())
+	status_col.add_child(attr_button)
+	attr_dot = UIKit.notify_dot(attr_button)
 	_build_picker()
+	detail_slot = "arma"
+
+func _equipment_slot(slot_id: String) -> Button:
+	var b := UIKit.button("", 15)
+	b.name = "Slot_" + slot_id
+	b.custom_minimum_size = Vector2(103, 74)
+	b.tooltip_text = SLOT_NAMES[slot_id]
+	var card := VBoxContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.alignment = BoxContainer.ALIGNMENT_CENTER
+	card.add_theme_constant_override("separation", 2)
+	card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	card.offset_left = 3.0
+	card.offset_top = 2.0
+	card.offset_right = -3.0
+	card.offset_bottom = -2.0
+	b.add_child(card)
+	var icon_frame := PanelContainer.new()
+	icon_frame.name = "SpriteSlot"
+	icon_frame.custom_minimum_size = Vector2(48, 48)
+	icon_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame := StyleBoxFlat.new()
+	frame.bg_color = Color(0.10, 0.11, 0.13, 0.94)
+	frame.border_color = Color(0.55, 0.48, 0.32, 0.8)
+	frame.set_border_width_all(1)
+	frame.set_corner_radius_all(3)
+	icon_frame.add_theme_stylebox_override("panel", frame)
+	var icon := TextureRect.new()
+	icon.name = "ItemSprite"
+	icon.custom_minimum_size = Vector2(44, 44)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_frame.add_child(icon)
+	card.add_child(icon_frame)
+	var text_label := Label.new()
+	text_label.name = "SlotLabel"
+	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	text_label.clip_text = true
+	text_label.add_theme_font_size_override("font_size", 10)
+	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(text_label)
+	slot_labels[slot_id] = text_label
+	slot_icons[slot_id] = icon
+	return b
 
 static func trinket_slot(s: String) -> Array:
 	return ["ring" if s.begins_with("anillo") else "talisman", int(s.right(1))]
@@ -151,8 +223,8 @@ func _build_picker() -> void:
 	var c := UIKit.button("Cancelar", 20)
 	c.name = "PickerCancel"
 	c.custom_minimum_size = Vector2(160, 54)
-	c.pressed.connect(func() -> void: picker.visible = false)
-	UIKit.close_x(picker, Vector2(200 + 880 - 50, 78), "PickerX", func() -> void: picker.visible = false) # ronda 20
+	c.pressed.connect(_cancel_picker)
+	UIKit.close_x(picker, Vector2(200 + 880 - 50, 78), "PickerX", _cancel_picker) # ronda 20
 	f.add_child(c)
 
 # ---------------- Contenido ----------------
@@ -161,6 +233,7 @@ func _cur_id(s: String) -> String:
 	match s:
 		"arma": return gs.weapon_id
 		"arma2": return gs.weapon2_id
+		"izq1": return gs.left_hand()
 		"eikon": return gs.eikon_id
 		"titulo": return gs.title_id()
 	if s in TRINKET_SLOTS:
@@ -170,11 +243,14 @@ func _cur_id(s: String) -> String:
 
 func _item_name(s: String, id: String) -> String:
 	if id == "":
-		return "— (recambio)" if s == "arma2" else "— Nada —"
+		return "— Vacío —"
 	match s:
-		"arma", "arma2": return Catalog.weapon(id).display_name
+		"arma": return Catalog.weapon(id).display_name
+		"arma2": return "Escudo" if id == "escudo" else Catalog.weapon(id).display_name
+		"izq1": return "Escudo del personaje" if id == "escudo" else (Catalog.weapon(id).display_name if id != "" else "— Vacío —")
 		"eikon": return (load(Catalog.EIKONS[id]) as EikonData).eikon_name
-	if s in TRINKET_SLOTS or s == "titulo":
+		"titulo": return String(Titles.def(id).get("name", id))
+	if s in TRINKET_SLOTS:
 		return String(Trinkets.def(id).get("name", id))
 	var a := Catalog.armor(id)
 	return a.display_name if a else id
@@ -186,12 +262,17 @@ func options(s: String) -> Array:
 	match s:
 		"arma":
 			for w in Catalog.weapons_for(c):
-				if w.id in gs.owned_weapons: out.append(w.id)
+				if not w.ranged and w.id in gs.owned_weapons: out.append(w.id)
 		"arma2":
 			out.append("")
-			var main_r: bool = Catalog.weapon(gs.weapon_id).ranged
+			if c.shield_mesh != "" and not gs.right_hand_two_handed(): out.append("escudo")
 			for w in Catalog.weapons_for(c):
-				if w.id in gs.owned_weapons and w.ranged != main_r: out.append(w.id)
+				if w.ranged and w.id in gs.owned_weapons: out.append(w.id)
+		"izq1":
+			out.append("")
+			if not gs.right_hand_two_handed():
+				for w in Catalog.weapons_for(c):
+					if not w.ranged and not w.two_handed and w.id in gs.owned_weapons: out.append(w.id)
 		"eikon":
 			for id: String in Catalog.EIKONS:
 				if id in gs.owned_eikons: out.append(id)
@@ -213,15 +294,17 @@ func sheet_with(s: String, id: String) -> Dictionary:
 	var c := Catalog.character(gs.character_id)
 	var w := Catalog.weapon(gs.weapon_id)
 	var w2: WeaponDef = gs.weapon2()
+	var offhand: WeaponDef = gs.offhand_weapon()
 	var arm: Dictionary = gs.armor_eq.duplicate()
 	match s:
 		"arma":
 			w = Catalog.weapon(id)
-			if w2 and w2.ranged == w.ranged: w2 = null
-		"arma2": w2 = Catalog.weapon(id) if id != "" else null
+			if w.two_handed: offhand = null
+		"arma2": w2 = Catalog.weapon(id) if id != "" and id != "escudo" else null
+		"izq1": offhand = Catalog.weapon(id) if id != "" and id != "escudo" else null
 		"eikon", "titulo", "anillo0", "anillo1", "talisman0", "talisman1", "talisman2": pass
 		_: arm[s] = id
-	var sh := EquipStats.sheet(c, gs.char_level(), gs.char_attrs(), w, w2, EquipStats.armor_defs(arm))
+	var sh := EquipStats.sheet(c, gs.char_level(), gs.char_attrs(), w, w2, EquipStats.armor_defs(arm), offhand)
 	sh["ar"] = EquipStats.attack_rating(c, w, gs.char_attrs(), Progression.combine_mods(gs.char_skills())["dano"])
 	sh["ar2"] = EquipStats.attack_rating(c, w2 if w2 else (Fighter.FALLBACK_BOW if not w.ranged else Fighter.FALLBACK_MELEE), gs.char_attrs(), 1.0, w2 != null)
 	return sh
@@ -240,10 +323,18 @@ func open_picker(s: String) -> void:
 		b.pressed.connect(select_option.bind(id))
 		picker_list.add_child(b)
 	picker.visible = true
+	detail_slot = s
+	item_details.text = _item_details_text(s, _cur_id(s))
 	_show_diff()
 
 func select_option(id: String) -> void:
+	if picker_slot == "arma2" and id != "" and id == gs.weapon2_id:
+		equip("arma2", "")
+		picker.visible = false
+		refresh()
+		return
 	picker_choice = id
+	item_details.text = _item_details_text(picker_slot, id)
 	for b in picker_list.get_children():
 		if b is Button:
 			UIKit.button_styles(b, UIKit.ORANGE if String(b.name) == "Opt_" + (id if id != "" else "none") else UIKit.BLUE)
@@ -262,6 +353,15 @@ func diff_text(s: String, id: String) -> String:
 	var a := sheet_with(s, _cur_id(s))
 	var b := sheet_with(s, id)
 	var t := "[b]%s[/b]\n" % _item_name(s, id)
+	if s == "arma2" and id == "escudo":
+		return t + "Escudo independiente. Se equipa en el espacio terciario y habilita el bloqueo al mantener el comando de mano izquierda; un toque breve hace parry.\n"
+	if s == "izq1":
+		if id == "escudo":
+			return t + "Mantén la acción de mano izquierda para bloquear. Un toque breve hace parry.\n"
+		if id != "" and Catalog.weapon(id).two_handed:
+			return t + "No cabe en la mano izquierda: requiere dos manos.\n"
+		t += _cmp("Carga de equipo", a["peso"], b["peso"], "%.1f")
+		return t + "El toque breve de mano izquierda ejecuta parry.\n"
 	if s.begins_with("arma"):
 		var w := Catalog.weapon(id) if id != "" else null
 		if w:
@@ -304,9 +404,44 @@ func _show_diff() -> void:
 	picker_diff.text = diff_text(picker_slot, picker_choice)
 	picker_ok.disabled = picker_choice == _cur_id(picker_slot)
 
+func _item_details_text(s: String, id: String) -> String:
+	var heading: String = String(SLOT_NAMES.get(s, s))
+	if id == "":
+		return "[color=#d7c79f][b]%s[/b][/color]\n\nRanura vacía. Selecciona una pieza para ver sus detalles." % heading
+	var title := _item_name(s, id)
+	var body := ""
+	if s == "arma":
+		var w: WeaponDef = gs.eff_weapon(id)
+		body = "%s\n\nAlcance: %.1f m\nDaño: %.0f ligero · %.0f fuerte\nPeso: %.1f\n\nEscalado: %s" % [w.description, w.reach_foot, w.light_damage, w.heavy_damage, EquipStats.weapon_weight(w), Attributes.scaling_text(w)]
+	elif s == "arma2":
+		if id == "escudo":
+			body = "Escudo equipado en el espacio terciario. Mantén el comando de mano izquierda para bloquear; un toque breve hace parry."
+		else:
+			var ranged: WeaponDef = gs.eff_weapon(id)
+			body = "%s\n\nDaño del proyectil: %.1f\nPeso: %.1f" % [ranged.description, ranged.arrow_damage, EquipStats.weapon_weight(ranged)]
+	elif s == "izq1":
+		var offhand: WeaponDef = gs.eff_weapon(id)
+		body = "%s\n\nArma ligera para la mano izquierda. Un toque breve ejecuta parry." % offhand.description
+	elif s == "eikon":
+		var e: EikonData = load(Catalog.EIKONS[id])
+		body = "%s\n\n%s · elemento %s" % [e.description, "Montura" if e.rideable else "Compañero", EquipStats.TYPE_NAMES[EquipStats.EIKON_ELEMENT.get(id, "fisico")]]
+	elif s in TRINKET_SLOTS:
+		body = String(Trinkets.def(id).get("desc", ""))
+	elif s == "titulo":
+		body = String(Titles.def(id).get("desc", ""))
+	else:
+		var armor_piece: ArmorDef = Catalog.armor(id)
+		if armor_piece:
+			body = "Conjunto: %s\n\nPeso: %.1f\nEquilibrio: %.0f" % [armor_piece.set_name, armor_piece.weight, armor_piece.poise]
+	return "[color=#d7c79f][b]%s[/b][/color]\n[color=#f2dc99]%s[/color]\n\n%s" % [heading, title, body]
+
 func confirm_pick() -> void:
 	equip(picker_slot, picker_choice)
 	picker.visible = false
+
+func _cancel_picker() -> void:
+	picker.visible = false
+	item_details.text = _item_details_text(detail_slot, _cur_id(detail_slot))
 
 func equip(s: String, id: String) -> bool:
 	var ok := false
@@ -315,6 +450,7 @@ func equip(s: String, id: String) -> bool:
 			ok = gs.set_weapon(id)
 			gs.save_loadout()
 		"arma2": ok = gs.set_weapon2(id)
+		"izq1": ok = gs.set_left_hand(id)
 		"eikon":
 			if id in gs.owned_eikons:
 				gs.eikon_id = id
@@ -340,27 +476,22 @@ func refresh() -> void:
 	var pts: int = gs.attr_points()
 	attr_button.text = "ATRIBUTOS  +%d" % pts if pts > 0 else "ATRIBUTOS"
 	attr_dot.visible = pts > 0
+	var current_weapon: WeaponDef = Catalog.weapon(gs.weapon_id)
+	weapon_art_button.visible = WeaponArts.compatible(current_weapon)
+	weapon_art_button.text = "Arte: %s  ↻" % WeaponArts.name_of(gs.weapon_art())
 	var cs: Dictionary = gs.char_stat()
-	var t := "[b]%s[/b] · %s %s\n" % [gs.display_name_with_title(), c.display_name, c.role]
-	t += "Jugado %s · Victorias %d / %d\n" % [gs.hours_text(cs["secs"]), cs["wins"], cs["matches"]]
-	t += "[color=#f2dc99]Nivel %d[/color] · %d/%d XP\n" % [gs.char_level(),
-		Progression.level_progress(int(gs.char_xp.get(c.id, 0))).x, Progression.level_progress(int(gs.char_xp.get(c.id, 0))).y]
-	for k: String in Attributes.KEYS:
-		t += "%s [b]%d[/b]%s" % [Attributes.NAMES[k], at[k], "\n" if Attributes.KEYS.find(k) % 2 == 1 else "   "]
-	if pts > 0:
-		t += "[color=#9fe08a]%d punto(s) de atributo sin repartir[/color]\n" % pts
-	t += "\n[color=#f2dc99]Pasiva · %s:[/color] %s\n" % [c.passive_name, c.passive_desc]
-	var learned: Array = []
-	for sk: Dictionary in Progression.tree(c.id):
-		if sk["id"] in gs.char_skills():
-			learned.append(sk["name"])
-	t += "[color=#f2dc99]Habilidades:[/color] %s (%d punto(s) libres)" % [", ".join(learned) if not learned.is_empty() else "ninguna", gs.skill_points()]
+	var t := "[b]%s[/b]\n%s · %s\n" % [c.display_name, gs.display_name_with_title(), c.role]
+	t += "[color=#f2dc99]Nivel %d[/color] · %d victorias\n" % [gs.char_level(), cs["wins"]]
+	for i in Attributes.KEYS.size():
+		var k: String = Attributes.KEYS[i]
+		t += "%s [b]%d[/b]%s" % [Attributes.NAMES[k].substr(0, 3), at[k], "\n" if i % 3 == 2 or i == Attributes.KEYS.size() - 1 else "   "]
 	left.text = t
 	var s := "[b]ESTADÍSTICAS[/b]\n"
 	s += "Vida %.0f · Energía %.0f · Estamina %.0f\n" % [c.vida + m["vida"] + ad["vida"], ad["energia_max"], c.estamina + m["estamina"] + ad["estamina"]]
 	s += "Ataque (der.) %s: [b]%.0f[/b] + [color=#9fe08a]%.0f[/color]\n" % [Catalog.weapon(gs.weapon_id).display_name, sh["ar"]["base"], sh["ar"]["bonus"]]
-	var w2n: String = gs.weapon2().display_name if gs.weapon2() else ("Arco (recambio)" if not Catalog.weapon(gs.weapon_id).ranged else "Dagas (recambio)")
-	s += "Ataque (izq./dist.) %s: [b]%.0f[/b] + [color=#9fe08a]%.0f[/color]\n" % [w2n, sh["ar2"]["base"], sh["ar2"]["bonus"]]
+	var w2n: String = "Escudo" if gs.weapon2_id == "escudo" else (String(gs.weapon2().display_name) if gs.weapon2() else "Vacío")
+	s += "Terciario: %s\n" % w2n
+	s += "Mano izquierda: %s\n" % ("dos manos · bloqueada" if gs.right_hand_two_handed() else _item_name("izq1", gs.left_hand()))
 	if sh["ar"]["sagrado"] > 0.05:
 		s += "   (de ello sagrado %.1f)\n" % sh["ar"]["sagrado"]
 	s += "Defensa: [b]%.0f[/b]\n[color=#f2dc99]Absorción[/color] " % sh["defensa"]
@@ -394,4 +525,7 @@ func refresh() -> void:
 		s += "\n[color=#f2dc99]Accesorios:[/color] " + ", ".join(tn)
 		stats.text = s
 	for sl: String in SLOTS:
-		(slot_buttons[sl] as Button).text = "%s:  %s" % [SLOT_NAMES[sl], _item_name(sl, _cur_id(sl))]
+		var short_names: Dictionary = {"titulo": "TÍTULO", "arma": "DERECHA", "izq1": "IZQUIERDA", "arma2": "TERCIARIO", "casco": "CASCO", "pecho": "PECHO", "guantes": "GUANTES", "piernas": "PIERNAS", "eikon": "EIKON"}
+		(slot_labels[sl] as Label).text = "%s\n%s" % [short_names[sl], _item_name(sl, _cur_id(sl))]
+		(slot_buttons[sl] as Button).tooltip_text = "%s: %s" % [SLOT_NAMES[sl], _item_name(sl, _cur_id(sl))]
+	item_details.text = _item_details_text(detail_slot, _cur_id(detail_slot))

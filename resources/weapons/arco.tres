@@ -11,6 +11,7 @@ display_name = "Arco"
 description = "A distancia. Tensar 0,5 s quieto y andar lento 0,4 s; flechas de 8 que enlazan rápido. El escudo las anula. Cambia a dagas para el cuerpo a cuerpo."
 ranged = true
 allows_shield = false
+two_handed = true
 mesh_right = ""
 procedural = "arco"
 fire_draw = 0.5

@@ -7,7 +7,7 @@ extends Node
 ## v6 = ronda 19: armadura (casco/pecho/guantes/piernas) y arma secundaria; se regala el equipo inicial del rol).
 
 const SAVE_PATH := "user://loadout.cfg"
-const SAVE_VERSION := 11 ## v11 = ronda 31: habilidades de jefe por personaje; v9 = ronda 29: varios personajes con nombre propio; v10 = ronda 30: anillos/talismanes y ficha (horas, victorias)
+const SAVE_VERSION := 13 ## v13 = arma principal, offhand y arma terciaria a distancia
 ## Ronda 15: ranuras de personaje. Hoy solo existe la ranura 0; un futuro selector
 ## multi-ranura al iniciar solo tiene que cambiar active_slot y llamar a load_loadout().
 const MAX_SLOTS := 1
@@ -29,7 +29,8 @@ var attr_migrated: bool = false
 # --- Ronda 19 ---
 var owned_armor: Array = []
 var armor_eq: Dictionary = {} ## slot -> id ("" = nada)
-var weapon2_id: String = "" ## arma secundaria (la del otro tipo: cuerpo a cuerpo / a distancia)
+var weapon2_id: String = "" ## equipo terciario: arma a distancia o escudo
+var left_hand_id: String = "" ## arma ligera de mano izquierda
 var armor_migrated: bool = false ## ronda 18: se repartieron los atributos al migrar
 var weapon_up: Dictionary = {} ## ronda 20: id arma -> nivel de mejora (+0..+10)
 var weapon_inf: Dictionary = {} ## ronda 20: id arma -> infusión ("" = normal)
@@ -63,6 +64,10 @@ var last_result: Dictionary = {} ## resultado de la última partida (pantalla de
 ## Rival: si es true (al jugar desde el lobby) recibe un equipamiento aleatorio; si no, el de siempre.
 var random_rival: bool = false
 var from_lobby: bool = false
+var champion_mode: bool = false
+var champion_progress: int = 0 ## campeones derrotados en la escalera (0..5)
+var owned_eikon_seals: Array = []
+var equipped_eikon_seal: String = ""
 
 ## Ronda 30: RECURSOS DE PRUEBA. true = al cargar, el perfil recibe (una sola vez por perfil)
 ## mucho oro, cristales, piedras de forja y todos los accesorios. PONER EN false ANTES DE PUBLICAR.
@@ -165,24 +170,52 @@ func equip_armor(slot: String, id: String) -> bool:
 	save_loadout()
 	return true
 
-## Arma secundaria: del tipo contrario a la principal ("" = la de recambio).
+## Ranura terciaria: armas a distancia o escudo independiente.
 func set_weapon2(id: String) -> bool:
 	if id == "":
 		weapon2_id = ""
 		save_loadout()
 		return true
+	if id == "escudo":
+		if Catalog.character(character_id).shield_mesh == "" or right_hand_two_handed():
+			return false
+		weapon2_id = id
+		save_loadout()
+		return true
 	var w := Catalog.weapon(id)
-	if w.id != id or not Catalog.character(character_id).allows(id) or not id in owned_weapons or w.ranged == Catalog.weapon(weapon_id).ranged:
+	if w.id != id or not w.ranged or not Catalog.character(character_id).allows(id) or not id in owned_weapons:
 		return false
 	weapon2_id = id
 	save_loadout()
 	return true
 
 func weapon2() -> WeaponDef:
-	if weapon2_id == "":
+	if weapon2_id == "" or weapon2_id == "escudo":
 		return null
 	var w := Catalog.weapon(weapon2_id)
-	return eff_weapon(weapon2_id) if w.id == weapon2_id and w.ranged != Catalog.weapon(weapon_id).ranged else null
+	return eff_weapon(weapon2_id) if w.id == weapon2_id and w.ranged else null
+
+## La mano izquierda admite escudo o arma ligera compatible; las pesadas ocupan ambas manos.
+func set_left_hand(id: String) -> bool:
+	if id != "":
+		var offhand := Catalog.weapon(id)
+		if offhand.id != id or offhand.ranged or offhand.two_handed or not Catalog.character(character_id).allows(id) or not id in owned_weapons or right_hand_two_handed():
+			return false
+	left_hand_id = id
+	save_loadout()
+	return true
+
+func left_hand() -> String:
+	return left_hand_id
+
+func offhand_weapon() -> WeaponDef:
+	if left_hand_id == "" or left_hand_id == "escudo":
+		return null
+	var w := Catalog.weapon(left_hand_id)
+	return eff_weapon(left_hand_id) if w.id == left_hand_id and not w.ranged and not w.two_handed else null
+
+func right_hand_two_handed() -> bool:
+	return Catalog.weapon(weapon_id).two_handed
 
 # ---------------- Herrería (ronda 20) ----------------
 
@@ -259,7 +292,7 @@ func armor_pieces() -> Dictionary:
 
 ## Hoja de estadísticas del personaje equipado.
 func sheet() -> Dictionary:
-	return EquipStats.sheet(Catalog.character(character_id), char_level(), char_attrs(), eff_weapon(weapon_id), weapon2(), armor_pieces())
+	return EquipStats.sheet(Catalog.character(character_id), char_level(), char_attrs(), eff_weapon(weapon_id), weapon2(), armor_pieces(), offhand_weapon())
 
 ## Compra todas las piezas que faltan de un conjunto. "ok", "ya", "nivel" u "oro".
 func buy_set(set_id: String) -> String:
@@ -317,16 +350,53 @@ func choose_first_character(id: String, nm: String = "") -> void:
 	_unlock_char(id)
 	set_char_name(id, nm)
 	character_id = id
-	weapon_id = Catalog.character(id).default_weapon
+	weapon_id = main_weapon_default(id)
+	weapon2_id = default_ranged_weapon(id)
+	left_hand_id = default_offhand(id, weapon_id)
 	first_run_done = true
 	save_loadout()
+
+static func main_weapon_default(id: String) -> String:
+	var c := Catalog.character(id)
+	if not Catalog.weapon(c.default_weapon).ranged:
+		return c.default_weapon
+	for w: WeaponDef in Catalog.weapons_for(c):
+		if not w.ranged and not w.two_handed:
+			return w.id
+	for w: WeaponDef in Catalog.weapons_for(c):
+		if not w.ranged:
+			return w.id
+	return "espada_escudo"
+
+static func default_ranged_weapon(id: String) -> String:
+	var c := Catalog.character(id)
+	if c.allows("arco"):
+		return "arco"
+	return ""
+
+static func default_offhand(id: String, main_id: String) -> String:
+	return ""
+
+static func migrate_hand_gear(main_id: String, old_second_id: String, cid: String) -> Dictionary:
+	var main := main_id
+	var tertiary := ""
+	if Catalog.weapon(main).ranged:
+		tertiary = main
+		main = old_second_id if old_second_id != "" and not Catalog.weapon(old_second_id).ranged else main_weapon_default(cid)
+	elif old_second_id != "" and Catalog.weapon(old_second_id).ranged:
+		tertiary = old_second_id
+	var shield_as_tertiary := old_second_id == "" and Catalog.character(cid).shield_mesh != "" and Catalog.weapon(main).allows_shield
+	return {"weapon_id": main, "weapon2": "escudo" if shield_as_tertiary else tertiary, "left_hand": ""}
 
 func _unlock_char(id: String) -> void:
 	if not id in unlocked_chars:
 		unlocked_chars.append(id)
-	var dw := Catalog.character(id).default_weapon
+	var dw := main_weapon_default(id)
 	if not dw in owned_weapons:
 		owned_weapons.append(dw)
+	var rw := default_ranged_weapon(id)
+	if rw != "" and not rw in owned_weapons:
+		owned_weapons.append(rw)
 	if not char_xp.has(id):
 		char_xp[id] = 0
 	if not attrs.has(id):
@@ -368,20 +438,37 @@ func switch_character(id: String) -> bool:
 	var g: Dictionary = other_slots.get(id, {})
 	other_slots.erase(id)
 	var c := Catalog.character(id)
-	weapon_id = String(g.get("weapon_id", c.default_weapon))
-	weapon2_id = String(g.get("weapon2", ""))
+	var hg := migrate_hand_gear(String(g.get("weapon_id", main_weapon_default(id))), String(g.get("weapon2", "")), id) if not bool(g.get("hands_v13", false)) else g
+	weapon_id = String(hg.get("weapon_id", main_weapon_default(id)))
+	weapon2_id = String(hg.get("weapon2", ""))
+	left_hand_id = String(hg.get("left_hand", default_offhand(id, weapon_id)))
+	if left_hand_id == "escudo":
+		if weapon2_id == "": weapon2_id = "escudo"
+		left_hand_id = ""
 	armor_eq = g.get("armor", {})
 	spells = g.get("spells", [])
 	rings_eq = _fit(g.get("rings", []), Trinkets.RING_SLOTS)
 	talismans_eq = _fit(g.get("talismans", []), Trinkets.TALISMAN_SLOTS)
-	if not c.allows(weapon_id) or not weapon_id in owned_weapons:
-		weapon_id = c.default_weapon
+	if Catalog.weapon(weapon_id).ranged or not c.allows(weapon_id) or not weapon_id in owned_weapons:
+		weapon_id = main_weapon_default(id)
+	if weapon2_id == "escudo" and c.shield_mesh == "":
+		weapon2_id = ""
+	elif weapon2_id != "" and weapon2_id != "escudo" and (not Catalog.weapon(weapon2_id).ranged or not c.allows(weapon2_id) or not weapon2_id in owned_weapons):
+		weapon2_id = default_ranged_weapon(id)
+	if weapon_id != "" and Catalog.weapon(weapon_id).two_handed:
+		left_hand_id = ""
+	elif left_hand_id == "escudo" and (c.shield_mesh == "" or not Catalog.weapon(weapon_id).allows_shield):
+		left_hand_id = default_offhand(id, weapon_id)
+	elif left_hand_id != "" and left_hand_id != "escudo":
+		var offhand := Catalog.weapon(left_hand_id)
+		if offhand.id != left_hand_id or offhand.ranged or offhand.two_handed or not c.allows(left_hand_id) or not left_hand_id in owned_weapons:
+			left_hand_id = ""
 	equipped_spells()
 	save_loadout()
 	return true
 
 func _gear() -> Dictionary:
-	return {"weapon_id": weapon_id, "weapon2": weapon2_id, "armor": armor_eq.duplicate(), "spells": spells.duplicate(),
+	return {"hands_v13": true, "weapon_id": weapon_id, "weapon2": weapon2_id, "left_hand": left_hand_id, "armor": armor_eq.duplicate(), "spells": spells.duplicate(),
 		"rings": rings_eq.duplicate(), "talismans": talismans_eq.duplicate()}
 
 func buy(kind: String, id: String) -> String:
@@ -394,7 +481,7 @@ func buy(kind: String, id: String) -> String:
 			var keep: Dictionary = armor_eq.duplicate()
 			armor_eq = {}
 			_unlock_char(id) # equipo inicial de su rol para él, no para el actual
-			other_slots[id] = {"weapon_id": Catalog.character(id).default_weapon, "weapon2": "", "armor": armor_eq.duplicate(), "spells": [], "rings": ["", ""], "talismans": ["", "", ""]}
+			other_slots[id] = {"hands_v13": true, "weapon_id": main_weapon_default(id), "weapon2": default_ranged_weapon(id), "left_hand": default_offhand(id, main_weapon_default(id)), "armor": armor_eq.duplicate(), "spells": [], "rings": ["", ""], "talismans": ["", "", ""]}
 			armor_eq = keep
 		"weapon": owned_weapons.append(id)
 		"eikon": owned_eikons.append(id)
@@ -427,15 +514,28 @@ func set_character(id: String) -> bool:
 		return false
 	character_id = id
 	var c := Catalog.character(id)
-	if not c.allows(weapon_id) or (first_run_done and not weapon_id in owned_weapons):
-		weapon_id = c.default_weapon
+	if left_hand_id == "escudo":
+		if weapon2_id == "": weapon2_id = "escudo"
+		left_hand_id = ""
+	if Catalog.weapon(weapon_id).ranged or not c.allows(weapon_id) or (first_run_done and not weapon_id in owned_weapons):
+		weapon_id = main_weapon_default(id)
+	if weapon2_id == "escudo" and c.shield_mesh == "":
+		weapon2_id = ""
+	elif weapon2_id != "" and weapon2_id != "escudo" and (not Catalog.weapon(weapon2_id).ranged or not c.allows(weapon2_id) or (first_run_done and not weapon2_id in owned_weapons)):
+		weapon2_id = default_ranged_weapon(id)
+	if left_hand_id == "escudo" and (c.shield_mesh == "" or not Catalog.weapon(weapon_id).allows_shield):
+		left_hand_id = default_offhand(id, weapon_id)
+	elif left_hand_id != "" and left_hand_id != "escudo":
+		var offhand := Catalog.weapon(left_hand_id)
+		if offhand.id != left_hand_id or offhand.ranged or offhand.two_handed or not c.allows(left_hand_id) or not left_hand_id in owned_weapons or Catalog.weapon(weapon_id).two_handed:
+			left_hand_id = ""
 	return true
 
 ## Datos de la ranura activa (lo que se guarda por personaje).
 func slot_data() -> Dictionary:
 	return {"character_id": character_id, "weapon_id": weapon_id,
 		"xp": int(char_xp.get(character_id, 0)), "skills": char_skills(), "attrs": char_attrs(),
-		"armor": armor_eq, "weapon2": weapon2_id, "spells": spells, "rings": rings_eq, "talismans": talismans_eq}
+		"armor": armor_eq, "weapon2": weapon2_id, "left_hand": left_hand_id, "spells": spells, "rings": rings_eq, "talismans": talismans_eq}
 
 # ---------------- Ronda 21: magia de eikon y artes de arma ----------------
 
@@ -471,6 +571,13 @@ func cycle_spell(slot: int) -> String:
 	set_spell(slot, String(opts[(i + 1) % opts.size()]))
 	return String(spells[slot])
 
+func set_eikon_seal(id: String) -> bool:
+	if id != "" and (not EikonSeals.DEFS.has(id) or not id in owned_eikon_seals):
+		return false
+	equipped_eikon_seal = id
+	save_loadout()
+	return true
+
 func weapon_art(wid: String = "") -> String:
 	if wid == "": wid = weapon_id
 	if not WeaponArts.compatible(Catalog.weapon(wid)):
@@ -503,16 +610,21 @@ func buy_art(aid: String) -> bool:
 	return true
 
 func set_weapon(id: String) -> bool:
-	if not Catalog.character(character_id).allows(id) or (first_run_done and not id in owned_weapons):
+	var w := Catalog.weapon(id)
+	if w.id != id or w.ranged or not Catalog.character(character_id).allows(id) or (first_run_done and not id in owned_weapons):
 		return false
 	weapon_id = id
-	if weapon2() == null:
-		weapon2_id = ""
+	if right_hand_two_handed():
+		left_hand_id = ""
 	return true
 
 ## Aplica el resultado de una partida. Devuelve el resumen para la pantalla de resultados.
 func apply_match_result(stats: Dictionary) -> Dictionary:
 	var rw := Progression.match_rewards(stats)
+	var champion_id := String(stats.get("champion_id", ""))
+	var champion_won := bool(stats.get("champion_mode", false)) and bool(stats.get("won", false))
+	var new_seal := ""
+	var seal_auto_equipped := false
 	var acc0 := account_level()
 	var ch0 := char_level()
 	var acc_xp0 := account_xp
@@ -525,10 +637,29 @@ func apply_match_result(stats: Dictionary) -> Dictionary:
 	for sid: String in stones:
 		add_material(sid, int(stones[sid]))
 	record_match(bool(stats.get("won", false)), float(stats.get("secs", 0.0)))
+	if champion_won and champion_progress < ChampionCatalog.ORDER.size():
+		champion_progress += 1
+		var seal_id := String(ChampionCatalog.by_id(champion_id).get("seal", ""))
+		if seal_id != "" and not seal_id in owned_eikon_seals:
+			owned_eikon_seals.append(seal_id)
+			new_seal = seal_id
+			if equipped_eikon_seal == "":
+				equipped_eikon_seal = seal_id
+				seal_auto_equipped = true
+	var next_champion := ChampionCatalog.at(champion_progress)
+	var next_champion_id: String = ChampionCatalog.ORDER[champion_progress] if champion_progress < ChampionCatalog.ORDER.size() else ""
+	var next_reward := EikonSeals.def(String(next_champion.get("seal", "")))
 	last_result = {"won": stats.get("won", false), "perfect": stats.get("won", false) and int(stats.get("lost_rounds", 1)) == 0, "xp": rw["xp"], "gold": int(rw["gold"]) + bonus, "level_bonus": bonus,
 		"lines": rw["lines"], "mult": rw["mult"], "account_before": acc0, "account_after": account_level(),
 		"char_before": ch0, "char_after": char_level(), "account_xp_before": acc_xp0, "account_xp": account_xp,
-		"character": character_id, "stones": stones}
+		"character": character_id, "stones": stones,
+		"champion_mode": bool(stats.get("champion_mode", false)), "champion_id": champion_id,
+		"champion_progress": champion_progress, "champion_total": ChampionCatalog.ORDER.size(),
+		"new_seal": new_seal, "new_seal_name": EikonSeals.name_of(new_seal) if new_seal != "" else "",
+		"seal_auto_equipped": seal_auto_equipped, "next_champion_id": next_champion_id,
+		"next_champion_name": ChampionCatalog.display_name(next_champion) if next_champion_id != "" else "",
+		"next_champion_intro": String(next_champion.get("intro", "")),
+		"next_reward_name": String(next_reward.get("name", "")), "next_reward_desc": String(next_reward.get("desc", ""))}
 	save_loadout()
 	return last_result
 
@@ -551,6 +682,10 @@ func save_loadout() -> void:
 	cfg.set_value("progreso", "owned_weapons", owned_weapons)
 	cfg.set_value("progreso", "owned_eikons", owned_eikons)
 	cfg.set_value("progreso", "owned_armor", owned_armor)
+	cfg.set_value("progreso", "champion_progress", champion_progress)
+	cfg.set_value("progreso", "champion_mode", champion_mode)
+	cfg.set_value("sellos", "owned", owned_eikon_seals)
+	cfg.set_value("sellos", "equipped", equipped_eikon_seal)
 	cfg.set_value("herreria", "niveles", weapon_up)
 	cfg.set_value("herreria", "infusiones", weapon_inf)
 	cfg.set_value("herreria", "materiales", materials)
@@ -609,6 +744,7 @@ func load_loadout() -> void:
 			if ver >= 6:
 				armor_eq = cfg.get_value(sec, "armor", {})
 				weapon2_id = cfg.get_value(sec, "weapon2", "")
+				left_hand_id = cfg.get_value(sec, "left_hand", default_offhand(character_id, weapon_id))
 			if ver >= 5:
 				attrs = {character_id: cfg.get_value(sec, "attrs", Attributes.start_for(character_id))}
 			unlocked_chars = [character_id] if first_run_done else []
@@ -619,6 +755,13 @@ func load_loadout() -> void:
 		owned_weapons = cfg.get_value("progreso", "owned_weapons", [])
 		owned_eikons = cfg.get_value("progreso", "owned_eikons", ["fenix"])
 		owned_armor = cfg.get_value("progreso", "owned_armor", [])
+		champion_progress = clampi(int(cfg.get_value("progreso", "champion_progress", 0)), 0, ChampionCatalog.ORDER.size())
+		champion_mode = bool(cfg.get_value("progreso", "champion_mode", false))
+		owned_eikon_seals = cfg.get_value("sellos", "owned", [])
+		equipped_eikon_seal = String(cfg.get_value("sellos", "equipped", ""))
+		owned_eikon_seals = owned_eikon_seals.filter(func(id: Variant) -> bool: return EikonSeals.DEFS.has(String(id)))
+		if equipped_eikon_seal != "" and not equipped_eikon_seal in owned_eikon_seals:
+			equipped_eikon_seal = ""
 		if ver < 3:
 			migrated_from = ver
 			old_mounts = cfg.get_value("progreso", "owned_mounts", ["caballo"])
@@ -678,7 +821,10 @@ func load_loadout() -> void:
 			char_xp[id] = int(g.get("xp", 0))
 			skills[id] = g.get("skills", [])
 			attrs[id] = g.get("attrs", Attributes.start_for(id))
-			other_slots[id] = {"weapon_id": g.get("weapon_id", Catalog.character(id).default_weapon), "weapon2": g.get("weapon2", ""), "armor": g.get("armor", {}), "spells": g.get("spells", []),
+			var hg := migrate_hand_gear(String(g.get("weapon_id", main_weapon_default(id))), String(g.get("weapon2", "")), id) if ver < 13 else g
+			var starter_main := main_weapon_default(id)
+			if not starter_main in owned_weapons: owned_weapons.append(starter_main)
+			other_slots[id] = {"hands_v13": true, "weapon_id": hg.get("weapon_id", main_weapon_default(id)), "weapon2": hg.get("weapon2", ""), "left_hand": hg.get("left_hand", default_offhand(id, main_weapon_default(id))), "armor": g.get("armor", {}), "spells": g.get("spells", []),
 				"rings": _fit(g.get("rings", []), Trinkets.RING_SLOTS), "talismans": _fit(g.get("talismans", []), Trinkets.TALISMAN_SLOTS)}
 	# Ronda 30 (v10): accesorios y ficha. Una partida v<10 empieza sin accesorios y con la ficha a cero.
 	owned_trinkets = []
@@ -702,6 +848,12 @@ func load_loadout() -> void:
 		_migrate_attrs()
 		if migrated_from == 0:
 			migrated_from = ver
+	if ver < 13:
+		var hg := migrate_hand_gear(weapon_id, weapon2_id, character_id)
+		weapon_id = String(hg["weapon_id"])
+		weapon2_id = String(hg["weapon2"])
+		left_hand_id = String(cfg.get_value(sec, "left_hand", hg["left_hand"]))
+		if not weapon_id in owned_weapons: owned_weapons.append(weapon_id)
 	set_character(character_id)
 	if first_run_done and not eikon_id in owned_eikons: eikon_id = "fenix"
 	if magic_migrated:
@@ -777,6 +929,10 @@ func _migrate_characters() -> void:
 
 func reset_defaults() -> void:
 	debug_granted = false
+	champion_mode = false
+	champion_progress = 0
+	owned_eikon_seals = []
+	equipped_eikon_seal = ""
 	char_titles = {}
 	owned_trinkets = []
 	rings_eq = ["", ""]
@@ -800,6 +956,7 @@ func reset_defaults() -> void:
 	owned_armor = []
 	armor_eq = {}
 	weapon2_id = ""
+	left_hand_id = default_offhand(character_id, weapon_id)
 	armor_migrated = false
 	weapon_up = {}
 	weapon_inf = {}
@@ -916,7 +1073,7 @@ func boss_abilities(cid: String = "") -> Array:
 
 ## Equipa/quita una habilidad (máx. 3, mínimo 1). Devuelve si cambió.
 func toggle_boss_ability(id: String) -> bool:
-	if not BossAbilities.DEFS.has(id):
+	if not BossAbilities.has(id):
 		return false
 	var a := boss_abilities()
 	if id in a:

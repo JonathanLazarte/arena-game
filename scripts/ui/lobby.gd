@@ -6,7 +6,13 @@ extends Node3D
 ## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
 ## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
 ## Ronda 20: pestañas Herrero y Ajustes; cada panel tiene «✕» (y Esc / Atrás) para cerrarlo.
-const TABS := ["Personaje", "Armas", "Eikons", "Habilidades", "Jefe", "Herrero", "Tienda", "Reclutar", "Inventario", "Ajustes"]
+const TABS := ["Personaje", "Eikons", "Habilidades", "Jefe", "Herrero", "Tienda", "Reclutar", "Ajustes"]
+const TAB_GROUPS := [
+	{"title": "EQUIPO", "tabs": ["Personaje", "Eikons"]},
+	{"title": "COMBATE", "tabs": ["Habilidades", "Jefe"]},
+	{"title": "PROGRESO", "tabs": ["Herrero", "Tienda", "Reclutar"]},
+	{"title": "PERFIL", "tabs": ["Ajustes"]},
+]
 const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Artes", "Accesorios"]
 const BUS_NAMES := {"Master": "General", "Música": "Música", "Efectos": "Efectos", "UI": "Interfaz"}
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
@@ -43,6 +49,8 @@ var gem_label: Label
 var dots: Dictionary = {} ## pestaña -> punto de notificación
 var xp_bar: ProgressBar
 var play_button: Button
+var champion_button: Button
+var champion_reward_label: Label
 var modal: Control
 var modal_title: Label
 var modal_text: Label
@@ -289,22 +297,29 @@ func _build_ui() -> void:
 	gem_label = UIKit.title("", 22)
 	gem_label.name = "Cristales" # moneda de muestra (solo se muestra)
 	hb.add_child(UIKit.currency_pill("gema", gem_label))
-	# Pestañas
+	# Navegación agrupada para separar equipo, combate, progreso y perfil.
 	var tabs := VBoxContainer.new()
-	tabs.position = Vector2(44, 84)
-	tabs.add_theme_constant_override("separation", 8)
+	tabs.position = Vector2(28, 82)
+	tabs.add_theme_constant_override("separation", 3)
 	root_ui.add_child(tabs)
-	for t: String in TABS:
-		var b := UIKit.button(t, 21)
-		b.name = "Tab_" + t
-		b.custom_minimum_size = Vector2(210, 54)
-		b.toggle_mode = true
-		b.pressed.connect(set_tab.bind(t))
-		tabs.add_child(b)
-		tab_buttons[t] = b
-		var d := UIKit.notify_dot(b)
-		d.visible = false
-		dots[t] = d
+	var nav_title := UIKit.title("MENÚ", 18, UIKit.YELLOW)
+	nav_title.custom_minimum_size = Vector2(190, 27)
+	tabs.add_child(nav_title)
+	for group: Dictionary in TAB_GROUPS:
+		var group_title := UIKit.label(String(group["title"]), 12, UIKit.MUTED)
+		group_title.custom_minimum_size = Vector2(190, 17)
+		tabs.add_child(group_title)
+		for t: String in group["tabs"]:
+			var b := UIKit.button(t, 17)
+			b.name = "Tab_" + t
+			b.custom_minimum_size = Vector2(192, 38)
+			b.toggle_mode = true
+			b.pressed.connect(set_tab.bind(t))
+			tabs.add_child(b)
+			tab_buttons[t] = b
+			var d := UIKit.notify_dot(b)
+			d.visible = false
+			dots[t] = d
 	# Nombre bajo el pedestal
 	name_label = UIKit.title("", 30)
 	name_label.position = Vector2(370, 560)
@@ -373,10 +388,25 @@ func _build_ui() -> void:
 		b.pressed.connect(set_difficulty.bind(d))
 		dh.add_child(b)
 		diff_buttons[d] = b
-	play_button = UIKit.big_button("JUGAR", 46)
+	champion_button = UIKit.button("", 16, UIKit.BLUE)
+	champion_button.name = "ChampionMode"
+	champion_button.position = Vector2(850, 592)
+	champion_button.size = Vector2(410, 50)
+	champion_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	champion_button.toggle_mode = true
+	champion_button.pressed.connect(func() -> void: set_champion_mode(champion_button.button_pressed))
+	root_ui.add_child(champion_button)
+	champion_reward_label = UIKit.label("", 12, UIKit.YELLOW)
+	champion_reward_label.name = "ChampionRewardPreview"
+	champion_reward_label.position = Vector2(850, 643)
+	champion_reward_label.size = Vector2(410, 28)
+	champion_reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	champion_reward_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	root_ui.add_child(champion_reward_label)
+	play_button = UIKit.big_button("JUGAR", 28)
 	play_button.name = "Jugar"
-	play_button.position = Vector2(850, 600)
-	play_button.size = Vector2(410, 100)
+	play_button.position = Vector2(850, 672)
+	play_button.size = Vector2(410, 46)
 	play_button.pressed.connect(play)
 	root_ui.add_child(play_button)
 	ui.move_child(UIKit.crystal_shards(ui, 18), 0)
@@ -588,13 +618,18 @@ func set_difficulty(d: String) -> void:
 	gs.save_loadout()
 	_refresh_all(false)
 
+func set_champion_mode(enabled: bool) -> void:
+	gs.champion_mode = enabled
+	gs.save_loadout()
+	_refresh_all(false)
+
 func _refresh_all(rebuild: bool = true) -> void:
 	var c := Catalog.character(view_char)
 	view_char = gs.character_id # ronda 30: el escaparate solo muestra a tus personajes
 	var locked := false
 	if rebuild:
 		var w := Catalog.weapon(gs.weapon_id) if not locked else Catalog.weapon(c.default_weapon)
-		stage.show_character(c, w, locked)
+		stage.show_character(c, w, locked, gs.offhand_weapon() if not locked else null, gs.weapon2() if not locked else null, not locked and gs.weapon2_id == "escudo")
 		if stage.preview:
 			stage.preview.set_base_glow(Smithing.engraving_glow(int(gs.weapon_up.get(gs.weapon_id, 0)))) # ronda 30: grabado
 	stage.show_eikon(load(Catalog.EIKONS[gs.eikon_id]) if tab == "Eikons" else null)
@@ -603,6 +638,35 @@ func _refresh_all(rebuild: bool = true) -> void:
 	for d: String in diff_buttons:
 		(diff_buttons[d] as Button).button_pressed = d == gs.difficulty
 		UIKit.button_styles(diff_buttons[d], UIKit.ORANGE if d == gs.difficulty else UIKit.BLUE)
+	if champion_button:
+		champion_button.button_pressed = gs.champion_mode
+		var champ := ChampionCatalog.at(gs.champion_progress)
+		var champ_total: int = ChampionCatalog.ORDER.size()
+		var completed: bool = gs.champion_progress >= champ_total
+		var champ_name: String = ChampionCatalog.display_name(champ)
+		if gs.champion_mode:
+			champion_button.text = ("ESCALERA COMPLETADA · %d/%d\nRevancha: %s" % [gs.champion_progress, champ_total, champ_name] if completed
+				else "CAMPEÓN %d/%d · %s\n%s" % [gs.champion_progress + 1, champ_total, String(champ.get("name", "Campeón")), String(champ.get("title", ""))])
+			var reward: Dictionary = EikonSeals.def(String(champ.get("seal", "")))
+			champion_button.tooltip_text = "%s\nRecompensa: %s — %s" % [String(champ.get("intro", "")), String(reward.get("name", "Sello de Eikon")), String(reward.get("desc", ""))]
+		else:
+			champion_button.text = "DUELO ALEATORIO · activar escalera de campeones"
+			champion_button.tooltip_text = "Enfrenta rivales aleatorios o activa la escalera de cinco campeones con estilos y recompensas únicas."
+		UIKit.button_styles(champion_button, UIKit.ORANGE if gs.champion_mode else UIKit.BLUE)
+	if champion_reward_label:
+		var seal_total: int = EikonSeals.ORDER.size()
+		var seal_count: int = gs.owned_eikon_seals.size()
+		if gs.champion_progress >= ChampionCatalog.ORDER.size():
+			champion_reward_label.text = "✦ ESCALERA COMPLETA · %d/%d sellos únicos" % [seal_count, seal_total]
+		elif gs.champion_mode:
+			var reward_champ: Dictionary = ChampionCatalog.at(gs.champion_progress)
+			var reward_seal: Dictionary = EikonSeals.def(String(reward_champ.get("seal", "")))
+			champion_reward_label.text = "✦ PREMIO AL VENCER: %s" % String(reward_seal.get("name", "Sello"))
+		else:
+			champion_reward_label.text = "Progreso de campeones: %d/%d · activa la escalera para obtener sellos" % [gs.champion_progress, ChampionCatalog.ORDER.size()]
+	if play_button:
+		var next_champ := ChampionCatalog.at(gs.champion_progress)
+		play_button.text = ("REVANCHA: %s" % String(next_champ.get("name", "Campeón")) if gs.champion_progress >= ChampionCatalog.ORDER.size() else "ENFRENTAR: %s" % String(next_champ.get("name", "Campeón"))) if gs.champion_mode else "JUGAR"
 	oro_label.text = str(gs.oro)
 	gem_label.text = str(gs.gemas)
 	level_badge.level = gs.account_level()
@@ -642,7 +706,10 @@ func _refresh_all(rebuild: bool = true) -> void:
 			# Ronda 19: ficha completa (atributos, estadísticas y equipo)
 			sheet.refresh()
 		"Armas":
+			list_box.add_child(UIKit.label("MANO DERECHA · arma principal", 14, UIKit.YELLOW))
 			for w in Catalog.weapons_for(cur):
+				if w.ranged:
+					continue
 				var own: bool = gs.is_unlocked("weapon", w.id)
 				if not own:
 					continue # ronda 19: se compran en la Tienda
@@ -656,7 +723,19 @@ func _refresh_all(rebuild: bool = true) -> void:
 						_refresh_all()
 					else:
 						request_purchase("weapon", w.id))
-			list_box.add_child(UIKit.label("Más armas en la Tienda.", 15, UIKit.MUTED))
+			list_box.add_child(UIKit.label("Más armas principales en la Tienda.", 15, UIKit.MUTED))
+			list_box.add_child(UIKit.label("TERCIARIO · arco o escudo", 14, UIKit.YELLOW))
+			if cur.shield_mesh != "":
+				_card("Escudo%s" % (" · equipado" if gs.weapon2_id == "escudo" else ""), gs.weapon2_id == "escudo", false, func() -> void:
+					gs.set_weapon2("" if gs.weapon2_id == "escudo" else "escudo")
+					_refresh_all())
+			for rw in Catalog.weapons_for(cur):
+				if not rw.ranged or not gs.is_unlocked("weapon", rw.id):
+					continue
+				_card("%s%s" % [rw.display_name, " · equipada" if rw.id == gs.weapon2_id else ""], rw.id == gs.weapon2_id, false, func() -> void:
+					gs.set_weapon2("" if rw.id == gs.weapon2_id else rw.id)
+					gs.save_loadout()
+					_refresh_all())
 			# Ronda 21: arte de arma intercambiable (colección)
 			if WeaponArts.compatible(Catalog.weapon(gs.weapon_id)):
 				var ab := UIKit.button("Arte: %s  ↻" % WeaponArts.name_of(gs.weapon_art()), 17, UIKit.BLUE)
@@ -668,7 +747,9 @@ func _refresh_all(rebuild: bool = true) -> void:
 					_refresh_all(false))
 				list_box.add_child(ab)
 			var cw: WeaponDef = gs.eff_weapon(gs.weapon_id)
-			detail.text = "[b]%s[/b]\n%s\nEscudo: %s · Combo: %d" % [cw.display_name, cw.description, "Sí" if cw.allows_shield else "No", cw.max_combo]
+			var offhand_text := "dos manos" if cw.two_handed else (Catalog.weapon(gs.left_hand_id).display_name if gs.left_hand_id != "" else "vacía")
+			var tertiary_text: String = "Escudo" if gs.weapon2_id == "escudo" else (String(gs.weapon2().display_name) if gs.weapon2() else "vacío")
+			detail.text = "[b]%s[/b]\n%s\nMano izquierda: %s · Terciario: %s · Combo: %d" % [cw.display_name, cw.description, offhand_text, tertiary_text, cw.max_combo]
 			# Ronda 18: escalado (S-E) y requisitos
 			var at: Dictionary = gs.char_attrs()
 			detail.text += "\n[color=#f2dc99]Escalado:[/color] %s\n[color=#f2dc99]Requisitos:[/color] %s" % [Attributes.scaling_text(cw), Attributes.req_text(cw)]
@@ -713,6 +794,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 				_stat("Daño", e.attack_damage, 20.0, str(e.attack_damage))
 				_stat("Alcance", e.attack_range, 12.0, "%.1f m" % e.attack_range)
 			_build_spell_slots()
+			_build_eikon_seals()
 		"Habilidades":
 			tree_view.build(gs.character_id, gs.char_skills(), gs.skill_points())
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
@@ -758,6 +840,36 @@ func _build_spell_slots() -> void:
 			var d := EikonSpells.spell(id)
 			lines.append("%s: %s (%d Energía, x%.2f)" % [d["name"], d["desc"], int(d["cost"]), EikonSpells.power(id, ad)])
 	detail.text += "\n[color=#f2dc99]Hechizos[/color] (a pie: X lanza, T cambia):\n" + ("\n".join(lines) if not lines.is_empty() else "Ninguno equipado.")
+
+## Ronda 35: sellos únicos ganados en la escalera; uno afecta a cada invocación.
+func _build_eikon_seals() -> void:
+	list_box.add_child(UIKit.label("Sellos de Eikon · %d/%d desbloqueados" % [gs.owned_eikon_seals.size(), EikonSeals.ORDER.size()], 16, Color(0.95, 0.86, 0.6)))
+	var none := UIKit.button("Sin sello" + ("  ✓" if gs.equipped_eikon_seal == "" else ""), 15,
+		UIKit.ORANGE if gs.equipped_eikon_seal == "" else UIKit.BLUE)
+	none.custom_minimum_size = Vector2(370, 36)
+	none.disabled = gs.owned_eikon_seals.is_empty() or gs.equipped_eikon_seal == ""
+	none.pressed.connect(func() -> void:
+		gs.set_eikon_seal("")
+		_refresh_all(false))
+	list_box.add_child(none)
+	for champ_id: String in ChampionCatalog.ORDER:
+		var champion: Dictionary = ChampionCatalog.by_id(champ_id)
+		var id: String = String(champion.get("seal", ""))
+		var d: Dictionary = EikonSeals.def(id)
+		var owned: bool = id in gs.owned_eikon_seals
+		var seal_title: String = (("✓ " if gs.equipped_eikon_seal == id else "") + String(d["name"])) if owned else "Bloqueado · derrota a %s" % String(champion.get("name", "Campeón"))
+		var b := UIKit.button(seal_title, 14,
+			UIKit.ORANGE if gs.equipped_eikon_seal == id else (UIKit.BLUE if owned else UIKit.MUTED))
+		b.custom_minimum_size = Vector2(370, 36)
+		b.disabled = not owned
+		b.tooltip_text = String(d["desc"])
+		if owned:
+			b.pressed.connect(func() -> void:
+				gs.set_eikon_seal(id)
+				_refresh_all(false))
+		list_box.add_child(b)
+		list_box.add_child(UIKit.label(String(d["desc"]), 12, UIKit.MUTED))
+	detail.text += "\n[color=#f2dc99]Sello equipado:[/color] %s" % (EikonSeals.name_of(gs.equipped_eikon_seal) if gs.equipped_eikon_seal != "" else "ninguno")
 
 func _card(text: String, selected: bool, locked: bool, cb: Callable, coin: bool = true) -> Button:
 	var b := UIKit.button(text, 18, UIKit.ORANGE if selected else (Color(0.3, 0.36, 0.48) if locked else UIKit.BLUE))
@@ -842,7 +954,7 @@ func _build_shop(cur: CharacterDef) -> void:
 					_refresh_all(false))
 				b.name = "Buy_art_" + aid
 				b.disabled = own
-			detail.text = "[b]Tienda · Artes de arma[/b]\nTu colección: cambia el arte de cada arma cuerpo a cuerpo en la pestaña Armas."
+			detail.text = "[b]Tienda · Artes de arma[/b]\nTu colección: cambia el arte del arma cuerpo a cuerpo desde la ficha de Personaje."
 
 ## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
 func _update_dots() -> void:
@@ -851,7 +963,6 @@ func _update_dots() -> void:
 	var can_w := false
 	for w in Catalog.weapons_for(Catalog.character(gs.character_id)):
 		can_w = can_w or gs.can_buy("weapon", w.id) == "ok"
-	dots["Armas"].visible = false
 	var can_e := false
 	for id: String in Catalog.EIKONS:
 		can_e = can_e or gs.can_buy("eikon", id) == "ok"
@@ -866,7 +977,7 @@ func play() -> void:
 	if modal.visible:
 		return
 	gs.from_lobby = true
-	gs.random_rival = true
+	gs.random_rival = not gs.champion_mode
 	gs.save_loadout()
 	UIKit.sfx("confirm")
 	UIKit.go("res://scenes/arena.tscn")
@@ -1020,6 +1131,9 @@ func _build_settings() -> void:
 	var ct := list_box.get_child(list_box.get_child_count() - 2)
 	list_box.move_child(ct, 0) # Controles arriba, a la vista
 	list_box.move_child(brow, 1)
+	var hand_help := UIKit.label("Mano izquierda: toque breve = parry · mantener = escudo (si está equipado).", 14, UIKit.MUTED)
+	list_box.add_child(hand_help)
+	list_box.move_child(hand_help, 2)
 	# Ronda 25: cámara
 	var crow := HBoxContainer.new()
 	crow.add_theme_constant_override("separation", 10)
@@ -1070,7 +1184,7 @@ func _build_settings() -> void:
 func _build_boss() -> void:
 	var eq: Array = gs.boss_abilities()
 	list_box.add_child(UIKit.label("Equipadas %d/%d · B usa · N cambia" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.MUTED))
-	for id: String in BossAbilities.ORDER:
+	for id: String in BossAbilities.all_ids():
 		var on: bool = id in eq
 		var b := UIKit.button(("✔ " if on else "   ") + "%s  (%s)" % [BossAbilities.def(id)["name"], BossAbilities.cost_text(id)], 17, UIKit.ORANGE if on else UIKit.BLUE)
 		b.name = "Boss_" + id

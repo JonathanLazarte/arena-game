@@ -11,6 +11,7 @@ display_name = "Ballesta"
 description = "A distancia. Apunta rápido (0,25 s) y apenas te frena al disparar, pero recarga 1,3 s. Virotes de 16, muy rápidos, aturden más. Cambia a dagas para el cuerpo a cuerpo."
 ranged = true
 allows_shield = false
+two_handed = true
 mesh_source = "res://assets/models/Rogue.glb"
 mesh_right = "1H_Crossbow"
 procedural = "ballesta"

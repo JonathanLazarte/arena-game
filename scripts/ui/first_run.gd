@@ -154,11 +154,19 @@ func _build_ui() -> void:
 func select(i: int) -> void:
 	index = (i + chars.size()) % chars.size()
 	var c := chars[index]
-	stage.show_character(c, Catalog.weapon(c.default_weapon))
+	var main_weapon := c.default_weapon
+	stage.show_character(c, Catalog.weapon(main_weapon))
 	stage.pedestal.rotation.y = 0.0
 	name_label.text = c.display_name
 	role_label.text = c.role
-	desc.text = "%s\n\n[color=#f2dc99]Pasiva · %s:[/color] %s\n[color=#a8ccff]Arma: %s[/color]" % [c.description, c.passive_name, c.passive_desc, Catalog.weapon(c.default_weapon).display_name]
+	var gear_text := "Mano derecha: %s" % Catalog.weapon(main_weapon).display_name
+	var ranged_default := "arco" if c.allows("arco") else ""
+	if ranged_default != "":
+		gear_text += " · Terciaria: %s" % Catalog.weapon(ranged_default).display_name
+	var main_def := Catalog.weapon(main_weapon)
+	if c.shield_mesh != "" and main_def.allows_shield and not main_def.two_handed:
+		gear_text += " · Mano izquierda: escudo"
+	desc.text = "%s\n\n[color=#f2dc99]Pasiva · %s:[/color] %s\n[color=#a8ccff]%s[/color]" % [c.description, c.passive_name, c.passive_desc, gear_text]
 	for ch in stats_box.get_children():
 		ch.queue_free()
 	stats_box.add_child(UIKit.stat_row("Vida", c.vida, 140.0, str(int(c.vida)), 170, UIKit.GREEN))

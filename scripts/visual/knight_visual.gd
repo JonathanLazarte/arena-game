@@ -12,6 +12,8 @@ const TEX := preload("res://assets/models/knight_texture.png")
 const SCALE := 0.85
 const MOUNT_Y := -0.36 ## baja el modelo para que la cadera (sentada) quede en el origen = punto de silla
 const CONTACT := 0.42 ## fracción del clip de ataque en la que la hoja impacta
+const TRAIL_LIFE := 0.24
+const TRAIL_MAX_SAMPLES := 18
 const UPPER := ["spine", "chest", "upperarm.l", "lowerarm.l", "wrist.l", "hand.l", "handslot.l",
 	"upperarm.r", "lowerarm.r", "wrist.r", "hand.r", "handslot.r", "head",
 	"elbowIK.l", "handIK.l", "elbowIK.r", "handIK.r"]
@@ -79,6 +81,7 @@ var playback: AnimationNodeStateMachinePlayback
 var mix: AnimationNodeBlend2
 var sword: MeshInstance3D
 var shield: MeshInstance3D
+var offhand_weapon_mesh: MeshInstance3D
 var bow: MeshInstance3D
 var glow_mat: StandardMaterial3D
 var body_mat: StandardMaterial3D
@@ -97,9 +100,15 @@ var wdef: WeaponDef
 var sword_l: MeshInstance3D ## segunda arma (dagas)
 var states: Dictionary = STATES.duplicate()
 var _char_tint: Color = Color.WHITE
+var _sword_trail: MeshInstance3D
+var _sword_trail_mesh: ArrayMesh
+var _sword_trail_material: StandardMaterial3D
+var _trail_samples: Array[Dictionary] = []
+var _trail_override_t: float = 0.0
+var _trail_override_color: Color = Color.WHITE
 
 ## c: color de equipo. cd/wd: personaje y arma (null = Caballero con espada y escudo).
-func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
+func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def: WeaponDef = null, ranged_def: WeaponDef = null) -> void:
 	cdef = cd if cd else load("res://resources/characters/caballero.tres") as CharacterDef
 	wdef = wd if wd else load("res://resources/weapons/espada_escudo.tres") as WeaponDef
 	var melee_w := wdef
@@ -108,7 +117,7 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	for i in 3:
 		states["light%d" % i] = melee_w.anim_light[i % melee_w.anim_light.size()]
 	states["heavy"] = melee_w.anim_heavy
-	var rw: WeaponDef = wdef if wdef.ranged else load("res://resources/weapons/arco.tres") as WeaponDef
+	var rw: WeaponDef = ranged_def if ranged_def else (wdef if wdef.ranged else load("res://resources/weapons/arco.tres") as WeaponDef)
 	states["aim"] = rw.anim_aim
 	states["shoot"] = rw.anim_shoot
 	states["reload"] = rw.anim_reload
@@ -123,7 +132,7 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	accent_mat = body_mat.duplicate() as StandardMaterial3D
 	set_tint(c, false)
 	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
-	var own_shield := melee_w.allows_shield and cdef.shield_mesh != ""
+	var own_shield := cdef.shield_mesh != ""
 	for mi in AnimUtil.meshes(model):
 		var n := String(mi.name)
 		if not n.begins_with(cdef.body_prefix) or n.contains("Shield"):
@@ -136,6 +145,9 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 		sword = _weapon_mesh(sk, melee_w.mesh_source, melee_w.mesh_right)
 	if melee_w.mesh_left != "":
 		sword_l = _weapon_mesh(sk, melee_w.mesh_source, melee_w.mesh_left)
+	if offhand_def:
+		var offhand_mesh_name := offhand_def.mesh_left if offhand_def.mesh_left != "" else offhand_def.mesh_right
+		offhand_weapon_mesh = _weapon_mesh(sk, offhand_def.mesh_source, offhand_mesh_name, true)
 	if own_shield:
 		shield = _weapon_mesh(sk, cdef.shield_source, cdef.shield_mesh)
 		shield.material_override = accent_mat
@@ -151,6 +163,7 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	glow_mat.roughness = 1.0
 	glow_mat.metallic_specular = 0.0
 	sword.material_overlay = glow_mat
+	_create_sword_trail()
 	# Arco: arma propia enganchada a la mano izquierda con BoneAttachment3D
 	var att := BoneAttachment3D.new()
 	att.name = "bow_slot"
@@ -158,10 +171,10 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null) -> void:
 	sk.add_child(att)
 	bow = MeshUtil.box(att, Vector3(0.1, 1.8, 0.14), Vector3.ZERO, Color(0.5, 0.3, 0.12))
 	MeshUtil.box(bow, Vector3(0.02, 1.7, 0.02), Vector3(0, 0, 0.25), Color(0.9, 0.9, 0.85)) # cuerda
-	if wdef.procedural == "ballesta":
+	if rw.procedural == "ballesta":
 		# Ronda 17: ballesta = malla «1H_Crossbow» del Rogue (KayKit Adventurers, CC0)
 		bow.queue_free()
-		bow = _weapon_mesh(sk, wdef.mesh_source, wdef.mesh_right)
+		bow = _weapon_mesh(sk, rw.mesh_source, rw.mesh_right)
 		bow.name = "Ballesta"
 	bow.visible = false
 	# Postura a horcajadas sobre el AnimationTree (SkeletonModifier3D)
@@ -203,15 +216,17 @@ var _loco_clips: Dictionary = {}
 
 ## Malla de arma: la del propio modelo si existe, o copiada de otro .glb KayKit
 ## (mismo hueso handslot y misma transformación local).
-func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String) -> MeshInstance3D:
-	var own := model.find_child(mesh_name, true, false) as MeshInstance3D
+func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String, force_left: bool = false) -> MeshInstance3D:
+	var own: MeshInstance3D = null
+	if not force_left:
+		own = model.find_child(mesh_name, true, false) as MeshInstance3D
 	if own:
 		own.visible = true
 		return own
 	var src := (load(source) as PackedScene).instantiate() as Node3D
 	var smi := src.find_child(mesh_name, true, false) as MeshInstance3D
-	var bone := "handslot.l" if mesh_name.contains("Offhand") or mesh_name.contains("Shield") else "handslot.r"
-	if smi and smi.get_parent() is BoneAttachment3D:
+	var bone := "handslot.l" if force_left or mesh_name.contains("Offhand") or mesh_name.contains("Shield") else "handslot.r"
+	if not force_left and smi and smi.get_parent() is BoneAttachment3D:
 		bone = (smi.get_parent() as BoneAttachment3D).bone_name
 	var att := BoneAttachment3D.new()
 	att.name = mesh_name + "_slot"
@@ -540,11 +555,13 @@ func _apply_weapon_scale() -> void:
 		var b: Vector3 = _base_scales[m]
 		m.scale = Vector3(b.x, b.y, b.z) * maxf(_swap_k, 0.02)
 
-func set_loadout(l: int) -> void:
+func set_loadout(l: int, shield_enabled: bool = true) -> void:
 	sword.visible = l == 0
 	if sword_l:
-		sword_l.visible = l == 0
-	shield.visible = l == 0
+		sword_l.visible = l == 0 and offhand_weapon_mesh == null
+	shield.visible = l == 0 and shield_enabled
+	if offhand_weapon_mesh:
+		offhand_weapon_mesh.visible = l == 0
 	bow.visible = l == 1
 
 func set_mounted(m: bool, sword_scale: float) -> void:
@@ -572,19 +589,142 @@ func _cast_total(f: Fighter) -> float:
 func _clip_len(s: String) -> float:
 	return ap.get_animation(states[s]).length
 
+## Estela 3D muestreada desde la empuñadura hasta la punta del arma, en espacio global.
+func _create_sword_trail() -> void:
+	_sword_trail = MeshInstance3D.new()
+	_sword_trail.name = "SwordRibbonTrail"
+	_sword_trail.top_level = true
+	_sword_trail.global_transform = Transform3D.IDENTITY
+	_sword_trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_sword_trail_material = StandardMaterial3D.new()
+	_sword_trail_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_sword_trail_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_sword_trail_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_sword_trail_material.vertex_color_use_as_albedo = true
+	_sword_trail_material.albedo_color = Color.WHITE
+	_sword_trail_material.render_priority = 1
+	_sword_trail_mesh = ArrayMesh.new()
+	_sword_trail.mesh = _sword_trail_mesh
+	_sword_trail.material_override = _sword_trail_material
+	_sword_trail.visible = false
+	add_child(_sword_trail)
+
+func flash_sword_trail(color: Color, duration: float = 0.18) -> void:
+	_trail_override_color = color
+	_trail_override_t = maxf(_trail_override_t, duration)
+
+func _sword_points() -> PackedVector3Array:
+	var points := PackedVector3Array()
+	if sword == null or sword.mesh == null:
+		return points
+	var box := sword.get_aabb()
+	var axis := 0
+	if box.size.y >= box.size.x and box.size.y >= box.size.z:
+		axis = 1
+	elif box.size.z >= box.size.x:
+		axis = 2
+	var base := box.position + box.size * 0.5
+	var tip := base
+	base[axis] = box.position[axis]
+	tip[axis] = box.end[axis]
+	points.append(sword.to_global(base))
+	points.append(sword.to_global(tip))
+	return points
+
+func _trail_color(f: Fighter) -> Color:
+	if _trail_override_t > 0.0:
+		return _trail_override_color
+	match String(f.melee().infusion):
+		"sangrante": return Color(1.0, 0.12, 0.16)
+		"gelido": return Color(0.45, 0.82, 1.0)
+		"venenoso": return Color(0.45, 1.0, 0.38)
+		"ardiente": return Color(1.0, 0.32, 0.08)
+		"magica": return Color(0.7, 0.48, 1.0)
+		"sagrada": return Color(1.0, 0.84, 0.38)
+	return Color(1.0, 0.9, 0.64)
+
+func _update_sword_trail(f: Fighter, delta: float) -> void:
+	_trail_override_t = maxf(_trail_override_t - delta, 0.0)
+	for i in range(_trail_samples.size() - 1, -1, -1):
+		var sample: Dictionary = _trail_samples[i]
+		sample["age"] = float(sample["age"]) + delta
+		if float(sample["age"]) >= TRAIL_LIFE:
+			_trail_samples.remove_at(i)
+	var normal_swing := f.atk_state == Fighter.Atk.ACTIVE and sword.visible and f.loadout == Fighter.Loadout.SWORD_SHIELD
+	if normal_swing or _trail_override_t > 0.0:
+		var points := _sword_points()
+		if points.size() == 2:
+			_trail_samples.append({"base": points[0], "tip": points[1], "age": 0.0})
+			while _trail_samples.size() > TRAIL_MAX_SAMPLES:
+				_trail_samples.pop_front()
+	_rebuild_sword_trail(_trail_color(f))
+
+func _rebuild_sword_trail(color: Color) -> void:
+	if _sword_trail_mesh == null:
+		return
+	_sword_trail_mesh.clear_surfaces()
+	if _trail_samples.size() < 2:
+		_sword_trail.visible = false
+		return
+	var vertices := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	for i in _trail_samples.size():
+		var sample: Dictionary = _trail_samples[i]
+		var alpha := clampf(1.0 - float(sample["age"]) / TRAIL_LIFE, 0.0, 1.0)
+		vertices.append(sample["base"])
+		vertices.append(sample["tip"])
+		colors.append(Color(color.r, color.g, color.b, alpha))
+		colors.append(Color(color.r, color.g, color.b, alpha * 0.82))
+		if i > 0:
+			var prev := (i - 1) * 2
+			var curr := i * 2
+			indices.append_array(PackedInt32Array([prev, prev + 1, curr, prev + 1, curr + 1, curr]))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	_sword_trail_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_sword_trail_mesh.surface_set_material(0, _sword_trail_material)
+	_sword_trail.visible = true
+
 ## Ronda 31: pose de cada habilidad de jefe.
 func _ability_state(f: Fighter) -> String:
 	match f.ab_id:
-		"carga_area": return "boss_charge"
-		"rafaga": return "cast"
-		"escudo_mana": return "block"
+		"carga_area", "furia_fase", "rayos_trazadores", "lluvia_meteoros": return "boss_charge"
+		"rafaga":
+			var swing_index := _rafaga_swing_index(f)
+			return "light%d" % swing_index if swing_index >= 0 else "cast"
+		"onda_rastrera", "aliento_dragon": return "cast"
+		"escudo_mana", "postura_contra": return "block"
 		"salto_caida": return "jump_air" if f.ab_air else "land"
-		"combo_falso": return "heavy" if f.ab_fired >= 3 else "light%d" % clampi(f.ab_fired, 0, 2)
+		"combo_falso": return "heavy" if f.ab_combo_finisher else "light%d" % clampi(f.ab_fired, 0, 2)
+		"danza_cisne": return "heavy" if f.ab_fired >= 3 else "light%d" % clampi(f.ab_fired, 0, 2)
+		"tajo_retardado", "giro_martillo", "paso_espectral": return "heavy"
+		"presa_verdugo": return "dash_strike" if f.ab_fired == 0 else "heavy"
 	return "none"
+
+## Cada corte visual empieza antes de que salga su proyectil, para que el contacto de la hoja
+## coincida con la emisión del tajo espectral.
+func _rafaga_swing_index(f: Fighter) -> int:
+	var d: Dictionary = BossAbilities.def("rafaga")
+	var windup := float(d.get("windup", 0.6))
+	var lead := 0.36
+	var tail := 0.5
+	if f.ab_t < windup - lead or f.ab_t >= windup + tail:
+		return -1
+	return posmod(int(f.ab_uses.get("rafaga", 1)) - 1, 3)
+
+
+func set_paused(paused: bool) -> void:
+	if tree:
+		tree.active = not paused
 
 func update(f: Fighter, delta: float) -> void:
 	oneshot_t = maxf(oneshot_t - delta, 0.0)
 	_update_bow_glow(delta)
+	_update_sword_trail(f, delta)
 	if bow_charged and not f.bow_charged_ready():
 		set_bow_charged(false)
 	if f.cast_t <= 0.0:
@@ -684,10 +824,17 @@ func update(f: Fighter, delta: float) -> void:
 		if key != _ab_hit_key:
 			_ab_hit_key = key
 			playback.start(s, true)
-		var hits: Array = cd["hits"]
-		var nl := hits.size() - 1
-		var wnd := float(cd["hit_windup"]) if f.ab_fired < nl else float(hits[nl][0]) - float(hits[nl - 1][0]) - 1.0
+		var wnd := float(cd["final_stage_time"]) if f.ab_combo_finisher and not f.ab_combo_variant else float(cd["variant_windup"]) if f.ab_combo_variant else float(cd["stage_windup"])
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(wnd, 0.2))
+	elif f.ab_id == "rafaga" and s.begins_with("light"):
+		var swing_index := _rafaga_swing_index(f)
+		var key := 1000000 + swing_index * 1000 + int(f.ab_uses.get("rafaga", 0))
+		if key != _ab_hit_key:
+			_ab_hit_key = key
+			playback.start(s, true)
+		var d: Dictionary = BossAbilities.def("rafaga")
+		var lead := float(d.get("rafaga_swing_lead", 0.36))
+		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(lead, 0.1))
 	elif s == "heavy" and f.atk_state == Fighter.Atk.NONE:
 		# pose de carga: avanza el clip hasta ~60 % de la anticipación mientras se mantiene
 		if not _prepose:
