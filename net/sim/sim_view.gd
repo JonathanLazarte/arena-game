@@ -78,9 +78,8 @@ func _apply_arrows(s: PackedInt64Array) -> void:
 		var m := _arrows[j]
 		m.visible = s[q + S.PR_ON] != 0
 		if m.visible:
-			var d: int = s[q + S.PR_DIR]
-			m.global_position = Vector3(s[q + S.PR_X] / 1000000.0, 1.3, s[q + S.PR_Z] / 1000000.0)
-			m.rotation.y = atan2(-FxMath.COS[d] / 4096.0, -FxMath.SIN[d] / 4096.0)
+			m.global_position = Vector3(s[q + S.PR_X] / 1000000.0, s[q + S.PR_Y] / 1000000.0, s[q + S.PR_Z] / 1000000.0)
+			m.rotation.y = atan2(-float(s[q + S.PR_VX]), -float(s[q + S.PR_VZ]))
 
 ## Arrastra la entrada local (PlayerCommand / acciones) al int de entrada de la sim.
 ## move_world: dirección en el mundo (ya relativa a la cámara); null = sin movimiento.

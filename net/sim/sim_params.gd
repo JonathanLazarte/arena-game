@@ -11,6 +11,12 @@ const HZ := 60.0
 ## Índices de ataque: 0..2 golpes del combo ligero, 3 fuerte, 4 estocada (dash/voltereta/carrera).
 const A_HEAVY := 3
 const A_DASH := 4
+## Subtipos físicos para la tabla de defensa: 0 = sin subtipo (flechas), 1..4 = PhysTypes.
+const SUBS := ["", "estandar", "cortante", "contundente", "perforante"]
+const DEF_TAB_MAX := 400 ## daño bruto máximo tabulado (por unidad)
+
+static func sub_code(sub: String) -> int:
+	return maxi(SUBS.find(sub), 0)
 
 ## Ticks hasta que un temporizador offline (t += 1/60 en float, condición t >= sec) se cumple.
 ## Reproduce el redondeo real del juego offline (p. ej. 0,4 s = 25 ticks, no 24).
@@ -97,7 +103,23 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	atks.append(_bake_attack(f, o, A_DASH, st_k, sp))
 	p["atk"] = atks
 	p["gc_pm"] = pm(Fighter.GC_WINDUP_MULT)
-	p["crit_dmg"] = milli(_incoming(o, w.heavy_damage * f.damage_mult() * Fighter.CRIT_MULT, w.phys_type))
+	p["crit_raw"] = milli(w.heavy_damage * _dmg_mult(f) * Fighter.CRIT_MULT)
+	p["crit_sub"] = sub_code(w.phys_type)
+	# Defensa de ESTE luchador como defensor: tabla incoming(a)/a (ppm) por subtipo, a = 0..400
+	if not f.eq.is_empty():
+		var tabs: Array = []
+		for sb: String in SUBS:
+			var t := PackedInt32Array()
+			for a in DEF_TAB_MAX + 1:
+				var amt := maxf(float(a), 0.01)
+				t.append(int(round(EquipStats.incoming(amt, "fisico", f.eq, f.eq_ref, sb) / amt * 1000000.0)))
+			tabs.append(t)
+		p["def_tab"] = tabs
+	# Pasivas y talismanes con efecto en tiempo de partida
+	p["furia_pm"] = pm(0.25 * f.passive_k()) if f.character.passive_id == "furia" else 0
+	p["heal_tick"] = milli(2.0 * f.passive_k() * float(f.ad["curacion"]) / HZ) if f.character.passive_id == "luz_sanadora" else 0
+	p["parry_stamina"] = milli(float(f.tfx["parry_stamina"]))
+	p["aim_lead_pm"] = pm(f.aim_lead)
 	# Arco
 	var r := f.ranged()
 	p["bow_draw"] = tk(r.fire_draw / sp)
@@ -122,8 +144,8 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 		stun_k = 1.2
 	var base := r.arrow_damage * (1.0 + 0.3 * f.passive_k() if f.character.passive_id == "ojo_de_halcon" else 1.0) * f.weapon_attr_mult(r) * r.upgrade_dmg_mult
 	p["arrow_raw"] = milli(base)
-	p["arrow_dmg"] = milli(_incoming(o, base, ""))
-	p["arrow_dmg_ch"] = milli(_incoming(o, base * dmg_k, ""))
+	p["arrow_raw_ch"] = milli(base * dmg_k)
+	p["arrow_reflect_life"] = tk(2.0)
 	p["arrow_speed"] = um(r.projectile_speed / HZ)
 	p["arrow_speed_ch"] = um(r.projectile_speed * spd_k / HZ)
 	p["arrow_force"] = milli(f.arrow_stun_force(r.ranged_hitstun))
@@ -134,6 +156,13 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	p["arrow_block_cost"] = milli(Fighter.COST_BLOCKED_ARROW * float(o.tfx["stamina_cost"]))
 	p["counter_arrow_pm"] = pm(float(PhysTypes.COUNTER_DMG["estandar"]))
 	return p
+
+## damage_mult sin la parte que depende del estado (furia con vida baja): la sim la aplica en vivo.
+static func _dmg_mult(f: Fighter) -> float:
+	var k := f.damage_mult()
+	if f.character.passive_id == "furia" and f.health < f.max_health * 0.4:
+		k /= 1.0 + 0.25 * f.passive_k()
+	return k
 
 static func _incoming(o: Fighter, amount: float, sub: String) -> float:
 	if o.eq.is_empty():
@@ -176,7 +205,7 @@ static func _bake_attack(f: Fighter, o: Fighter, idx: int, st_k: float, sp: floa
 			window = h.window
 			lunge = h.lunge
 			sub = PhysTypes.of_hit(w, h)
-	var raw: float = float(d["damage"]) * f.damage_mult()
+	var raw: float = float(d["damage"]) * _dmg_mult(f)
 	var per := h.stun_force if (h and h.stun_force >= 0.0) else hitstun * StunRules.HITSTUN_TO_FORCE
 	var force := (StunRules.str_force(float(f.attributes().get("fuerza", 10))) + StunRules.weapon_force(w) + per) * float(f.ad.get("stun_dealt", 1.0))
 	pmult *= float(PhysTypes.POISE_MOD.get(sub, 1.0))
@@ -191,7 +220,7 @@ static func _bake_attack(f: Fighter, o: Fighter, idx: int, st_k: float, sp: floa
 		"stamina": milli(float(d["stamina"]) * st_k),
 		"reach": um(reach), "cos_arc": cos_q(arc), "window": tk(window) if window >= 0.0 else -1,
 		"step": um(step), "lunge": um(lunge * f.speed_mult() / HZ),
-		"raw": milli(raw), "dmg": milli(_incoming(o, raw, sub)),
+		"raw": milli(raw), "sub": sub_code(sub),
 		"force": milli(force), "resist_pm": pm(resist),
 		"pd_pm": pm(2.0 * pmult * float(f.ad["impacto"])),
 		"counter_pm": pm(float(PhysTypes.COUNTER_DMG.get(sub, 1.15))),
@@ -208,9 +237,9 @@ static func defaults() -> Array:
 		"roll_start": 4, "roll_if_end": 28, "roll_total": 48, "roll_fast": 28, "roll_dist": 4500000, "roll_drift": 400000,
 		"roll_buffer": 11, "backstep_t": 21, "backstep_v": 95238, "parry_window": 18, "parry_recovery": 48, "parry_stagger": 96,
 		"swap_t": 26, "has_bow": 1, "hit_radius": 750000, "robust": 50000, "stance_max": 175000, "stance_regen": 200, "has_shield": 1,
-		"chip_pm": 120, "guard_break_t": 60, "max_combo": 3, "gc_pm": 600, "crit_dmg": 57200,
+		"chip_pm": 120, "guard_break_t": 60, "max_combo": 3, "gc_pm": 600, "crit_raw": 57200, "crit_sub": 1,
 		"bow_draw": 30, "bow_recovery": 24, "bow_recovery_ch": 29, "bow_reload": 0, "bow_cd": 9, "bow_hold": 54, "bow_slow_pm": 250,
-		"arrow_raw": 8000, "arrow_dmg": 8000, "arrow_dmg_ch": 17600, "arrow_speed": 533333, "arrow_speed_ch": 746667,
+		"arrow_raw": 8000, "arrow_raw_ch": 17600, "arrow_reflect_life": 120, "arrow_speed": 533333, "arrow_speed_ch": 746667,
 		"arrow_force": 18000, "arrow_force_ch": 33000, "arrow_n_ch": 1, "arrow_life": 150, "arrow_radius": 500000,
 		"arrow_block_cost": 3000, "counter_arrow_pm": 1150,
 	}
@@ -218,13 +247,13 @@ static func defaults() -> Array:
 	for i in 3:
 		atks.append({"windup": 26 if i < 2 else 30, "active": 8, "recovery": 33, "whiff": 15, "stamina": 13000, "reach": 2200000,
 			"cos_arc": 1401, "window": 27, "step": 900000 if i < 2 else 1200000, "lunge": 0, "raw": 11000 if i < 2 else 14000,
-			"dmg": 11000 if i < 2 else 14000, "force": 26000 if i < 2 else 34000, "resist_pm": 0, "pd_pm": 2000 if i < 2 else 2600,
+			"sub": 1, "force": 26000 if i < 2 else 34000, "resist_pm": 0, "pd_pm": 2000 if i < 2 else 2600,
 			"counter_pm": 1150, "block_cost": 22000 if i < 2 else 44000, "heavy_hit": 0 if i < 2 else 1})
 	atks.append({"windup": 48, "active": 9, "recovery": 45, "whiff": 21, "stamina": 28000, "reach": 2200000, "cos_arc": 1401,
-		"window": -1, "step": 1400000, "lunge": 0, "raw": 26000, "dmg": 26000, "force": 38000, "resist_pm": 1000, "pd_pm": 2000,
+		"window": -1, "step": 1400000, "lunge": 0, "raw": 26000, "sub": 1, "force": 38000, "resist_pm": 1000, "pd_pm": 2000,
 		"counter_pm": 1150, "block_cost": 44000, "heavy_hit": 1})
 	atks.append({"windup": 10, "active": 9, "recovery": 30, "whiff": 15, "stamina": 10000, "reach": 2200000, "cos_arc": 1401,
-		"window": -1, "step": 0, "lunge": 200000, "raw": 15000, "dmg": 15000, "force": 32000, "resist_pm": 500, "pd_pm": 2000,
+		"window": -1, "step": 0, "lunge": 200000, "raw": 15000, "sub": 1, "force": 32000, "resist_pm": 500, "pd_pm": 2000,
 		"counter_pm": 1150, "block_cost": 44000, "heavy_hit": 1})
 	p["atk"] = atks
 	return [p, p.duplicate(true)]

@@ -77,13 +77,13 @@ func _initialize() -> void:
 		S.step(s, P, S.IN_ATK if t == 0 else 0, 0)
 		if hit_t < 0 and s[F + S.HP] < h0: hit_t = t
 	var a0: Dictionary = P[0]["atk"][0]
-	check(s[F + S.HP] == P[1]["hp"] - a0["dmg"], "ligero: daño exacto (%d)" % (P[1]["hp"] - s[F + S.HP]))
+	check(s[F + S.HP] == P[1]["hp"] - a0["raw"], "ligero: daño exacto (%d)" % (P[1]["hp"] - s[F + S.HP]))
 	check(hit_t == 1 + a0["windup"] - 1, "ligero: golpea al acabar la anticipación (tick %d)" % hit_t)
 	# combo de 3: tocar repetidamente encadena
 	s = duel(1.8)
 	run(s, 200, func(t: int) -> int: return S.IN_ATK if t % 12 < 2 and t < 120 else 0)
 	var dealt: int = s[S.DMG_DEALT]
-	var exp3: int = P[0]["atk"][0]["dmg"] + P[0]["atk"][1]["dmg"] + P[0]["atk"][2]["dmg"]
+	var exp3: int = P[0]["atk"][0]["raw"] + P[0]["atk"][1]["raw"] + P[0]["atk"][2]["raw"]
 	check(s[S.HITS] == 3, "combo de 3 golpes encadenado (%d golpes, %d daño)" % [s[S.HITS], dealt])
 	check(s[F + S.STAGGERS] + s[F + S.STUNS] >= 1, "el combo acumula aturdimiento (nivel %d)" % s[F + S.LAST_LVL])
 	# fuerte: mantener 0,4 s; cargar más da más daño
@@ -93,8 +93,8 @@ func _initialize() -> void:
 	s = duel(1.8)
 	run(s, 160, func(t: int) -> int: return S.IN_ATK if t < 120 else 0)
 	var charged_dmg: int = P[1]["hp"] - s[F + S.HP]
-	check(heavy_dmg == P[0]["atk"][3]["dmg"], "fuerte: daño base (%d)" % heavy_dmg)
-	check(charged_dmg == P[0]["atk"][3]["dmg"] * 1400 / 1000, "fuerte cargado al máximo: +40 %% (%d)" % charged_dmg)
+	check(heavy_dmg == P[0]["atk"][3]["raw"], "fuerte: daño base (%d)" % heavy_dmg)
+	check(charged_dmg == P[0]["atk"][3]["raw"] * 1400 / 1000, "fuerte cargado al máximo: +40 %% (%d)" % charged_dmg)
 	# bloqueo: daño reducido (chip) y aguante gastado
 	s = duel(1.8)
 	run(s, 60, light_at(0), func(_t: int) -> int: return S.IN_BLOCK)
@@ -114,7 +114,7 @@ func _initialize() -> void:
 	run(s, 30, light_at(0), func(t: int) -> int: return S.IN_PARRY if t == 18 else 0)
 	check(s[F + S.PARRIES] == 1 and s[F + S.HP] == P[1]["hp"] and s[S.STUN] > 60 and s[S.RIPOSTE_T] > 0, "parry: atacante aturdido (stun %d ticks), sin daño" % s[S.STUN])
 	run(s, 60, func(_t: int) -> int: return 0, light_at(0))
-	check(P[0]["hp"] - s[S.HP] == P[1]["atk"][0]["dmg"] * 1800 / 1000, "réplica tras parry x1,8 (%d)" % (P[0]["hp"] - s[S.HP]))
+	check(P[0]["hp"] - s[S.HP] == P[1]["atk"][0]["raw"] * 1800 / 1000, "réplica tras parry x1,8 (%d)" % (P[0]["hp"] - s[S.HP]))
 	# derribo (nivel 3) con presión sostenida + inmunidad al levantarse
 	s = duel(1.8)
 	var max_lvl := 0
@@ -140,10 +140,10 @@ func _initialize() -> void:
 		S.step(s, P, (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t == 40 else 0), 0)
 		if arrow_hit < 0 and s[F + S.HP] < hh: arrow_hit = t
 	check(s[S.LOADOUT] == S.Load.BOW, "cambio a arco")
-	check(P[1]["hp"] - s[F + S.HP] == P[0]["arrow_dmg"], "flecha: daño (%d) al tick %d" % [P[1]["hp"] - s[F + S.HP], arrow_hit])
+	check(P[1]["hp"] - s[F + S.HP] == P[0]["arrow_raw"], "flecha: daño (%d) al tick %d" % [P[1]["hp"] - s[F + S.HP], arrow_hit])
 	s = duel(10.0)
 	run(s, 260, func(t: int) -> int: return (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t >= 40 and t < 40 + 30 + 60 else 0))
-	check(P[1]["hp"] - s[F + S.HP] == P[0]["arrow_dmg_ch"] and s[S.SHOT_CHARGED] == 1, "disparo cargado (mantener 0,9 s tras tensar): %d" % (P[1]["hp"] - s[F + S.HP]))
+	check(P[1]["hp"] - s[F + S.HP] == P[0]["arrow_raw_ch"] and s[S.SHOT_CHARGED] == 1, "disparo cargado (mantener 0,9 s tras tensar): %d" % (P[1]["hp"] - s[F + S.HP]))
 	s = duel(10.0)
 	run(s, 200, func(t: int) -> int: return (S.IN_SWAP if t == 0 else 0) | (S.IN_ATK if t == 40 else 0), func(_t: int) -> int: return S.IN_BLOCK)
 	check(s[F + S.HP] == P[1]["hp"] and s[F + S.BLOCKS] == 1 and s[F + S.ST] < P[1]["st_max"], "flecha bloqueada: sin daño, cuesta aguante")

@@ -33,6 +33,17 @@ func _run() -> void:
 		["presión sostenida", 1.8, 420, _pressure_script()],
 		["flecha", 10.0, 140, [[0, 0, "swap", 0], [40, 0, "shoot", 0]]],
 		["flecha cargada", 10.0, 220, [[0, 0, "swap", 0], [40, 0, "shoot", 90]]],
+		["ataque en carrera", 6.0, 90, [[0, 0, "move_on", 0], [0, 0, "sprint_on", 0], [30, 0, "light", 0], [31, 0, "move_off", 0], [31, 0, "sprint_off", 0]]],
+		["crítico tras rotura de postura", 1.8, 520, _crit_script()],
+		["ballesta", 10.0, 200, [[0, 0, "swap", 0], [40, 0, "shoot", 0]], {"w2": "ballesta"}],
+		["ballesta cargada (abanico)", 10.0, 260, [[0, 0, "swap", 0], [40, 0, "shoot", 100]], {"w2": "ballesta"}],
+		["armadura: ligero + fuerte", 1.8, 220, [[2, 0, "light", 0], [120, 0, "heavy", 0]], {"armor": true}],
+		["armadura: contragolpe", 1.8, 80, [[30, 1, "heavy", 0], [36, 0, "light", 0]], {"armor": true}],
+		["armadura: parry + réplica", 1.8, 140, [[2, 0, "light", 0], [20, 1, "parry", 0], [40, 1, "light", 0]], {"armor": true}],
+		["flecha con adelanto (blanco andando)", 12.0, 160, [[0, 0, "swap", 0], [0, 1, "move_on", 8], [40, 0, "shoot", 0]], {"lead": 1.0}],
+		["pasiva furia (vida baja)", 1.8, 60, [[2, 0, "light", 0]], {"chars": ["berserker", ""], "hp": [25.0, -1.0]}],
+		["pasiva curación", 1.8, 420, [[2, 0, "light", 0]], {"chars": ["", "paladin"]}],
+		["talismán: parry devuelve aguante", 1.8, 60, [[2, 0, "light", 0], [20, 1, "parry", 0]], {"trinkets": [[], ["eco_templado"]]}],
 	]
 	var all_params_ok := true
 	for sc in scen:
@@ -40,13 +51,13 @@ func _run() -> void:
 		var P: Array = off["params"]
 		for pp: Dictionary in P:
 			pp["buffer"] = 0 # el lado offline llama a la API sin el búfer del controlador
-		var sim := _sim(P, sc)
+		var sim := _sim(P, sc, off["hp_start"])
 		var name: String = sc[0]
 		print("--- %s: offline %s | sim %s" % [name, str(off["r"]), str(sim)])
 		var r: Dictionary = off["r"]
 		for k in ["dmg0", "dmg1"]:
 			check(absf(float(r[k]) - float(sim[k])) <= 0.05 + 0.01 * float(r[k]), "%s: %s offline %.2f vs sim %.2f" % [name, k, r[k], sim[k]])
-		for k in ["lvl0", "lvl1", "parries", "dodges", "guard_breaks", "hits0", "hits1", "stance_breaks"]:
+		for k in ["lvl0", "lvl1", "parries", "dodges", "guard_breaks", "hits0", "hits1", "stance_breaks", "crits"]:
 			check(int(r[k]) == int(sim[k]), "%s: %s offline %d vs sim %d" % [name, k, r[k], sim[k]])
 		for k in ["first_hit", "stun0", "stun1"]:
 			var tol := 1 if k == "first_hit" else 2
@@ -64,6 +75,12 @@ func _guard_break_script() -> Array:
 		out.append([4 + k * 14, 0, "light", 0])
 	return out
 
+func _crit_script() -> Array:
+	var out := _pressure_script()
+	out.append([388, 0, "light", 0]) # ya libre, rival con la postura rota delante
+	out.append([392, 0, "light", 0])
+	return out
+
 func _pressure_script() -> Array:
 	var out := []
 	for k in 30:
@@ -72,7 +89,7 @@ func _pressure_script() -> Array:
 
 func _empty_result() -> Dictionary:
 	return {"dmg0": 0.0, "dmg1": 0.0, "lvl0": 0, "lvl1": 0, "parries": 0, "dodges": 0, "guard_breaks": 0, "hits0": 0, "hits1": 0,
-		"first_hit": -1, "stun0": 0, "stun1": 0, "stance_breaks": 0, "log": []}
+		"first_hit": -1, "stun0": 0, "stun1": 0, "stance_breaks": 0, "crits": 0, "log": []}
 
 func _dir_off(d32: int) -> Vector3:
 	var a := d32 / 32.0 * TAU
@@ -83,24 +100,43 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 	var gap: float = sc[1]
 	var n: int = sc[2]
 	var script: Array = sc[3]
+	var setup: Dictionary = sc[4] if sc.size() > 4 else {}
 	var fs: Array[Fighter] = []
 	for i in 2:
 		var f := Fighter.new()
 		f.team = i
+		var chars: Array = setup.get("chars", ["", ""])
+		if String(chars[i]) != "":
+			f.set_loadout_defs(load("res://resources/characters/%s.tres" % chars[i]), f.weapon)
+		var w2: WeaponDef = load("res://resources/weapons/%s.tres" % setup["w2"]) if setup.has("w2") else Fighter.FALLBACK_BOW
+		if setup.get("armor", false):
+			f.set_equipment(5, EquipStats.rival_armor("caballero", 5), w2)
+		if setup.has("trinkets"):
+			f.set_trinkets(setup["trinkets"][i])
 		world.add_child(f)
-		f.secondary = Fighter.FALLBACK_BOW
+		f.secondary = w2
+		if setup.has("lead"):
+			f.aim_lead = float(setup["lead"])
 		fs.append(f)
 	await physics_frame
 	fs[0].global_position = Vector3.ZERO
 	fs[0].facing = Vector3(0, 0, -1)
 	fs[1].global_position = Vector3(0, 0, -gap)
 	fs[1].facing = Vector3(0, 0, 1)
+	var hp_set: Array = setup.get("hp", [-1.0, -1.0])
+	for i in 2:
+		if float(hp_set[i]) > 0.0:
+			fs[i].health = float(hp_set[i])
 	var params := SimParams.bake(fs[0], fs[1])
 	await physics_frame
 	var r := _empty_result()
 	var hp0 := [fs[0].health, fs[1].health]
 	var holds := [{}, {}]
 	for t in n:
+		for i in 2:
+			if holds[i].has("move"):
+				var d0: int = int(holds[i]["move"])
+				fs[i].move_input = _dir_off(d0) if i == 0 else -_dir_off(d0)
 		for e: Array in script:
 			if int(e[0]) != t:
 				continue
@@ -119,12 +155,19 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 					f.move_input = _dir_off(int(e[3]))
 					f.dash()
 				"swap": f.swap_loadout()
+				"move_on": holds[int(e[1])]["move"] = int(e[3])
+				"move_off": holds[int(e[1])].erase("move")
+				"sprint_on": f.want_sprint = true
+				"sprint_off": f.want_sprint = false
 				"shoot":
 					f.shoot()
 					f.want_shot_hold = int(e[3]) > 0
 					holds[int(e[1])]["shot"] = t + int(e[3])
 		for i in 2:
 			var h: Dictionary = holds[i]
+			if h.has("move"):
+				var d32: int = int(h["move"])
+				fs[i].move_input = _dir_off(d32) if i == 0 else -_dir_off(d32)
 			if h.has("charge") and t >= int(h["charge"]):
 				fs[i].want_charge = false
 			if h.has("shot") and t >= int(h["shot"]):
@@ -151,13 +194,14 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 	r["hits0"] = fs[0].hits_landed
 	r["hits1"] = fs[1].hits_landed
 	r["stance_breaks"] = fs[0].stance_breaks + fs[1].stance_breaks
+	r["crits"] = fs[0].crits + fs[1].crits
 	for f in fs:
 		f.queue_free()
 	await physics_frame
-	return {"params": params, "r": r}
+	return {"params": params, "r": r, "hp_start": hp0}
 
 # ---------------- Sim ----------------
-func _sim(P: Array, sc: Array) -> Dictionary:
+func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 	var gap: float = sc[1]
 	var n: int = sc[2]
 	var script: Array = sc[3]
@@ -166,6 +210,8 @@ func _sim(P: Array, sc: Array) -> Dictionary:
 	s[S.FACE] = 0
 	s[F + S.X] = int(round(gap * 1000000.0))
 	s[F + S.FACE] = 128
+	for i in 2:
+		s[i * F + S.HP] = int(round(float(hp_start[i]) * 1000.0))
 	# compila el guion a entradas por tick
 	var ins := [[], []]
 	for i in 2:
@@ -191,6 +237,15 @@ func _sim(P: Array, sc: Array) -> Dictionary:
 				var d32: int = (int(e[3]) + (16 if i == 1 else 0)) & 31
 				ins[i][t] |= S.IN_ROLL | S.IN_MOVE | d32
 			"swap": ins[i][t] |= S.IN_SWAP
+			"move_on":
+				var md: int = (int(e[3]) + (16 if i == 1 else 0)) & 31
+				for k in range(t, n): ins[i][k] = (ins[i][k] & ~S.IN_DIR_MASK) | S.IN_MOVE | md
+			"move_off":
+				for k in range(t, n): ins[i][k] &= ~(S.IN_MOVE | S.IN_DIR_MASK)
+			"sprint_on":
+				for k in range(t, n): ins[i][k] |= S.IN_SPRINT
+			"sprint_off":
+				for k in range(t, n): ins[i][k] &= ~S.IN_SPRINT
 			"shoot":
 				for k in range(t, mini(t + maxi(int(e[3]), 1), n)): ins[i][k] |= S.IN_ATK
 	var r := _empty_result()
@@ -206,8 +261,9 @@ func _sim(P: Array, sc: Array) -> Dictionary:
 			r["log"].append("%d:%.1f" % [t, (h1 - s[F + S.HP]) / 1000.0])
 		if r["first_hit"] < 0 and s[F + S.HP] < h1:
 			r["first_hit"] = t
-	r["dmg0"] = (P[0]["hp"] - s[S.HP]) / 1000.0
-	r["dmg1"] = (P[1]["hp"] - s[F + S.HP]) / 1000.0
+	r["dmg0"] = float(hp_start[0]) - s[S.HP] / 1000.0
+	r["dmg1"] = float(hp_start[1]) - s[F + S.HP] / 1000.0
+	r["crits"] = s[S.CRITS] + s[F + S.CRITS]
 	r["lvl0"] = s[S.STAGGERS] + s[S.STUNS] * 10 + s[S.KNOCKDOWNS] * 100
 	r["lvl1"] = s[F + S.STAGGERS] + s[F + S.STUNS] * 10 + s[F + S.KNOCKDOWNS] * 100
 	r["parries"] = s[S.PARRIES] + s[F + S.PARRIES]

@@ -42,7 +42,7 @@ const P_BASE := 2 * F_FIELDS
 enum { G_FRAME, G_FREEZE, G_RNG, G_HITSTOP_ON, G_FIELDS }
 const PROJ_BASE := P_BASE + G_FIELDS
 const PROJ_MAX := 8
-enum { PR_ON, PR_OWNER, PR_X, PR_Z, PR_DIR, PR_SPEED, PR_LIFE, PR_DMG, PR_FORCE, PR_RAW, PR_DODGED, PR_FIELDS }
+enum { PR_ON, PR_OWNER, PR_X, PR_Z, PR_Y, PR_VX, PR_VZ, PR_VY, PR_LIFE, PR_RAW, PR_FORCE, PR_DODGED, PR_FIELDS }
 const SIZE := PROJ_BASE + PROJ_MAX * PR_FIELDS
 
 const ARENA_R := 40000000     # µm (muro circular)
@@ -82,6 +82,12 @@ const CONTACT_GAP := 800000
 const COUNTER_POISE_PM := 1300
 const COUNTER_FORCE_PM := 1300
 const BLOCK_REGEN_PM := 500
+const HIT_CENTER_Y := 1000000 # µm (Fighter.get_hit_center a pie)
+const ARROW_Y0 := 1800000     # centro + 0,8 m
+const FAN_COS := 4030         # cos(0,18 rad) ×4096 (abanico de la ballesta)
+const FAN_SIN := 733
+const HEAL_DELAY := 180       # 3 s sin golpes (pasiva de curación)
+const FURIA_HP_PM := 400
 
 static func initial(params: Array, seed_v: int = 1, hitstop: bool = true) -> PackedInt64Array:
 	var s := PackedInt64Array()
@@ -489,7 +495,21 @@ static func _damage(s: PackedInt64Array, a: int, b: int, amount: int) -> void:
 
 ## take_hit. kind: 0 cuerpo a cuerpo, 1 flecha, 2 crítico. raw = daño bruto (bloqueo), fin = tras defensa.
 ## Devuelve 0 nada, 1 golpe, 2 bloqueo, 3 parry, 4 esquiva.
-static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, fin: int, force: int, pd_pm: int, counter_pm: int, block_cost: int) -> int:
+## Daño tras la defensa del defensor: tabla horneada de EquipStats.incoming (no lineal) interpolada.
+static func _incoming(P: Array, d: int, sub: int, amount: int) -> int:
+	var tabs: Array = P[d].get("def_tab", [])
+	if tabs.is_empty() or amount <= 0:
+		return amount
+	var t: PackedInt32Array = tabs[sub]
+	var i := amount / 1000
+	var r: int
+	if i >= t.size() - 1:
+		r = t[t.size() - 1]
+	else:
+		r = t[i] + (t[i + 1] - t[i]) * (amount % 1000) / 1000
+	return amount * r / 1000000
+
+static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int) -> int:
 	var d := 1 - att
 	var a := att * F_FIELDS
 	var b := d * F_FIELDS
@@ -508,6 +528,8 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 			s[a + RIPOSTE_T] = P[d]["parry_stagger"]
 		s[b + PARRIES] += 1
 		s[b + PARRY_STATE] = Parry.NONE
+		if P[d].get("parry_stamina", 0) > 0:
+			s[b + ST] = mini(s[b + ST] + P[d]["parry_stamina"], P[d]["st_max"])
 		if s[P_BASE + G_HITSTOP_ON] != 0:
 			s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], HITSTOP_PARRY)
 		return 3
@@ -534,9 +556,9 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var counter := kind != 2 and (s[b + ATK_STATE] == Atk.WINDUP or s[b + ATK_STATE] == Atk.ACTIVE)
 	if counter:
 		mult = mult * counter_pm / 1000
+	var amount := _incoming(P, d, sub, raw * mult / 1000)
 	if s[b + STUN_IMM] > 0 and s[b + KNOCKDOWNS] > 0:
-		mult = mult * GETUP_DMG_PM / 1000
-	var amount := fin * mult / 1000
+		amount = amount * GETUP_DMG_PM / 1000
 	_damage(s, a, b, amount)
 	s[b + SINCE_HIT] = 0
 	var pd := amount * pd_pm / 1000
@@ -571,6 +593,8 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		s[o + STUN_WIN] -= 1
 		if s[o + STUN_WIN] <= 0:
 			_reset_stun(s, o)
+	if p.get("heal_tick", 0) > 0 and s[o + ALIVE] != 0 and s[o + SINCE_HIT] > HEAL_DELAY and s[o + HP] < p["hp"]:
+		s[o + HP] = mini(s[o + HP] + p["heal_tick"], p["hp"])
 	if s[o + SWAP_T] > 0:
 		s[o + SWAP_T] -= 1
 		if s[o + SWAP_T] <= 0:
@@ -601,7 +625,7 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		if s[o + CRIT_DONE] == 0 and s[o + CRIT_T] >= CRIT_HIT_AT:
 			s[o + CRIT_DONE] = 1
 			if s[_opp(i) + ALIVE] != 0:
-				_take_hit(s, P, i, 2, p["crit_dmg"], p["crit_dmg"], 0, 0, 1000, 0)
+				_take_hit(s, P, i, 2, p["crit_raw"], p["crit_sub"], 0, 0, 1000, 0)
 				s[o + CRITS] += 1
 				if s[P_BASE + G_HITSTOP_ON] != 0:
 					s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], 7)
@@ -683,7 +707,10 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> voi
 	var force: int = a["force"]
 	if heavy:
 		force = force * (1000 + 500 * s[o + CHARGE_T] / CHARGE_MAX) / 1000
-	var res := _take_hit(s, P, i, 0, a["raw"] * ck / 1000, a["dmg"] * ck / 1000, force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], a["block_cost"])
+	var raw: int = a["raw"] * ck / 1000
+	if P[i].get("furia_pm", 0) > 0 and s[o + HP] * 1000 < P[i]["hp"] * FURIA_HP_PM:
+		raw = raw * (1000 + P[i]["furia_pm"]) / 1000
+	var res := _take_hit(s, P, i, 0, raw, a["sub"], force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], a["block_cost"])
 	if res == 1 or res == 2 or res == 3:
 		s[o + ATK_LANDED] = 1
 	if res == 1:
@@ -729,12 +756,29 @@ static func _update_shot(s: PackedInt64Array, P: Array, i: int, inp: int) -> voi
 
 static func _release(s: PackedInt64Array, P: Array, i: int, charged: bool) -> void:
 	var o := i * F_FIELDS
+	var b := _opp(i)
 	var p: Dictionary = P[i]
 	var f: int = s[o + FACE]
-	var dir := f
-	var to := _dir_to_opp(s, i)
-	if absi(FxMath.ddiff(f, to)) < 90: # el rival no está detrás (dot > -0,2)
-		dir = to
+	var ox: int = s[o + X] + FxMath.COS[f] * 1400000 / FxMath.ONE
+	var oz: int = s[o + Z] + FxMath.SIN[f] * 1400000 / FxMath.ONE
+	var spd: int = p["arrow_speed_ch"] if charged else p["arrow_speed"]
+	# dirección 3D: hacia el centro del rival (con adelanto) si no está detrás; si no, al frente
+	var dx: int = FxMath.COS[f]
+	var dz: int = FxMath.SIN[f]
+	var dy := 0
+	var unit := FxMath.ONE
+	var tx: int = s[b + X] - ox
+	var tz: int = s[b + Z] - oz
+	var ty := HIT_CENTER_Y - ARROW_Y0
+	var hl := FxMath.length(tx, tz)
+	if s[b + ALIVE] != 0 and (hl == 0 or (tx * FxMath.COS[f] + tz * FxMath.SIN[f]) > -819 * hl):
+		var l3 := FxMath.isqrt(tx * tx + tz * tz + ty * ty)
+		var lead: int = p.get("aim_lead_pm", 0)
+		if lead > 0 and spd > 0:
+			tx += s[b + VX] * l3 / spd * lead / 1000
+			tz += s[b + VZ] * l3 / spd * lead / 1000
+		var l := maxi(FxMath.isqrt(tx * tx + tz * tz + ty * ty), 1)
+		dx = tx; dz = tz; dy = ty; unit = l
 	var n: int = p["arrow_n_ch"] if charged else 1
 	s[o + SHOTS] += n
 	for k in n:
@@ -745,16 +789,23 @@ static func _release(s: PackedInt64Array, P: Array, i: int, charged: bool) -> vo
 				break
 		if slot < 0:
 			return # piscina llena: el disparo se pierde (8 flechas vivas como máximo)
+		var rx := dx
+		var rz := dz
+		if n > 1 and k != 1: # abanico: gira ±0,18 rad alrededor del eje vertical
+			var sg := k - 1
+			rx = (dx * FAN_COS - sg * dz * FAN_SIN) / FxMath.ONE
+			rz = (sg * dx * FAN_SIN + dz * FAN_COS) / FxMath.ONE
 		var q := PROJ_BASE + slot * PR_FIELDS
 		s[q + PR_ON] = 1
 		s[q + PR_OWNER] = i
-		s[q + PR_X] = s[o + X] + FxMath.COS[f] * 1400000 / FxMath.ONE
-		s[q + PR_Z] = s[o + Z] + FxMath.SIN[f] * 1400000 / FxMath.ONE
-		s[q + PR_DIR] = (dir + (k - 1) * 7) & 255 if n > 1 else dir
-		s[q + PR_SPEED] = p["arrow_speed_ch"] if charged else p["arrow_speed"]
+		s[q + PR_X] = ox
+		s[q + PR_Z] = oz
+		s[q + PR_Y] = ARROW_Y0
+		s[q + PR_VX] = rx * spd / unit
+		s[q + PR_VZ] = rz * spd / unit
+		s[q + PR_VY] = dy * spd / unit
 		s[q + PR_LIFE] = p["arrow_life"]
-		s[q + PR_DMG] = p["arrow_dmg_ch"] if charged else p["arrow_dmg"]
-		s[q + PR_RAW] = p["arrow_raw"]
+		s[q + PR_RAW] = p["arrow_raw_ch"] if charged and p.has("arrow_raw_ch") else p["arrow_raw"]
 		s[q + PR_FORCE] = p["arrow_force_ch"] if charged else p["arrow_force"]
 		s[q + PR_DODGED] = 0
 
@@ -763,11 +814,11 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 		var q := PROJ_BASE + j * PR_FIELDS
 		if s[q + PR_ON] == 0:
 			continue
-		var d: int = s[q + PR_DIR]
-		s[q + PR_X] += FxMath.COS[d] * s[q + PR_SPEED] / FxMath.ONE
-		s[q + PR_Z] += FxMath.SIN[d] * s[q + PR_SPEED] / FxMath.ONE
+		s[q + PR_X] += s[q + PR_VX]
+		s[q + PR_Z] += s[q + PR_VZ]
+		s[q + PR_Y] += s[q + PR_VY]
 		s[q + PR_LIFE] -= 1
-		if s[q + PR_LIFE] <= 0 or FxMath.length(s[q + PR_X], s[q + PR_Z]) > ARENA_R:
+		if s[q + PR_LIFE] <= 0 or FxMath.length(s[q + PR_X], s[q + PR_Z]) > ARENA_R + 2000000 or s[q + PR_Y] < -1000000:
 			s[q + PR_ON] = 0
 			continue
 		if s[q + PR_DODGED] != 0:
@@ -776,16 +827,21 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 		var b := _opp(owner)
 		if s[b + ALIVE] == 0:
 			continue
-		var l := FxMath.length(s[q + PR_X] - s[b + X], s[q + PR_Z] - s[b + Z])
-		if l < P[owner]["arrow_radius"] + P[1 - owner]["hit_radius"]:
-			var res := _take_hit(s, P, owner, 1, s[q + PR_RAW], s[q + PR_DMG], s[q + PR_FORCE], 2000, P[owner]["counter_arrow_pm"], 0)
+		var ex: int = s[q + PR_X] - s[b + X]
+		var ez: int = s[q + PR_Z] - s[b + Z]
+		var ey: int = s[q + PR_Y] - HIT_CENTER_Y
+		var r: int = P[owner]["arrow_radius"] + P[1 - owner]["hit_radius"]
+		if ex * ex + ez * ez + ey * ey < r * r:
+			var res := _take_hit(s, P, owner, 1, s[q + PR_RAW], 0, s[q + PR_FORCE], 2000, P[owner]["counter_arrow_pm"], 0)
 			if res == 4:
 				s[q + PR_DODGED] = 1
 				continue
-			if res == 3: # reflejo: cambia de bando
-				s[q + PR_DIR] = (d + 128) & 255
+			if res == 3: # reflejo: invierte la dirección y cambia de bando
+				s[q + PR_VX] = -s[q + PR_VX]
+				s[q + PR_VZ] = -s[q + PR_VZ]
+				s[q + PR_VY] = -s[q + PR_VY]
 				s[q + PR_OWNER] = 1 - owner
-				s[q + PR_LIFE] = 120
+				s[q + PR_LIFE] = P[owner].get("arrow_reflect_life", 120)
 				continue
 			s[q + PR_ON] = 0 # (hits_landed offline solo cuenta cuerpo a cuerpo)
 
