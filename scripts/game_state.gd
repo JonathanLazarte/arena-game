@@ -72,7 +72,7 @@ var equipped_eikon_seal: String = ""
 ## Ronda 30: RECURSOS DE PRUEBA. true = al cargar, el perfil recibe (una sola vez por perfil)
 ## mucho oro, cristales, piedras de forja y todos los accesorios. PONER EN false ANTES DE PUBLICAR.
 ## También se puede forzar con el argumento `-- --debug-grant` o desactivar con `-- --no-debug-grant`.
-const DEBUG_GRANT := true
+const DEBUG_GRANT := false
 const DEBUG_GOLD := 500000
 const DEBUG_GEMS := 5000
 const DEBUG_STONES := {"piedra_1": 60, "piedra_2": 60, "piedra_3": 60, "piedra_antigua": 15}

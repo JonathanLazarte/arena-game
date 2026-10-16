@@ -532,6 +532,8 @@ func _try_boss(dist: float, dir: Vector3, opp: Fighter) -> bool:
 			"giro_martillo": ok = dist < 3.5
 			"paso_espectral": ok = dist > 3.5 and dist < 12.0
 			"onda_rastrera", "rayos_trazadores", "lluvia_meteoros": ok = dist > 4.5 and dist < 15.0
+			"embate_sismico": ok = dist < 8.0 and me.health > 40.0
+			"lanza_celeste": ok = dist > 5.0 and dist < 16.0
 			"aliento_dragon": ok = dist > 2.5 and dist < 7.0 and me.facing.dot(dir) > 0.5
 			"furia_fase": ok = dist > 4.0 and me.health > 50.0 and me.rage_t <= 0.0
 			"postura_contra": ok = dist < 3.5 and opp.atk_state == Fighter.Atk.WINDUP

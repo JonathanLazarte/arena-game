@@ -29,6 +29,33 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 - Coste de vida: no se puede usar si dejaría la vida ≤ 0. IA: elige por distancia/situación, huye de la carga, rueda la estocada y cada tajo de la ráfaga, y ante el salto se aparta/rueda al verle empezar a bajar.
 - Cambio de habilidad: tecla N o botón ▶ del HUD (PC y táctil).
 
+### Reglas comunes (Ronda 33)
+- Imbloqueable (`unblockable` en la definición; `BossAbilities.is_unblockable`): el escudo no la para. Estocada, Tajo Retardado, Presa del Verdugo, Giro Devastador, Paso Espectral y Lanza Celeste lo son; Danza del Cisne se bloquea y un parry la corta.
+- Estocada: sigue al objetivo toda la carga; en la embestida solo corrige la dirección los primeros 0,15 s, después va recta.
+- Recarga global de 1,4 s desde que acaba una habilidad de jefe (la Ráfaga puede encadenarse consigo misma). Recarga propia por habilidad (`cd`) opcional, desactivada por defecto (`Fighter.per_ability_cd_enabled`).
+- Cada habilidad tiene un aviso propio (texto `tele`/`tele_txt` y color de brillo distintos), coste de recurso, fuerza de aturdimiento y recuperación castigable (≥ 0,3 s). Un coste de vida nunca puede dejar la vida a 0.
+- En móvil todos los avisos duran +12 % (`telegraph_k` = 1,12).
+- Aura dorada pulsante mientras hay invulnerabilidad, inmunidad al aturdimiento o súper-armadura (robustez extra ≥ +1,0).
+- Voltereta con búfer de 0,18 s: si se pulsa durante una acción, sale en cuanto el personaje queda libre.
+- Rendimiento: rival más cercano cacheado cada 0,1 s; datos del ataque calculados una vez por ataque; máximo 6 ráfagas de partículas simultáneas.
+
+### Habilidades extendidas (13)
+| id | nombre | coste | tipo | clave |
+|---|---|---|---|---|
+| tajo_retardado | Tajo Retardado | 24 aguante | golpe | amague y golpe tardío a 1,25 s; onda al impactar |
+| presa_verdugo | Presa del Verdugo | 28 aguante | agarre | agarre imbloqueable; si falla, recuperación larga |
+| giro_martillo | Giro Devastador | 30 aguante | barrido | 360°, dos golpes, súper-armadura |
+| danza_cisne | Danza del Cisne | 40 aguante | ráfaga | 6 tajos con i-frames breves; un parry la corta |
+| paso_espectral | Paso Espectral | 25 maná | teletransporte | desaparece invulnerable y golpea por la espalda |
+| onda_rastrera | Onda Rastrera | 24 aguante | ondas | 3 ondas en abanico con trayectoria visible |
+| rayos_trazadores | Rayos Trazadores | 25 maná | lluvia | 4 rayos que siguen tu posición |
+| lluvia_meteoros | Lluvia de Meteoros | 35 maná | lluvia | 7 marcas repartidas, aviso 1 s |
+| aliento_dragon | Aliento de Dragón | 30 maná | cono | fuego sostenido 1,5 s que gira despacio |
+| furia_fase | Furia de Fase | 20 vida | bufo | +30 % daño, +15 % velocidad, súper-armadura 9 s |
+| postura_contra | Postura de Contragolpe | 22 aguante | contra | si le atacan en la ventana, anula y castiga |
+| embate_sismico | Embate Sísmico | 18 vida | ondas | 8 ondas en anillo (una apunta al rival), fuerza 45, recuperación 1,3 s |
+| lanza_celeste | Lanza Celeste | 30 maná | lluvia | una lanza imbloqueable sobre tu posición, aviso 1,1 s, fuerza 70, recuperación 1,4 s |
+
 ## Fuerte cargado
 - La pose de carga del fuerte se ve desde que se empieza a mantener el ataque (antes de que salga el fuerte).
 

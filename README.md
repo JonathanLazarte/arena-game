@@ -755,3 +755,11 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - «Ráfaga» reproduce un tajo del personaje por cada proyectil; la fase de contacto de cada animación coincide con la emisión del corte espectral.
 - La preparación para PvP queda limitada a esta modularización: faltan reglas de combate, salas y sincronización de red por definir antes de implementar un modo PvP.
 - A pie, la aceleración normal es más rápida; el impulso de carrera entra con una respuesta exponencial de 0,14 s y cae con una cola más suave de 0,28 s al soltarla. El frenado de dirección sigue siendo ágil; las monturas mantienen su aceleración propia y comparten la entrada/salida gradual del galope.
+
+## Ronda 33 — Cierre del bloque de jefe
+
+- Habilidades imbloqueables marcadas en la definición; la Estocada lo es y solo corrige la embestida los primeros 0,15 s.
+- Aura dorada pulsante con invulnerabilidad o súper-armadura. Avisos +12 % más largos en móvil. Búfer de voltereta de 0,18 s.
+- Recarga global de 1,4 s entre habilidades de jefe; recarga propia por habilidad opcional.
+- Rendimiento: rival más cercano cacheado (0,1 s), datos de ataque una vez por ataque, máximo 6 ráfagas de partículas.
+- 13 habilidades extendidas con aviso propio, coste, aturdimiento y recuperación castigable; nuevas: Embate Sísmico y Lanza Celeste. Máx. 3 en la pestaña «Jefe», cambio con ▶. Pruebas: `tests/test_r33_boss.gd`.

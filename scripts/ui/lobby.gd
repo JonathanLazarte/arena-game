@@ -1196,4 +1196,4 @@ func _build_boss() -> void:
 			_refresh_all(false)
 			detail.text = BossAbilities.codex(id))
 		list_box.add_child(b)
-	detail.text = "[b]Habilidades de jefe[/b]\nSin tiempo de recarga: cuestan aguante, maná (Energía) o vida (nunca te dejan a 0).\n\n" + BossAbilities.codex(String(eq[0]))
+	detail.text = "[b]Habilidades de jefe[/b]\nCuestan aguante, maná (Energía) o vida (nunca te dejan a 0). Recarga global de 1,4 s entre habilidades.\n\n" + BossAbilities.codex(String(eq[0]))
