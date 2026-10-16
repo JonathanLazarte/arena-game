@@ -26,6 +26,7 @@ const BOSS_CHARGE := 1.6 ## carga visible (pose, brillo y partículas en la hoja
 const BOSS_TRACK := 1.6 ## ronda 31: sigue al objetivo TODA la carga (no se esquiva caminando)
 const BOSS_DIST := 12.0 ## ronda 31: más alcance (antes 7,5)
 const BOSS_SPEED := 30.0 ## m/s (0,4 s de embestida)
+const BOSS_LUNGE_HOME_T := 0.15 ## ronda 33: la embestida solo se corrige durante 0,15 s
 const BOSS_HOME_DEG := 140.0 ## ronda 31: corrección de dirección durante la embestida (°/s)
 const BOSS_REACH := 1.8
 const BOSS_ARC_DEG := 35.0
@@ -39,6 +40,23 @@ var boss_phase: int = Boss.NONE
 var boss_t: float = 0.0
 var boss_dir: Vector3 = Vector3.FORWARD
 var boss_cd: float = 0.0
+## Ronda 33: recarga global entre habilidades de jefe y recargas por habilidad (opcionales).
+const BOSS_GLOBAL_CD := 1.4
+static var per_ability_cd_enabled: bool = false
+var ab_cds: Dictionary = {}
+var _last_boss_id: String = ""
+## Ronda 33: búfer de voltereta (una pulsación durante una acción se ejecuta al quedar libre).
+const ROLL_BUFFER := 0.18
+var roll_buf_t: float = 0.0
+## Ronda 33: rendimiento — rival más cercano cacheado cada 0,1 s; datos del ataque una vez por ataque.
+const NEAREST_REFRESH := 0.1
+var _nearest_cache: Node3D = null
+var _nearest_t: float = 0.0
+var _atk_cache: Dictionary = {}
+var _atk_cache_key: Array = []
+## Ronda 33: máximo de ráfagas de partículas simultáneas (todas las instancias).
+const MAX_BURSTS := 6
+static var bursts_live: int = 0
 var boss_travel: float = 0.0
 var boss_hit: bool = false
 var boss_uses: int = 0
@@ -508,8 +526,9 @@ func _status_from(from: Node3D, kind: String) -> Dictionary:
 	return {}
 
 func _burst_particles(c: Color) -> void:
-	if not is_inside_tree():
+	if not is_inside_tree() or bursts_live >= MAX_BURSTS:
 		return
+	bursts_live += 1
 	var p := CPUParticles3D.new()
 	p.one_shot = true
 	p.amount = 28
@@ -534,12 +553,32 @@ func _burst_particles(c: Color) -> void:
 	add_child(p)
 	p.position = Vector3(0, 1.2, 0)
 	p.emitting = true
-	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
+	get_tree().create_timer(1.2).timeout.connect(func() -> void:
+		bursts_live = maxi(bursts_live - 1, 0)
+		if is_instance_valid(p):
+			p.queue_free())
+
+## Ronda 33: aura dorada pulsante con invulnerabilidad (incl. inmunidad al aturdimiento) o súper-armadura.
+func golden_aura_active() -> bool:
+	if not alive:
+		return false
+	return invuln > 0.0 or stun_immune_t > 0.0 or current_stun_resist() >= 1.0
+
+func _nearest_enemy() -> Node3D:
+	var now := Time.get_ticks_msec() * 0.001
+	if now - _nearest_t >= NEAREST_REFRESH or not is_instance_valid(_nearest_cache) or not _nearest_cache.is_inside_tree():
+		_nearest_t = now
+		_nearest_cache = MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	return _nearest_cache
 
 ## Aura continua mientras dura el veneno o la congelación.
 func _update_aura() -> void:
 	var c := Color.TRANSPARENT
-	if status_fx.poison_t > 0.0:
+	var gold := golden_aura_active()
+	if gold:
+		var k := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012) # ronda 33: pulso dorado
+		c = Color(1.0, 0.82, 0.25).lerp(Color(1.0, 0.95, 0.6), k)
+	elif status_fx.poison_t > 0.0:
 		c = StatusFx.COLORS["veneno"]
 	elif status_fx.frost_t > 0.0:
 		c = StatusFx.COLORS["congelacion"]
@@ -567,6 +606,7 @@ func _update_aura() -> void:
 		add_child(_aura)
 		_aura.position = Vector3(0, 1.0, 0)
 	((_aura.mesh as SphereMesh).material as StandardMaterial3D).albedo_color = c
+	_aura.scale = Vector3.ONE * ((1.0 + 0.25 * sin(Time.get_ticks_msec() * 0.012)) if gold else 1.0)
 	_aura.emitting = true
 
 ## Tipo de daño de un golpe recibido.
@@ -848,6 +888,7 @@ func _physics_process(delta: float) -> void:
 			_apply_loadout_visuals()
 			loadout_changed.emit(loadout)
 	_update_attack(delta)
+	_update_roll_buffer(delta)
 	_update_parry(delta)
 	if meter_passive and alive and meter < METER_MAX and not is_instance_valid(active_eikon):
 		add_meter(METER_PASSIVE * delta)
@@ -1112,7 +1153,7 @@ func _physics_process(delta: float) -> void:
 func _combo_lunging() -> bool:
 	if not (atk_state == Atk.ACTIVE or (atk_state == Atk.WINDUP and atk_t > atk_dur * 0.55)):
 		return false
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	return tgt == null or MeshUtil.flat(tgt.global_position - global_position).length() > 1.3
 
 func _lock_valid() -> bool:
@@ -1201,6 +1242,14 @@ func attack_heavy() -> bool:
 	return _request_attack(true)
 
 func _atk_data() -> Dictionary:
+	var key := [attacks_started, atk_heavy, atk_dash, atk_jump, cur_hit, charge_t, combo]
+	if key == _atk_cache_key and not _atk_cache.is_empty():
+		return _atk_cache
+	_atk_cache_key = key
+	_atk_cache = _atk_data_build()
+	return _atk_cache
+
+func _atk_data_build() -> Dictionary:
 	var d: Dictionary = DASH_STRIKE.duplicate() if atk_dash else (JUMP_ATTACK.duplicate() if atk_jump else melee().attack(atk_heavy))
 	if cur_hit and not atk_dash and not atk_jump and not atk_heavy:
 		d = cur_hit.attack_dict()
@@ -1253,7 +1302,7 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	attacks_started += 1
 	spend_stamina(d["stamina"])
 	_snd("swing_heavy" if heavy or EquipStats.weapon_weight(melee()) >= 8.0 else "swing_light")
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	if tgt and global_position.distance_to(tgt.global_position) < sword_range() + 1.5:
 		var dd := MeshUtil.flat(tgt.global_position - global_position)
 		# Ronda 23: con objetivo fijado se encara siempre; sin fijar, solo si está delante
@@ -1362,7 +1411,7 @@ func _release_shot(charged: bool = false) -> void:
 	var af := aim_facing()
 	var origin := get_hit_center() + Vector3(0, 0.8, 0) + af * 1.4
 	var dir := af
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	if tgt:
 		var d: Vector3 = tgt.get_hit_center() - origin
 		if MeshUtil.flat(d).normalized().dot(af) > -0.2:
@@ -1406,6 +1455,21 @@ func _release_shot(charged: bool = false) -> void:
 static var dash_strike_enabled: bool = false
 
 func dash() -> bool:
+	var ok := _dash_now()
+	if not ok and alive and not mounted:
+		roll_buf_t = ROLL_BUFFER # ronda 33: se reintenta al quedar libre
+	elif ok:
+		roll_buf_t = 0.0
+	return ok
+
+func _update_roll_buffer(delta: float) -> void:
+	if roll_buf_t <= 0.0:
+		return
+	roll_buf_t = maxf(roll_buf_t - delta, 0.0)
+	if _dash_now():
+		roll_buf_t = 0.0
+
+func _dash_now() -> bool:
 	_stagger_roll_cancel() # ronda 31
 	if not _can_act() or dash_cd > 0.0 or stamina <= 0.0 or parry_state != Parry.NONE or roll_t >= 0.0:
 		return false
@@ -1489,7 +1553,7 @@ func _on_dash_end() -> void:
 func _start_dash_strike() -> void:
 	if atk_state != Atk.NONE:
 		_cancel_attack()
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	if tgt and global_position.distance_to(tgt.global_position) < 9.0:
 		var dd := MeshUtil.flat(tgt.global_position - global_position)
 		if dd.length() > 0.1 and dd.normalized().dot(dash_dir) > -0.2:
@@ -1504,7 +1568,7 @@ func _start_dash_strike() -> void:
 	_ds_visual = true
 
 func _lunge_velocity() -> Vector3:
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	if tgt:
 		var d := MeshUtil.flat(tgt.global_position - global_position)
 		if d.length() < sword_range() - 0.5:
@@ -1580,7 +1644,7 @@ func eikon_special() -> bool:
 	m.special_cd = ed.special_cooldown
 	eikon_specials += 1
 	_snd({"llamarada": "eikon_fire", "colmillo": "eikon_ice", "vendaval": "eikon_wind"}.get(ed.special_id, "eikon_fire"))
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	match ed.special_id:
 		"llamarada":
 			var p := Projectile.new()
@@ -1909,6 +1973,8 @@ func reset_for_round(pos: Vector3, face: Vector3, keep_meter: bool = true) -> vo
 	shot_charged = false
 	charged_shots = 0
 	boss_cd = 0.0
+	ab_cds.clear()
+	roll_buf_t = 0.0
 	stance = stance_max
 	stance_broken_t = 0.0
 	guard_counter_t = 0.0
@@ -2040,6 +2106,10 @@ func can_use_boss(id: String) -> bool:
 		return false
 	if id != "escudo_mana" and loadout != Loadout.SWORD_SHIELD:
 		return false
+	if boss_cd > 0.0 and not (id == "rafaga" and _last_boss_id == "rafaga"):
+		return false # ronda 33: recarga global (la Ráfaga encadena consigo misma)
+	if float(ab_cds.get(id, 0.0)) > 0.0:
+		return false
 	return boss_cost_ok(id)
 
 func boss_cost_ok(id: String) -> bool:
@@ -2087,6 +2157,9 @@ func boss_skill(id: String = "") -> bool:
 		return false
 	_pay_boss(id)
 	ab_uses[id] = int(ab_uses.get(id, 0)) + 1
+	_last_boss_id = id
+	if per_ability_cd_enabled and float(BossAbilities.def(id).get("cd", 0.0)) > 0.0:
+		ab_cds[id] = float(BossAbilities.def(id)["cd"])
 	if id != "estocada":
 		_start_ability(id)
 		return true
@@ -2148,6 +2221,8 @@ func is_boss_invulnerable() -> bool:
 
 func _update_boss(delta: float) -> void:
 	boss_cd = maxf(boss_cd - delta, 0.0)
+	for k: String in ab_cds.keys():
+		ab_cds[k] = maxf(float(ab_cds[k]) - delta, 0.0)
 	if boss_phase == Boss.NONE:
 		return
 	if not alive:
@@ -2177,7 +2252,8 @@ func _update_boss(delta: float) -> void:
 				impact.emit(0.4)
 		Boss.LUNGE:
 			# Ronda 31: corrige la dirección hacia el objetivo mientras embiste (caminar de lado no basta)
-			boss_dir = _turn_toward(boss_dir, _spell_dir(), deg_to_rad(BOSS_HOME_DEG) * delta)
+			if boss_t <= BOSS_LUNGE_HOME_T: # ronda 33: solo corrige al arrancar
+				boss_dir = _turn_toward(boss_dir, _spell_dir(), deg_to_rad(BOSS_HOME_DEG) * delta)
 			facing = boss_dir
 			var step := BOSS_SPEED * delta
 			boss_travel += step
@@ -2217,6 +2293,8 @@ func _update_boss(delta: float) -> void:
 				_end_boss()
 
 func _end_boss() -> void:
+	if boss_phase != Boss.NONE:
+		boss_cd = BOSS_GLOBAL_CD
 	if boss_phase != Boss.NONE and boss_phase != Boss.RECOVER:
 		invuln = 0.0
 	boss_phase = Boss.NONE
@@ -2253,7 +2331,7 @@ func _step_velocity(delta: float) -> Vector3:
 	if atk_state == Atk.ACTIVE and atk_t + delta >= atk_dur:
 		mv = _step_left
 	var dir := facing
-	var tgt: Node3D = face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	var tgt: Node3D = face_target if _lock_valid() else _nearest_enemy()
 	if tgt:
 		var d := MeshUtil.flat(tgt.global_position - global_position)
 		var dl := d.length()
@@ -2505,7 +2583,7 @@ func charged_shot_kind() -> String:
 	return "triple" if r.reload_time > 0.0 else "potente"
 
 # ---------------- Ronda 31: habilidades de jefe (BossAbilities) ----------------
-var telegraph_k: float = 1.15 if OS.has_feature("mobile") else 1.0
+var telegraph_k: float = 1.12 if OS.has_feature("mobile") else 1.0 ## ronda 33: avisos +12 % en móvil
 var rage_t: float = 0.0
 var ab_ext_hit_landed: bool = false
 var ab_counter_triggered: bool = false
@@ -2583,7 +2661,7 @@ func ab_force(assigned: float, magic: bool) -> float:
 	return (StunRules.str_force(float(attributes().get("fuerza", 10))) + StunRules.weapon_force(melee()) + assigned) * float(ad.get("stun_dealt", 1.0))
 
 func _ab_target() -> Node3D:
-	return face_target if _lock_valid() else MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
+	return face_target if _lock_valid() else _nearest_enemy()
 
 func _start_ability(id: String) -> void:
 	ab_id = id
@@ -2626,6 +2704,7 @@ func _start_ability(id: String) -> void:
 func _end_ability(interrupted: bool = false) -> void:
 	if ab_id == "":
 		return
+	boss_cd = BOSS_GLOBAL_CD
 	if interrupted:
 		ab_interrupted += 1
 		if is_instance_valid(ab_aoe) and not ab_aoe.detonated:

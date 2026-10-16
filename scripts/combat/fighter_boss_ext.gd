@@ -144,7 +144,7 @@ static func _update_wave(f: Fighter, delta: float, d: Dictionary, prev: float, t
 		var dmg := f.ab_damage(f.ab_id)
 		var frc := f.ab_force(float(d.get("force", 30.0)), false)
 		for i in cnt:
-			var ang := (i - (cnt - 1) * 0.5) * spread
+			var ang := (i * spread) if d.get("ring", false) else (i - (cnt - 1) * 0.5) * spread
 			var dir := f.facing.rotated(Vector3.UP, ang).normalized()
 			GroundWave.spawn(f.get_parent(), f, f.team, f.global_position + dir * 1.0, dir,
 				float(d["speed"]), float(d["range"]), float(d["width"]), dmg, frc, float(d["warn"]) * tk)

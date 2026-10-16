@@ -8,14 +8,15 @@ const DEFAULT := ["estocada"]
 const ORDER := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso", "salto_caida"]
 const EXT_ORDER := [
 	"tajo_retardado", "presa_verdugo", "giro_martillo", "danza_cisne", "paso_espectral",
-	"onda_rastrera", "rayos_trazadores", "lluvia_meteoros", "aliento_dragon", "furia_fase", "postura_contra"
+	"onda_rastrera", "rayos_trazadores", "lluvia_meteoros", "aliento_dragon", "furia_fase", "postura_contra",
+	"embate_sismico", "lanza_celeste"
 ]
 const COST_NAMES := {"stamina": "aguante", "mana": "maná", "health": "vida"}
 
 const DEFS := {
-	"estocada": {"name": "Estocada de jefe", "cost_type": "stamina", "cost": 30.0, "dmg": 1.6, "force": 60.0, "resist": 99.0, "magic": false,
+	"estocada": {"name": "Estocada de jefe", "cost_type": "stamina", "cost": 30.0, "unblockable": true, "home_time": 0.15, "dmg": 1.6, "force": 60.0, "resist": 99.0, "magic": false,
 		"windup": 1.6, "dist": 12.0, "speed": 30.0, "reach": 1.8, "home_deg": 140.0, "range": 12.0,
-		"desc": "Carga 1,6 s siguiendo al objetivo (invulnerable) y sale disparada 12 m corrigiendo la dirección. Caminar de lado NO la esquiva: hay que rodar justo antes del impacto.",
+		"desc": "Carga 1,6 s siguiendo al objetivo (invulnerable) y sale disparada 12 m; solo corrige la dirección en los primeros 0,15 s de la embestida. Imbloqueable: rueda justo antes del impacto o apártate cuando ya salió.",
 		"tele": "Hoja roja que se enciende y sonido que sube."},
 	"carga_area": {"name": "Carga en área", "cost_type": "mana", "cost": 35.0, "dmg": 1.4, "force": 45.0, "resist": 4.0, "magic": true,
 		"windup": 2.2, "radius": 7.5, "recovery": 0.6, "range": 3.5,
@@ -54,6 +55,18 @@ static func def(id: String) -> Dictionary:
 		return BossAbilitiesExt.DEFS[id]
 	return DEFS.get(id, {})
 
+## Ronda 33: imbloqueable = el escudo no la para (daño tipo «jefe»).
+static func is_unblockable(id: String) -> bool:
+	var d := def(id)
+	return bool(d.get("unblockable", false)) or (d.has("type") and String(d.get("kind", "")) == "jefe")
+
+## Ronda 33: descripción del aviso (única por habilidad). En las de lluvia "tele" es un tiempo.
+static func telegraph_text(id: String) -> String:
+	var d := def(id)
+	if d.has("tele_txt"):
+		return String(d["tele_txt"])
+	return String(d["tele"]) if d.get("tele") is String else ""
+
 static func cost_text(id: String) -> String:
 	var d := def(id)
 	return "%d %s" % [int(d.get("cost", 0)), COST_NAMES.get(String(d.get("cost_type", "")), "")]
@@ -76,6 +89,10 @@ static func codex(id: String) -> String:
 		t += "\n"
 	var res := float(d.get("resist", 0.0))
 	t += "Robustez durante la habilidad: %s\n" % ("inmune" if res >= 99.0 else "x%.1f" % (1.0 + res))
-	if d.has("tele"):
-		t += "Se reconoce: %s" % d["tele"]
+	if is_unblockable(id):
+		t += "[color=#ff8040]IMBLOQUEABLE[/color] · "
+	if float(d.get("cd", 0.0)) > 0.0:
+		t += "Recarga propia opcional: %.0f s · " % float(d["cd"])
+	if telegraph_text(id) != "":
+		t += "Se reconoce: %s" % telegraph_text(id)
 	return t
