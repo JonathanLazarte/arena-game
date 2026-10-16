@@ -59,3 +59,8 @@ func step(s: PackedInt64Array, a: int, b: int) -> void:
 		fx.feed(SimEvents.diff(prev, s))
 func checksum(s: PackedInt64Array) -> int:
 	return FightSim.checksum(s)
+
+func on_rollback(from_frame: int) -> void:
+	if fx: fx.begin_resim(from_frame)
+func after_tick(confirmed: int, frame: int) -> void:
+	if fx: fx.flush(confirmed, frame)

@@ -27,6 +27,8 @@ var resim_usec: Array[int] = []
 var params_hash: int = 0    ## params_checksum local (0 = sin comprobación)
 var peer_hash: int = -1     ## recibido del rival; hasta que coincida no se avanza
 var params_mismatch := false
+var last_resim := 0      ## ticks re-simulados en el último tick (0 = sin rollback)
+var step_usec := 0.0     ## coste medio de un paso de sim (EMA)
 var engine: RbEngine ## simulación enchufable (RbSim por defecto; FightEngine para las reglas de combate)
 
 func _init(player: int, delay: int = 2, window: int = 8, eng: RbEngine = null) -> void:
@@ -93,6 +95,18 @@ func _sim_one() -> void:
 		checksums[frame] = engine.checksum(state)
 	frame += 1
 
+## Cambia el retardo de entrada local en caliente. Las entradas ya enviadas son definitivas;
+## al subir, los ticks que quedarían sin entrada se rellenan con la última (el rival los recibe igual).
+func set_delay(d: int) -> void:
+	if d == input_delay:
+		return
+	if d > input_delay:
+		var last: int = local_in.get(last_local, 0)
+		for t in range(last_local + 1, frame + d):
+			local_in[t] = last
+		last_local = maxi(last_local, frame + d - 1)
+	input_delay = d
+
 ## Un tick de tiempo real. Devuelve false si se detiene (demasiado por delante del rival).
 func tick() -> bool:
 	if params_mismatch or (params_hash != 0 and peer_hash != params_hash):
@@ -103,6 +117,7 @@ func tick() -> bool:
 		var target := frame
 		var n := target - _earliest_wrong
 		state = saved[_earliest_wrong].duplicate()
+		engine.on_rollback(_earliest_wrong)
 		frame = _earliest_wrong
 		_earliest_wrong = -1
 		while frame < target:
@@ -111,15 +126,22 @@ func tick() -> bool:
 		resim_frames += n
 		max_resim = maxi(max_resim, n)
 		resim_usec.append(Time.get_ticks_usec() - t0)
+		last_resim = n
+		if resim_usec.size() > 600: resim_usec = resim_usec.slice(300)
 	else:
+		last_resim = 0
 		# los ticks ya confirmados que acertaron también obtienen checksum
 		for t in range(maxi(0, last_remote - max_rollback - 2), mini(last_remote + 1, frame)):
 			if not checksums.has(t) and saved.has(t + 1):
 				checksums[t] = engine.checksum(saved[t + 1])
 	if frame - last_remote > max_rollback:
 		stalls += 1
+		engine.after_tick(mini(last_remote, frame - 1), frame)
 		return false
+	var t1 := Time.get_ticks_usec()
 	_sim_one()
+	step_usec = step_usec * 0.95 + float(Time.get_ticks_usec() - t1) * 0.05
+	engine.after_tick(mini(last_remote, frame - 1), frame)
 	# limpieza
 	var old := frame - 120
 	saved.erase(old); predicted.erase(old)

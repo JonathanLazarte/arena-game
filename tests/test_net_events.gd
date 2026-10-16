@@ -8,7 +8,9 @@ func check(c: bool, m: String) -> void:
 
 func _initialize() -> void:
 	var P := SimParams.defaults()
-	for rtt in [50, 100, 200]:
+	var rates := {}
+	for combo in [[50, 0], [100, 0], [200, 0], [50, 2], [100, 2], [200, 2]]:
+		var rtt: int = combo[0]; var hold: int = combo[1]
 		var fxs: Array[SimFx] = []
 		var counts: Array[Dictionary] = [{}, {}]
 		var h := RbHarness.new()
@@ -18,6 +20,7 @@ func _initialize() -> void:
 			var e := FightEngine.new(P)
 			var fx := SimFx.new(); fx.keep_frames = 1 << 30
 			var idx := fxs.size()
+			fx.hold_ticks = hold; fx.local_slot = idx
 			fx.callback = func(ev: Dictionary) -> void:
 				counts[idx][ev["key"]] = int(counts[idx].get(ev["key"], 0)) + 1
 			e.fx = fx; fxs.append(fx)
@@ -44,10 +47,13 @@ func _initialize() -> void:
 				if not fxs[i].fired.has(k): ok_all = false
 			fxs[i].confirm(upto, refk)
 			spur += fxs[i].spurious
-		check(r["mismatches"] == 0, "%d ms: sin divergencia" % rtt)
-		check(dup == 0, "%d ms: ningún efecto se repite al re-simular (bloqueados %d)" % [rtt, fxs[0].duplicates_blocked + fxs[1].duplicates_blocked])
-		check(ok_all, "%d ms: los %d eventos confirmados se mostraron en ambos pares" % [rtt, refk.size()])
-		print("      %d ms: eventos espurios por predicción fallida: %d de %d (%.1f%%)" % [rtt, spur, refk.size() * 2, 100.0 * spur / maxf(refk.size() * 2, 1)])
+		check(r["mismatches"] == 0, "%d ms/r%d: sin divergencia" % [rtt, hold])
+		check(dup == 0, "%d ms/r%d: ningún efecto se repite al re-simular (bloqueados %d)" % [rtt, hold, fxs[0].duplicates_blocked + fxs[1].duplicates_blocked])
+		check(ok_all, "%d ms/r%d: los %d eventos confirmados se mostraron en ambos pares" % [rtt, hold, refk.size()])
+		var rate := 100.0 * spur / maxf(refk.size() * 2, 1)
+		rates[combo] = rate
+		print("      %d ms, retención %d: efectos mostrados de una predicción fallida: %d de %d (%.1f%%), cancelados antes de mostrarse %d" % [rtt, hold, spur, refk.size() * 2, rate, fxs[0].cancelled + fxs[1].cancelled])
+	check(rates[[200, 2]] < rates[[200, 0]] and rates[[100, 2]] <= rates[[100, 0]], "retener 2 ticks reduce los efectos espurios (200 ms: %.1f%% → %.1f%%)" % [rates[[200, 0]], rates[[200, 2]]])
 	# comprobación de params
 	var hh := RbHarness.new()
 	hh.engine_factory = func() -> RbEngine: return FightEngine.new(P)
