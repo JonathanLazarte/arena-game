@@ -100,3 +100,57 @@ Ruleset: sword/shield + bow on foot. Out: mounts, eikons, magic, boss abilities,
 **Online/sim mode:** `Fighter.sim_driven` (default false). When true, `_physics_process` only orients the node and updates `KnightVisual`; `SimView.apply(state)` writes the fields the animation/HUD read and emits `health_changed`/`stamina_changed`/`died`. The view never feeds back into the sim, so rollback just re-applies a state.
 
 **Parity (tests/test_net_parity.gd, real Fighter vs FightSim, same scripted actions, 22 scenarios incl. sprint attack, crit, crossbow, armour (light/heavy/counter/parry), aim lead, rage, heal passive, parry-stamina charm):** all compared values equal; first-hit tick within ±1, stun durations within ±2 ticks (0 differences beyond the exact tolerance). Remaining sub-tick drift: charged heavy damage < 0.05 (charge time quantised to ticks).
+
+## 10. Phase 2: online transport, lobby, relay
+
+**Files:** `net/online/net_link.gd` (UDP link: relay room, NAT punch, relay fallback, LAN), `net/online/net_match.gd` (handshake, rollback session, sync, checksums, logs), `net/online/online_panel.gd` (lobby menu), `net/sim/sim_match.gd` (local device input + online stepping), `server/` (Node.js + TypeScript relay, Dockerfile, `fly.toml` example).
+
+**Transport:** plain UDP (`PacketPeerUDP`), one socket per client, IPv4. ENet was not used: it would add its own reliability and ordering on top of the rollback input redundancy, and a third-party relay can't forward ENet without speaking it. WebRTC was not used: it needs a signalling + STUN/TURN stack and a native extension on Android/desktop. The relay already gives rendezvous plus a TURN-like fallback. Byte 0 of each datagram is the type:
+- relay: `C` create {code?} → `W` {code, slot 0}; `J` join {code} → `M` {slot, peer "ip:port", code} to both, or `E` {err: no_room / room_full / code_taken}; `R`+payload is forwarded verbatim as `D`+payload; `K`/`k` keepalive every 2 s; `X` leave → `x` to the other member. Rooms expire after 120 s without traffic. Codes are 5 chars from an alphabet with no 0/O/1/I.
+- peer: `P`/`Q` punch request/answer (for 2 s after `M`; a `Q` reply means the direct path works both ways, and from then on data goes direct). `L`/`l` LAN hello (host binds UDP 47801). `D`+`var_to_bytes(Dictionary)` game messages (decoded without objects).
+- Control messages are retransmitted every 300 ms until answered. The guest's join is retried for `join_wait_ms` when the room doesn't exist yet.
+
+**Handshake (`NetMatch.prelude_step`):** `hi` {protocol version} → 12 `ping`/`pong` 40 ms apart → the host takes the median RTT, picks the input delay and RNG seed, and repeats `start` {delay, seed} until it gets `go`. The guest only reports ready once its `go` has actually left the socket, and it answers any late `start` during play.
+
+**Adaptive input delay:** `delay = clamp(round(RTT / 2 / 16.7 ms) − 1, 1, 4)` ticks, fixed for the match (host decides): LAN ~1, 100 ms → 2, 150 ms → 3, ≥ 170 ms → 4. Rollback covers the rest (window 8).
+
+**Session packet** (`t: "in"`, every physics tick): redundant local inputs since the peer's ack (`PackedInt32Array`), `ack`, `ph` (params checksum), `f` (sender frame), `s`/`e`/`ed` (send time, echoed time, echo hold → RTT, EMA 0.1), and every 4th tick the last 12 confirmed `[frame, checksum]` pairs (`PackedInt64Array`). Measured ≈ 16–19 kB/s each way.
+
+**Time sync (frame advantage):** `adv = my_frame − (peer_frame + RTT/2 in ticks)`, EMA 0.1. When `adv > 1.5` the peer that is ahead skips one tick (no local input, no step), at most once every 12 ticks. RbSession's window stall (frame − last confirmed > 8) is the hard limit.
+
+**Checksums + desync report:** each peer compares the received checksums with its own confirmed ones. On the first mismatch, status becomes `desync` and `user://net/desync_<time>_p<slot>_f<frame>.json` is written: the replay up to that point, both checksums, and the full state int array after the frame.
+
+**Params handshake:** see section 9. A peer that detects a mismatch sends `bad_params` 3× (the other side would otherwise just stall), and both end with `params_mismatch`.
+
+**Replays / input logs:** `NetMatch.replay_dict()` = {proto, params (var_to_str), seed, delay, slot, spawn, in0[], in1[] confirmed, checksum every 10th tick}. It's saved to `user://net/replay_<time>_p<slot>.json` at the end of every online match. `NetMatch.verify_replay(d)` re-simulates without the network and returns the ticks whose checksum differs.
+
+**Rounds in the sim (online):** globals `G_WINS0/1`, `G_ROUND`, `G_END_T`. A KO sets `G_END_T` and adds the win. `FightEngine` (rounds = true) resets the fighters from `spawn` 150 ticks later, keeping wins, round, frame and RNG, so the reset rolls back like everything else. A match is first to 2. The arena only reads the *confirmed* state (`NetMatch.confirmed_state()`) for the round label and the match end. There's no round timer online; the HUD timer shows the RTT.
+
+**End conditions:** `ko`, `forfeit_win` / `forfeit_loss` (the HUD menu's back-to-lobby or rematch sends `bye` 3×, unthrottled), `peer_left` (relay `x`), `disconnected` (no packet for 4 s), `desync`, `params_mismatch`, `version`.
+
+**Arena online mode:** `NetMatch.current` set → the arena builds two identical standard fighters (same character/weapon/eikon, no random boss abilities/magic; lobby loadouts are not exchanged yet), disables the AI and `PlayerController`, and runs `SimMatch` with `net`. The host is sim slot 0 at +Z and the guest slot 1 at −Z. On each device the `player` node (camera, left HUD bar) is its own fighter: the guest calls `setup(enemy, player)`.
+
+**Local input (`SimMatch.sample_device(local_slot)`):** keyboard actions; HUD touch buttons (they press the same input actions: Atacar, Parry/Escudo (hold ≥ 11 ticks = shield, tap = parry), Rodar, Correr (toggle; drops when the stick is released or when exhausted), Arma 3ª, Fijar); the HUD `TouchStick` added to the keys, through `PlayerController.shape_stick`; left mouse = attack while the camera has captured the mouse. Movement is camera-relative.
+
+**Lobby:** the `ONLINE` button opens `OnlinePanel`. Relay address field (saved in `user://online.cfg`), `Crear sala` (shows the code), `Unirse con código`, `LAN: crear` (shows this device's private IPs, UDP 47801), `LAN: unirse` (host IP). The handshake runs in the panel, then the arena opens.
+
+**Tests:** `tests/test_net_online.gd` (in-process, 34 checks: delay formula, LAN pair at 80 ms RTT, 600 ticks in sync, replay verify/tamper, forfeit, forced desync + report, silent disconnect, params mismatch, sim rounds, touch input, arena online as host and as guest, lobby panel LAN pairing). `server` `npm test` (relay unit tests), `npm run test:e2e` (relay + two headless Godot processes, `tests/net_client.gd`). Measured on localhost with simulated latency (900 ticks, random bots):
+
+| scenario | RTT measured | delay | path | max resim | result |
+|---|---|---|---|---|---|
+| 0 ms | 13 ms | 1 | direct after punch | 1 | 0 checksum mismatches |
+| 50 ms RTT, 2 % loss | 78 ms | 2 | relay-forwarded | 5 | 0 |
+| 100 ms RTT, 2 % loss | 124 ms | 3 | direct | 4 | 0 |
+| 200 ms RTT, 5 % loss | 224 ms | 4 | relay-forwarded | 8 | 0 |
+| LAN, 60 ms RTT, 1 % loss | 84 ms | 1–2 | direct, no server | — | 0 |
+
+(Measured RTT includes up to one physics tick of polling on each side.)
+
+**Deploying the relay (nothing deployed):** the relay needs one public UDP port, about 20 kB/s per relayed match, and almost no CPU or RAM. Pick a region near the players (São Paulo for Uruguay):
+- **Oracle Cloud Always Free** (VM.Standard.E2.1.Micro or Ampere A1, São Paulo/Vinhedo regions): free; open UDP 47800 in the VCN security list and in the VM firewall; run with Docker or `node dist/src/index.js` under systemd.
+- **Google Cloud free tier e2-micro:** free only in some US regions (adds ~150 ms from South America); fine for testing.
+- **Fly.io:** `server/fly.toml` example (region `gru`). UDP needs `HOST=fly-global-services` and a dedicated IPv4 (paid, a few USD/month); billed by usage, with no permanent free tier for new accounts.
+- **Any small VPS** (Hetzner, DigitalOcean, Vultr ~4–6 USD/month): `docker run -d --restart=always -p 47800:47800/udp arena-relay`.
+Then type `host:47800` in the game's Online panel. Players who can punch through NAT (most home routers) only use the relay for pairing; symmetric NAT / CGNAT on mobile data falls back to relaying through it.
+
+**Known limits:** both players use the standard loadout (loadout exchange + bake is next); IPv4 only; no room listing or matchmaking; the input delay is fixed per match; the relay has no authentication or rate limiting (fine for private codes, harden before public release).

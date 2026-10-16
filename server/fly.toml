@@ -1,0 +1,15 @@
+# Example only (not deployed). `fly launch --no-deploy` then `fly deploy`.
+app = "arena-relay-CHANGE-ME"
+primary_region = "gru" # São Paulo: closest Fly region to Montevideo
+
+[build]
+
+[env]
+  PORT = "47800"
+  HOST = "fly-global-services" # required for UDP on Fly
+
+[[services]]
+  internal_port = 47800
+  protocol = "udp"
+  [[services.ports]]
+    port = 47800
