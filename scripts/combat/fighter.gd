@@ -1242,7 +1242,7 @@ func attack_heavy() -> bool:
 	return _request_attack(true)
 
 func _atk_data() -> Dictionary:
-	var key := [attacks_started, atk_heavy, atk_dash, atk_jump, cur_hit, charge_t, combo]
+	var key := [attacks_started, atk_heavy, atk_dash, atk_jump, cur_hit, charge_t, combo, melee(), mounted]
 	if key == _atk_cache_key and not _atk_cache.is_empty():
 		return _atk_cache
 	_atk_cache_key = key
@@ -1286,6 +1286,8 @@ func _start_attack(heavy: bool, chained: bool) -> void:
 	_charge_added = false
 	atk_heavy = heavy
 	cur_hit = null
+	_atk_cache_key = [] # ronda 33: datos nuevos para este ataque
+	_nearest_t = -1.0 # y rival actualizado al empezarlo
 	if not heavy and not atk_dash and not atk_jump:
 		cur_hit = combo_hit_for(combo)
 		if cur_hit:

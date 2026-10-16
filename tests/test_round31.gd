@@ -101,6 +101,7 @@ func _run() -> void:
 	p.energy = 0.0
 	check(not p.can_use_boss("escudo_mana"), "coste de maná: sin Energía no se puede")
 	p.energy = p.energy_max
+	p.boss_cd = 0.0
 	check(p.boss_skill("escudo_mana"), "escudo de maná")
 	await create_timer(0.3).timeout
 	hp = p.health
@@ -110,6 +111,7 @@ func _run() -> void:
 	check(p.ab_id == "", "el escudo termina a los 1,5 s")
 	_fresh(p)
 	p.energy = p.energy_max
+	p.boss_cd = 0.0
 	check(p.boss_skill("carga_area"), "carga en área")
 	check(p.current_stun_resist() >= 3.0, "carga: robustez muy alta")
 	var rr := p.effective_robustness()
@@ -124,6 +126,7 @@ func _run() -> void:
 	p.health = p.max_health
 	e.global_position = Vector3(0, 0, -8)
 	var hp0 := p.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("salto_caida") and p.health < hp0, "salto: paga vida")
 	await create_timer(2.6).timeout
 	check(p.ab_id == "" and p.global_position.distance_to(Vector3(0, 0, -8)) < 2.0, "salto: cae sobre la marca fijada")
@@ -136,6 +139,7 @@ func _run() -> void:
 	p.face_target = e
 	p.stamina = p.stamina_max
 	var eh := e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("estocada"), "estocada")
 	for i in 150:
 		e.move_input = Vector3(1, 0, 0) # camina de lado
@@ -151,6 +155,7 @@ func _run() -> void:
 	p.global_position = Vector3(0, 0, 0)
 	e.global_position = Vector3(0, 0, -10)
 	eh = e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("rafaga"), "ráfaga")
 	for i in 120:
 		e.move_input = Vector3(1, 0, 0) * 0.5

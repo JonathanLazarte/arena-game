@@ -72,6 +72,7 @@ func _run() -> void:
 	p.facing = Vector3(0, 0, -1)
 	p.face_target = e
 	var d0 := p.global_position.distance_to(e.global_position)
+	p.boss_cd = 0.0
 	check(p.boss_skill("combo_falso"), "combo falso")
 	await create_timer(1.4).timeout
 	var d1 := p.global_position.distance_to(e.global_position)
@@ -85,6 +86,7 @@ func _run() -> void:
 	e.global_position = Vector3(0, 0, -10)
 	p.face_target = e
 	var eh := e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("rafaga"), "ráfaga")
 	for i in 85: # primer tajo, a 10 m
 		e.move_input = Vector3(1, 0, 0)
@@ -107,6 +109,7 @@ func _run() -> void:
 	arena.ai.profile.boss_dodge_chance = 1.0
 	var r0: int = arena.ai.slash_rolls
 	p.energy = p.energy_max
+	p.boss_cd = 0.0
 	check(p.boss_skill("rafaga"), "ráfaga contra la IA")
 	await create_timer(3.5).timeout
 	check(arena.ai.slash_rolls - r0 >= 2, "la IA rueda cada tajo (%d volteretas)" % (arena.ai.slash_rolls - r0))
@@ -118,6 +121,7 @@ func _run() -> void:
 	p.global_position = Vector3(0, 0, 6)
 	e.global_position = Vector3(0, 0, -4)
 	p.health = p.max_health
+	p.boss_cd = 0.0
 	check(p.boss_skill("salto_caida"), "salto con caída")
 	await create_timer(1.4).timeout
 	var hid := 0
@@ -135,6 +139,7 @@ func _run() -> void:
 	e.global_position = Vector3(0, 0, -4)
 	var jd: int = arena.ai.jump_dodges
 	var ehh := e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("salto_caida"), "salto contra la IA")
 	await create_timer(2.4).timeout
 	check(arena.ai.jump_dodges > jd or e.health == ehh, "la IA reacciona al verle bajar (rueda o se aparta)")

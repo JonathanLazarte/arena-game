@@ -54,6 +54,7 @@ func _run() -> void:
 	p.facing = Vector3.FORWARD
 	p.face_target = e
 	var eh0 := e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("onda_rastrera"), "Onda Rastrera iniciada")
 	await create_timer(1.8).timeout
 	check(e.health < eh0, "GroundWave impacta al enemigo en el suelo (%.1f -> %.1f)" % [eh0, e.health])
@@ -67,6 +68,7 @@ func _run() -> void:
 	e.facing = Vector3.BACK
 	p.face_target = e
 	eh0 = e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("paso_espectral"), "Paso Espectral iniciado")
 	await create_timer(1.3).timeout
 	check(p.global_position.z < e.global_position.z and e.health < eh0, "Paso Espectral reaparece detrás del rival y golpea")
@@ -80,6 +82,7 @@ func _run() -> void:
 	p.facing = Vector3.FORWARD
 	var ph0 := p.health
 	eh0 = e.health
+	p.boss_cd = 0.0
 	check(p.boss_skill("postura_contra"), "Postura de Contragolpe iniciada")
 	await create_timer(0.45).timeout
 	var res := p.take_hit(25.0, e, "melee")
@@ -90,6 +93,7 @@ func _run() -> void:
 	_fresh(p)
 	p.set_boss_abilities(["furia_fase"])
 	var dmg0 := p.damage_mult()
+	p.boss_cd = 0.0
 	check(p.boss_skill("furia_fase"), "Furia de Fase iniciada")
 	await create_timer(0.6).timeout
 	check(p.rage_t > 0.0 and p.damage_mult() > dmg0 * 1.25, "Furia de Fase activa buff de daño y velocidad")
