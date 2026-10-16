@@ -3,7 +3,7 @@ extends RefCounted
 ## Partida online sobre un NetLink: saludo (versión, RTT, retardo de entrada adaptativo),
 ## RbSession con FightEngine, sincronía de tiempo por ventaja de fotogramas, intercambio de
 ## checksums con informe de desincronía, registro de entradas (repetición) y desconexión/abandono.
-const PROTO := 2
+const PROTO := 3
 const TICK_MS := 1000.0 / 60.0
 const PINGS := 12
 const TIMEOUT_MS := 4000
@@ -44,6 +44,24 @@ var _peer_hello := false
 var _start_sent_at := 0
 var _peer_started := false
 var _last_send_ms := 0
+## Equipo del lobby (NetLoadout.from_game_state); se envía en el saludo. Vacío = equipo estándar.
+var local_loadout: Dictionary = {}
+var peer_loadout: Dictionary = {}
+## Retardo adaptativo durante la partida (histéresis): subir tras UP_TICKS seguidos pidiendo más,
+## bajar tras DOWN_TICKS pidiendo menos con 15 ms de margen; como mucho un cambio cada COOLDOWN.
+var adaptive_delay := true
+const UP_TICKS := 90
+const DOWN_TICKS := 300
+const DELAY_COOLDOWN := 180
+const DOWN_MARGIN_MS := 15.0
+var delay_changes := 0
+var start_delay := 2
+var _want_up := 0
+var _want_down := 0
+var _delay_cool := 0
+## Holgura de parada online (ticks) aplicada a los params al empezar (ver SimParams.online_tuning).
+var parry_lenience := 0
+var fx_hold_ticks := 2
 
 func _init(l: NetLink) -> void:
 	link = l
@@ -64,6 +82,8 @@ func prelude_step() -> bool:
 				if int(m.get("v", 0)) != PROTO:
 					status = "version"
 				_peer_hello = true
+				var lo: Variant = m.get("lo", {})
+				peer_loadout = lo if lo is Dictionary else {}
 			"ping": link.send_msg({"t": "pong", "s": m.get("s", 0)})
 			"pong":
 				rtt_samples.append(float(t - int(m.get("s", 0))))
@@ -79,13 +99,13 @@ func prelude_step() -> bool:
 		status = "disconnected"; return false
 	if not _peer_hello and t >= _hello_at:
 		_hello_at = t + 200
-		link.send_msg({"t": "hi", "v": PROTO})
+		link.send_msg({"t": "hi", "v": PROTO, "lo": local_loadout})
 	if _peer_hello and _pings_sent < PINGS and t >= _ping_at:
 		_ping_at = t + 40
 		_pings_sent += 1
 		link.send_msg({"t": "ping", "s": t})
 	if _peer_hello and phase == Ph.HELLO:
-		link.send_msg({"t": "hi", "v": PROTO}) # que el rival también nos vea
+		link.send_msg({"t": "hi", "v": PROTO, "lo": local_loadout}) # que el rival también nos vea
 		phase = Ph.PING
 	if me == 0 and phase == Ph.PING and (rtt_samples.size() >= PINGS - 2 or (_pings_sent >= PINGS and t - _ping_at > 600)):
 		rtt_ms = _median(rtt_samples) if not rtt_samples.is_empty() else 100.0
@@ -103,7 +123,14 @@ func _median(a: Array[float]) -> float:
 	var b := a.duplicate(); b.sort()
 	return b[b.size() / 2]
 
+## Equipos por hueco de sim: [anfitrión, invitado].
+func loadouts_by_slot() -> Array[Dictionary]:
+	return [local_loadout, peer_loadout] if me == 0 else [peer_loadout, local_loadout]
+
 func start_play(params: Array, spawn: Array[int] = []) -> void:
+	start_delay = input_delay
+	parry_lenience = SimParams.lenience_for_delay(input_delay)
+	params = SimParams.online_tuning(params, parry_lenience)
 	engine = FightEngine.new(params, seed_v, true)
 	engine.rounds = true
 	engine.spawn = spawn
@@ -159,9 +186,33 @@ func play_step(local_input: int) -> bool:
 	else:
 		session.add_local_input(local_input)
 		advanced = session.tick()
+	if advanced and adaptive_delay:
+		_adapt_delay()
 	_send(t)
 	_check_desync()
 	return advanced
+
+func _adapt_delay() -> void:
+	_delay_cool -= 1
+	var d := session.input_delay
+	_want_up = _want_up + 1 if delay_for_rtt(rtt_ms) > d else 0
+	_want_down = _want_down + 1 if delay_for_rtt(rtt_ms + DOWN_MARGIN_MS) < d else 0
+	if _delay_cool > 0:
+		return
+	if _want_up >= UP_TICKS:
+		set_input_delay(d + 1)
+	elif _want_down >= DOWN_TICKS:
+		set_input_delay(d - 1)
+
+func set_input_delay(d: int) -> void:
+	d = clampi(d, MIN_DELAY, MAX_DELAY)
+	if d == session.input_delay:
+		return
+	session.set_delay(d)
+	input_delay = d
+	delay_changes += 1
+	_want_up = 0; _want_down = 0
+	_delay_cool = DELAY_COOLDOWN
 
 var _echo := 0
 var _echo_at := 0

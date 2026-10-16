@@ -9,7 +9,7 @@ func check(c: bool, msg: String) -> void:
 func _initialize() -> void:
 	_run.call_deferred()
 
-func _pair(port: int, lat: float = 0.0) -> Array[NetMatch]:
+func _pair(port: int, lat: float = 0.0, los: Array = [{}, {}]) -> Array[NetMatch]:
 	var a := NetLink.new(); var b := NetLink.new()
 	a.host_lan(port); b.join_lan("127.0.0.1", port)
 	for l in [a, b]: l.sim_delay_ms = lat
@@ -19,6 +19,7 @@ func _pair(port: int, lat: float = 0.0) -> Array[NetMatch]:
 		if a.ready_to_play() and b.ready_to_play(): break
 		OS.delay_msec(5)
 	ms = [NetMatch.new(a), NetMatch.new(b)]
+	ms[0].local_loadout = los[0]; ms[1].local_loadout = los[1]
 	var done := [false, false]
 	for i in 600:
 		for k in 2:
@@ -164,7 +165,7 @@ func _test_arena(me_slot: int, port: int) -> void:
 		if rng.randf() < 0.25: mine_in = (rng.randi() & 0x1FFF) | FightSim.IN_LOCK
 		bot.play_step(cur)
 		await physics_frame
-	var view_ok := absf(ar.player.global_position.x - mine.session.state[me_slot * FightSim.F_FIELDS + FightSim.X] / 1.0e6) < 0.01
+	var view_ok := absf(ar.player.global_position.x - ar.sim_match.view.offsets[me_slot].x - mine.session.state[me_slot * FightSim.F_FIELDS + FightSim.X] / 1.0e6) < 0.01
 	check(mine.session.frame > 300 and mine.desync_frame < 0 and bot.desync_frame < 0 and mine.checked_to > 250, "arena online (hueco %d): %d ticks sin desincronía, checksums hasta %d" % [me_slot, mine.session.frame, mine.checked_to])
 	check(view_ok, "arena online (hueco %d): el nodo player muestra al luchador local" % me_slot)
 	check(ar.hud.timer_label.text.ends_with("ms"), "arena online: HUD muestra la latencia (%s)" % ar.hud.timer_label.text)

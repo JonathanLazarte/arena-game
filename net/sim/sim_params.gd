@@ -258,6 +258,19 @@ static func defaults() -> Array:
 	p["atk"] = atks
 	return [p, p.duplicate(true)]
 
+## Holgura de parada online: +1 tick por tick de retardo de entrada por encima de 1, máximo 2
+## (≤ 33 ms). La recuperación se acorta lo mismo, así el compromiso total de la parada no cambia.
+static func lenience_for_delay(delay: int) -> int:
+	return clampi(delay - 1, 0, 2)
+
+static func online_tuning(ps: Array, lenience: int) -> Array:
+	var out: Array = ps.duplicate(true)
+	for p: Dictionary in out:
+		p["parry_window"] = int(p["parry_window"]) + lenience
+		p["parry_recovery"] = maxi(1, int(p["parry_recovery"]) - lenience)
+		p["net_lenience"] = lenience
+	return out
+
 static func params_checksum(ps: Array) -> int:
 	# FNV-1a de 32 bits sobre el texto UTF-8: estable entre plataformas (hash() no lo garantiza).
 	var h := 2166136261

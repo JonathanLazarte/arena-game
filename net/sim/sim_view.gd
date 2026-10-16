@@ -7,6 +7,14 @@ const S = preload("res://net/sim/fight_sim.gd")
 var fighters: Array[Fighter] = []
 var arrow_parent: Node3D
 var _arrows: Array[MeshInstance3D] = []
+## Suavizado visual (online): tras un rollback la posición dibujada no salta al estado corregido;
+## guarda el error como desplazamiento y lo reduce SMOOTH_DECAY por tick. La sim no lo ve nunca.
+var smooth := false
+const SMOOTH_DECAY := 0.75
+const SMOOTH_SNAP := 1.5 ## m: errores mayores se aplican de golpe (teletransporte real, reinicio de ronda)
+var offsets: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
+var _prev_sim: Array[Vector3] = [Vector3.INF, Vector3.INF]
+var _prev_vel: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
 
 func _init(a: Fighter, b: Fighter, parent: Node3D = null) -> void:
 	fighters = [a, b]
@@ -14,10 +22,28 @@ func _init(a: Fighter, b: Fighter, parent: Node3D = null) -> void:
 	for f in fighters:
 		f.sim_driven = true
 
-func apply(s: PackedInt64Array) -> void:
+func apply(s: PackedInt64Array, corrected: bool = false) -> void:
 	for i in 2:
 		_apply_fighter(fighters[i], s, i * S.F_FIELDS)
+		if smooth:
+			_smooth(i, s, corrected)
 	_apply_arrows(s)
+
+func _smooth(i: int, s: PackedInt64Array, corrected: bool) -> void:
+	var o := i * S.F_FIELDS
+	var sim := Vector3(s[o + S.X] / 1000000.0, 0.0, s[o + S.Z] / 1000000.0)
+	var vel := Vector3(s[o + S.VX] / 1000000.0, 0.0, s[o + S.VZ] / 1000000.0)
+	if corrected and _prev_sim[i] != Vector3.INF:
+		offsets[i] += (_prev_sim[i] + _prev_vel[i]) - sim # lo que se iba a ver menos lo corregido
+	if offsets[i].length() > SMOOTH_SNAP:
+		offsets[i] = Vector3.ZERO
+	offsets[i] *= SMOOTH_DECAY
+	if offsets[i].length() < 0.002:
+		offsets[i] = Vector3.ZERO
+	_prev_sim[i] = sim
+	_prev_vel[i] = vel
+	var f := fighters[i]
+	f.global_position = Vector3(sim.x + offsets[i].x, f.global_position.y, sim.z + offsets[i].z)
 
 func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	var hz := 60.0

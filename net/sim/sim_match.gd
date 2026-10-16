@@ -42,6 +42,9 @@ func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> v
 		local_slot = net.me
 		net.start_play(params, spawn_of(a, b))
 		engine = net.engine
+		params_hash = net.session.params_hash # incluye el ajuste online (holgura de parada)
+		fx.hold_ticks = net.fx_hold_ticks
+		fx.local_slot = local_slot
 	else:
 		engine = FightEngine.new(params, 1, true)
 	engine.fx = fx
@@ -49,6 +52,7 @@ func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> v
 		if on_event.is_valid():
 			on_event.call(ev)
 	view = SimView.new(a, b, parent)
+	view.smooth = net != null
 
 static func spawn_of(a: Fighter, b: Fighter) -> Array[int]:
 	var sp: Array[int] = []
@@ -92,7 +96,7 @@ func _net_step() -> void:
 	net.play_step(_sample(local_slot))
 	state = net.session.state
 	tick_n += 1
-	view.apply(state)
+	view.apply(state, net.session.last_resim > 0)
 	if _ended:
 		return
 	if net.phase == NetMatch.Ph.OVER:

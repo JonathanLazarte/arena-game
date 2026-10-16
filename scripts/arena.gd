@@ -45,7 +45,7 @@ func _ready() -> void:
 	if online:
 		gs = null # online: equipo estándar idéntico en ambos pares (ver docs/netcode.md)
 	if online:
-		player = _make_fighter("Tú", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
+		player = _make_online_fighter(online.local_loadout, "Tú", 0, Color(0.2, 0.4, 1.0))
 	elif gs and gs.from_lobby:
 		player = _make_fighter(gs.display_name_with_title(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
@@ -72,7 +72,7 @@ func _ready() -> void:
 			Attributes.auto_allocate(rc.id, gs.char_level()), # ronda 18: atributos acordes al nivel
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(rc.id, gs.char_level())}) # ronda 19
 	elif online:
-		enemy = _make_fighter("Rival online", 1, Color(0.85, 0.15, 0.15), EIKONS[0])
+		enemy = _make_online_fighter(online.peer_loadout, "Rival online", 1, Color(0.85, 0.15, 0.15))
 	else:
 		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), EIKONS[1 + randi() % 2])
 	if champion_id == "" and not online:
@@ -158,6 +158,8 @@ func _setup_sim_match() -> void:
 			enemy.global_position = Vector3(0, 0.2, -SPAWN_DIST); enemy.facing = Vector3.BACK
 			sim_match.setup(player, enemy, self, online)
 		sim_match.match_ended.connect(_on_online_ended)
+		net_overlay = NetOverlay.new(online)
+		add_child(net_overlay)
 		time_left = 1.0e9
 	else:
 		sim_match.setup(player, enemy, self)
@@ -253,6 +255,7 @@ static var hitstop_enabled: bool = true
 ## Modo sim (fase online): ambos luchadores los mueve FightSim con dos entradas locales. Por defecto apagado.
 static var sim_mode: bool = false
 var sim_match: SimMatch
+var net_overlay: NetOverlay
 var online: NetMatch ## partida online en curso (NetMatch.current al entrar)
 var hitstops: int = 0
 func _on_hitstop(d: float) -> void:
@@ -277,6 +280,13 @@ func _exit_tree() -> void:
 	if _hs_prev > 0.0:
 		Engine.time_scale = _hs_prev
 		_hs_prev = 0.0
+
+## Online: el equipo llega como datos (NetLoadout); ambos pares construyen los dos luchadores igual.
+func _make_online_fighter(lo: Dictionary, fallback: String, team: int, c: Color) -> Fighter:
+	var a := NetLoadout.fighter_args(lo)
+	if a.is_empty():
+		return _make_fighter(fallback, team, c, EIKONS[0])
+	return _make_fighter(String(a["name"]), team, c, EIKONS[0], a["cd"], a["wd"], a["skills"], a["attrs"], a["eqp"])
 
 func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 		cd: CharacterDef = null, wd: WeaponDef = null, sk: Array = [], at: Dictionary = {}, eqp: Dictionary = {}) -> Fighter:

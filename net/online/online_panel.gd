@@ -132,6 +132,7 @@ func _physics_process(_d: float) -> void:
 				return
 		if link.ready_to_play():
 			m = NetMatch.new(link)
+			m.local_loadout = NetLoadout.from_game_state(get_node_or_null("/root/GameState"))
 			status_label.text = "Rival encontrado. Midiendo latencia…"
 		return
 	if m.prelude_step():
