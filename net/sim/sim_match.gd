@@ -15,7 +15,15 @@ var camera: Camera3D
 var running := false
 ## Sustituye la entrada de un jugador: func(tick: int) -> int (pruebas, bots, red). Vacío = dispositivo.
 var input_override: Array[Callable] = [Callable(), Callable()]
-var joy_device := 0 ## mando del jugador 2
+var joy_device := 0 ## mando del jugador 2 (solo partida local)
+var local_slot := 0 ## índice de sim que controlan teclado/ratón/táctil y sigue la cámara
+var joystick: TouchStick ## joystick táctil del HUD (móvil)
+var net: NetMatch ## partida online: la sim la avanza RbSession con rollback
+var sprint_latch := false ## botón táctil «Correr» (alternar)
+var _prev_run := false
+signal match_ended(winner_slot: int, reason: String)
+var _ended := false
+var last_confirmed_wins := [0, 0]
 var on_event: Callable ## func(ev) para sonido/partículas/sacudida del anfitrión
 var tick_n := 0
 var _lock := [true, true]
@@ -24,19 +32,38 @@ var _hand_t := [0, 0]
 var _hand_prev := [false, false]
 const HAND_HOLD := 11 ## ticks (PlayerController.LEFT_HOLD_FOR_SHIELD 0,18 s)
 
-func setup(a: Fighter, b: Fighter, parent: Node3D) -> void:
+## a = jugador 0 de la sim, b = jugador 1 (en online el anfitrión es siempre el 0).
+func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> void:
 	fighters = [a, b]
 	params = SimParams.bake(a, b)
 	params_hash = SimParams.params_checksum(params) # se intercambia en el saludo de red (RbSession.params_hash)
-	engine = FightEngine.new(params, 1, true)
+	net = online
+	if net:
+		local_slot = net.me
+		net.start_play(params, spawn_of(a, b))
+		engine = net.engine
+	else:
+		engine = FightEngine.new(params, 1, true)
 	engine.fx = fx
 	fx.callback = func(ev: Dictionary) -> void:
 		if on_event.is_valid():
 			on_event.call(ev)
 	view = SimView.new(a, b, parent)
 
+static func spawn_of(a: Fighter, b: Fighter) -> Array[int]:
+	var sp: Array[int] = []
+	for f in [a, b]:
+		sp.append(SimParams.um(f.global_position.x)); sp.append(SimParams.um(f.global_position.z))
+		sp.append(FxMath.dir_of(SimParams.um(f.facing.x), SimParams.um(f.facing.z)))
+	return sp
+
 ## Reinicia el estado desde las posiciones de aparición de los Fighter.
 func reset_round() -> void:
+	if net:
+		state = net.session.state
+		view.apply(state)
+		running = true
+		return
 	state = engine.initial()
 	for i in 2:
 		var f := fighters[i]
@@ -52,11 +79,35 @@ func _physics_process(_d: float) -> void:
 		step_once()
 
 func step_once() -> void:
+	if net:
+		_net_step()
+		return
 	var a := _sample(0)
 	var b := _sample(1)
 	engine.step(state, a, b)
 	tick_n += 1
 	view.apply(state)
+
+func _net_step() -> void:
+	net.play_step(_sample(local_slot))
+	state = net.session.state
+	tick_n += 1
+	view.apply(state)
+	if _ended:
+		return
+	if net.phase == NetMatch.Ph.OVER:
+		_ended = true
+		var w := local_slot if net.status in ["forfeit_win", "peer_left", "disconnected"] else 1 - local_slot
+		net.save_replay()
+		match_ended.emit(w, net.status)
+		return
+	var cs := net.confirmed_state()
+	last_confirmed_wins = [cs[FightSim.P_BASE + FightSim.G_WINS0], cs[FightSim.P_BASE + FightSim.G_WINS1]]
+	var w2 := engine.match_over(cs)
+	if w2 >= 0:
+		_ended = true
+		net.save_replay()
+		match_ended.emit(w2, "ko")
 
 func _sample(i: int) -> int:
 	if input_override[i].is_valid():
@@ -67,12 +118,22 @@ func _sample(i: int) -> int:
 func sample_device(i: int) -> int:
 	var mv := Vector2.ZERO
 	var atk := false; var hand := false; var roll := false; var sprint := false; var swap := false; var lock := false
-	if i == 0:
+	if i == local_slot:
 		mv = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		if joystick and joystick.visible:
+			mv = (mv + PlayerController.shape_stick(joystick.axis)).limit_length(1.0)
+		var run := Input.is_action_pressed("run_toggle")
+		if run and not _prev_run:
+			sprint_latch = not sprint_latch
+		_prev_run = run
 		atk = Input.is_action_pressed("attack_sword")
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			atk = true # PC: clic izquierdo con el ratón capturado por la cámara
 		hand = Input.is_action_pressed("left_hand")
 		roll = Input.is_action_pressed("dash")
-		sprint = Input.is_action_pressed("sprint")
+		if mv.length() < 0.2 or state.size() > 0 and state[i * FightSim.F_FIELDS + FightSim.EXH] > 0:
+			sprint_latch = false
+		sprint = Input.is_action_pressed("sprint") or sprint_latch
 		swap = Input.is_action_pressed("swap_weapon")
 		lock = Input.is_action_pressed("lock_on")
 	else:
@@ -101,7 +162,7 @@ func sample_device(i: int) -> int:
 func world_move(i: int, mv: Vector2) -> Vector3:
 	var f := fighters[i]
 	var fwd := Vector3.FORWARD
-	if i == 0 and camera:
+	if i == local_slot and camera:
 		fwd = MeshUtil.flat(-camera.global_transform.basis.z).normalized()
 	else:
 		var d := MeshUtil.flat(fighters[1 - i].global_position - f.global_position)

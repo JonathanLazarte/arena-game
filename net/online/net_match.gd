@@ -97,7 +97,7 @@ func prelude_step() -> bool:
 		link.send_msg({"t": "start", "delay": input_delay, "seed": seed_v})
 	if me == 1 and _peer_started and not rtt_samples.is_empty():
 		rtt_ms = _median(rtt_samples)
-	return _peer_started
+	return _peer_started and link.pending_out() == 0 # el «go» del invitado debe haber salido
 
 func _median(a: Array[float]) -> float:
 	var b := a.duplicate(); b.sort()
@@ -132,9 +132,13 @@ func play_step(local_input: int) -> bool:
 				for i in range(0, cks.size() - 1, 2):
 					peer_ck[int(cks[i])] = int(cks[i + 1])
 			"ping": link.send_msg({"t": "pong", "s": m.get("s", 0)})
+			"start": link.send_msg({"t": "go"}) # el anfitrión aún no recibió nuestro «go»
 			"bye":
 				status = "forfeit_win"; phase = Ph.OVER
-	if session.params_mismatch:
+			"bad_params":
+				status = "params_mismatch"; phase = Ph.OVER
+	if session.params_mismatch and status == "":
+		for i in 3: link.send_msg({"t": "bad_params"}, true) # el rival no puede detectarlo si dejamos de enviar
 		status = "params_mismatch"; phase = Ph.OVER
 	if link.peer_left and status == "":
 		status = "peer_left"; phase = Ph.OVER
@@ -193,7 +197,7 @@ func _check_desync() -> void:
 
 func forfeit() -> void:
 	if link.ready_to_play():
-		for i in 3: link.send_msg({"t": "bye"})
+		for i in 3: link.send_msg({"t": "bye"}, true)
 	status = "forfeit_loss"; phase = Ph.OVER
 
 func _drain() -> Array[Dictionary]:
@@ -223,7 +227,7 @@ func replay_dict() -> Dictionary:
 		b.append(r if me == 0 else l)
 	var ck := {}
 	for f: int in session.checksums:
-		if f < n and f % 60 == 59:
+		if f < n and f % 10 == 9:
 			ck[str(f)] = session.checksums[f]
 	return {"proto": PROTO, "ph": session.params_hash, "params": var_to_str(engine.params), "seed": seed_v,
 		"delay": input_delay, "me": me, "spawn": Array(engine.spawn), "in0": a, "in1": b, "ck": ck}

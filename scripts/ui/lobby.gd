@@ -49,6 +49,8 @@ var gem_label: Label
 var dots: Dictionary = {} ## pestaña -> punto de notificación
 var xp_bar: ProgressBar
 var play_button: Button
+var online_button: Button
+var online_panel: OnlinePanel
 var champion_button: Button
 var champion_reward_label: Label
 var modal: Control
@@ -409,6 +411,12 @@ func _build_ui() -> void:
 	play_button.size = Vector2(410, 46)
 	play_button.pressed.connect(play)
 	root_ui.add_child(play_button)
+	online_button = UIKit.button("ONLINE", 22)
+	online_button.name = "Online"
+	online_button.position = Vector2(640, 672)
+	online_button.size = Vector2(200, 46)
+	online_button.pressed.connect(open_online)
+	root_ui.add_child(online_button)
 	ui.move_child(UIKit.crystal_shards(ui, 18), 0)
 	var hint := UIKit.label("Arrastra para girar · Q/E pestañas · 1-3 dificultad · Enter jugar", 14, UIKit.TEXT)
 	hint.position = Vector2(20, 692)
@@ -973,6 +981,15 @@ func _stat(label_t: String, v: float, vmax: float, txt: String) -> void:
 	stats_box.add_child(UIKit.stat_row(label_t, v, vmax, txt))
 
 ## Empieza la partida 1v1 con el equipamiento elegido (rival aleatorio).
+## Menú online: Crear sala / Unirse con código / LAN.
+func open_online() -> OnlinePanel:
+	if is_instance_valid(online_panel):
+		return online_panel
+	gs.save_loadout()
+	online_panel = OnlinePanel.new()
+	ui.add_child(online_panel)
+	return online_panel
+
 func play() -> void:
 	if modal.visible:
 		return

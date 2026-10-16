@@ -41,7 +41,12 @@ func _ready() -> void:
 	_build_arena()
 	# Equipamiento: el del lobby (GameState) o el clásico si se carga la arena directamente (pruebas)
 	var gs := get_node_or_null("/root/GameState")
-	if gs and gs.from_lobby:
+	online = NetMatch.current if NetMatch.current != null and NetMatch.current.phase != NetMatch.Ph.OVER else null
+	if online:
+		gs = null # online: equipo estándar idéntico en ambos pares (ver docs/netcode.md)
+	if online:
+		player = _make_fighter("Tú", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
+	elif gs and gs.from_lobby:
 		player = _make_fighter(gs.display_name_with_title(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "left_hand": gs.left_hand(), "offhand": gs.offhand_weapon(), "shield": gs.weapon2_id == "escudo", "trinkets": gs.equipped_trinkets()})
@@ -66,9 +71,11 @@ func _ready() -> void:
 		enemy = _make_fighter("Rival (%s)" % rc.display_name, 1, Color(0.85, 0.15, 0.15), r["eikon"], rc, Smithing.effective(r["weapon"], Smithing.rival_level(gs.char_level())), [], # ronda 20: arma mejorada a su nivel
 			Attributes.auto_allocate(rc.id, gs.char_level()), # ronda 18: atributos acordes al nivel
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(rc.id, gs.char_level())}) # ronda 19
+	elif online:
+		enemy = _make_fighter("Rival online", 1, Color(0.85, 0.15, 0.15), EIKONS[0])
 	else:
 		enemy = _make_fighter("Rival", 1, Color(0.85, 0.15, 0.15), EIKONS[1 + randi() % 2])
-	if champion_id == "":
+	if champion_id == "" and not online:
 		var pool: Array = BossAbilities.ORDER.duplicate()
 		pool.shuffle()
 		enemy.set_boss_abilities(pool.slice(0, BossAbilities.MAX_EQUIPPED)) # ronda 31: el rival lleva 3 al azar
@@ -91,8 +98,12 @@ func _ready() -> void:
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind(player, enemy)
-	hud.restart_requested.connect(restart_match)
-	hud.lobby_requested.connect(func() -> void: UIKit.go("res://scenes/lobby.tscn"))
+	hud.restart_requested.connect(func() -> void:
+		if online: leave_online(); UIKit.go("res://scenes/lobby.tscn")
+		else: restart_match())
+	hud.lobby_requested.connect(func() -> void:
+		leave_online()
+		UIKit.go("res://scenes/lobby.tscn"))
 	player.fluid = true # ronda 30: movimiento fluido del jugador
 	controller = PlayerController.new()
 	controller.me = player
@@ -122,7 +133,7 @@ func _ready() -> void:
 	lock_marker = MeshUtil.sphere(self, 0.22, Vector3.ZERO, Color(1.0, 0.82, 0.35), true)
 	lock_ring = _make_lock_ring()
 	_warm_eikons()
-	if sim_mode:
+	if sim_mode or online:
 		_setup_sim_match()
 	start_round()
 
@@ -135,10 +146,62 @@ func _setup_sim_match() -> void:
 	sim_match.name = "SimMatch"
 	sim_match.camera = camera
 	add_child(sim_match)
-	sim_match.setup(player, enemy, self)
+	sim_match.joystick = hud.joystick
+	if online:
+		# el anfitrión es el jugador 0 de la sim; el invitado ve su luchador (nodo player) en el hueco 1
+		if online.me == 1:
+			player.global_position = Vector3(0, 0.2, -SPAWN_DIST); player.facing = Vector3.BACK
+			enemy.global_position = Vector3(0, 0.2, SPAWN_DIST); enemy.facing = Vector3.FORWARD
+			sim_match.setup(enemy, player, self, online)
+		else:
+			player.global_position = Vector3(0, 0.2, SPAWN_DIST); player.facing = Vector3.FORWARD
+			enemy.global_position = Vector3(0, 0.2, -SPAWN_DIST); enemy.facing = Vector3.BACK
+			sim_match.setup(player, enemy, self, online)
+		sim_match.match_ended.connect(_on_online_ended)
+		time_left = 1.0e9
+	else:
+		sim_match.setup(player, enemy, self)
 	sim_match.on_event = _on_sim_event
 	enemy.face_target = player
 	player.face_target = enemy
+
+const ONLINE_END_TEXT := {"ko": "", "forfeit_win": "El rival abandonó", "forfeit_loss": "Abandonaste",
+	"peer_left": "El rival se fue", "disconnected": "Conexión perdida", "desync": "Desincronía (informe guardado)",
+	"params_mismatch": "Versiones distintas", "version": "Versiones distintas"}
+func _on_online_ended(winner_slot: int, reason: String) -> void:
+	if state == "over":
+		return
+	state = "over"
+	var won := winner_slot == online.me
+	if reason == "desync" or reason == "params_mismatch":
+		won = false
+	hud.show_results(won, {})
+	var t: String = ONLINE_END_TEXT.get(reason, reason)
+	if t != "":
+		hud.show_message(t, 4.0)
+	online.link.close()
+	NetMatch.current = null
+
+## Abandono / volver al lobby durante una partida online.
+func leave_online() -> void:
+	if online and state != "over":
+		online.forfeit()
+		online.link.close()
+	NetMatch.current = null
+
+func _process_online_hud() -> void:
+	if not online or sim_match == null:
+		return
+	var w: Array = sim_match.last_confirmed_wins
+	if int(w[0]) != _shown_wins[0] or int(w[1]) != _shown_wins[1]:
+		_shown_wins = [int(w[0]), int(w[1])]
+		var mine: int = _shown_wins[online.me]
+		var theirs: int = _shown_wins[1 - online.me]
+		wins = [mine, theirs]
+		round_num = mine + theirs + 1
+		_update_round_label()
+	hud.timer_label.text = "%d ms" % int(online.rtt_ms)
+var _shown_wins := [0, 0]
 
 func _on_sim_event(ev: Dictionary) -> void:
 	match String(ev["kind"]):
@@ -190,6 +253,7 @@ static var hitstop_enabled: bool = true
 ## Modo sim (fase online): ambos luchadores los mueve FightSim con dos entradas locales. Por defecto apagado.
 static var sim_mode: bool = false
 var sim_match: SimMatch
+var online: NetMatch ## partida online en curso (NetMatch.current al entrar)
 var hitstops: int = 0
 func _on_hitstop(d: float) -> void:
 	if sim_mode or not hitstop_enabled or _hs_prev > 0.0 or Engine.time_scale <= 0.0:
@@ -208,6 +272,8 @@ func _on_hitstop(d: float) -> void:
 
 var _hs_prev: float = 0.0
 func _exit_tree() -> void:
+	if online and NetMatch.current == online:
+		leave_online()
 	if _hs_prev > 0.0:
 		Engine.time_scale = _hs_prev
 		_hs_prev = 0.0
@@ -408,7 +474,8 @@ func _prop_at(parent: Node3D, file: String, pos: Vector3, k: float) -> void:
 func _physics_process(delta: float) -> void:
 	if camera == null or player == null:
 		return
-	if state == "fight":
+	_process_online_hud()
+	if state == "fight" and not online:
 		time_left -= delta
 		hud.timer_label.text = str(ceili(maxf(time_left, 0.0)))
 		if time_left <= 0.0:
@@ -489,7 +556,7 @@ func start_round(new_match: bool = false) -> void:
 	state = "fight"
 	champion_phase2_started = false
 	time_left = ROUND_TIME
-	controller.enabled = not sim_mode
+	controller.enabled = not sim_mode and online == null
 	if sim_match:
 		sim_match.reset_round()
 	_update_round_label()
@@ -527,6 +594,8 @@ func _update_round_label() -> void:
 func _on_fighter_died(f: Fighter) -> void:
 	if state != "fight":
 		return
+	if online:
+		return # online: rondas y victoria las decide la sim (estado confirmado)
 	var winner := 1 if f == player else 0
 	if sim_match:
 		sim_match.running = false

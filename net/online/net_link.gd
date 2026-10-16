@@ -115,16 +115,16 @@ func _fail(msg: String) -> void:
 	state = St.FAILED
 
 # ---------------- envío ----------------
-func send_msg(d: Dictionary) -> void:
+func send_msg(d: Dictionary, urgent: bool = false) -> void:
 	if state != St.CONNECTED and state != St.PUNCHING:
 		return
 	var body := var_to_bytes(d)
 	if direct:
 		var b := PackedByteArray([0x44]); b.append_array(body)
-		_raw(b, peer_ip, peer_port)
+		_raw(b, peer_ip, peer_port, urgent)
 	else:
 		var r := PackedByteArray([0x52]); r.append_array(body)
-		_raw(r, relay_ip, relay_port)
+		_raw(r, relay_ip, relay_port, urgent)
 
 func _msg(t: String, d: Dictionary) -> PackedByteArray:
 	var b := t.to_ascii_buffer()
@@ -237,6 +237,9 @@ func _deliver(b: PackedByteArray) -> void:
 func _json(b: PackedByteArray) -> Dictionary:
 	var v: Variant = JSON.parse_string(b.slice(1).get_string_from_utf8())
 	return v if v is Dictionary else {}
+
+func pending_out() -> int:
+	return _outq.size()
 
 func ready_to_play() -> bool:
 	return state == St.CONNECTED or state == St.PUNCHING
