@@ -154,3 +154,24 @@ Ruleset: sword/shield + bow on foot. Out: mounts, eikons, magic, boss abilities,
 Then type `host:47800` in the game's Online panel. Players who can punch through NAT (most home routers) only use the relay for pairing; symmetric NAT / CGNAT on mobile data falls back to relaying through it.
 
 **Known limits:** both players use the standard loadout (loadout exchange + bake is next); IPv4 only; no room listing or matchmaking; the input delay is fixed per match; the relay has no authentication or rate limiting (fine for private codes, harden before public release).
+
+## 11. Phase 3: latency tuning
+
+**Parry lenience (online only):** `SimParams.lenience_for_delay(start delay)` gives 0 ticks at delay 1, 1 at delay 2, and 2 at delay ≥ 3 (≤ 33 ms). `online_tuning` adds it to `parry_window` and takes it off `parry_recovery`, so a whiffed parry costs the same total time. It's applied in `NetMatch.start_play` (PROTO 3), it's part of the params checksum, and the offline/base params are untouched. The value comes from the *starting* delay so the params stay fixed for the whole match. Hit-stop is unchanged: it's the in-sim freeze (5/4/7 ticks), already rollback-safe, and the frozen ticks give rollback some slack. Not scaled.
+
+**Render smoothing:** `SimView.smooth` (online). After a tick with a rollback (`RbSession.last_resim > 0`), the per-fighter error (previous sim position + previous velocity) − corrected position is added to a visual offset. The offset decays ×0.75 per tick (≈ 19 ticks to under 3 mm from 0.5 m) and snaps if it's over 1.5 m (round reset, real teleports). Only node positions change; the sim state and checksums never see it.
+
+**Unconfirmed effects:** `SimFx.hold_ticks = 2` online. An event is held until its tick is confirmed or 2 ticks have passed. If a re-simulation covering its tick (`RbEngine.on_rollback` → `begin_resim`) doesn't produce it again, it's cancelled before it's shown. The local player's own swing/roll/shot fire instantly. Hook: `RbEngine.after_tick(confirmed, frame)` → `SimFx.flush`. Effects shown from a wrong guess (random bots, tests/test_net_events.gd): 50 ms 2.2 % → 0 %, 100 ms 4.8 % → 0 %, 200 ms 14.3 % → 9.5 %.
+
+**Adaptive input delay during the match:** each peer adapts its own *local* delay (`RbSession.set_delay`). Inputs that were already sent are final; when the delay goes up, the ticks that would have no input are filled with the last input and sent like any other. So the two peers never need to agree on a switch frame, and determinism doesn't depend on it.
+- Target = `delay_for_rtt(rtt EMA)`.
+- Go up 1 after 90 consecutive ticks asking for more.
+- Go down 1 after 300 consecutive ticks where even RTT + 15 ms asks for less.
+- At most one change per 180 ticks; range 1–4.
+- Test: RTT 20 → 140 → 20 ms went 1→4→2 in 5 changes over 1500 ticks, with 0 checksum mismatches and a reproducible replay.
+
+**Net overlay:** `NetOverlay` (F3 / "Red" button, top right). Shows ping and path (direct/relay), current/start delay and number of changes, rollback (last/max/total), frame advantage, sync skips, stalls, sim step and average re-sim µs measured *on the device*, parry lenience, kB/s, tick/confirmed tick and desync status.
+
+**Lobby loadout online:** `NetLoadout.from_game_state` → {name, char, w/w2/lh as [id, upgrade level, infusion], level, skills, attrs, armor, trinkets}, data only. It's sent in the `hi` handshake. Each peer rebuilds *both* fighters from the two loadouts (`Arena._make_online_fighter`), and bad data is cleaned up (unknown ids → defaults, levels clamped). Eikon, magic and boss abilities don't travel (not in the online ruleset). A mismatch would show up as `params_mismatch`. Tested with berserker vs archer: the bake checksum is identical on both peers.
+
+**Mobile budget:** `FightSim.step` ≈ 44 µs on the dev Xeon in GDScript. Worst tick (8-tick rollback + new tick + copies) ≈ 0.4 ms desktop, ≈ 2 ms estimated on a mid phone (×5), against a 4 ms budget. The overlay shows the real per-device numbers ("Sim: paso … µs").
