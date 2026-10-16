@@ -10,6 +10,9 @@ var loss := 0.02
 var delay := 2
 var window := 8
 var seed_v := 1
+var engine_factory: Callable = func() -> RbEngine: return RbEngine.new() ## motor por par
+var bot_mask := 63 ## bits de entrada que pueden pulsar los bots
+var bot_change := 0.25
 var corrupt_at := -1 ## prueba negativa: altera el estado del par 1 en ese tick (simula una fuente no determinista)
 
 func run(ticks: int) -> Dictionary:
@@ -19,7 +22,7 @@ func run(ticks: int) -> Dictionary:
 	bots[0].seed = seed_v * 31 + 1
 	bots[1].seed = seed_v * 31 + 2
 	var cur_in: Array[int] = [0, 0]
-	var peers: Array[RbSession] = [RbSession.new(0, delay, window), RbSession.new(1, delay, window)]
+	var peers: Array[RbSession] = [RbSession.new(0, delay, window, engine_factory.call()), RbSession.new(1, delay, window, engine_factory.call())]
 	var wire: Array = [] # [deliver_ms, to, packet]
 	var dt := 1000.0 / RbSim.TICK_HZ
 	var step_usec := 0
@@ -36,13 +39,13 @@ func run(ticks: int) -> Dictionary:
 		wire = keep
 		for i in 2:
 			var p := peers[i]
-			if k < ticks and bots[i].randf() < 0.25: # cambia de intención ~cada 4 ticks
-				cur_in[i] = bots[i].randi() & 63
+			if k < ticks and bots[i].randf() < bot_change: # cambia de intención ~cada 4 ticks
+				cur_in[i] = bots[i].randi() & bot_mask
 			p.add_local_input(cur_in[i] if k < ticks else 0)
 			var t0 := Time.get_ticks_usec()
 			p.tick()
 			if i == 1 and p.frame == corrupt_at:
-				p.state[RbSim.X] += 1
+				p.state[0] += 1
 			step_usec += Time.get_ticks_usec() - t0
 			steps += 1
 			if rng.randf() >= loss:
@@ -74,5 +77,5 @@ func run(ticks: int) -> Dictionary:
 		"resim_us_avg": (float(all_us.reduce(func(a, b): return a + b, 0)) / maxf(all_us.size(), 1)),
 		"resim_us_p99": (all_us[int(all_us.size() * 0.99)] if all_us.size() > 0 else 0),
 		"tick_us_avg": float(step_usec) / float(steps),
-		"hp": [peers[0].state[RbSim.HP], peers[0].state[RbSim.FIELDS + RbSim.HP]],
+		"state": peers[0].state,
 	}

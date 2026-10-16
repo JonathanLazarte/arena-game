@@ -24,11 +24,14 @@ var max_resim: int = 0
 var stalls: int = 0
 var resim_usec: Array[int] = []
 
-func _init(player: int, delay: int = 2, window: int = 8) -> void:
+var engine: RbEngine ## simulación enchufable (RbSim por defecto; FightEngine para las reglas de combate)
+
+func _init(player: int, delay: int = 2, window: int = 8, eng: RbEngine = null) -> void:
 	me = player
 	input_delay = delay
 	max_rollback = window
-	state = RbSim.initial()
+	engine = eng if eng != null else RbEngine.new()
+	state = engine.initial()
 	for t in delay: # los primeros ticks no tienen entrada: neutros y confirmados
 		local_in[t] = 0
 		remote_in[t] = 0
@@ -78,9 +81,9 @@ func _inputs_for(t: int) -> Array:
 func _sim_one() -> void:
 	saved[frame] = state.duplicate()
 	var ins: Array = _inputs_for(frame)
-	RbSim.step(state, ins[0], ins[1])
+	engine.step(state, ins[0], ins[1])
 	if frame <= last_remote:
-		checksums[frame] = RbSim.checksum(state)
+		checksums[frame] = engine.checksum(state)
 	frame += 1
 
 ## Un tick de tiempo real. Devuelve false si se detiene (demasiado por delante del rival).
@@ -102,7 +105,7 @@ func tick() -> bool:
 		# los ticks ya confirmados que acertaron también obtienen checksum
 		for t in range(maxi(0, last_remote - max_rollback - 2), mini(last_remote + 1, frame)):
 			if not checksums.has(t) and saved.has(t + 1):
-				checksums[t] = RbSim.checksum(saved[t + 1])
+				checksums[t] = engine.checksum(saved[t + 1])
 	if frame - last_remote > max_rollback:
 		stalls += 1
 		return false
