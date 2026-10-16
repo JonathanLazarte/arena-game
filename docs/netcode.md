@@ -134,7 +134,7 @@ Ruleset: sword/shield + bow on foot. Out: mounts, eikons, magic, boss abilities,
 
 **Lobby:** the `ONLINE` button opens `OnlinePanel`. Relay address field (saved in `user://online.cfg`), `Crear sala` (shows the code), `Unirse con código`, `LAN: crear` (shows this device's private IPs, UDP 47801), `LAN: unirse` (host IP). The handshake runs in the panel, then the arena opens.
 
-**Tests:** `tests/test_net_online.gd` (in-process, 34 checks: delay formula, LAN pair at 80 ms RTT, 600 ticks in sync, replay verify/tamper, forfeit, forced desync + report, silent disconnect, params mismatch, sim rounds, touch input, arena online as host and as guest, lobby panel LAN pairing). `server` `npm test` (relay unit tests), `npm run test:e2e` (relay + two headless Godot processes, `tests/net_client.gd`). Measured on localhost with simulated latency (900 ticks, random bots):
+**Tests:** `tests/test_net_online.gd` (in-process, 36 checks: delay formula, LAN pair at 80 ms RTT, 600 ticks in sync, replay verify/tamper, forfeit, forced desync + report, silent disconnect, params mismatch, sim rounds, touch input, arena online as host and as guest, lobby panel LAN pairing). `server` `npm test` (relay unit tests), `npm run test:e2e` (relay + two headless Godot processes, `tests/net_client.gd`). Measured on localhost with simulated latency (900 ticks, random bots):
 
 | scenario | RTT measured | delay | path | max resim | result |
 |---|---|---|---|---|---|
