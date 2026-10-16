@@ -69,5 +69,68 @@ func _initialize() -> void:
 		if rolled_at < 0 and s[S.ROLL_T] >= 0: rolled_at = t
 		if cancel_at < 0 and s[S.ATK_STATE] == S.Atk.RECOVERY and s[S.ATK_T] * 2 >= s[S.ATK_DUR]: cancel_at = t
 	check(rolled_at > 52 and rolled_at - 52 <= P[0]["roll_buffer"], "búfer de voltereta: pulsada en la recuperación, sale %d ticks después (al poder cancelar)" % (rolled_at - 52))
+	# --- cuerpo a cuerpo ---
+	s = duel(1.8)
+	var hit_t := -1
+	for t in 60:
+		var h0: int = s[F + S.HP]
+		S.step(s, P, S.IN_ATK if t == 0 else 0, 0)
+		if hit_t < 0 and s[F + S.HP] < h0: hit_t = t
+	var a0: Dictionary = P[0]["atk"][0]
+	check(s[F + S.HP] == P[1]["hp"] - a0["dmg"], "ligero: daño exacto (%d)" % (P[1]["hp"] - s[F + S.HP]))
+	check(hit_t == 1 + a0["windup"] - 1, "ligero: golpea al acabar la anticipación (tick %d)" % hit_t)
+	# combo de 3: tocar repetidamente encadena
+	s = duel(1.8)
+	run(s, 200, func(t: int) -> int: return S.IN_ATK if t % 12 < 2 and t < 120 else 0)
+	var dealt: int = s[S.DMG_DEALT]
+	var exp3: int = P[0]["atk"][0]["dmg"] + P[0]["atk"][1]["dmg"] + P[0]["atk"][2]["dmg"]
+	check(s[S.HITS] == 3, "combo de 3 golpes encadenado (%d golpes, %d daño)" % [s[S.HITS], dealt])
+	check(s[F + S.STAGGERS] + s[F + S.STUNS] >= 1, "el combo acumula aturdimiento (nivel %d)" % s[F + S.LAST_LVL])
+	# fuerte: mantener 0,4 s; cargar más da más daño
+	s = duel(1.8)
+	run(s, 140, func(t: int) -> int: return S.IN_ATK if t < 25 else 0)
+	var heavy_dmg: int = P[1]["hp"] - s[F + S.HP]
+	s = duel(1.8)
+	run(s, 160, func(t: int) -> int: return S.IN_ATK if t < 120 else 0)
+	var charged_dmg: int = P[1]["hp"] - s[F + S.HP]
+	check(heavy_dmg == P[0]["atk"][3]["dmg"], "fuerte: daño base (%d)" % heavy_dmg)
+	check(charged_dmg == P[0]["atk"][3]["dmg"] * 1400 / 1000, "fuerte cargado al máximo: +40 %% (%d)" % charged_dmg)
+	# bloqueo: daño reducido (chip) y aguante gastado
+	s = duel(1.8)
+	run(s, 60, light_at(0), func(_t: int) -> int: return S.IN_BLOCK)
+	check(s[F + S.BLOCKS] == 1 and P[1]["hp"] - s[F + S.HP] == P[0]["atk"][0]["raw"] * P[1]["chip_pm"] / 1000, "bloqueo: pasa el 12 %% (%d)" % (P[1]["hp"] - s[F + S.HP]))
+	s = duel(1.8)
+	var gc_seen := false
+	for t in 80:
+		S.step(s, P, light_at(0).call(t), (S.IN_BLOCK if t < 27 else 0) | (S.IN_ATK if t == 27 else 0))
+		if s[F + S.ATK_GC] != 0: gc_seen = true
+	check(gc_seen, "atacar justo tras bloquear = contra de guardia")
+	# rotura de guardia: golpes bloqueados hasta agotar el aguante
+	s = duel(1.8)
+	run(s, 900, func(t: int) -> int: return S.IN_ATK if t % 12 < 2 else 0, func(_t: int) -> int: return S.IN_BLOCK)
+	check(s[F + S.GUARD_BREAKS] >= 1, "rotura de guardia al agotar el aguante (%d bloqueos)" % s[F + S.BLOCKS])
+	# parry: aturde al atacante 1,6 s, sin daño; la réplica hace x1,8
+	s = duel(1.8)
+	run(s, 30, light_at(0), func(t: int) -> int: return S.IN_PARRY if t == 18 else 0)
+	check(s[F + S.PARRIES] == 1 and s[F + S.HP] == P[1]["hp"] and s[S.STUN] > 60 and s[S.RIPOSTE_T] > 0, "parry: atacante aturdido (stun %d ticks), sin daño" % s[S.STUN])
+	run(s, 60, func(_t: int) -> int: return 0, light_at(0))
+	check(P[0]["hp"] - s[S.HP] == P[1]["atk"][0]["dmg"] * 1800 / 1000, "réplica tras parry x1,8 (%d)" % (P[0]["hp"] - s[S.HP]))
+	# derribo (nivel 3) con presión sostenida + inmunidad al levantarse
+	s = duel(1.8)
+	var max_lvl := 0
+	for t in 600:
+		S.step(s, P, S.IN_ATK if (t % 12 < 2) else 0, 0)
+		max_lvl = maxi(max_lvl, s[F + S.LAST_LVL])
+	check(s[F + S.KNOCKDOWNS] >= 1 or s[F + S.STANCE_BREAKS] >= 1, "presión sostenida: derribo o rotura de postura (derribos %d, posturas %d, nivel máx %d)" % [s[F + S.KNOCKDOWNS], s[F + S.STANCE_BREAKS], max_lvl])
+	# hit-stop como contador de congelación: el fuerte congela 5 ticks
+	var ends: Array[int] = []
+	for hs in [true, false]:
+		var sx := duel(1.8, hs)
+		var end_t := -1
+		for t in 200:
+			S.step(sx, P, S.IN_ATK if t < 25 else 0, 0)
+			if t > 30 and end_t < 0 and sx[S.ATK_STATE] == S.Atk.NONE: end_t = t
+		ends.append(end_t)
+	check(ends[0] - ends[1] == S.HITSTOP_HEAVY, "hit-stop = contador de congelación (+%d ticks)" % (ends[0] - ends[1]))
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
