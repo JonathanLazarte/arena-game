@@ -12,8 +12,16 @@ const HZ := 60.0
 const A_HEAVY := 3
 const A_DASH := 4
 
+## Ticks hasta que un temporizador offline (t += 1/60 en float, condición t >= sec) se cumple.
+## Reproduce el redondeo real del juego offline (p. ej. 0,4 s = 25 ticks, no 24).
 static func tk(sec: float) -> int:
-	return maxi(int(ceil(sec * HZ - 0.001)), 0)
+	var t := 0.0
+	var n := 0
+	var dt := 1.0 / HZ
+	while t < sec and n < 100000:
+		t += dt
+		n += 1
+	return n
 
 static func um(m: float) -> int:
 	return int(round(m * 1000000.0))
@@ -80,6 +88,7 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	var conc := EquipStats.resist_mult("concentracion", f.eq, f.eq_ref) if not f.eq.is_empty() else 1.0
 	p["guard_break_t"] = tk(Fighter.GUARD_BREAK_STAGGER * conc)
 	p["max_combo"] = f.max_combo()
+	p["has_bow"] = 1 if f.secondary != null else 0
 	# Ataques
 	var atks: Array = []
 	for i in 3:
@@ -174,6 +183,11 @@ static func _bake_attack(f: Fighter, o: Fighter, idx: int, st_k: float, sp: floa
 	return {
 		"windup": tk(float(d["windup"]) / sp), "active": tk(float(d["active"])),
 		"recovery": tk(float(d["recovery"]) / sp), "whiff": tk(float(d["whiff"]) / sp),
+		# sumas horneadas como un solo temporizador (el offline acumula un único float)
+		"rec_hit": tk(float(d["recovery"]) / sp), "rec_whiff": tk(float(d["recovery"]) / sp + float(d["whiff"]) / sp),
+		"rec_hit_fin": tk(float(d["recovery"]) / sp + Fighter.FINISHER_EXTRA_RECOVERY),
+		"rec_whiff_fin": tk(float(d["recovery"]) / sp + float(d["whiff"]) / sp + Fighter.FINISHER_EXTRA_RECOVERY),
+		"gc_windup": tk(float(d["windup"]) / sp * Fighter.GC_WINDUP_MULT),
 		"stamina": milli(float(d["stamina"]) * st_k),
 		"reach": um(reach), "cos_arc": cos_q(arc), "window": tk(window) if window >= 0.0 else -1,
 		"step": um(step), "lunge": um(lunge * f.speed_mult() / HZ),
@@ -193,7 +207,7 @@ static func defaults() -> Array:
 		"cost_roll": 20000, "cost_backstep": 6000, "cost_parry": 15000, "cost_bow": 6000, "dash_cd": 48,
 		"roll_start": 4, "roll_if_end": 28, "roll_total": 48, "roll_fast": 28, "roll_dist": 4500000, "roll_drift": 400000,
 		"roll_buffer": 11, "backstep_t": 21, "backstep_v": 95238, "parry_window": 18, "parry_recovery": 48, "parry_stagger": 96,
-		"swap_t": 26, "hit_radius": 750000, "robust": 50000, "stance_max": 175000, "stance_regen": 200, "has_shield": 1,
+		"swap_t": 26, "has_bow": 1, "hit_radius": 750000, "robust": 50000, "stance_max": 175000, "stance_regen": 200, "has_shield": 1,
 		"chip_pm": 120, "guard_break_t": 60, "max_combo": 3, "gc_pm": 600, "crit_dmg": 57200,
 		"bow_draw": 30, "bow_recovery": 24, "bow_recovery_ch": 29, "bow_reload": 0, "bow_cd": 9, "bow_hold": 54, "bow_slow_pm": 250,
 		"arrow_raw": 8000, "arrow_dmg": 8000, "arrow_dmg_ch": 17600, "arrow_speed": 533333, "arrow_speed_ch": 746667,

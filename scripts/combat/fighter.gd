@@ -857,7 +857,16 @@ func apply_local_hitstop(d: float) -> void:
 	if _kv:
 		_kv.set_paused(true)
 
+## Online (fase 1): con sim_driven la simulación determinista (net/sim, SimView) manda y este nodo
+## solo se dibuja. Por defecto false: el juego offline no cambia.
+var sim_driven: bool = false
+
 func _physics_process(delta: float) -> void:
+	if sim_driven:
+		rotation.y = atan2(-facing.x, -facing.z)
+		if _kv:
+			_kv.update(self, delta)
+		return
 	if local_hitstop_t > 0.0:
 		local_hitstop_t = maxf(local_hitstop_t - delta, 0.0)
 		if local_hitstop_t <= 0.0 and _kv:

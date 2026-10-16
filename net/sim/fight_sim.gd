@@ -197,6 +197,8 @@ static func _try(s: PackedInt64Array, P: Array, i: int, a: int) -> void:
 	var o := i * F_FIELDS
 	if s[o + Q0] == 0 and _do(s, P, i, a, false):
 		return
+	if P[i].get("buffer", BUFFER_WINDOW) <= 0:
+		return # sin búfer de acciones (pruebas de paridad contra la API de Fighter)
 	for k in 4:
 		if s[o + Q0 + k] == a:
 			return
@@ -272,7 +274,7 @@ static func _parry(s: PackedInt64Array, P: Array, i: int) -> bool:
 
 static func _swap(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var o := i * F_FIELDS
-	if not _can_act(s, o) or s[o + SWAP_T] > 0 or s[o + ATK_STATE] != Atk.NONE or s[o + SHOT_STATE] != Shot.NONE or s[o + ROLL_T] >= 0:
+	if s[o + ALIVE] == 0 or P[i]["has_bow"] == 0 or s[o + SWAP_T] > 0 or s[o + ATK_STATE] != Atk.NONE or s[o + STUN] > 0:
 		return false
 	s[o + SWAP_T] = P[i]["swap_t"]
 	s[o + BLOCKING] = 0
@@ -305,7 +307,8 @@ static func _request_attack(s: PackedInt64Array, P: Array, i: int, heavy: bool) 
 			s[o + COMBO] = P[i]["max_combo"]
 			_start_attack(s, P, i, SimParams.A_HEAVY, false)
 			s[o + ATK_GC] = 1
-			s[o + ATK_DUR] = s[o + ATK_DUR] * P[i]["gc_pm"] / 1000
+			var ga: Dictionary = P[i]["atk"][SimParams.A_HEAVY]
+			s[o + ATK_DUR] = ga["gc_windup"] if ga.has("gc_windup") else s[o + ATK_DUR] * P[i]["gc_pm"] / 1000
 			return true
 		if (s[o + PREV_IN] & IN_SPRINT) and not heavy and (s[o + PREV_IN] & IN_MOVE) and not (s[o + PREV_IN] & IN_HALF) and s[o + SPRINT_PM] > 0:
 			s[o + DASH_DIR] = ((s[o + PREV_IN] & IN_DIR_MASK) * 8) & 255
@@ -641,9 +644,7 @@ static func _update_attack(s: PackedInt64Array, P: Array, i: int, inp: int) -> v
 			if s[o + ATK_T] >= s[o + ATK_DUR]:
 				s[o + ATK_STATE] = Atk.RECOVERY
 				s[o + ATK_T] = 0
-				s[o + ATK_DUR] = a["recovery"] + (0 if s[o + ATK_LANDED] != 0 else a["whiff"])
-				if s[o + COMBO] >= P[i]["max_combo"]:
-					s[o + ATK_DUR] += FINISHER_EXTRA
+				s[o + ATK_DUR] = _rec_dur(a, s[o + ATK_LANDED] != 0, s[o + COMBO] >= P[i]["max_combo"])
 		Atk.RECOVERY:
 			if s[o + BUFFERED] != 0 and s[o + COMBO] < P[i]["max_combo"] and s[o + ATK_T] >= CHAIN_MIN_RECOVERY and s[o + ST] > 0 and s[o + EXH] <= 0 and s[o + STUN] <= 0:
 				s[o + COMBO] += 1
@@ -651,6 +652,13 @@ static func _update_attack(s: PackedInt64Array, P: Array, i: int, inp: int) -> v
 				return
 			if s[o + ATK_T] >= s[o + ATK_DUR]:
 				_cancel_attack(s, o)
+
+static func _rec_dur(a: Dictionary, landed: bool, finisher: bool) -> int:
+	if a.has("rec_hit"):
+		if finisher:
+			return a["rec_hit_fin"] if landed else a["rec_whiff_fin"]
+		return a["rec_hit"] if landed else a["rec_whiff"]
+	return a["recovery"] + (0 if landed else a["whiff"]) + (FINISHER_EXTRA if finisher else 0)
 
 static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> void:
 	var o := i * F_FIELDS
@@ -779,9 +787,7 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 				s[q + PR_OWNER] = 1 - owner
 				s[q + PR_LIFE] = 120
 				continue
-			if res == 1:
-				s[owner * F_FIELDS + HITS] += 1
-			s[q + PR_ON] = 0
+			s[q + PR_ON] = 0 # (hits_landed offline solo cuenta cuerpo a cuerpo)
 
 static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var o := i * F_FIELDS
@@ -790,7 +796,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var moving := (inp & IN_MOVE) != 0
 	if s[o + ALIVE] == 0 or s[o + STUN] > 0 or s[o + CRIT_T] >= 0:
 		moving = false
-	var want_block: bool = (inp & IN_BLOCK) != 0 and p["has_shield"] != 0
+	var want_block: bool = (inp & IN_BLOCK) != 0 # sin escudo el control local no envía IN_BLOCK
 	var wb: bool = want_block and s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + ROLL_T] < 0 and s[o + BACKSTEP_T] <= 0 and s[o + LOADOUT] == Load.SWORD and s[o + SWAP_T] <= 0 and s[o + ATK_STATE] == Atk.NONE and s[o + PARRY_STATE] == Parry.NONE
 	s[o + BLOCKING] = 1 if wb else 0
 	if wb:

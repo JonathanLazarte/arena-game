@@ -57,5 +57,16 @@ func _initialize() -> void:
 	var hc := RbHarness.new(); hc.rtt_ms = 100; hc.corrupt_at = 500
 	var rc := hc.run(1000)
 	check(rc["mismatches"] > 0, "desincronía inyectada detectada (%d ticks distintos)" % rc["mismatches"])
+	# 6) reglas de combate completas (FightSim, fase 1) con rollback a 50-200 ms
+	for rtt in [50, 100, 150, 200]:
+		for sd in [1, 2]:
+			var hf := RbHarness.new()
+			hf.rtt_ms = rtt; hf.jitter_ms = 15.0; hf.loss = 0.03; hf.seed_v = sd
+			hf.bot_mask = 0x3FFF & ~FightSim.IN_SWAP & ~FightSim.IN_BLOCK; hf.bot_or = FightSim.IN_LOCK; hf.bot_change = 0.15
+			hf.engine_factory = func() -> RbEngine: var e := FightEngine.new(SimParams.defaults(), 9, true); e.gap_um = 2000000; return e
+			var rf := hf.run(1800)
+			var st: PackedInt64Array = rf["state"]
+			check(rf["mismatches"] == 0 and rf["final_equal"] and rf["common"] > 1700 and (st[FightSim.HP] < 100000 or st[FightSim.F_FIELDS + FightSim.HP] < 100000),
+				"FightSim RTT %d semilla %d: %d ticks confirmados, 0 desincronías (vida %d/%d, rollback medio %.1f)" % [rtt, sd, rf["common"], st[FightSim.HP], st[FightSim.F_FIELDS + FightSim.HP], rf["avg_rollback_len"]])
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
