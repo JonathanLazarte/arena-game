@@ -2,10 +2,8 @@ class_name Mount
 extends CharacterBody3D
 ## Montura independiente del jinete. Cuando lleva jinete sigue su transform;
 ## sin jinete se queda cerca de donde la dejaron y pasea un poco.
-## Ronda 14: las monturas son EIKONS montables (fénix, lobo, grifo). Una montura de eikon
-## pertenece a su invocador (owner_fighter): solo él la monta, dura `life` segundos y al
-## acabarse lo baja (sin derribo) y desaparece. Sin dueño (owner_fighter = null) es una
-## montura neutral que cualquiera puede montar (solo pruebas antiguas / Arena.start_mounted).
+## Ronda 14: las monturas son EIKONS montables (fénix, lobo, grifo).
+## Fase 8: solo vista — SimWorld la coloca como títere según el estado de la sim (dueño, vida, jinete).
 
 var data: MountData
 var rider: Fighter = null

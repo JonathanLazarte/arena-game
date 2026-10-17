@@ -1,6 +1,6 @@
 class_name SimMatch
 extends Node
-## Partida local a dos jugadores sobre FightSim (modo sim de la arena, Arena.sim_mode).
+## Partida local a dos jugadores sobre FightSim (fase 8: toda partida offline; rival = SimAI).
 ## Cada tick físico: muestrea las dos entradas, empaqueta con SimView.pack_input, avanza la sim,
 ## vuelca el estado en los Fighter (SimView) y dispara efectos deduplicados (SimFx).
 ## Es el mismo bucle que usará RbSession en red, sin la capa de transporte.

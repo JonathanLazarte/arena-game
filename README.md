@@ -37,12 +37,13 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 
 ## Estructura
 - `scenes/arena.tscn` + `scripts/arena.gd`: arena (muro circular y pilares), cámara, rondas y pantalla final.
-- `scripts/combat/fighter.gd`: jinete (movimiento montado o a pie, espada con arco de alcance, escudo/parry, arco, dash/voltereta, aguante, montar/desmontar, invocación).
-- `scripts/combat/mount.gd`: montura independiente (sigue al jinete; libre, pasea cerca). Cualquier jinete puede montar cualquier montura libre.
-- `scripts/combat/eikon.gd`: invocaciones (ataques cuerpo a cuerpo, a distancia o en área).
-- `scripts/combat/projectile.gd`: flechas y proyectiles.
-- `scripts/ai/ai_controller.gd`: IA rival por fases (rodear a media distancia por delante, comprometerse a atacar con espada o dash, retirarse y descansar o huir cuando le falta aguante). Si la derriban, vuelve a montar cuando es seguro o lucha a pie. Evita quedarse a la espalda y nunca se solapa.
-- `scripts/player_controller.gd`: teclado y controles táctiles.
+- `net/sim/`: **toda la jugabilidad** (fase 8), offline y online: `fight_sim.gd`, `sim_abilities.gd`, `sim_magic.gd`, `sim_params.gd`; `sim_ai.gd` es la IA rival (emite bits de entrada como un mando); `sim_view.gd`/`sim_world.gd` vuelcan el estado en los nodos.
+- `scripts/combat/fighter.gd`: vista del jinete (estadísticas que hornea SimParams, modelo, animación y sonido; sin reglas).
+- `scripts/combat/mount.gd`: montura (títere que coloca SimWorld).
+- `scripts/combat/eikon.gd`: invocaciones (títere que coloca SimWorld).
+- `scripts/combat/projectile.gd`: constantes de arena (radio, pilares); los proyectiles viven en la sim.
+- `scripts/ai/ai_difficulty.gd`: perfiles de dificultad que usa `SimAI` (fases rodear/comprometerse/retirarse/descansar/respiro).
+- `scripts/player_controller.gd`: ayudas de HUD/cámara (la entrada la muestrea `SimMatch`).
 - `scripts/ui/hud.gd`, `touch_stick.gd`: HUD, joystick y botones táctiles (multitáctil).
 - `scripts/data/mount_data.gd`, `eikon_data.gd`: Resources de datos.
 - `resources/mounts/*.tres`: caballo, unicornio, grifo y `on_foot.tres` (estadísticas a pie). `resources/eikons/*.tres`: fénix, lobo de hielo, gólem.
@@ -55,10 +56,11 @@ Juego de lucha 1 contra 1 en arena, de fantasía medieval. Los dos luchadores va
 
 ## Pruebas
 ```
-godot --headless --path . -s res://tests/test_combat.gd   # espada, bloqueo, parry, arco, eikon
-godot --headless --path . -s res://tests/test_match.gd    # partida IA contra IA completa
-godot --headless --path . -s res://tests/test_souls.gd   # compromiso, fuerte, cambio de arma, parry, lectura de la IA
-godot --headless --path . -s res://tests/test_ai.gd -- 1  # la IA no se pega a la espalda ni se solapa (semilla opcional)
+godot --headless --path . -s res://tests/test_fight_sim.gd  # reglas de la sim (espada, bloqueo, parry, arco...)
+godot --headless --path . -s res://tests/test_sim_rules.gd  # pruebas antiguas de combate portadas a la sim
+godot --headless --path . -s res://tests/test_sim_ai.gd     # IA sobre la sim, frasco, Fase II
+godot --headless --path . -s res://tests/test_match.gd      # partida SimAI contra SimAI completa
+# todas: ver docs/HANDOFF.md §5
 ```
 
 ## Exportar
@@ -763,3 +765,9 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - Recarga global de 1,4 s entre habilidades de jefe; recarga propia por habilidad opcional.
 - Rendimiento: rival más cercano cacheado (0,1 s), datos de ataque una vez por ataque, máximo 6 ráfagas de partículas.
 - 13 habilidades extendidas con aviso propio, coste, aturdimiento y recuperación castigable; nuevas: Embate Sísmico y Lanza Celeste. Máx. 3 en la pestaña «Jefe», cambio con ▶. Pruebas: `tests/test_r33_boss.gd`.
+
+## Fase 8 — Una sola jugabilidad (offline = online, protocolo 7)
+- Toda partida (contra la IA o en red) corre en la simulación determinista `net/sim`. `Fighter`, `Eikon` y `Mount` solo dibujan y suenan; la IA (`SimAI`) juega pulsando los mismos «botones» que un jugador.
+- Nuevo en la sim: frasco (1 carga por ronda, H / «Frasco»), Fase II del campeón, golpe sísmico del personaje, estocada tras el paso atrás.
+- Cambios para el jugador offline: el movimiento y los tiempos son exactamente los del online (sin suavizado de entrada propio); los efectos de habilidades se dibujan con las primitivas de `SimWorld`; el arco apunta por orientación/fijado (sin apuntado con ratón); el HUD del campeón muestra las 3 habilidades aunque la 3.ª llegue en Fase II.
+- Retirados: `AIController`, `FighterCombat`/`FighterBossExt`/`FighterMount`, `GroundWave`, la lógica de `Projectile`/`GroundAoE`, el modo `Arena.sim_mode`/`start_mounted` y `test_net_parity`; las pruebas antiguas de jugabilidad se portaron a `test_sim_rules`/`test_sim_ai`.

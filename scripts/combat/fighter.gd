@@ -48,10 +48,7 @@ var _last_boss_id: String = ""
 ## Ronda 33: búfer de voltereta (una pulsación durante una acción se ejecuta al quedar libre).
 const ROLL_BUFFER := 0.18
 var roll_buf_t: float = 0.0
-## Ronda 33: rendimiento — rival más cercano cacheado cada 0,1 s; datos del ataque una vez por ataque.
-const NEAREST_REFRESH := 0.1
-var _nearest_cache: Node3D = null
-var _nearest_t: float = 0.0
+## Ronda 33: rendimiento — datos del ataque una vez por ataque.
 var _atk_cache: Dictionary = {}
 var _atk_cache_key: Array = []
 ## Ronda 33: máximo de ráfagas de partículas simultáneas (todas las instancias).
@@ -383,7 +380,6 @@ var arts_used: int = 0
 var _art_mult: float = 1.0
 var incoming_element: String = "" ## lo fija el proyectil/hechizo justo antes de impactar
 var incoming_status: Dictionary = {}
-var _hit_element: String = ""
 var _hit_status: Dictionary = {}
 var special_t: float = 0.0 ## anticipación del golpe sísmico
 var specials_used: int = 0
@@ -511,21 +507,6 @@ func add_status(k: String, amount: float) -> bool:
 	status_proc.emit(k)
 	return true
 
-## Acumulación que trae un golpe recibido.
-func _status_from(from: Node3D, kind: String) -> Dictionary:
-	if from is Fighter and is_instance_valid(from):
-		var f := from as Fighter
-		if kind == "melee":
-			return f.melee().status
-		if kind == "arrow":
-			return f.ranged().status
-		if kind == "eikon" and f.eikon and f.eikon.id == "lobo":
-			return {"congelacion": LOBO_FROST}
-	if from is Mount and (from as Mount).eikon and (from as Mount).eikon.id == "lobo":
-		return {"congelacion": LOBO_FROST}
-	if from is Eikon and (from as Eikon).data and (from as Eikon).data.id == "lobo":
-		return {"congelacion": LOBO_FROST}
-	return {}
 
 func _burst_particles(c: Color) -> void:
 	if not is_inside_tree() or bursts_live >= MAX_BURSTS:
@@ -566,12 +547,6 @@ func golden_aura_active() -> bool:
 		return false
 	return invuln > 0.0 or stun_immune_t > 0.0 or current_stun_resist() >= 1.0
 
-func _nearest_enemy() -> Node3D:
-	var now := Time.get_ticks_msec() * 0.001
-	if now - _nearest_t >= NEAREST_REFRESH or not is_instance_valid(_nearest_cache) or not _nearest_cache.is_inside_tree():
-		_nearest_t = now
-		_nearest_cache = MeshUtil.nearest(global_position, MeshUtil.enemies_of(get_tree(), team))
-	return _nearest_cache
 
 ## Aura continua mientras dura el veneno o la congelación.
 func _update_aura() -> void:
@@ -611,20 +586,6 @@ func _update_aura() -> void:
 	_aura.scale = Vector3.ONE * ((1.0 + 0.25 * sin(Time.get_ticks_msec() * 0.012)) if gold else 1.0)
 	_aura.emitting = true
 
-## Tipo de daño de un golpe recibido.
-func _damage_type(from: Node3D, kind: String) -> String:
-	if _hit_element != "":
-		return _hit_element
-	if kind == "melee" or kind == "arrow":
-		return "fisico"
-	var eid := ""
-	if from is Mount and (from as Mount).eikon:
-		eid = (from as Mount).eikon.id
-	elif from is Eikon and (from as Eikon).data:
-		eid = (from as Eikon).data.id
-	elif from is Fighter and kind == "eikon" and (from as Fighter).eikon:
-		eid = (from as Fighter).eikon.id
-	return EquipStats.EIKON_ELEMENT.get(eid, "fisico")
 
 func attributes() -> Dictionary:
 	return attrs if not attrs.is_empty() else Attributes.start_for(character.id)
@@ -827,9 +788,6 @@ func _physics_process(delta: float) -> void:
 	if _kv:
 		_kv.update(self, delta)
 
-static func _turn_toward(from: Vector3, to: Vector3, max_step: float) -> Vector3:
-	var ang := from.signed_angle_to(to, Vector3.UP)
-	return from.rotated(Vector3.UP, clampf(ang, -max_step, max_step)).normalized()
 
 ## Telegrafía: true durante la anticipación de un ataque.
 func is_attacking() -> bool:
