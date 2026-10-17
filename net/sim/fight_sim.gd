@@ -23,6 +23,7 @@ const IN_EIKON := 1 << 18      # invocar eikon / especial del eikon montado
 const IN_MOUNT := 1 << 19      # desmontar del eikon montable
 const IN_ART := 1 << 20        # arte del arma (botón «Habilidad» sin habilidad propia)
 const IN_BOSS_VAR := 1 << 21   # variante: remate en estocada del combo de la pausa falsa
+const IN_JUMP := 1 << 22       # salto (fase 7)
 
 static func make_input(dir32: int, move: bool, buttons: int) -> int:
 	return (dir32 & IN_DIR_MASK) | (IN_MOVE if move else 0) | buttons
@@ -31,7 +32,7 @@ static func make_input(dir32: int, move: bool, buttons: int) -> int:
 enum Atk { NONE, WINDUP, ACTIVE, RECOVERY }
 enum Parry { NONE, ACTIVE, RECOVERY }
 enum Shot { NONE, DRAW, RECOVER, RELOAD }
-enum Act { NONE, LIGHT, HEAVY, PARRY, ROLL, SWAP, SHOOT }
+enum Act { NONE, LIGHT, HEAVY, PARRY, ROLL, SWAP, SHOOT, JUMP }
 enum Load { SWORD, BOW }
 
 enum {
@@ -53,9 +54,11 @@ enum {
 	MOUNTED, MSTANCE, MDASH_T,
 	# fase 6: dash montado (embestida), artes de arma, golpes a invocaciones
 	MD_T, MD_HIT, MD_ATK, ART_CD, ART_T, ART_K, ATK_PET,
+	# fase 7: salto (altura µm, velocidad vertical µm/tick, en el aire, ticks en el aire, recuperación al caer)
+	FY, FVY, AIR, AIR_T, LAND_T,
 	# contadores de eventos de fase 4
 	AB_STARTS, AB_HITS, AB_INTR, GRABS, SPELLS, SUMMONS, EK_SPECIALS, EK_HITS, SHIELD_ABSORB, DISMOUNTS,
-	ARTS, PET_HITS, PET_KILLS, MDASH_HITS,
+	ARTS, PET_HITS, PET_KILLS, MDASH_HITS, JUMPS,
 	F_FIELDS
 }
 const P_BASE := 2 * F_FIELDS
@@ -86,6 +89,14 @@ const KNOCK_DECAY := 11111    # µm/tick por tick (40 m/s²)
 const STAMINA_ATK_SLOW_PM := 300
 const MOUNTED_ATK_SLOW_PM := 550
 const MOUNTED_CHARGE_SLOW_PM := 300
+const GRAVITY_T := 5556       # µm/tick² (Fighter.GRAVITY 20 m/s²)
+const JUMP_V := 133333        # µm/tick (Fighter.JUMP_VELOCITY 8 m/s)
+const JUMP_ATK_VY := -33333   # el picado arranca bajando a 2 m/s como mínimo
+const AIR_MIN := 5            # Fighter: _air_t > 0,08 s antes de poder aterrizar
+const LAND_TICKS := 11        # Fighter.LAND_RECOVERY 0,18 s
+const GROUND_H := 350000      # GroundAoE.GROUND_HEIGHT
+const STEER_FLIP := 107       # 150° en rumbos: más allá se frena en línea recta (Fighter._steer_velocity)
+const STEER_MIN := 5000       # 0,3 m/s
 const DASH_STRIKE_MIN := 7 ## Fighter.DASH_STRIKE_MIN_TIME 0,12 s
 const HEAVY_HOLD := 24        # ticks (Fighter.HEAVY_HOLD 0,4 s)
 const BLOCK_HOLD := 0         # el bit de escudo ya es "mantener" (el control táctil decide toque/mantener)
@@ -245,6 +256,8 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		_try(s, P, i, Act.PARRY)
 	if pressed & IN_ROLL:
 		_try(s, P, i, Act.ROLL)
+	if pressed & IN_JUMP:
+		_try(s, P, i, Act.JUMP)
 	if pressed & IN_BOSS_NEXT:
 		SimAbilities.cycle(s, P, i)
 	if pressed & IN_BOSS:
@@ -300,6 +313,7 @@ static func _do(s: PackedInt64Array, P: Array, i: int, a: int, retry: bool) -> b
 		Act.PARRY: return s[o + MOUNTED] == 0 and _parry(s, P, i)
 		Act.SHOOT: return _shoot(s, P, i)
 		Act.SWAP: return _swap(s, P, i)
+		Act.JUMP: return _jump(s, P, i)
 		Act.ROLL:
 			if retry and s[o + ATK_STATE] == Atk.WINDUP:
 				return false
@@ -311,7 +325,7 @@ static func _opp(i: int) -> int:
 	return (1 - i) * F_FIELDS
 
 static func _can_act(s: PackedInt64Array, o: int) -> bool:
-	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0 and s[o + ART_T] <= 0
+	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0 and s[o + ART_T] <= 0 and s[o + LAND_T] <= 0
 
 static func _spend(s: PackedInt64Array, P: Array, i: int, v: int) -> void:
 	var o := i * F_FIELDS
@@ -372,6 +386,35 @@ static func _crit_candidate(s: PackedInt64Array, i: int) -> bool:
 		return false
 	return _in_front(s, b, i * F_FIELDS, 819) # target.facing · d >= 0,2
 
+## Fighter.jump: a pie salto completo; montado (lobo/grifo) un brinco; en el fénix no.
+static func _jump(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * F_FIELDS
+	if not _can_act(s, o) or s[o + EXH] > 0 or s[o + AIR] != 0 or s[o + ROLL_T] >= 0 or s[o + ATK_STATE] != Atk.NONE or s[o + PARRY_STATE] != Parry.NONE or s[o + SWAP_T] > 0 or s[o + BACKSTEP_T] > 0:
+		return false
+	if s[o + ST] <= 0 or s[o + FY] >= 50000:
+		return false
+	var v := JUMP_V
+	if s[o + MOUNTED] != 0:
+		v = P[i].get("m_jump", 0)
+		if v <= 0:
+			return false
+	s[o + BLOCKING] = 0
+	_spend(s, P, i, P[i].get("cost_jump", 12000))
+	s[o + FVY] = v
+	s[o + AIR] = 1
+	s[o + AIR_T] = 0
+	s[o + JUMPS] += 1
+	return true
+
+static func _land(s: PackedInt64Array, o: int) -> void:
+	s[o + AIR] = 0
+	s[o + AIR_T] = 0
+	s[o + FVY] = 0
+	s[o + FY] = 0
+	s[o + LAND_T] = LAND_TICKS
+	if s[o + ATK_IDX] == SimParams.A_JUMP and s[o + ATK_STATE] == Atk.WINDUP:
+		s[o + ATK_T] = s[o + ATK_DUR] # el picado golpea al tocar el suelo
+
 static func _request_attack(s: PackedInt64Array, P: Array, i: int, heavy: bool) -> bool:
 	var o := i * F_FIELDS
 	if s[o + BACKSTEP_T] > 0 and s[o + LOADOUT] == Load.SWORD:
@@ -381,7 +424,7 @@ static func _request_attack(s: PackedInt64Array, P: Array, i: int, heavy: bool) 
 		return false
 	if s[o + LOADOUT] != Load.SWORD or not _can_act(s, o) or s[o + SWAP_T] > 0 or s[o + PARRY_STATE] != Parry.NONE or s[o + ROLL_T] >= 0:
 		return false
-	if s[o + ATK_STATE] == Atk.NONE and s[o + ST] > 0:
+	if s[o + ATK_STATE] == Atk.NONE and s[o + ST] > 0 and s[o + AIR] == 0 and s[o + MOUNTED] == 0:
 		if _crit_candidate(s, i):
 			_start_crit(s, P, i)
 			return true
@@ -398,6 +441,13 @@ static func _request_attack(s: PackedInt64Array, P: Array, i: int, heavy: bool) 
 			s[o + DASH_DIR] = ((s[o + PREV_IN] & IN_DIR_MASK) * 8) & 255
 			_start_attack(s, P, i, SimParams.A_DASH, false)
 			return true
+	if s[o + AIR] != 0 and s[o + MOUNTED] == 0:
+		if s[o + ATK_STATE] != Atk.NONE or s[o + ST] <= 0:
+			return false
+		s[o + COMBO] = P[i]["max_combo"]
+		_start_attack(s, P, i, SimParams.A_JUMP, false)
+		s[o + FVY] = mini(s[o + FVY], JUMP_ATK_VY)
+		return true
 	if s[o + ATK_STATE] != Atk.NONE:
 		var a: Dictionary = _atk(P, i, s)
 		var in_window: bool = s[o + ATK_STATE] != Atk.RECOVERY or a["window"] < 0 or s[o + ATK_IDX] >= 3 or s[o + ATK_T] <= a["window"]
@@ -470,7 +520,7 @@ static func _dash_now(s: PackedInt64Array, P: Array, i: int) -> bool:
 	if s[o + STAGGER_T] > 0 and s[o + STUN] <= s[o + STAGGER_T] and s[o + DOWN_T] <= 0:
 		s[o + STUN] = 0
 		s[o + STAGGER_T] = 0
-	if not _can_act(s, o) or s[o + DASH_CD] > 0 or s[o + ST] <= 0 or s[o + PARRY_STATE] != Parry.NONE or s[o + ROLL_T] >= 0:
+	if not _can_act(s, o) or s[o + DASH_CD] > 0 or s[o + ST] <= 0 or s[o + PARRY_STATE] != Parry.NONE or s[o + ROLL_T] >= 0 or s[o + AIR] != 0:
 		return false
 	if s[o + ATK_STATE] != Atk.NONE and not (s[o + MOUNTED] != 0 and s[o + ATK_STATE] == Atk.WINDUP):
 		if s[o + ATK_STATE] == Atk.RECOVERY and s[o + ATK_T] * 1000 >= s[o + ATK_DUR] * ROLL_CANCEL_PM:
@@ -840,6 +890,7 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		s[o + MD_T] -= 1
 		if s[o + MD_T] <= 0 and s[o + ATK_STATE] != Atk.WINDUP:
 			s[o + MD_ATK] = 0
+	if s[o + LAND_T] > 0: s[o + LAND_T] -= 1
 	if s[o + ART_CD] > 0: s[o + ART_CD] -= 1
 	if s[o + ART_T] > 0: s[o + ART_T] -= 1
 	_update_attack(s, P, i, inp)
@@ -974,7 +1025,8 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> voi
 	if heavy:
 		force = force * (1000 + 500 * s[o + CHARGE_T] / CHARGE_MAX) / 1000
 	var raw := _strike_raw(s, P, i, a)
-	var res := _take_hit(s, P, i, 0, raw, a["sub"], force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], a["block_cost"])
+	var bc: int = a.get("block_cost_m", a["block_cost"]) if s[o + MOUNTED] != 0 else a["block_cost"]
+	var res := _take_hit(s, P, i, 0, raw, a["sub"], force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], bc)
 	if res == 1 or res == 2 or res == 3:
 		s[o + ATK_LANDED] = 1
 	if res == 1:
@@ -1148,7 +1200,7 @@ static func spawn_proj(s: PackedInt64Array, owner: int, kind: int, ox: int, oz: 
 	if aim and s[b + ALIVE] != 0:
 		var tx: int = s[b + X] - ox
 		var tz: int = s[b + Z] - oz
-		var ty: int = HIT_CENTER_Y - y0
+		var ty: int = HIT_CENTER_Y + s[b + FY] - y0
 		var hl := FxMath.length(tx, tz)
 		if hl > 0 or ty != 0:
 			head = FxMath.dir_of(tx, tz, face) * 1000
@@ -1194,7 +1246,7 @@ static func _proj_home(s: PackedInt64Array, q: int) -> void:
 		return
 	var wx: int = s[b + X] - s[q + PR_X]
 	var wz: int = s[b + Z] - s[q + PR_Z]
-	var wy: int = HIT_CENTER_Y - s[q + PR_Y]
+	var wy: int = HIT_CENTER_Y + s[b + FY] - s[q + PR_Y]
 	if wx * wx + wz * wz + wy * wy <= 200000 * 200000:
 		return
 	if wx * s[q + PR_VX] + wz * s[q + PR_VZ] + wy * s[q + PR_VY] < 0:
@@ -1239,7 +1291,7 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 			continue
 		var ex: int = s[q + PR_X] - s[b + X]
 		var ez: int = s[q + PR_Z] - s[b + Z]
-		var ey: int = s[q + PR_Y] - HIT_CENTER_Y
+		var ey: int = s[q + PR_Y] - HIT_CENTER_Y - s[b + FY]
 		var r: int = s[q + PR_R] + P[1 - owner]["hit_radius"]
 		if ex * ex + ez * ez + ey * ey < r * r:
 			var res: int
@@ -1292,7 +1344,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var tvx := 0
 	var tvz := 0
 	var locked := (inp & IN_LOCK) != 0 and s[b + ALIVE] != 0
-	var turning_locked: bool = s[o + ATK_STATE] == Atk.ACTIVE or s[o + ATK_STATE] == Atk.RECOVERY
+	var turning_locked: bool = s[o + ATK_STATE] == Atk.ACTIVE or s[o + ATK_STATE] == Atk.RECOVERY or (s[o + AIR] != 0 and s[o + MOUNTED] == 0)
 	var turn: int = 0 if turning_locked else p["turn"]
 	var sprint_req: bool = (inp & IN_SPRINT) != 0 and amount_pm > 300 and s[o + EXH] <= 0 and not wb and s[o + ST] > 0 and s[o + SHOT_STATE] == Shot.NONE
 	var spd: int = p["speed"]
@@ -1320,7 +1372,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		tvz = FxMath.SIN[s[o + FACE]] * v2 / FxMath.ONE
 	# carrera (rampa lineal en lugar de la suavizado exponencial)
 	var sp_pm: int = s[o + SPRINT_PM]
-	sp_pm = mini(sp_pm + 120, 1000) if sprint_req else maxi(sp_pm - 60, 0)
+	sp_pm = mini(sp_pm + p.get("sprint_up", 278), 1000) if sprint_req else maxi(sp_pm - p.get("sprint_down", 208), 0)
 	s[o + SPRINT_PM] = sp_pm
 	var mul: int = 1000 + (p["sprint_pm"] - 1000) * sp_pm / 1000
 	if sprint_req:
@@ -1330,6 +1382,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if s[o + ATK_STATE] != Atk.NONE: mul = mul * (MOUNTED_ATK_SLOW_PM if s[o + MOUNTED] != 0 else STAMINA_ATK_SLOW_PM) / 1000
 	if s[o + MOUNTED] != 0 and s[o + ATK_IDX] == SimParams.A_HEAVY and s[o + CHARGE_T] > 0 and (inp & IN_ATK):
 		mul = mul * MOUNTED_CHARGE_SLOW_PM / 1000
+	if s[o + LAND_T] > 0: mul = mul * 400 / 1000
 	if s[o + SHOT_STATE] == Shot.DRAW:
 		mul = 0
 		s[o + VX] = 0
@@ -1346,23 +1399,38 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		if wb: rg = rg * BLOCK_REGEN_PM / 1000
 		if s[o + FROST_T] > 0: rg = rg * FROST_REGEN_PM / 1000
 		s[o + ST] = mini(s[o + ST] + rg, p["st_max"])
-	# aceleración (move_toward)
-	if s[o + ROLL_T] < 0:
+	# aceleración: a pie, la velocidad GIRA hacia la deseada (Fighter._steer_velocity) y ajusta su
+	# módulo; con giros de más de 150° o casi parado frena en línea recta (move_toward). En el aire no hay control.
+	if s[o + ROLL_T] < 0 and s[o + AIR] == 0:
 		var acc: int = p["acc"]
 		var cur := FxMath.length(s[o + VX], s[o + VZ])
-		if FxMath.length(tvx, tvz) < cur - 1666:
+		var tl := FxMath.length(tvx, tvz)
+		if tl < cur - 1666:
 			acc = p["brake"]
 		elif sp_pm > 0:
 			acc = p["acc_sprint"]
-		var dvx: int = tvx - s[o + VX]
-		var dvz: int = tvz - s[o + VZ]
-		var dl := FxMath.length(dvx, dvz)
-		if dl <= acc:
-			s[o + VX] = tvx
-			s[o + VZ] = tvz
+		var steer: int = p.get("steer", 0) if s[o + MOUNTED] == 0 else 0
+		var hc := FxMath.dir_of(s[o + VX], s[o + VZ], 0)
+		var ht := FxMath.dir_of(tvx, tvz, hc)
+		if steer > 0 and cur >= STEER_MIN and tl >= STEER_MIN and absi(FxMath.ddiff(hc, ht)) <= STEER_FLIP:
+			var nl: int = mini(cur + acc, tl) if tl > cur else maxi(cur - acc, tl)
+			if absi(FxMath.ddiff(hc, ht)) <= steer:
+				s[o + VX] = tvx * nl / tl
+				s[o + VZ] = tvz * nl / tl
+			else:
+				var h := FxMath.turn_toward(hc, ht, steer)
+				s[o + VX] = FxMath.COS[h] * nl / FxMath.ONE
+				s[o + VZ] = FxMath.SIN[h] * nl / FxMath.ONE
 		else:
-			s[o + VX] += dvx * acc / dl
-			s[o + VZ] += dvz * acc / dl
+			var dvx: int = tvx - s[o + VX]
+			var dvz: int = tvz - s[o + VZ]
+			var dl := FxMath.length(dvx, dvz)
+			if dl <= acc:
+				s[o + VX] = tvx
+				s[o + VZ] = tvz
+			else:
+				s[o + VX] += dvx * acc / dl
+				s[o + VZ] += dvz * acc / dl
 	var vx: int = s[o + VX]
 	var vz: int = s[o + VZ]
 	var a_idx: int = s[o + ATK_IDX]
@@ -1434,6 +1502,15 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 			vz += FxMath.SIN[pf] * push / FxMath.ONE
 	s[o + X] += vx
 	s[o + Z] += vz
+	# salto: gravedad (×1,8 durante el picado), suelo en y = 0 y aterrizaje
+	if s[o + AIR] != 0:
+		if s[o + AIR_T] > 0:
+			var jatk: bool = s[o + ATK_IDX] == SimParams.A_JUMP and s[o + ATK_STATE] != Atk.NONE
+			s[o + FVY] -= GRAVITY_T * 18 / 10 if jatk else GRAVITY_T
+		s[o + FY] = maxi(s[o + FY] + s[o + FVY], 0)
+		s[o + AIR_T] += 1
+		if s[o + AIR_T] >= AIR_MIN and s[o + FY] < 20000 and s[o + FVY] <= 0:
+			_land(s, o)
 	var r := FxMath.length(s[o + X], s[o + Z])
 	var lim := ARENA_R - 450000
 	if r > lim:

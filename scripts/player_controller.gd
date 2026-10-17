@@ -65,7 +65,7 @@ func _update_target(cycle: bool) -> void:
 
 const STICK_DEADZONE := 0.18
 const STICK_CURVE := 1.5 ## >1: más precisión cerca del centro
-const INPUT_SMOOTH := 0.08 ## s para completar un cambio de dirección de 90°
+const INPUT_SMOOTH := 0.03 ## s para completar un cambio de dirección de 90° (fase 7: antes 0,08)
 var _smooth: Vector2 = Vector2.ZERO
 
 ## Zona muerta radial (no por eje) y curva de respuesta: conserva la dirección exacta del stick.
@@ -146,6 +146,7 @@ func _physics_process(delta: float) -> void:
 	var v := shape_stick(cmd.move_vector)
 	if joystick:
 		v = (v + shape_stick(joystick.axis)).limit_length(1.0)
+	var v_raw := v
 	_smooth = smooth_input(_smooth, v, delta)
 	v = _smooth
 	var fwd := Vector3.FORWARD
@@ -156,6 +157,7 @@ func _physics_process(delta: float) -> void:
 		fwd = MeshUtil.flat(-camera.global_transform.basis.z).normalized()
 	var right := fwd.cross(Vector3.UP)
 	me.move_input = (right * v.x + fwd * -v.y) if enabled else Vector3.ZERO
+	var move_raw := (right * v_raw.x + fwd * -v_raw.y) if enabled else Vector3.ZERO
 	me.want_block = enabled and me.want_block
 	
 	if _pressed_edge("run_toggle") and not me.mounted:
@@ -181,6 +183,10 @@ func _physics_process(delta: float) -> void:
 	var bv := _pressed_edge("boss_variation")
 	var bn := _pressed_edge("boss_next")
 	
+	# Fase 7: voltereta y ataques toman la dirección del stick SIN suavizar (giro instantáneo al pulsar)
+	if (ds or atk_edge or jp) and move_raw.length() > 0.05:
+		me.move_input = move_raw
+		_smooth = v_raw
 	_update_buffer_hit()
 	if not enabled:
 		_clear_buffer()

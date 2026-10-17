@@ -107,6 +107,9 @@ static func bake(f: Fighter, p: Dictionary) -> void:
 		p["m_dash_t"] = tk_down(m.dash_duration)
 		p["m_dash_if"] = tk_down(m.dash_iframes)
 		p["m_dash_cd"] = tk_down(m.dash_cooldown)
+		p["m_jump"] = 0 if m.hover > 0.0 else SimParams.um(m.jump_velocity * Fighter.MOUNT_HOP_MULT / 60.0)
+		ek["move_m"] = SimParams.um(ed.move_speed * 0.7 / 60.0) # Mount._companion_step
+		ek["cd_m0"] = tk_down(0.8) # Mount.attack_cd inicial
 	# invocación golpeable (Eikon.take_hit / Mount.take_hit sin jinete): radio y altura
 	ek["hr"] = SimParams.um(1.2 if ed.rideable else 0.9 * ed.size)
 	ek["fly"] = 1 if (ed.flying and not ed.rideable) else 0
@@ -125,6 +128,8 @@ static func cycle_spell(s: PackedInt64Array, P: Array, i: int) -> void:
 
 static func cast(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var o := i * FightSim.F_FIELDS
+	if s[o + FightSim.AIR] != 0:
+		return false
 	var sp: Array = P[i].get("spells", [])
 	var k: int = s[o + FightSim.SP_SEL]
 	if k >= sp.size() or (sp[k] as Dictionary).is_empty():
@@ -199,7 +204,7 @@ static func eikon_button(s: PackedInt64Array, P: Array, i: int) -> bool:
 	if s[o + FightSim.METER] < FightSim.METER_MAX or s[o + FightSim.STUN] > 0:
 		return false
 	if int(ek["ride"]) != 0:
-		if s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.SWAP_T] > 0:
+		if s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.SWAP_T] > 0 or s[o + FightSim.AIR] != 0:
 			return false
 		s[o + FightSim.MOUNTED] = 1
 		s[o + FightSim.MSTANCE] = MOUNT_STANCE
@@ -212,7 +217,7 @@ static func eikon_button(s: PackedInt64Array, P: Array, i: int) -> bool:
 		s[o + FightSim.EK_Z] = s[o + FightSim.Z] + FxMath.SIN[side] * 3000000 / FxMath.ONE
 	s[o + FightSim.EK_T] = ek["life"]
 	s[o + FightSim.EK_HP] = ek["hp"]
-	s[o + FightSim.EK_CD] = ek["cd0"]
+	s[o + FightSim.EK_CD] = ek.get("cd_m0", ek["cd0"]) if int(ek["ride"]) != 0 else ek["cd0"]
 	s[o + FightSim.EK_SPC] = 0
 	s[o + FightSim.METER] = 0
 	s[o + FightSim.SUMMONS] += 1
@@ -325,8 +330,7 @@ static func _eikon(s: PackedInt64Array, P: Array, i: int) -> void:
 		s[o + FightSim.EK_X] = s[o + FightSim.X]
 		s[o + FightSim.EK_Z] = s[o + FightSim.Z]
 		return
-	if int(ek["ride"]) != 0:
-		return # montura sin jinete: espera a su dueño (no ataca online)
+	var ride := int(ek["ride"]) != 0 # montura sin jinete: ataca como compañera (Mount._companion_step)
 	var b := FightSim._opp(i)
 	if s[o + FightSim.EK_CD] > 0:
 		s[o + FightSim.EK_CD] -= 1
@@ -335,12 +339,16 @@ static func _eikon(s: PackedInt64Array, P: Array, i: int) -> void:
 	var dx: int = s[b + FightSim.X] - s[o + FightSim.EK_X]
 	var dz: int = s[b + FightSim.Z] - s[o + FightSim.EK_Z]
 	var l := FxMath.length(dx, dz)
+	var mv: int = ek.get("move_m", ek["move"]) if ride else ek["move"]
 	if l > int(ek["range_in"]) and l > 0:
-		s[o + FightSim.EK_X] += dx * int(ek["move"]) / l
-		s[o + FightSim.EK_Z] += dz * int(ek["move"]) / l
+		s[o + FightSim.EK_X] += dx * mv / l
+		s[o + FightSim.EK_Z] += dz * mv / l
 	if l <= int(ek["range"]) and s[o + FightSim.EK_CD] <= 0:
 		s[o + FightSim.EK_CD] = ek["cd"]
-		match int(ek["kind"]):
+		var kind: int = int(ek["kind"])
+		if ride and kind != 1:
+			kind = 0 # la montura solo muerde (cuerpo a cuerpo) o dispara
+		match kind:
 			0:
 				if FightSim._take_hit(s, P, i, 4, ek["dmg"], 0, -1, 2000, 1000, 0) == 1:
 					s[o + FightSim.EK_HITS] += 1
@@ -355,7 +363,7 @@ static func _eikon(s: PackedInt64Array, P: Array, i: int) -> void:
 static func art(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var o := i * FightSim.F_FIELDS
 	var a: Dictionary = P[i].get("art", {})
-	if a.is_empty() or s[o + FightSim.MOUNTED] != 0 or not FightSim._can_act(s, o) or s[o + FightSim.EXH] > 0 or s[o + FightSim.BACKSTEP_T] > 0:
+	if a.is_empty() or s[o + FightSim.MOUNTED] != 0 or s[o + FightSim.AIR] != 0 or not FightSim._can_act(s, o) or s[o + FightSim.EXH] > 0 or s[o + FightSim.BACKSTEP_T] > 0:
 		return false
 	if s[o + FightSim.ART_CD] > 0 or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
 		return false

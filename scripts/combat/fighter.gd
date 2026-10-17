@@ -176,12 +176,15 @@ const POISE_REGEN := 25.0
 const SWAP_TIME := 0.42
 ## Correr a pie fijado: hacia atrás se corre algo más lento que de frente (estilo souls).
 const RUN_BACK_FACTOR := 0.8
-## A pie: aceleración ágil, impulso de carrera gradual y frenada corta para controles táctiles.
-const FOOT_MOVE_ACCEL := 36.0
-const FOOT_SPRINT_ACCEL := 30.0
-const FOOT_BRAKE_ACCEL := 46.0
-const SPRINT_RESPONSE_UP := 0.14
-const SPRINT_RESPONSE_DOWN := 0.28
+## Fase 7 (sensación de acción): a pie se alcanza la velocidad de andar en ~0,09 s y se frena en
+## ~0,07 s (corriendo ~0,11 s, ≤0,75 m de inercia). La carrera entra/sale en rampa lineal corta.
+## Ver docs/design.md («Movimiento»). La sim online usa los mismos valores (SimParams).
+const FOOT_MOVE_ACCEL := 90.0
+const FOOT_SPRINT_ACCEL := 75.0
+const FOOT_BRAKE_ACCEL := 120.0
+const SPRINT_RAMP_UP := 0.06 ## s de andar a correr (rampa lineal)
+const SPRINT_RAMP_DOWN := 0.08 ## s de correr a andar
+const STEER_TURN_MULT := 2.0 ## la velocidad gira a TURN_RATE_DEG × esto (sin derrapes en giros)
 ## Ronda 16: corriendo fijado, por encima de este ángulo entre la entrada y la dirección al
 ## rival se deja de hacer strafe y se corre de cara hacia donde se va (atrás = hacia la cámara).
 const RUN_TURN_DEG := 110.0
@@ -1010,11 +1013,7 @@ func _physics_process(delta: float) -> void:
 			target_vel = facing * st.speed * speed_mult() * amount
 	# Galope (montado, igual que antes) / correr a pie (también de espaldas si va fijado)
 	sprinting = run_req and (not reversing or (not mounted and _lock_valid()) or run_away)
-	var sprint_response_time: float = SPRINT_RESPONSE_UP if sprinting else SPRINT_RESPONSE_DOWN
-	var sprint_response := 1.0 - exp(-delta / sprint_response_time)
-	_sprint_blend = lerpf(_sprint_blend, 1.0 if sprinting else 0.0, sprint_response)
-	if not sprinting and _sprint_blend < 0.001:
-		_sprint_blend = 0.0
+	_sprint_blend = move_toward(_sprint_blend, 1.0 if sprinting else 0.0, delta / (SPRINT_RAMP_UP if sprinting else SPRINT_RAMP_DOWN))
 	if _sprint_blend > 0.0:
 		target_vel *= lerpf(1.0, st.sprint_multiplier, _sprint_blend)
 	if sprinting:
@@ -1056,7 +1055,7 @@ func _physics_process(delta: float) -> void:
 				move_accel = FOOT_SPRINT_ACCEL
 			else:
 				move_accel = FOOT_MOVE_ACCEL
-		planar_vel = _steer_velocity(planar_vel, target_vel, move_accel * delta, deg_to_rad(TURN_RATE_DEG) * 1.15 * delta) if fluid and not mounted else planar_vel.move_toward(target_vel, st.acceleration * delta)
+		planar_vel = _steer_velocity(planar_vel, target_vel, move_accel * delta, deg_to_rad(TURN_RATE_DEG) * STEER_TURN_MULT * delta) if fluid and not mounted else planar_vel.move_toward(target_vel, st.acceleration * delta)
 	var v := planar_vel
 	if atk_dash and not mounted and (atk_state == Atk.WINDUP or atk_state == Atk.ACTIVE):
 		v = _lunge_velocity()
@@ -2408,7 +2407,7 @@ func turning_locked() -> bool:
 
 
 # ---------------- Ronda 30: movimiento fluido ----------------
-const TURN_RATE_DEG := 800.0 ## giro a pie (°/s)
+const TURN_RATE_DEG := 1080.0 ## giro a pie (°/s); fase 7: antes 800
 const LEAN_K := 0.012 ## rad de inclinación por rad/s de giro
 const LEAN_MAX := 0.14
 var lean: float = 0.0

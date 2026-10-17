@@ -11,6 +11,7 @@ const HZ := 60.0
 ## Índices de ataque: 0..2 golpes del combo ligero, 3 fuerte, 4 estocada (dash/voltereta/carrera).
 const A_HEAVY := 3
 const A_DASH := 4
+const A_JUMP := 5 ## fase 7: picado desde el salto
 ## Subtipos físicos para la tabla de defensa: 0 = sin subtipo (flechas), 1..4 = PhysTypes.
 const SUBS := ["", "estandar", "cortante", "contundente", "perforante"]
 const DEF_TAB_MAX := 400 ## daño bruto máximo tabulado (por unidad)
@@ -59,6 +60,10 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	p["acc_sprint"] = um(Fighter.FOOT_SPRINT_ACCEL / HZ / HZ)
 	p["brake"] = um(Fighter.FOOT_BRAKE_ACCEL / HZ / HZ)
 	p["turn"] = maxi(int(round(Fighter.TURN_RATE_DEG / HZ * 256.0 / 360.0)), 1)
+	p["steer"] = maxi(int(round(Fighter.TURN_RATE_DEG * Fighter.STEER_TURN_MULT / HZ * 256.0 / 360.0)), 1)
+	p["sprint_up"] = maxi(int(round(1000.0 / (Fighter.SPRINT_RAMP_UP * HZ))), 1)
+	p["sprint_down"] = maxi(int(round(1000.0 / (Fighter.SPRINT_RAMP_DOWN * HZ))), 1)
+	p["cost_jump"] = milli(Fighter.COST_JUMP * st_k)
 	var rm := f.roll_mod()
 	p["regen"] = milli(Fighter.REGEN * float(rm["regen"]) / HZ)
 	p["regen_idle"] = milli(Fighter.REGEN_IDLE * float(rm["regen"]) / HZ)
@@ -102,6 +107,7 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 		atks.append(_bake_attack(f, o, i, st_k, sp))
 	atks.append(_bake_attack(f, o, A_HEAVY, st_k, sp))
 	atks.append(_bake_attack(f, o, A_DASH, st_k, sp))
+	atks.append(_bake_attack(f, o, A_JUMP, st_k, sp))
 	p["atk"] = atks
 	p["gc_pm"] = pm(Fighter.GC_WINDUP_MULT)
 	p["crit_raw"] = milli(w.heavy_damage * _dmg_mult(f) * Fighter.CRIT_MULT)
@@ -199,7 +205,12 @@ static func _bake_attack(f: Fighter, o: Fighter, idx: int, st_k: float, sp: floa
 	var step := w.step_heavy
 	var window := -1.0
 	var lunge := 0.0
-	if idx == A_DASH:
+	if idx == A_JUMP:
+		d = Fighter.JUMP_ATTACK.duplicate()
+		hitstun = 0.45
+		resist = StunRules.DASH_JUMP_RESIST
+		step = 0.0
+	elif idx == A_DASH:
 		d = Fighter.DASH_STRIKE.duplicate()
 		hitstun = 0.45
 		resist = StunRules.DASH_JUMP_RESIST
@@ -242,14 +253,20 @@ static func _bake_attack(f: Fighter, o: Fighter, idx: int, st_k: float, sp: floa
 		"pd_pm": pm(2.0 * pmult * float(f.ad["impacto"])),
 		"counter_pm": pm(float(PhysTypes.COUNTER_DMG.get(sub, 1.15))),
 		"block_cost": milli(o.blocked_hit_cost(raw, f) * float(o.tfx["stamina_cost"])),
+		# montado: el coste de bloqueo sale del daño con el multiplicador de la montura (umbral de golpe fuerte)
+		"block_cost_m": milli(o.blocked_hit_cost(raw * w.mounted_damage_mult, f) * float(o.tfx["stamina_cost"])),
 		"heavy_hit": 1 if raw >= Fighter.HEAVY_HIT else 0,
 	}
 
 ## Parámetros por defecto sin árbol de escena (pruebas puras de rollback): dos luchadores neutros.
 static func defaults() -> Array:
 	var p := {
-		"hp": 100000, "st_max": 100000, "speed": 138333, "sprint_pm": 1600, "acc": 10000, "acc_sprint": 8333, "brake": 12778,
-		"turn": 9, "regen": 300, "regen_idle": 533, "regen_delay": 36, "exhaust": 90, "drain_block": 50, "drain_sprint": 333,
+		"hp": 100000, "st_max": 100000, "speed": 138333, "sprint_pm": 1600,
+		"acc": um(Fighter.FOOT_MOVE_ACCEL / HZ / HZ), "acc_sprint": um(Fighter.FOOT_SPRINT_ACCEL / HZ / HZ), "brake": um(Fighter.FOOT_BRAKE_ACCEL / HZ / HZ),
+		"turn": maxi(int(round(Fighter.TURN_RATE_DEG / HZ * 256.0 / 360.0)), 1),
+		"steer": maxi(int(round(Fighter.TURN_RATE_DEG * Fighter.STEER_TURN_MULT / HZ * 256.0 / 360.0)), 1),
+		"sprint_up": maxi(int(round(1000.0 / (Fighter.SPRINT_RAMP_UP * HZ))), 1), "sprint_down": maxi(int(round(1000.0 / (Fighter.SPRINT_RAMP_DOWN * HZ))), 1),
+		"cost_jump": 12000, "regen": 300, "regen_idle": 533, "regen_delay": 36, "exhaust": 90, "drain_block": 50, "drain_sprint": 333,
 		"cost_roll": 20000, "cost_backstep": 6000, "cost_parry": 15000, "cost_bow": 6000, "dash_cd": 48,
 		"roll_start": 4, "roll_if_end": 28, "roll_total": 48, "roll_fast": 28, "roll_dist": 4500000, "roll_drift": 400000,
 		"roll_buffer": 11, "backstep_t": 21, "backstep_v": 95238, "parry_window": 18, "parry_recovery": 48, "parry_stagger": 96,
@@ -271,6 +288,9 @@ static func defaults() -> Array:
 		"counter_pm": 1150, "block_cost": 44000, "heavy_hit": 1})
 	atks.append({"windup": 10, "active": 9, "recovery": 30, "whiff": 15, "stamina": 10000, "reach": 2200000, "cos_arc": 1401,
 		"window": -1, "step": 0, "lunge": 200000, "raw": 15000, "sub": 1, "force": 32000, "resist_pm": 500, "pd_pm": 2000,
+		"counter_pm": 1150, "block_cost": 44000, "heavy_hit": 1})
+	atks.append({"windup": 13, "active": 7, "recovery": 27, "whiff": 12, "stamina": 14000, "reach": 2200000, "cos_arc": 1401,
+		"window": -1, "step": 0, "lunge": 0, "raw": 16000, "sub": 1, "force": 32000, "resist_pm": 500, "pd_pm": 2000,
 		"counter_pm": 1150, "block_cost": 44000, "heavy_hit": 1})
 	p["atk"] = atks
 	return [p, p.duplicate(true)]

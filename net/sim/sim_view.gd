@@ -47,7 +47,7 @@ func _smooth(i: int, s: PackedInt64Array, corrected: bool) -> void:
 
 func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	var hz := 60.0
-	f.global_position = Vector3(s[o + S.X] / 1000000.0, f.global_position.y, s[o + S.Z] / 1000000.0)
+	f.global_position = Vector3(s[o + S.X] / 1000000.0, s[o + S.FY] / 1000000.0, s[o + S.Z] / 1000000.0)
 	f.facing = Vector3(FxMath.COS[s[o + S.FACE]] / 4096.0, 0.0, FxMath.SIN[s[o + S.FACE]] / 4096.0)
 	f.planar_vel = Vector3(s[o + S.VX] / 1000000.0 * hz, 0.0, s[o + S.VZ] / 1000000.0 * hz)
 	f.velocity = f.planar_vel
@@ -72,6 +72,10 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.atk_dur = s[o + S.ATK_DUR] / hz
 	f.atk_heavy = s[o + S.ATK_IDX] == SimParams.A_HEAVY
 	f.atk_dash = s[o + S.ATK_IDX] == SimParams.A_DASH
+	f.atk_jump = s[o + S.ATK_IDX] == SimParams.A_JUMP and s[o + S.ATK_STATE] != S.Atk.NONE
+	f.airborne = s[o + S.AIR] != 0
+	f.land_t = s[o + S.LAND_T] / hz
+	f.velocity.y = s[o + S.FVY] / 1000000.0 * hz
 	f.combo = s[o + S.COMBO]
 	f.cur_hit = f.combo_hit_for(f.combo) if f.atk_state != Fighter.Atk.NONE and s[o + S.ATK_IDX] < 3 else null
 	f.charge_t = s[o + S.CHARGE_T] / hz

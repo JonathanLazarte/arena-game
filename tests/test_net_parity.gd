@@ -87,6 +87,19 @@ func _run() -> void:
 		["montado (lobo): dash + ligero ligado", 6.0, 140, [[2, 0, "summon", 0], [30, 0, "light", 0], [32, 0, "roll", 0]], {"eikon": ["lobo", ""], "meter": [100.0, 0.0]}],
 		["montura sin jinete golpeada", 2.2, 200, [[2, 1, "summon", 0], [20, 1, "mount", 0], [40, 0, "light", 0], [80, 0, "light", 0], [120, 0, "light", 0]], {"eikon": ["", "lobo"], "meter": [0.0, 100.0], "sim_only": true}],
 		["golem compañero golpeado", 2.0, 160, [[2, 1, "summon", 0], [10, 0, "light", 0], [50, 0, "light", 0], [90, 0, "light", 0]], {"eikon": ["", "golem"], "meter": [0.0, 100.0]}],
+		# ---- Fase 7: salto y movimiento ágil ----
+		["salto en el sitio", 4.0, 90, [[2, 0, "jump", 0]]],
+		["salto andando", 6.0, 90, [[0, 0, "move_on", 0], [10, 0, "jump", 0], [80, 0, "move_off", 0]]],
+		["picado (ataque en salto)", 2.0, 120, [[2, 0, "jump", 0], [14, 0, "light", 0]]],
+		["salto montado (lobo)", 6.0, 160, [[2, 0, "summon", 0], [30, 0, "jump", 0]], {"eikon": ["lobo", ""], "meter": [100.0, 0.0]}],
+		["salto esquiva onda rastrera", 6.0, 200, [[2, 1, "boss", 0], [80, 0, "jump", 0]], {"boss": [[], ["onda_rastrera"]]}],
+		["onda rastrera sin saltar (control)", 6.0, 200, [[2, 1, "boss", 0]], {"boss": [[], ["onda_rastrera"]]}],
+		["arranque y frenada", 9.0, 60, [[0, 0, "move_on", 0], [20, 0, "move_off", 0]]],
+		["carrera: arranque y frenada", 12.0, 80, [[0, 0, "move_on", 0], [0, 0, "sprint_on", 0], [30, 0, "move_off", 0], [30, 0, "sprint_off", 0]]],
+		["carrera con giro de 90°", 9.0, 90, [[0, 0, "move_on", 8], [0, 0, "sprint_on", 0], [25, 0, "move_on", 0], [60, 0, "move_off", 0], [60, 0, "sprint_off", 0]]],
+		["giro brusco de 180°", 9.0, 70, [[0, 0, "move_on", 0], [20, 0, "move_on", 16], [45, 0, "move_off", 0]]],
+		["montura sin jinete ataca", 2.4, 240, [[2, 1, "summon", 0], [20, 1, "mount", 0]], {"eikon": ["", "lobo"], "meter": [0.0, 100.0]}],
+		["montado: bloqueo con coste de montura", 2.6, 140, [[0, 1, "block_on", 0], [2, 0, "summon", 0], [30, 0, "heavy", 0]], {"eikon": ["lobo", ""], "meter": [100.0, 0.0]}],
 		["talismán: parry devuelve aguante", 1.8, 60, [[2, 0, "light", 0], [20, 1, "parry", 0]], {"trinkets": [[], ["eco_templado"]]}],
 	]
 	var all_params_ok := true
@@ -108,6 +121,9 @@ func _run() -> void:
 			check(absf(float(r[k]) - float(sim[k])) <= 0.05 + 0.01 * float(r[k]), "%s: %s offline %.2f vs sim %.2f" % [name, k, r[k], sim[k]])
 		for k in ["lvl0", "lvl1", "parries", "dodges", "guard_breaks", "hits0", "hits1", "stance_breaks", "crits", "procs0", "procs1"]:
 			check(int(r[k]) == int(sim[k]), "%s: %s offline %d vs sim %d" % [name, k, r[k], sim[k]])
+		check(absf(float(r["st1"]) - float(sim["st1"])) <= 1.0, "%s: aguante final del rival offline %.1f vs sim %.1f" % [name, r["st1"], sim["st1"]])
+		check(absf(float(r["dist"]) - float(sim["dist"])) <= 0.25, "%s: distancia final offline %.2f vs sim %.2f m (±0,25)" % [name, r["dist"], sim["dist"]])
+		check(absi(int(r["air0"]) - int(sim["air0"])) <= 2 and absf(float(r["ymax0"]) - float(sim["ymax0"])) <= 0.1, "%s: en el aire offline %d ticks / %.2f m vs sim %d / %.2f m" % [name, r["air0"], r["ymax0"], sim["air0"], sim["ymax0"]])
 		for k in ["first_hit", "stun0", "stun1"]:
 			var tol := 1 if k == "first_hit" else 2
 			if absi(int(r[k]) - int(sim[k])) > tol:
@@ -143,7 +159,7 @@ func _spam(n: int, every: int) -> Array:
 	return out
 
 func _empty_result() -> Dictionary:
-	return {"pet1": 0.0, "dmg0": 0.0, "dmg1": 0.0, "lvl0": 0, "lvl1": 0, "parries": 0, "dodges": 0, "guard_breaks": 0, "hits0": 0, "hits1": 0,
+	return {"air0": 0, "ymax0": 0.0, "dist": 0.0, "pet1": 0.0, "dmg0": 0.0, "dmg1": 0.0, "lvl0": 0, "lvl1": 0, "parries": 0, "dodges": 0, "guard_breaks": 0, "hits0": 0, "hits1": 0,
 		"first_hit": -1, "stun0": 0, "stun1": 0, "stance_breaks": 0, "crits": 0, "procs0": 0, "procs1": 0, "log": []}
 
 func _dir_off(d32: int) -> Vector3:
@@ -232,6 +248,7 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 				"art": f.special()
 				"summon": f.summon()
 				"mount": f.toggle_mount()
+				"jump": f.jump()
 				"move_on": holds[int(e[1])]["move"] = int(e[3])
 				"move_off": holds[int(e[1])].erase("move")
 				"sprint_on": f.want_sprint = true
@@ -258,6 +275,8 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 				if c is Projectile: print("O %d off=%.1f p(%.2f,%.2f,%.2f) t(%.2f,%.2f)" % [t, rad_to_deg(Vector2(c.direction.x, c.direction.z).angle_to(Vector2(fs[1].global_position.x - c.global_position.x, fs[1].global_position.z - c.global_position.z))), c.global_position.x, c.global_position.y, c.global_position.z, fs[1].global_position.x, fs[1].global_position.z])
 		if pe:
 			r["pet1"] += maxf(ph - (float(pe.get("health")) if is_instance_valid(pe) and bool(pe.get("alive")) else 0.0), 0.0) if (not is_instance_valid(pe) or bool(pe.get("alive")) or float(pe.get("health")) <= 0.0) else 0.0
+		if fs[0].airborne: r["air0"] += 1
+		r["ymax0"] = maxf(r["ymax0"], fs[0].global_position.y)
 		for i in 2:
 			fs[i].move_input = Vector3.ZERO
 			if fs[i].stun > 0.0:
@@ -270,6 +289,8 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 			r["first_hit"] = t
 	r["dmg1"] = float(hp0[1]) - fs[1].health
 	r["dmg0"] = float(hp0[0]) - fs[0].health
+	r["dist"] = MeshUtil.flat(fs[1].global_position - fs[0].global_position).length()
+	r["st1"] = fs[1].stamina
 	r["lvl0"] = fs[0].staggers * 1 + fs[0].stuns * 10 + fs[0].knockdowns * 100
 	r["lvl1"] = fs[1].staggers * 1 + fs[1].stuns * 10 + fs[1].knockdowns * 100
 	r["parries"] = fs[0].parries_landed + fs[1].parries_landed
@@ -330,6 +351,7 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 			"art": ins[i][t] |= S.IN_ART
 			"summon": ins[i][t] |= S.IN_EIKON
 			"mount": ins[i][t] |= S.IN_MOUNT
+			"jump": ins[i][t] |= S.IN_JUMP
 			"move_on":
 				var md: int = (int(e[3]) + (16 if i == 1 else 0)) & 31
 				for k in range(t, n): ins[i][k] = (ins[i][k] & ~S.IN_DIR_MASK) | S.IN_MOVE | md
@@ -363,6 +385,8 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 			r["log"].append("%d:%.1f" % [t, (h1 - s[F + S.HP]) / 1000.0])
 		if r["first_hit"] < 0 and s[F + S.HP] < h1:
 			r["first_hit"] = t
+		if s[S.AIR] != 0: r["air0"] += 1
+		r["ymax0"] = maxf(r["ymax0"], s[S.FY] / 1000000.0)
 	r["dmg0"] = float(hp_start[0]) - s[S.HP] / 1000.0
 	r["dmg1"] = float(hp_start[1]) - s[F + S.HP] / 1000.0
 	r["crits"] = s[S.CRITS] + s[F + S.CRITS]
@@ -376,4 +400,6 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 	r["hits0"] = s[S.HITS]
 	r["hits1"] = s[F + S.HITS]
 	r["stance_breaks"] = s[S.STANCE_BREAKS] + s[F + S.STANCE_BREAKS]
+	r["dist"] = FxMath.length(s[F + S.X] - s[S.X], s[F + S.Z] - s[S.Z]) / 1000000.0
+	r["st1"] = s[F + S.ST] / 1000.0
 	return r

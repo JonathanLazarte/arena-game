@@ -353,7 +353,7 @@ static func spawn_hz(s: PackedInt64Array, owner: int, typ: int, x: int, z: int, 
 	return -1
 
 static func _grounded(s: PackedInt64Array, b: int) -> bool:
-	return s[b + FightSim.AB_AIR] == 0
+	return s[b + FightSim.AB_AIR] == 0 and s[b + FightSim.AIR] == 0 and s[b + FightSim.FY] < FightSim.GROUND_H
 
 ## Avance de marcas y ondas (después de los luchadores y proyectiles, como nodos añadidos después).
 static func hazards(s: PackedInt64Array, P: Array) -> void:
@@ -448,6 +448,8 @@ static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
 	var o := i * FightSim.F_FIELDS
 	var boss: Array = P[i].get("boss", [])
 	if slot < 0 or slot >= boss.size():
+		return false
+	if s[o + FightSim.AIR] != 0:
 		return false
 	var ab: Dictionary = boss[slot]
 	if s[o + FightSim.MOUNTED] != 0 or s[o + FightSim.ALIVE] == 0 or s[o + FightSim.STUN] > 0 or s[o + FightSim.EXH] > 0 or s[o + FightSim.CAST_T] > 0 or s[o + FightSim.CRIT_T] >= 0:

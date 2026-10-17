@@ -35,7 +35,7 @@ func _run() -> void:
 		var rtt := 100 if k % 2 == 0 else 200
 		var h := RbHarness.new()
 		h.rtt_ms = rtt; h.jitter_ms = 15.0; h.loss = 0.03; h.seed_v = 11 + k
-		h.bot_mask = (FightSim.IN_BOSS_VAR << 1) - 1 & ~FightSim.IN_SWAP & ~FightSim.IN_BLOCK; h.bot_or = FightSim.IN_LOCK; h.bot_change = 0.2
+		h.bot_mask = (FightSim.IN_JUMP << 1) - 1 & ~FightSim.IN_SWAP & ~FightSim.IN_BLOCK; h.bot_or = FightSim.IN_LOCK; h.bot_change = 0.2
 		h.engine_factory = func() -> RbEngine: var e := FightEngine.new(P, 9, true); e.gap_um = 3000000; return e
 		var r := h.run(1500)
 		var s: PackedInt64Array = r["state"]

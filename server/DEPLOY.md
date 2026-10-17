@@ -25,7 +25,7 @@ Run one relay per region and set `REGION` on each. Put the full list in the game
 Without Docker: `npm ci && npm run build && PORT=47800 REGION=sa-east node dist/src/index.js` under systemd (`Restart=always`, `User=nobody`).
 
 ## Hardening already in the relay (env to tune)
-- Version check: C/J/Q must carry `v == GAME_PROTO` (default 5), otherwise the client gets `E version`. Bump both together.
+- Version check: C/J/Q must carry `v == GAME_PROTO` (default 6), otherwise the client gets `E version`. Bump both together.
 - Session tokens: 96-bit random per member. Reconnect ('B' code+token) rebinds a new address within `GRACE_MS` (default 20 s). After that the remaining player gets 'F' and wins by forfeit.
 - Rate limits per address (token buckets): relay `RELAY_RATE`/s (200, burst 400) and control 10/s (`CTL_RATE`, burst 20). 600 violations within a minute bans the address for 60 s.
 - Packet size cap `MAX_PACKET` (1200 bytes). The client's reconnect snapshots are chunked to 900 bytes.
