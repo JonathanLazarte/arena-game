@@ -9,6 +9,8 @@ const DEFAULT_RELAY_PORT := 47800
 const PUNCH_MS := 2000
 const RETRY_MS := 300
 const KEEPALIVE_MS := 2000
+## Protocolo de juego (versión): viaja en C/J/Q y el relay rechaza otros («version»).
+const GAME_PROTO := 4
 
 enum St { IDLE, CONNECTING, WAITING, PUNCHING, CONNECTED, FAILED, CLOSED }
 var state: St = St.IDLE
@@ -39,6 +41,14 @@ var _punch_until := 0
 var _keep_at := 0
 var force_relay := false ## pruebas/diagnóstico: no intentar conexión directa
 var join_wait_ms := 0
+## Fase 5: emparejamiento rápido, región, reconexión con ficha de sesión, abandono.
+var token := ""
+var region := ""
+var queue_pos := -1
+var peer_abandoned := false
+var reconnected := 0
+var _reco_at := 0
+var blackout := false ## pruebas: simula cortar la red (se descarta todo lo enviado y recibido)
 ## Diagnóstico LAN (panel online)
 var bound_port := 0
 var hellos_sent := 0
@@ -58,7 +68,7 @@ func create_room(relay_host: String, port: int = DEFAULT_RELAY_PORT, want_code: 
 	if not _open(0): return
 	if not _set_relay(relay_host, port): return
 	mode = "relay"
-	_ctl = _msg("C", {"code": want_code} if want_code != "" else {})
+	_ctl = _msg("C", {"v": GAME_PROTO, "code": want_code} if want_code != "" else {"v": GAME_PROTO})
 	state = St.CONNECTING
 	_retry_at = 0
 
@@ -67,10 +77,30 @@ func join_room(relay_host: String, port: int, room_code: String) -> void:
 	if not _set_relay(relay_host, port): return
 	mode = "relay"
 	code = room_code.strip_edges().to_upper()
-	_ctl = _msg("J", {"code": code})
+	_ctl = _msg("J", {"v": GAME_PROTO, "code": code})
 	_join_deadline = now_ms() + join_wait_ms
 	state = St.CONNECTING
 	_retry_at = 0
+
+## Partida rápida: cola del relay de la región elegida; al emparejar llega «M» como en join_room.
+func quick_match(relay_host: String, port: int = DEFAULT_RELAY_PORT) -> void:
+	if not _open(0): return
+	if not _set_relay(relay_host, port): return
+	mode = "relay"
+	_ctl = _msg("Q", {"v": GAME_PROTO})
+	state = St.CONNECTING
+	_retry_at = 0
+
+## Durante una partida sin noticias del rival: pedir al relay que nos re-asocie (nueva dirección
+## o NAT renovado) con la ficha de sesión. A partir de aquí todo va por el relay.
+func reconnect_tick() -> void:
+	if mode != "relay" or token == "" or state == St.CLOSED or state == St.FAILED:
+		return
+	direct = false
+	var t := now_ms()
+	if t >= _reco_at:
+		_reco_at = t + 1000
+		_raw(_msg("B", {"code": code, "token": token}), relay_ip, relay_port, true)
 
 func host_lan(port: int = LAN_PORT) -> void:
 	if not _open(port): return
@@ -169,6 +199,7 @@ func _msg(t: String, d: Dictionary) -> PackedByteArray:
 	return b
 
 func _raw(b: PackedByteArray, ip: String, port: int, now: bool = false) -> void:
+	if blackout: return
 	bytes_out += b.size()
 	if now or (sim_delay_ms <= 0.0 and sim_loss <= 0.0):
 		udp.set_dest_address(ip, port)
@@ -194,6 +225,7 @@ func poll() -> void:
 		_outq = keep
 	while udp.get_available_packet_count() > 0:
 		var b := udp.get_packet()
+		if blackout: continue
 		_on_packet(b, udp.get_packet_ip(), udp.get_packet_port())
 	if state == St.CONNECTING and t >= _retry_at:
 		_retry_at = t + RETRY_MS
@@ -241,6 +273,12 @@ func _on_packet(b: PackedByteArray, ip: String, port: int) -> void:
 			"M":
 				var j: Dictionary = _json(b)
 				slot = int(j.get("slot", 0)); code = String(j.get("code", code))
+				token = String(j.get("token", token)); region = String(j.get("region", region))
+				if int(j.get("re", 0)) == 1:
+					reconnected += 1; direct = false
+					last_recv_ms = now_ms()
+					if state != St.CONNECTED and state != St.PUNCHING: state = St.CONNECTED
+					return
 				var pe := String(j.get("peer", "")).rsplit(":", true, 1)
 				peer_ip = pe[0]; peer_port = int(pe[1])
 				last_recv_ms = now_ms()
@@ -256,6 +294,16 @@ func _on_packet(b: PackedByteArray, ip: String, port: int) -> void:
 				_deliver(b)
 			"x":
 				peer_left = true
+			"b":
+				var pe2 := String(_json(b).get("peer", "")).rsplit(":", true, 1)
+				if pe2.size() == 2:
+					peer_ip = pe2[0]; peer_port = int(pe2[1])
+				direct = false # el rival cambió de dirección: seguimos por el relay
+			"F":
+				peer_abandoned = true
+			"q":
+				queue_pos = int(_json(b).get("pos", 0))
+				if state == St.CONNECTING: state = St.WAITING
 			"k":
 				pass
 		return

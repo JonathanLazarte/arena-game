@@ -29,6 +29,7 @@ var peer_hash: int = -1     ## recibido del rival; hasta que coincida no se avan
 var params_mismatch := false
 var last_resim := 0      ## ticks re-simulados en el último tick (0 = sin rollback)
 var step_usec := 0.0     ## coste medio de un paso de sim (EMA)
+var base_frame := 0 ## primer tick tras la última resincronización (entradas anteriores se ignoran)
 var engine: RbEngine ## simulación enchufable (RbSim por defecto; FightEngine para las reglas de combate)
 
 func _init(player: int, delay: int = 2, window: int = 8, eng: RbEngine = null) -> void:
@@ -68,7 +69,7 @@ func receive_packet(p: Dictionary) -> void:
 	var arr: Variant = p["inputs"]
 	for i in arr.size():
 		var t: int = from + i
-		if remote_in.has(t):
+		if t < base_frame or remote_in.has(t):
 			continue
 		remote_in[t] = arr[i]
 		if t < frame and predicted.get(t, -999) != arr[i]:
@@ -76,6 +77,22 @@ func receive_packet(p: Dictionary) -> void:
 				_earliest_wrong = t
 	while remote_in.has(last_remote + 1):
 		last_remote += 1
+
+## Reconexión: continuar desde una instantánea confirmada (estado ANTES de simular el tick f).
+## Se conserva el historial anterior (repetición); lo posterior se descarta.
+func reset_to(st: PackedInt64Array, f: int) -> void:
+	state = st.duplicate()
+	for d: Dictionary in [local_in, remote_in, predicted, saved, checksums]:
+		for k: int in d.keys():
+			if k >= f: d.erase(k)
+	frame = f
+	base_frame = f
+	for t in range(f, f + input_delay):
+		local_in[t] = 0
+		remote_in[t] = 0
+	last_local = f + input_delay - 1
+	last_remote = f + input_delay - 1
+	_earliest_wrong = -1
 
 func _inputs_for(t: int) -> Array:
 	var r: int

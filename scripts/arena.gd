@@ -171,7 +171,7 @@ func _setup_sim_match() -> void:
 const ONLINE_END_TEXT := {"ko": "", "forfeit_win": "El rival abandonó", "forfeit_loss": "Abandonaste",
 	"peer_left": "El rival se fue", "disconnected": "Conexión perdida", "desync": "Desincronía (informe guardado)",
 	"params_mismatch": "Versiones distintas", "version": "Versiones distintas",
-	"load_timeout": "El rival no terminó de cargar"}
+	"load_timeout": "El rival no terminó de cargar", "reconnect_failed": "No se pudo reconectar (abandono)"}
 func _on_online_ended(winner_slot: int, reason: String) -> void:
 	if state == "over":
 		return
@@ -218,7 +218,7 @@ func _process_loading() -> void:
 		# eikons precargados y sombreadores compilados (_warm_eikons); tope de 8 s por si algo falla
 		if _warm_frames >= WARM_FRAMES and (warm_done or _warm_frames > 480):
 			online.local_ready = true
-	var waiting := online.waiting_peer()
+	var waiting := online.waiting_peer() or online.reconnecting
 	if waiting and _loading_label == null:
 		var cl := CanvasLayer.new(); cl.layer = 50; add_child(cl)
 		_loading_label = Label.new()
@@ -229,6 +229,7 @@ func _process_loading() -> void:
 		cl.add_child(_loading_label)
 	if _loading_label:
 		_loading_label.visible = waiting
+		_loading_label.text = "Reconectando..." if online.reconnecting or online.reconnects > 0 and online.waiting_peer() else "Cargando rival..."
 const WARM_FRAMES := 4
 
 func _on_sim_event(ev: Dictionary) -> void:

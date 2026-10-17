@@ -3,7 +3,7 @@ extends RefCounted
 ## Partida online sobre un NetLink: saludo (versión, RTT, retardo de entrada adaptativo),
 ## RbSession con FightEngine, sincronía de tiempo por ventaja de fotogramas, intercambio de
 ## checksums con informe de desincronía, registro de entradas (repetición) y desconexión/abandono.
-const PROTO := 3
+const PROTO := NetLink.GAME_PROTO
 const TICK_MS := 1000.0 / 60.0
 const PINGS := 12
 const TIMEOUT_MS := 4000
@@ -26,6 +26,19 @@ var _ready_at := 0
 var _load_started := 0
 ## false mientras la escena local aún calienta sombreadores/recursos: se envían latidos «ka», no «rdy».
 var local_ready := true
+## Fase 5, reconexión: tras TIMEOUT_MS sin paquetes la sim se congela y se intenta volver
+## (relay: «B» con ficha) durante GRACE_MS; al volver el anfitrión envía una instantánea del
+## estado confirmado (época nueva) y ambos repiten el saludo «rdy». Pasado el plazo: abandono.
+var grace_ms := 25000 ## algo más que el del relay (20 s), que decide primero con «F»
+const SNAP_CHUNK := 900
+var reconnecting := false
+var reconnects := 0
+var epoch := 0
+var _reco_since := 0
+var _rs_at := 0
+var _snap_out: Array = []
+var _snap_at := 0
+var _snap_in: Dictionary = {}
 var load_ms := 0 ## lo que tardó en arrancar (pruebas / overlay)
 var phase: Ph = Ph.HELLO
 var link: NetLink
@@ -160,16 +173,19 @@ func _load_step(t: int) -> void:
 		return
 	if link.peer_left:
 		status = "peer_left"; phase = Ph.OVER; return
+	if me == 0 and not _snap_out.is_empty() and not peer_ready and t >= _snap_at:
+		_send_snap(t)
 	if t - link.last_recv_ms > LOAD_TIMEOUT_MS:
 		status = "load_timeout"; phase = Ph.OVER; return
 	if t >= _ready_at:
 		_ready_at = t + READY_EVERY_MS
-		link.send_msg({"t": "rdy" if local_ready else "ka"}, true) # también sirve de latido
+		link.send_msg({"t": "rdy" if local_ready else "ka", "ep": epoch}, true) # también sirve de latido
 	if peer_ready and local_ready:
 		phase = Ph.PLAY
 		load_ms = t - _load_started
 		link.last_recv_ms = maxi(link.last_recv_ms, t)
-		for i in 2: link.send_msg({"t": "rdy"}, true)
+		for i in 2: link.send_msg({"t": "rdy", "ep": epoch}, true)
+		_snap_out = []
 
 ## ¿Esperando a que cargue el rival? (la arena muestra «Cargando rival…»)
 func waiting_peer() -> bool:
@@ -189,17 +205,68 @@ func play_step(local_input: int) -> bool:
 	for m: Dictionary in _drain():
 		_handle(m, t)
 	_after_msgs(t)
-	if phase != Ph.PLAY:
-		return false
+	if phase != Ph.PLAY or reconnecting:
+		return false # congelado mientras se reconecta
 	return _play_tick(local_input, t)
+
+func _host_resync() -> void:
+	epoch += 1
+	var f := confirmed_frame() + 1
+	var st := confirmed_state()
+	var raw := var_to_bytes(st).compress(FileAccess.COMPRESSION_DEFLATE)
+	var n := int(ceil(raw.size() / float(SNAP_CHUNK)))
+	_snap_out = []
+	for i in n:
+		_snap_out.append({"t": "snap", "ep": epoch, "f": f, "i": i, "n": n, "sz": var_to_bytes(st).size(),
+			"b": raw.slice(i * SNAP_CHUNK, mini(raw.size(), (i + 1) * SNAP_CHUNK))})
+	_resync_apply(st, f)
+	_send_snap(NetLink.now_ms())
+
+func _send_snap(t: int) -> void:
+	_snap_at = t + 300
+	for m: Dictionary in _snap_out: link.send_msg(m, true)
+
+func _guest_snap(m: Dictionary) -> void:
+	var ep := int(m.get("ep", 0))
+	if me != 1 or ep <= epoch: return
+	if int(_snap_in.get("ep", -1)) != ep: _snap_in = {"ep": ep, "parts": {}}
+	_snap_in["parts"][int(m["i"])] = m["b"]
+	var n := int(m["n"])
+	if _snap_in["parts"].size() < n: return
+	var raw := PackedByteArray()
+	for i in n: raw.append_array(_snap_in["parts"][i])
+	var v: Variant = bytes_to_var(raw.decompress(int(m["sz"]), FileAccess.COMPRESSION_DEFLATE))
+	if not (v is PackedInt64Array): return
+	epoch = ep
+	_snap_in = {}
+	_resync_apply(v, int(m["f"]))
+
+func _resync_apply(st: PackedInt64Array, f: int) -> void:
+	session.reset_to(st, f)
+	reconnecting = false
+	reconnects += 1
+	peer_ready = false
+	peer_ack = -1; peer_frame = -1; adv_avg = 0.0
+	peer_ck.clear()
+	phase = Ph.LOAD
+	_ready_at = 0
+	_load_started = NetLink.now_ms()
+	link.last_recv_ms = _load_started
 
 func _handle(m: Dictionary, t: int) -> void:
 		match String(m.get("t", "")):
 			"rdy":
+				if int(m.get("ep", 0)) != epoch: return
 				peer_ready = true
 				if phase == Ph.PLAY and int(m.get("_r", 0)) == 0:
-					link.send_msg({"t": "rdy", "_r": 1}) # el rival sigue cargando: que nos vea listos
+					link.send_msg({"t": "rdy", "_r": 1, "ep": epoch}) # el rival sigue cargando: que nos vea listos
+			"rs":
+				if me == 0 and int(m.get("ep", 0)) > epoch: _host_resync()
+				elif me == 0 and int(m.get("ep", 0)) == epoch and phase == Ph.LOAD and not _snap_out.is_empty(): _send_snap(t)
+			"snap":
+				_guest_snap(m)
 			"in":
+				if int(m.get("ep", 0)) != epoch: return
 				session.receive_packet(m)
 				peer_ack = maxi(peer_ack, int(m.get("ack", -1)))
 				peer_frame = maxi(peer_frame, int(m.get("f", -1)))
@@ -223,8 +290,25 @@ func _after_msgs(t: int) -> void:
 		status = "params_mismatch"; phase = Ph.OVER
 	if link.peer_left and status == "":
 		status = "peer_left"; phase = Ph.OVER
-	if t - link.last_recv_ms > TIMEOUT_MS and status == "":
-		status = "disconnected"; phase = Ph.OVER
+	if link.peer_abandoned and status == "":
+		status = "forfeit_win"; phase = Ph.OVER # el relay confirmó el abandono del rival
+	if link.state == NetLink.St.FAILED and status == "":
+		status = "reconnect_failed" if reconnecting else "disconnected"; phase = Ph.OVER
+	if status != "": return
+	if not reconnecting and t - link.last_recv_ms > TIMEOUT_MS:
+		reconnecting = true; _reco_since = t
+	if reconnecting:
+		if t - _reco_since > grace_ms:
+			status = "disconnected"; phase = Ph.OVER; return
+		link.reconnect_tick()
+		if link.last_recv_ms > _reco_since and t - link.last_recv_ms < 300 and t >= _rs_at:
+			# el rival vuelve a responder: pedir/forzar la resincronización
+			_rs_at = t + 300
+			if me == 0: _host_resync()
+			else: link.send_msg({"t": "rs", "ep": epoch + 1}, true)
+		elif t >= _rs_at:
+			_rs_at = t + 500
+			link.send_msg({"t": "rs", "ep": epoch + 1}, true) # también sirve de latido
 
 func _play_tick(local_input: int, t: int) -> bool:
 	# sincronía: si vamos por delante del rival (estimado con el RTT), cedemos un tick
@@ -274,6 +358,7 @@ func _send(t: int) -> void:
 	var p := session.make_packet(peer_ack)
 	p["inputs"] = PackedInt32Array(p["inputs"])
 	p["t"] = "in"
+	p["ep"] = epoch
 	p["f"] = session.frame
 	p["s"] = t
 	if _echo > 0:
