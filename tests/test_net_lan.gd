@@ -57,7 +57,7 @@ func _run() -> void:
 	var p := OnlinePanel.new(); p.go_scene = false; root.add_child(p)
 	await process_frame
 	p.host_lan()
-	check(p.status_label.text.contains("0.0.0.0") and p.status_label.text.contains("ufw allow 47801/udp") and p.status_label.text.contains("Saludos recibidos"), "panel anfitrión: IP, puerto, interfaces, saludos y consejo de cortafuegos")
+	check(p.status_label.text.contains("0.0.0.0") and p.status_label.text.contains("ufw allow 47801/udp") and p.status_label.text.contains("firewall-cmd --add-port=47801/udp --permanent") and p.status_label.text.contains("Saludos recibidos"), "panel anfitrión: IP, puerto, interfaces, saludos y consejo de cortafuegos")
 	p.cancel()
 	var p2 := OnlinePanel.new(); p2.go_scene = false; root.add_child(p2)
 	await process_frame

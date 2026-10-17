@@ -116,8 +116,8 @@ func _my_name() -> String:
 
 func _host_text() -> String:
 	var ips := NetLink.lan_addresses()
-	return "Esperando rival en la misma wifi. Tu IP: %s (UDP %d, escuchando en todas las interfaces 0.0.0.0)\nSaludos recibidos: %d. Si el rival no conecta: permite UDP %d en el cortafuegos de este equipo (Linux: sudo ufw allow %d/udp) y desactiva el «aislamiento de clientes» del router." % [
-		", ".join(ips) if not ips.is_empty() else "? (sin red local)", link.bound_port, link.hellos_recv, NetLink.LAN_PORT, NetLink.LAN_PORT]
+	return "Esperando rival en la misma wifi. Tu IP: %s (UDP %d, escuchando en todas las interfaces 0.0.0.0)\nSaludos recibidos: %d. Si el rival no conecta: permite UDP %d en el cortafuegos de este equipo (Fedora/firewalld: sudo firewall-cmd --add-port=%d/udp --permanent && sudo firewall-cmd --reload; Ubuntu/ufw: sudo ufw allow %d/udp) y desactiva el «aislamiento de clientes» del router." % [
+		", ".join(ips) if not ips.is_empty() else "? (sin red local)", link.bound_port, link.hellos_recv, NetLink.LAN_PORT, NetLink.LAN_PORT, NetLink.LAN_PORT]
 
 ## Busca anfitriones en la wifi por difusión y rellena la IP sola.
 func search_lan() -> void:
@@ -190,6 +190,6 @@ func _err(e: String) -> String:
 	if e.begins_with("port_busy"):
 		return "el puerto UDP %s está ocupado (¿otra copia del juego abierta?)" % e.get_slice(":", 1)
 	if e == "lan_timeout" and link:
-		return "sin respuesta de %s:%d tras %d saludos. Comprueba: misma wifi (no la de invitados), la IP correcta (la que muestra el anfitrión), cortafuegos del anfitrión con UDP %d permitido (Linux: sudo ufw allow %d/udp; Windows: permitir el juego en redes privadas) y que el router no aísle clientes." % [link.peer_ip, link.peer_port, link.hellos_sent, NetLink.LAN_PORT, NetLink.LAN_PORT]
+		return "sin respuesta de %s:%d tras %d saludos. Comprueba: misma wifi (no la de invitados), la IP correcta (la que muestra el anfitrión), cortafuegos del anfitrión con UDP %d permitido (Fedora/firewalld: sudo firewall-cmd --add-port=%d/udp --permanent && sudo firewall-cmd --reload; Ubuntu/ufw: sudo ufw allow %d/udp; Windows: permitir el juego en redes privadas) y que el router no aísle clientes." % [link.peer_ip, link.peer_port, link.hellos_sent, NetLink.LAN_PORT, NetLink.LAN_PORT, NetLink.LAN_PORT]
 	return {"no_room": "no existe esa sala", "room_full": "la sala está llena", "code_taken": "código en uso",
 		"version": "versión distinta del juego", "disconnected": "sin respuesta del rival"}.get(e, e)
