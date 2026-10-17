@@ -517,6 +517,24 @@ Fuentes: https://eldenring.wiki.fextralife.com/Bosses · https://eldenring.wiki.
 
 **Prioridad:** P1 (retrasos, combos variables, lectura de curación) · P2 (fases) · P3 (jefes).
 
+### Catálogo adaptado (octubre 2026)
+26 habilidades nuevas en `BossAbilitiesExt`, con nombres y números propios. El patrón (aviso, trayectoria, castigo) sale de los movesets públicos; no se copian nombres, daño ni tiempos.
+
+| Nuestra | Patrón leído | Fuente |
+|---|---|---|
+| Daga Sagrada, Tajo Cruzado | anticipación larga, amague y estocada que cierra distancia | [Margit](https://eldenring.fandom.com/wiki/Fell_Omen) |
+| Cuerno de Embiste, Picado de Alas | carga con cuerno y caída con alas | patrón de caballero del crisol, descrito en la ficha de Godfrey ([Eldenpedia](https://eldenring.wiki.gg/wiki/Godfrey,_First_Elden_Lord)) |
+| Pisotón, Grito de Guerra | pisotón que saca rocas; rugido que potencia los pisotones | [Godfrey](https://eldenring.wiki.gg/wiki/Godfrey,_First_Elden_Lord) (Stomp, Regal Roar) |
+| Zarpazo de Sangre, Lluvia de Sangre | tajo que deja una estela y explota; lluvia de sangre que prende al tocar el suelo | [Mohg](https://eldenring.wiki.gg/wiki/Mohg,_Lord_of_Blood) (Bloodflame Talons, Bloodboon) |
+| Danza Triple, Flor Umbral | ráfagas que se acercan en varios pulsos; flor que estalla al caer | [Malenia](https://eldenring.wiki.gg/wiki/Malenia,_Blade_of_Miquella) (Waterfowl Dance, Scarlet Aeonia) |
+| Garra de Suelo, Estocada Negra, Saeta Oscura | onda al sacar la garra del suelo; estoque y tajo de filo oscuro | [Maliketh](https://eldenring.wiki.gg/wiki/Maliketh,_the_Black_Blade) (Beast Claw, Stab, Plunge) |
+| Flecha Grave, Vendaval de Hacha | flecha que persigue y hay que rodar; ondas al final de un hachazo | [Starscourge Radahn](https://eldenring.wiki.fextralife.com/Starscourge_Radahn) (Gravity Arrow, Gravity Waves) |
+| Lluvia de Lanzas, Columnas de Rayo | lanzas o rayos que marcan el suelo antes de caer | lluvia de lanzas de omen / estacas de dragón antiguo ([Maliketh](https://eldenring.wiki.gg/wiki/Maliketh,_the_Black_Blade) lista el mismo idioma de «marca y cae») |
+| Barrido de Cola, Presa de Fauces, Aliento de Rayo, Aliento de Escarcha, Chorro de Lava | cola, mordisco y conos de aliento | dragones y sierpe (aliento ya existente, ahora con rayo, hielo y un chorro corto) |
+| Rueda Noble, Anillo de Fuego | rueda que persigue; círculo de fuego que sale del cuerpo | noble de la piel divina y ritual de llama negra (patrón de área circular ya usado por el Embate) |
+| Orbe Lunar | proyectil grande y lento, poco giro | luna de la reina del plenilunio, leída como un orbe que se rodea caminando |
+| Guardia Refleja | quedarse quieto y castigar si te atacan | misma idea que la Postura, con ventana más larga y menos alcance |
+
 ---
 
 ## 15. Progresión y economía

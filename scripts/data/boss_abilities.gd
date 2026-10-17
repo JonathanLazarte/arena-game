@@ -9,7 +9,14 @@ const ORDER := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso"
 const EXT_ORDER := [
 	"tajo_retardado", "presa_verdugo", "giro_martillo", "danza_cisne", "paso_espectral",
 	"onda_rastrera", "rayos_trazadores", "lluvia_meteoros", "aliento_dragon", "furia_fase", "postura_contra",
-	"embate_sismico", "lanza_celeste"
+	"embate_sismico", "lanza_celeste",
+	"cuerno_embiste", "tajo_cruzado", "zarpazo_sangre", "barrido_cola", "daga_sagrada", "estocada_negra",
+	"flor_umbral", "presa_fauces", "giro_noble", "danza_triple", "alas_picado",
+	"garra_suelo", "vendaval_hacha", "anillo_fuego", "pisoton",
+	"lluvia_lanzas", "flecha_grave", "lluvia_sangre", "columnas_rayo",
+	"saeta_oscura", "orbe_lunar",
+	"aliento_rayo", "aliento_escarcha", "chorro_lava",
+	"grito_guerra", "guardia_reflejo",
 ]
 const COST_NAMES := {"stamina": "aguante", "mana": "maná", "health": "vida"}
 
@@ -49,7 +56,16 @@ const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfag
 	"combo_falso": "Pausa falsa", "salto_caida": "Caída", "tajo_retardado": "Tajo lento", "presa_verdugo": "Presa",
 	"giro_martillo": "Giro", "danza_cisne": "Danza", "paso_espectral": "Paso", "onda_rastrera": "Onda",
 	"rayos_trazadores": "Rayos", "lluvia_meteoros": "Meteoros", "aliento_dragon": "Aliento", "furia_fase": "Furia",
-	"postura_contra": "Contragolpe", "embate_sismico": "Embate", "lanza_celeste": "Lanza"}
+	"postura_contra": "Contragolpe", "embate_sismico": "Embate", "lanza_celeste": "Lanza",
+	"cuerno_embiste": "Cuerno", "tajo_cruzado": "Cruzado", "zarpazo_sangre": "Zarpazo",
+	"barrido_cola": "Cola", "daga_sagrada": "Daga", "estocada_negra": "Tajo negro",
+	"flor_umbral": "Flor", "presa_fauces": "Fauces", "giro_noble": "Rueda",
+	"danza_triple": "Triple", "alas_picado": "Picado", "garra_suelo": "Garra",
+	"vendaval_hacha": "Vendaval", "anillo_fuego": "Anillo", "pisoton": "Pisotón",
+	"lluvia_lanzas": "Lluvia", "flecha_grave": "Flecha", "lluvia_sangre": "Sangre",
+	"columnas_rayo": "Columnas", "saeta_oscura": "Saeta", "orbe_lunar": "Orbe",
+	"aliento_rayo": "Fulgor", "aliento_escarcha": "Escarcha", "chorro_lava": "Lava",
+	"grito_guerra": "Grito", "guardia_reflejo": "Reflejo"}
 const BASE_COLORS := {"estocada": Color(1.0, 0.3, 0.12), "carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(1.0, 0.82, 0.3),
 	"escudo_mana": Color(0.3, 1.0, 1.0), "combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}
 

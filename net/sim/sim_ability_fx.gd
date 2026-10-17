@@ -15,7 +15,6 @@ const AOE_BOOM := Color(1.0, 0.85, 0.5)
 const STOC := Color(1.0, 0.25, 0.1)
 const GOLD := Color(1.0, 0.82, 0.3)
 const FADE_T := 24 ## ticks que la marca sigue tras detonar (SimAbilities.hazards)
-const RAIN_TINT := ["rayos_trazadores", "lluvia_meteoros", "lanza_celeste"]
 
 var fighters: Array[Fighter] = []
 var parent: Node3D
@@ -370,7 +369,7 @@ func _hazards(s: PackedInt64Array, P: Array) -> void:
 		ring.visible = aoe
 		fill.visible = aoe
 		edge.visible = aoe
-		column.visible = aoe and id == "lanza_celeste" and not done
+		column.visible = aoe and _pillar(id) and not done
 		line.visible = not aoe and t < warn
 		crest.visible = not aoe and t >= warn
 		if aoe:
@@ -381,10 +380,11 @@ func _hazards(s: PackedInt64Array, P: Array) -> void:
 				var tm: TorusMesh = edge.mesh
 				tm.inner_radius = maxf(r - 0.12, 0.05)
 				tm.outer_radius = r
-			var tint := ab_color(id) if id in RAIN_TINT else AOE_RING
+			var rain := _rain(id)
+			var tint := ab_color(id) if rain else AOE_RING
 			ring.scale = Vector3(r, 1, r)
 			(ring.material_override as StandardMaterial3D).albedo_color = Color(tint, 0.35)
-			(edge.material_override as StandardMaterial3D).albedo_color = tint if id in RAIN_TINT else AOE_EDGE
+			(edge.material_override as StandardMaterial3D).albedo_color = tint if rain else AOE_EDGE
 			var fm: StandardMaterial3D = fill.material_override
 			if done:
 				var a := 0.8 * (1.0 - clampf(float(t - warn) / FADE_T, 0.0, 1.0))
@@ -393,7 +393,7 @@ func _hazards(s: PackedInt64Array, P: Array) -> void:
 			else:
 				var k := clampf(float(t) / warn, 0.05, 1.0)
 				fill.scale = Vector3(r * k, 1, r * k)
-				fm.albedo_color = Color(ab_color(id).lerp(AOE_FILL, 0.4) if id in RAIN_TINT else AOE_FILL, 0.55)
+				fm.albedo_color = Color(ab_color(id).lerp(AOE_FILL, 0.4) if rain else AOE_FILL, 0.55)
 			if column.visible:
 				# columna de luz que se estrecha; la lanza cae cuando desaparece
 				var k2 := clampf(float(t) / warn, 0.0, 1.0)
@@ -417,6 +417,12 @@ func _hazards(s: PackedInt64Array, P: Array) -> void:
 				var cm: StandardMaterial3D = crest.material_override
 				cm.albedo_color = c
 				cm.emission = c
+
+static func _rain(id: String) -> bool:
+	return String(BossAbilities.def(id).get("type", "")) == "rain"
+
+static func _pillar(id: String) -> bool:
+	return bool(BossAbilities.def(id).get("pillar", false))
 
 func hazard_root(j: int) -> Node3D:
 	return _hz[j]["root"] if j < _hz.size() else null
@@ -443,18 +449,28 @@ func _new_pr() -> Dictionary:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return {"root": root, "slash": slash, "orb": orb, "core": core, "trail": trail, "r": -1.0}
 
+## Color del tajo: la habilidad que lo disparó (AB_LAST), para que saeta y orbe no salgan dorados.
+static func _slash_color(s: PackedInt64Array, owner: int) -> Color:
+	if owner < 0 or owner > 1:
+		return GOLD
+	var code: int = s[owner * S.F_FIELDS + S.AB_LAST]
+	var ids := BossAbilities.all_ids()
+	if code < 0 or code >= ids.size():
+		return GOLD
+	return ab_color(String(ids[code]))
+
 ## Media luna de 7 segmentos en el plano perpendicular al vuelo, inclinada en diagonal (Projectile antiguo).
-static func _build_slash(piv: Node3D, radius: float) -> void:
+static func _build_slash(piv: Node3D, radius: float, col: Color = GOLD) -> void:
 	for c in piv.get_children():
 		c.queue_free()
 	for i in 7:
 		var a := deg_to_rad(-60.0 + i * 20.0)
-		var seg := MeshUtil.box(piv, Vector3(0.42, 0.07 + 0.05 * (1.0 - absf(i - 3) / 3.0), 0.12), Vector3(sin(a) * radius, cos(a) * radius - radius * 0.6, 0.0), GOLD)
+		var seg := MeshUtil.box(piv, Vector3(0.42, 0.07 + 0.05 * (1.0 - absf(i - 3) / 3.0), 0.12), Vector3(sin(a) * radius, cos(a) * radius - radius * 0.6, 0.0), col)
 		seg.rotation.z = -a
-		seg.material_override = MeshUtil.mat(GOLD, true)
+		seg.material_override = MeshUtil.mat(col, true)
 		seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var trail := MeshUtil.box(piv, Vector3(radius * 1.4, 0.04, 0.9), Vector3(0, radius * 0.35, 0.45), GOLD)
-	trail.material_override = MeshUtil.mat(Color(GOLD, 0.4), true)
+	var trail := MeshUtil.box(piv, Vector3(radius * 1.4, 0.04, 0.9), Vector3(0, radius * 0.35, 0.45), col)
+	trail.material_override = MeshUtil.mat(Color(col, 0.4), true)
 	trail.transparency = 0.6
 	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -469,6 +485,7 @@ func _projectiles(s: PackedInt64Array) -> void:
 		# las flechas (kind 0) las dibuja SimView
 		root.visible = s[q + S.PR_ON] != 0 and kind != 0
 		if not root.visible:
+			d["was"] = false
 			continue
 		root.global_position = Vector3(s[q + S.PR_X], s[q + S.PR_Y], s[q + S.PR_Z]) / 1.0e6
 		var v := Vector3(s[q + S.PR_VX], s[q + S.PR_VY], s[q + S.PR_VZ])
@@ -477,13 +494,18 @@ func _projectiles(s: PackedInt64Array) -> void:
 			root.look_at(root.global_position + v, up)
 		var slash: Node3D = d["slash"]
 		var orb: Node3D = d["orb"]
+		var born := root.visible and not bool(d.get("was", false))
+		d["was"] = root.visible
 		slash.visible = kind == 1
 		orb.visible = kind != 1
 		if kind == 1:
+			if born:
+				d["scol"] = _slash_color(s, s[q + S.PR_OWNER])
+				d["r"] = -1.0
 			var r := clampf(s[q + S.PR_R] / 1.0e6, 0.3, 1.6)
 			if not is_equal_approx(r, float(d["r"])):
 				d["r"] = r
-				_build_slash(slash, r)
+				_build_slash(slash, r, d.get("scol", GOLD))
 		else:
 			var c := Color(1.0, 0.55, 0.2)
 			if kind == 2:

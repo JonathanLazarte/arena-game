@@ -713,9 +713,42 @@ func _try_boss(dist: float, dir: Vector3) -> bool:
 			"escudo_mana": ok = dist < 3.5 and og(S.ATK_STATE) == S.Atk.WINDUP
 			"combo_falso": ok = dist < 9.0 and fd > 0.3
 			"salto_caida": ok = dist > 5.0 and dist < 14.0 and health() > 40.0
+			_: ok = _boss_situ(b[k], dist, fd)
 		if ok and boss_skill(id):
 			boss_by_id[id] = int(boss_by_id.get(id, 0)) + 1
 			return true
+	return false
+
+## Habilidades del lote 2: por distancia. Si falta un id, el tipo decide.
+func _boss_situ(ab: Dictionary, dist: float, fd: float) -> bool:
+	var id := String(ab.get("id", ""))
+	if id in ["cuerno_embiste", "giro_noble", "alas_picado", "estocada_negra"]:
+		return dist > 2.0 and dist < 7.5 and fd > 0.35
+	if id in ["tajo_cruzado", "zarpazo_sangre", "barrido_cola", "daga_sagrada", "danza_triple", "flor_umbral"]:
+		return dist < 4.4 and fd > 0.4
+	if id == "presa_fauces":
+		return dist < 2.6 and fd > 0.65
+	if id in ["garra_suelo", "vendaval_hacha", "pisoton"]:
+		return dist > 3.0 and dist < 12.0
+	if id == "anillo_fuego":
+		return dist < 5.5
+	if id in ["lluvia_lanzas", "columnas_rayo", "lluvia_sangre", "flecha_grave"]:
+		return dist > 4.0 and dist < 16.0
+	if id in ["saeta_oscura", "orbe_lunar"]:
+		return dist > 5.0 and dist < 16.0
+	if id in ["aliento_rayo", "aliento_escarcha", "chorro_lava"]:
+		return dist > 2.2 and dist < 8.0 and fd > 0.45
+	if id == "grito_guerra":
+		return dist > 3.5 and health() > 45.0 and g(S.RAGE_T) <= 0
+	if id == "guardia_reflejo":
+		return dist < 3.8 and og(S.ATK_STATE) == S.Atk.WINDUP
+	match int(ab.get("type", -1)):
+		SimAbilities.T_TIMELINE: return dist < 4.5 and fd > 0.4
+		SimAbilities.T_WAVE: return dist > 2.5 and dist < 12.0
+		SimAbilities.T_RAIN, SimAbilities.T_RAFAGA: return dist > 4.5 and dist < 16.0
+		SimAbilities.T_BREATH: return dist > 2.0 and dist < 8.0 and fd > 0.4
+		SimAbilities.T_RAGE: return g(S.RAGE_T) <= 0 and health() > 40.0
+		SimAbilities.T_COUNTER: return dist < 3.8 and og(S.ATK_STATE) == S.Atk.WINDUP
 	return false
 
 ## Tajo de ráfaga que me persigue a punto de llegar: voltereta lateral.

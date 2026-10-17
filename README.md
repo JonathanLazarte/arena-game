@@ -778,3 +778,8 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - Arco: vuelve el apuntado con ratón, ahora como entrada de la sim (rumbo cuantizado en 64 pasos), igual offline y online. Se puede desactivar en Ajustes.
 - Efectos de habilidades completos (partículas, burbuja, auras, marcas de suelo con borde y destello, ondas, media luna de la ráfaga, orbes) dibujados desde el estado de la sim.
 - Revancha online: los dos eligen «Revancha», siguen conectados y empieza otra partida con los mismos ajustes y una semilla nueva acordada; si el rival vuelve al lobby, se avisa.
+
+## Ronda 46 — Catálogo de jefe
+- 26 habilidades nuevas en la pestaña Jefe (45 en total). Reusan los ejecutores de la sim: golpe en línea de tiempo, ondas, lluvia, aliento, tajo que persigue, bufo y contragolpe. Nombres y números propios; el patrón de cada una está anotado en `docs/ELDEN_RING_REFERENCIA.md` §14.
+- El área de Flor Umbral y Picado de Alas sale aunque el cuerpo no conecte (`slam_always`). Lluvia de Lanzas, Columnas de Rayo y Lanza Celeste dibujan columna. Saeta Oscura y Orbe Lunar persiguen como la Ráfaga y se pueden repetir al terminar.
+- La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.

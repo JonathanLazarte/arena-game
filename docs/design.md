@@ -30,7 +30,7 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 - Cambio de habilidad: tecla N o botón ▶ del HUD (PC y táctil).
 
 ### Reglas comunes (Ronda 33)
-- Imbloqueable (`unblockable` en la definición; `BossAbilities.is_unblockable`): el escudo no la para. Estocada, Tajo Retardado, Presa del Verdugo, Giro Devastador, Paso Espectral y Lanza Celeste lo son; Danza del Cisne se bloquea y un parry la corta.
+- Imbloqueable (`unblockable` en la definición; `BossAbilities.is_unblockable`): el escudo no la para. Lo son la Estocada y las marcadas en la tabla (Tajo Retardado, Presa del Verdugo, Giro Devastador, Paso Espectral, Lanza Celeste, Cuerno, Daga Sagrada, Estocada Negra, Flor Umbral, Presa de Fauces, Rueda Noble, Danza Triple, Picado de Alas y Flecha Grave). Danza del Cisne se bloquea y un parry la corta.
 - Estocada: sigue al objetivo toda la carga; en la embestida solo corrige la dirección los primeros 0,15 s, después va recta.
 - Recarga global de 1,4 s desde que acaba una habilidad de jefe (la Ráfaga puede encadenarse consigo misma). Recarga propia por habilidad (`cd`) opcional, desactivada por defecto (`Fighter.per_ability_cd_enabled`).
 - Cada habilidad tiene un aviso propio (texto `tele`/`tele_txt` y color de brillo distintos), coste de recurso, fuerza de aturdimiento y recuperación castigable (≥ 0,3 s). Un coste de vida nunca puede dejar la vida a 0.
@@ -55,6 +55,38 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 | postura_contra | Postura de Contragolpe | 22 aguante | contra | si le atacan en la ventana, anula y castiga |
 | embate_sismico | Embate Sísmico | 18 vida | ondas | 8 ondas en anillo (una apunta al rival), fuerza 45, recuperación 1,3 s |
 | lanza_celeste | Lanza Celeste | 30 maná | lluvia | una lanza imbloqueable sobre tu posición, aviso 1,1 s, fuerza 70, recuperación 1,4 s |
+
+### Habilidades extendidas (lote 2, 26)
+Patrones de jefe con nombres y números propios. Mismas reglas: aviso, coste, recuperación castigable. `pillar` dibuja columna; `slam_always` suelta el área aunque el cuerpo falle; `type: rafaga` es un tajo que persigue (se puede repetir al terminar, pagando otra vez).
+
+| id | nombre | coste | tipo | clave |
+|---|---|---|---|---|
+| cuerno_embiste | Cuerno de Embiste | 28 aguante | golpe | dos tiempos, el primero cierra a gran velocidad; imbloqueable |
+| tajo_cruzado | Tajo Cruzado | 32 aguante | golpe | dos cortes y estocada; se bloquea |
+| zarpazo_sangre | Zarpazo de Sangre | 26 maná | golpe | corte y estallido en el suelo |
+| barrido_cola | Barrido de Cola | 26 aguante | golpe | dos arcos de 170°, alcance 4,4 m |
+| daga_sagrada | Daga Sagrada | 24 aguante | golpe | pinchazo y estocada tardía con amague; imbloqueable |
+| estocada_negra | Estocada Negra | 28 maná | golpe | una estocada larga, fuerza 52; imbloqueable |
+| flor_umbral | Flor Umbral | 16 vida | golpe | picado y flor de 5,2 m aunque falle el cuerpo |
+| presa_fauces | Presa de Fauces | 26 aguante | agarre | mordisco; si falla, recuperación extra |
+| giro_noble | Rueda Noble | 22 aguante | golpe | embestida que gira a 360°/s; imbloqueable |
+| danza_triple | Danza Triple | 42 aguante | golpe | cuatro tajos en tres pulsos, i-frames breves; imbloqueable |
+| alas_picado | Picado de Alas | 30 aguante | golpe | caída con área fija de 3,8 m |
+| garra_suelo | Garra de Suelo | 24 aguante | ondas | una onda ancha (2,6 m), fuerza 48 |
+| vendaval_hacha | Vendaval de Hacha | 28 aguante | ondas | dos ondas rápidas en abanico de 10° |
+| anillo_fuego | Anillo de Fuego | 30 maná | ondas | ocho ondas cortas en anillo |
+| pisoton | Pisotón | 20 aguante | ondas | una onda baja de 4,2 m de ancho, fuerza 55 |
+| lluvia_lanzas | Lluvia de Lanzas | 28 maná | lluvia | cinco columnas que siguen tu sitio |
+| flecha_grave | Flecha Grave | 24 maná | lluvia | un círculo de 2,6 m, aviso 1,25 s; imbloqueable |
+| lluvia_sangre | Lluvia de Sangre | 32 maná | lluvia | seis marcas repartidas en 5 m |
+| columnas_rayo | Columnas de Rayo | 34 maná | lluvia | tres columnas separadas 0,7 s |
+| saeta_oscura | Saeta Oscura | 18 maná | ráfaga | un tajo que curva a 48°/s |
+| orbe_lunar | Orbe Lunar | 30 maná | ráfaga | orbe lento de radio 1,05 m, poco giro |
+| aliento_rayo | Aliento de Rayo | 32 maná | cono | rayo, arco 18°, alcance 9 m |
+| aliento_escarcha | Aliento de Escarcha | 28 maná | cono | hielo, arco 42°, alcance 6,5 m |
+| chorro_lava | Chorro de Lava | 34 maná | cono | fuego denso, 5,5 m, 1,6 s |
+| grito_guerra | Grito de Guerra | 26 aguante | bufo | 5,5 s de furia (+30 % daño, +15 % velocidad) |
+| guardia_reflejo | Guardia Refleja | 20 aguante | contra | ventana 1,6 s, alcance 3,2 m, castigo ×1,9 |
 
 ## Fuerte cargado
 - La pose de carga del fuerte se ve desde que se empieza a mantener el ataque (antes de que salga el fuerte).

@@ -69,6 +69,7 @@ cd server && npm ci && npm test && GODOT=$(which godot) npm run test:e2e
 ```
 - **Fase 8**: las pruebas antiguas de jugabilidad del Fighter offline se portaron a la sim (`test_sim_rules`, `test_sim_ai`) o se retiraron; las secciones retiradas de los tests por rondas llevan el comentario `[fase 8] retirado` con el motivo. Los tests de datos/UI se ajustaron al diseño actual.
 - **Línea base fase 9 (2026-10-17, Godot 4.7.2 headless, 45 `test_*.gd`):** 45/45 pasan con el relay local levantado (`cd server && npm run build && PORT=47800 REGION=local npm start`; sin él fallan solo `test_net_relay5` y `test_net_matchmaking`). Nuevos: `test_boss_ui`, `test_bow_aim`, `test_net_rematch`, `test_ability_fx`. Relay: `npm test` 9/9, `npm run test:e2e` 5/5 (protocolo 8). Antes (fase 8, `6f4d0ab`): 40/41, fallaba `test_ui_audio`.
+- **Ronda 46:** el catálogo de jefe pasa a 45 habilidades (6 base + 39 extendidas). Las 26 nuevas reusan los ejecutores de la sim (línea de tiempo, onda, lluvia, aliento, ráfaga, furia, contragolpe). Protocolo sigue en **8**. Prueba nueva: `test_boss_roster.gd`. Verificadas en esta ronda: roster, UI de jefe, efectos, rollback de habilidades, IA y `test_round34`. La suite entera de 46 tests no se re-corrió.
 - `test_net_events` no era flaky: exigía `> 20` eventos y la partida genera exactamente 20 a 50 ms; ahora el umbral (≥ 15) es una comprobación aparte. `test_round25` pasó en esta corrida (sigue siendo posicional).
 - Los tests online/sim (`test_net_*`, `test_fight_sim`, `test_sim_*`) deben pasar al 100 %.
 

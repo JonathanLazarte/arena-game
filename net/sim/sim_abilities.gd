@@ -2,7 +2,7 @@ class_name SimAbilities
 extends RefCounted
 ## Habilidades de jefe en la simulación determinista (BossAbilities + BossAbilitiesExt): estocada,
 ## carga en área, ráfaga teledirigida, escudo de maná (100 % invulnerable), combo de la pausa falsa,
-## salto con caída y las 13 ampliadas (timeline, ondas, lluvia, aliento, furia y contragolpe).
+## salto con caída y las ampliadas (timeline, ondas, lluvia, aliento, ráfaga, furia y contragolpe).
 ## Reglas: recarga global de 1,4 s tras cada habilidad (la ráfaga encadena consigo misma), coste en
 ## aguante/maná/vida (la vida nunca baja a 0), imbloqueables = tipo «jefe» (sin bloqueo ni parry).
 ## Todo en enteros: los tiempos se hornean a ticks con SimParams.tk() sobre la MISMA expresión en
@@ -101,18 +101,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["force"] = fmag.call(float(d["force"]))
 			c["end"] = _tk(float(d["windup"]) + float(d["recovery"]))
 		"rafaga":
-			c["type"] = T_RAFAGA
-			c["w"] = _tk(float(d["windup"]))
-			c["turn"] = _turn(360.0)
-			c["count"] = int(d["count"])
-			c["spd"] = _um(float(d["speed"]) / 60.0)
-			c["life"] = _tk(float(d["life"]))
-			c["radius"] = _um(float(d.get("radius", 0.7)))
-			c["force"] = fmag.call(float(d["force"]))
-			c["home_t"] = _tk(float(d["home_time"]))
-			c["home"] = int(round(float(d["home_deg"]) / 60.0 * 256000.0 / 360.0))
-			c["pitch"] = int(round(float(d.get("home_pitch_deg", 24.0)) / 60.0 * 256000.0 / 360.0))
-			c["end"] = _tk(float(d["windup"]) + float(d["recovery"]))
+			_compile_rafaga(c, d, fmag, 1.0)
 		"escudo_mana":
 			c["type"] = T_ESCUDO
 			c["w"] = _tk(float(d["windup"]))
@@ -203,6 +192,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["slam_k"] = _ml(float(d.get("slam_mult", 0.65)))
 			c["slam_force"] = fphys.call(float(d.get("slam_force", 40.0)))
 			c["slam_last"] = 1 if d.get("slam_on_last", false) else 0
+			c["slam_always"] = 1 if d.get("slam_always", false) else 0
 			c["block_cost"] = 0
 		"wave":
 			c["type"] = T_WAVE
@@ -266,7 +256,24 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["reach"] = _um(float(d.get("reach", 4.0)))
 			c["c_raw"] = _ml(w.heavy_damage * dm * float(d.get("cmult", 1.6)))
 			c["c_force"] = fphys.call(float(d.get("cforce", 55.0)))
+		"rafaga":
+			_compile_rafaga(c, d, fmag, tk)
 	return c
+
+## Tajo que persigue. scale 1 = ráfaga base (tiempos de escritorio); el resto alarga el aviso.
+static func _compile_rafaga(c: Dictionary, d: Dictionary, fmag: Callable, scale: float) -> void:
+	c["type"] = T_RAFAGA
+	c["w"] = _tk(float(d["windup"]) * scale)
+	c["turn"] = _turn(360.0)
+	c["count"] = int(d["count"])
+	c["spd"] = _um(float(d["speed"]) / 60.0)
+	c["life"] = _tk(float(d["life"]))
+	c["radius"] = _um(float(d.get("radius", 0.7)))
+	c["force"] = fmag.call(float(d["force"]))
+	c["home_t"] = _tk(float(d["home_time"]) * scale)
+	c["home"] = int(round(float(d["home_deg"]) / 60.0 * 256000.0 / 360.0))
+	c["pitch"] = int(round(float(d.get("home_pitch_deg", 24.0)) / 60.0 * 256000.0 / 360.0))
+	c["end"] = _tk((float(d["windup"]) + float(d["recovery"])) * scale)
 
 # ---------------- Utilidades ----------------
 static func _ab(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
@@ -793,7 +800,7 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, ab: Dictionary, h: Ar
 				s[b + FightSim.Z] = s[o + FightSim.Z] + FxMath.SIN[f] * int(ab["grab_d"]) / FxMath.ONE
 				clamp_world(s, P, b)
 	var last_ok: bool = int(ab["slam_last"]) == 0 or s[o + FightSim.AB_FIRED] >= (ab["hits"] as Array).size() - 1
-	if any_hit and last_ok and int(ab["slam_r"]) > 0:
+	if last_ok and int(ab["slam_r"]) > 0 and (any_hit or int(ab.get("slam_always", 0)) != 0):
 		var f2: int = s[o + FightSim.FACE]
 		spawn_hz(s, i, 1, s[o + FightSim.X] + FxMath.COS[f2] * 1200000 / FxMath.ONE, s[o + FightSim.Z] + FxMath.SIN[f2] * 1200000 / FxMath.ONE,
 			ab["slam_warn"], ab["slam_r"], raw_live(s, P, i, int(ab["raw"]) * int(ab["slam_k"]) / 1000), ab["slam_force"], 150000, 0)
