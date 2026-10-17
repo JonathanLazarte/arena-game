@@ -2,7 +2,7 @@
 
 Proyecto de Jonathan: luchador de arena 1v1 en **Godot 4.7.2** (GDScript), offline contra IA y online P2P con rollback. Vas a seguir el desarrollo **en local, en su PC Fedora Linux**. Repo: `https://github.com/JonathanLazarte/arena-game` (rama `master`, base de este handoff: `3fb3bd4`; fase 8 completa en `6f4d0ab`+).
 
-Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (reglas duraderas y números), `docs/netcode.md` (online, §9–§15), `docs/determinism_audit.md`, `server/README.md`, `server/DEPLOY.md`.
+Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (reglas duraderas y números), `docs/netcode.md` (online, §9–§15), `docs/determinism_audit.md`, `server/README.md`, `server/DEPLOY.md`. Para crear habilidades de jefe nuevas (o pedírselas a un modelo): `docs/abilities_guide.md` (esquema JSON objetivo, validación, ejemplos y «estado actual vs esquema»).
 
 ---
 

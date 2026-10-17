@@ -88,6 +88,9 @@ Patrones de jefe con nombres y números propios. Mismas reglas: aviso, coste, re
 | grito_guerra | Grito de Guerra | 26 aguante | bufo | 5,5 s de furia (+30 % daño, +15 % velocidad) |
 | guardia_reflejo | Guardia Refleja | 20 aguante | contra | ventana 1,6 s, alcance 3,2 m, castigo ×1,9 |
 
+### Esquema de datos de habilidades (objetivo)
+- Formato JSON objetivo para autorar habilidades (catálogo + presets de jefe, pasos 1..N con windup/activo/recuperación en ticks, hitboxes con daño por golpe, ramas y remates a elección): [`docs/abilities_guide.md`](abilities_guide.md). Hoy las habilidades siguen en `BossAbilities`/`BossAbilitiesExt`; la migración es trabajo futuro (la guía lista las divergencias).
+
 ## Fuerte cargado
 - La pose de carga del fuerte se ve desde que se empieza a mantener el ataque (antes de que salga el fuerte).
 
