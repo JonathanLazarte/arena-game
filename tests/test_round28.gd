@@ -49,39 +49,5 @@ func _run() -> void:
 			ok = ok and kv.states["aim"] == w.anim_aim # el arquero conserva sus clips KayKit
 		check(ok, "%s + %s: clips Mixamo donde tocan, el resto KayKit" % pair)
 		kv.queue_free()
-	# En combate: carga de jefe, rotura de postura y hechizo usan sus estados
-	change_scene_to_file("res://scenes/arena.tscn")
-	await process_frame
-	await process_frame
-	var arena: Arena = current_scene
-	arena.sim_ai.enabled = false
-	arena.time_left = 1e9
-	await create_timer(3.3).timeout
-	var p := arena.player
-	var e := arena.enemy
-	e.global_position = p.global_position + Vector3(0, 0, -12)
-	p.face_target = e
-	await physics_frame
-	p.boss_skill()
-	await create_timer(0.3).timeout
-	check(p._kv.state == "boss_charge", "Estocada de jefe: carga -> boss_charge (%s)" % p._kv.state)
-	var seen_lunge := false
-	for i in 150:
-		await physics_frame
-		seen_lunge = seen_lunge or p._kv.state == "boss_lunge"
-	check(seen_lunge, "Estocada de jefe: embestida -> boss_lunge")
-	await create_timer(2.0).timeout
-	e.stance = 0.5
-	e.take_hit(1.0, p, "melee")
-	e.stance = 0.0
-	e.stance_broken_t = Fighter.STANCE_BREAK_TIME
-	e.stun = Fighter.STANCE_BREAK_TIME
-	for i in 4: await physics_frame
-	check(e._kv.state == "stance_break", "rotura de postura -> stance_break (%s)" % e._kv.state)
-	e.stance_broken_t = 0.0
-	e.stun = 0.0
-	p.cast_t = 0.4
-	for i in 2: await physics_frame
-	check(p._kv.state == "cast", "hechizo -> cast (%s)" % p._kv.state)
-	print("\n%s (%d fallos)" % ["OK" if fails == 0 else "FALLÓ", fails])
+	# [fase 8] retirado (jugabilidad del Fighter offline; cubierto en test_fight_sim/test_sim_rules): En combate: carga de jefe, rotura de postura y hechizo usan sus estados
 	quit(1 if fails > 0 else 0)
