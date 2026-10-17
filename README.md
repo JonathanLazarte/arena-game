@@ -783,3 +783,7 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - 26 habilidades nuevas en la pestaña Jefe (45 en total). Reusan los ejecutores de la sim: golpe en línea de tiempo, ondas, lluvia, aliento, tajo que persigue, bufo y contragolpe. Nombres y números propios; el patrón de cada una está anotado en `docs/ELDEN_RING_REFERENCIA.md` §14.
 - El área de Flor Umbral y Picado de Alas sale aunque el cuerpo no conecte (`slam_always`). Lluvia de Lanzas, Columnas de Rayo y Lanza Celeste dibujan columna. Saeta Oscura y Orbe Lunar persiguen como la Ráfaga y se pueden repetir al terminar.
 - La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.
+
+## Ronda 47 — Fénix y fin de ronda
+- Al morir con un eikon activo la partida se cortaba: `dismiss_eikon` llamaba a `Mount.expire`, que no existía, y no llegaba a anunciar la ronda. Ahora la montura se retira y la ronda sigue.
+- En el fénix el jinete se sienta en el lomo (el vuelo ya no se aplica dos veces y la cadera sigue la silla). El lobo y el grifo siguen a 1,3 m. Prueba: `tests/test_mount_seat.gd`.

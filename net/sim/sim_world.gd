@@ -46,6 +46,16 @@ func _apply_pet(s: PackedInt64Array, P: Array, i: int) -> void:
 		if _pets[i] != null:
 			_free_pet(i)
 		return
+	# dismiss_eikon (fin de ronda) libera el nodo en el mismo apply que lo dibujó. No revivirlo.
+	if is_instance_valid(_pets[i]) and (_pets[i] as Node).is_queued_for_deletion():
+		_pets[i] = null
+		f.active_eikon = null
+		if f.mounted:
+			f.mounted = false
+			f.mount_node = null
+			f._apply_mount_visuals()
+			f.mount_changed.emit(false)
+		return
 	var ride := int(ek.get("ride", 0)) != 0 and f.eikon.rideable and f.eikon.ride != null
 	if _pets[i] == null or not is_instance_valid(_pets[i]):
 		if ride:

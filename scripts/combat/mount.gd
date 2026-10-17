@@ -66,7 +66,8 @@ func _build_model() -> void:
 	model = ResCache.scene(data.model_path).instantiate() as Node3D
 	# El glTF mira a +Z: lo giramos para que mire a -Z (frente del juego)
 	model.basis = Basis(Vector3.UP, PI) * Basis.from_scale(Vector3.ONE * data.model_scale)
-	model.position.y = data.hover
+	# La altura de vuelo la pone SimWorld en la raíz. Subir el modelo otra vez dejaba al jinete colgando.
+	model.position.y = 0.0
 	add_child(model)
 	if data.tint:
 		AnimUtil.tint_surfaces(model, data.color, 0.6 if data.hover > 0.0 else 0.5, 1.2 if data.hover > 0.0 else 0.0)
@@ -92,6 +93,7 @@ func _build_model() -> void:
 	tree.anim_player = tree.get_path_to(ap)
 	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	tree.active = true
+	tree.advance(0.0)
 	_last_pos = global_position
 
 func _update_anim(delta: float) -> void:
@@ -104,7 +106,8 @@ func _update_anim(delta: float) -> void:
 func saddle_position() -> Vector3:
 	if saddle and saddle.is_inside_tree():
 		return saddle.global_position + global_basis * data.saddle_offset
-	return global_transform * (SADDLE_FALLBACK + Vector3(0, data.hover, 0))
+	# La raíz ya está a data.hover (SimWorld). No sumar el vuelo otra vez.
+	return global_transform * SADDLE_FALLBACK
 
 func is_free() -> bool:
 	return rider == null
@@ -137,6 +140,20 @@ func set_rider(r: Fighter) -> void:
 	if r == null:
 		home = global_position
 		_wander_t = 1.0
+
+## La vista lo llama al cerrar la ronda. La sim ya no tiene un reloj propio en la montura.
+func expire() -> void:
+	var r := rider
+	rider = null
+	if is_instance_valid(r) and r.mount_node == self:
+		r.mount_node = null
+		r.mounted = false
+		if r.active_eikon == self:
+			r.active_eikon = null
+		r._apply_mount_visuals()
+		r.mount_changed.emit(false)
+	expired.emit(self)
+	queue_free()
 
 var puppet := false ## fase 8: la mueve la sim (SimWorld); sin lógica propia
 ## Fase 8: títere visual (SimWorld la coloca); sin lógica propia.
