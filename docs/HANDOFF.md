@@ -35,7 +35,7 @@ Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (
 ## 3. Arquitectura online
 - **Modelo**: rollback P2P estilo GGPO. Solo viajan inputs. Sim pura de enteros a **60 Hz**; jamás lee delta, reloj, `Engine.time_scale` ni física del árbol.
 - **`net/sim/fight_sim.gd`**: estado = un `PackedInt64Array` (2 luchadores × N campos + globales: frame, freeze de hit-stop, RNG xorshift, rondas `G_WINS0/1`, `G_ROUND`, `G_END_T` + pools: proyectiles 12, hazards 16). `SIZE` se calcula al final de las constantes de layout. Unidades: posición µm, velocidad µm/tick, HP/aguante en milésimas, multiplicadores ‰, timers en ticks, rumbo 0..255. Checksum FNV-1a. Save/load = `duplicate()`.
-- **Bits de entrada**: 0–4 rumbo (32), 5 move, 6 medio stick, 7 atacar, 8 bloquear, 9 parry, 10 rodar, 11 correr, 12 swap, 13 fijar, 14 IN_BOSS, 15 IN_BOSS_NEXT, 16 IN_SPELL, 17 IN_SPELL_NEXT, 18 IN_EIKON, 19 IN_MOUNT, 20 IN_ART, 21 IN_BOSS_VAR, 22 IN_JUMP, 23 IN_FLASK. Flancos derivados en la sim (`prev_input` en estado).
+- **Bits de entrada**: 0–4 rumbo (32), 5 move, 6 medio stick, 7 atacar, 8 bloquear, 9 parry, 10 rodar, 11 correr, 12 swap, 13 fijar, 14 IN_BOSS, 15 IN_BOSS_NEXT, 16 IN_SPELL, 17 IN_SPELL_NEXT, 18 IN_EIKON, 19 IN_MOUNT, 20 IN_ART, 21 IN_BOSS_VAR, 22 IN_JUMP, 23 IN_FLASK, 24–29 rumbo de apuntado (64 pasos), 30 IN_AIM (31 libre: paquete int32). Flancos derivados en la sim (`prev_input` en estado).
 - **`fx_math.gd`**: trig por tabla, sqrt/atan2 enteros. **`sim_abilities.gd`**, **`sim_magic.gd`**: jefe, magia, eikons, montura.
 - **`SimParams.bake(a, b)`**: se calcula una vez por partida desde los dos `Fighter` reales (personaje, arma, atributos, armadura, amuletos, loadout). Pre-resuelve daño/tablas de defensa por par atacante→defensor; duraciones vía `tk()` (replica la acumulación float offline). `params_checksum()` se intercambia: si difiere → `params_mismatch`. Lenience de parry online según delay inicial (`lenience_for_delay`).
 - **`RbSession`** (`net/rb_session.gd`): input delay (1–4, adaptativo en partida con histéresis), predicción (repite último input), ventana 8 ticks, resim, stall, checksums confirmados, `reset_to(estado, f)` con épocas (reconexión). `fight_engine.gd` = adaptador RbEngine.
@@ -68,7 +68,7 @@ godot --headless --path . -s res://tests/bench_net_rollback.gd -- 2 8
 cd server && npm ci && npm test && GODOT=$(which godot) npm run test:e2e
 ```
 - **Fase 8**: las pruebas antiguas de jugabilidad del Fighter offline se portaron a la sim (`test_sim_rules`, `test_sim_ai`) o se retiraron; las secciones retiradas de los tests por rondas llevan el comentario `[fase 8] retirado` con el motivo. Los tests de datos/UI se ajustaron al diseño actual.
-- **Línea base (2026-10-17, `6f4d0ab`, Godot 4.7.2 headless, 41 `test_*.gd`):** 40/41 pasan. Falla solo `test_ui_audio` (la ✕ de Ajustes no sigue el ancho del panel, UI). `test_net_relay5` y `test_net_matchmaking` fallan sin relay y pasan con el relay local levantado (`cd server && npm run build && PORT=47800 REGION=local npm start`); `test_net_reconnect` pasa sin él. Relay: `npm test` 9/9, `npm run test:e2e` 5/5.
+- **Línea base fase 9 (2026-10-17, Godot 4.7.2 headless, 45 `test_*.gd`):** 45/45 pasan con el relay local levantado (`cd server && npm run build && PORT=47800 REGION=local npm start`; sin él fallan solo `test_net_relay5` y `test_net_matchmaking`). Nuevos: `test_boss_ui`, `test_bow_aim`, `test_net_rematch`, `test_ability_fx`. Relay: `npm test` 9/9, `npm run test:e2e` 5/5 (protocolo 8). Antes (fase 8, `6f4d0ab`): 40/41, fallaba `test_ui_audio`.
 - `test_net_events` no era flaky: exigía `> 20` eventos y la partida genera exactamente 20 a 50 ms; ahora el umbral (≥ 15) es una comprobación aparte. `test_round25` pasó en esta corrida (sigue siendo posicional).
 - Los tests online/sim (`test_net_*`, `test_fight_sim`, `test_sim_*`) deben pasar al 100 %.
 
@@ -96,7 +96,7 @@ Para instalar por sideload en el teléfono hay que **desactivar Play Protect** (
 
 **Linux:** `godot --headless --path . --export-release Linux ../out/linux/ArenaGame.x86_64` (o `--export-debug`) y `chmod +x`.
 
-**Última build (fase 8):** `/workspace/arena-game-build/arena-game-f8.apk` (debug, arm64-v8a + armeabi-v7a, firmada v2+v3 con la debug keystore; `apksigner verify` OK) y `/workspace/arena-game-build/arena-game-f8-linux.zip` (binario `arena-game-f8-linux.x86_64`, pck embebido, modo 755). `apksigner` necesita `JAVA_HOME` (JDK 17) en el PATH.
+**Última build (fase 9):** `/workspace/arena-game-build/arena-game-f9.apk` (debug, arm64-v8a + armeabi-v7a, firmada v2+v3 con la debug keystore; `apksigner verify` OK) y `/workspace/arena-game-build/arena-game-f9-linux.zip` (binario `arena-game-f9-linux.x86_64`, pck embebido, modo 755). `apksigner` necesita `JAVA_HOME` (JDK 17) en el PATH.
 
 **Firewall Fedora para LAN** (host de partida LAN):
 ```bash
@@ -123,15 +123,15 @@ Andar 8,3 m/s, correr ×1,3; aceleraciones, giro (13 rumbos/tick) y frenado en `
 ## 10. Huecos conocidos
 1. `NetLink` resuelve el DNS del relay **sincrónicamente** (`IP.resolve_hostname` en `net_link.gd` ~l.119 y ~l.181): congela la UI si el DNS tarda. Pasar a `IP.resolve_hostname_queue_item` + poll.
 2. Referencias a Elden Ring / Dark Souls en docs y comentarios (README rondas 9/25, `docs/design.md`, `docs/ELDEN_RING_REFERENCIA.md`, comentarios "estilo ER") → limpiar/renombrar.
-3. `test_ui_audio` (✕ de Ajustes) falla; `test_round25` posiblemente flaky (posicional).
-6. Fase 8: el HUD del campeón muestra las 3 habilidades aunque la 3.ª se desbloquee en Fase II; offline no hay apuntado con ratón del arco (sigue facing/fijado); visuales de habilidades offline = primitivas de SimWorld.
+3. `test_round25` posiblemente flaky (posicional).
+6. Fase 9 cerró los huecos de la fase 8 (✕ de Ajustes, HUD del campeón, apuntado con ratón, efectos de habilidades, iconos, ciclo ▶, revancha online); ver `docs/netcode.md` §17.
 4. Relay sin desplegar; IPv4 solo.
 5. Pendiente de design: Erika sin FBX de Mixamo.
 
 ## 11. Próximos pasos (prioridad)
 2. Desplegar el relay (Oracle São Paulo) y probar partida rápida Android↔Linux real; anotar IP/host en la config por defecto.
 3. DNS asíncrono en `NetLink`.
-4. Vigilar `test_round25`; arreglar la ✕ de Ajustes; visuales completos de habilidades sobre eventos de la sim.
+4. Vigilar `test_round25`. Probar la revancha y el apuntado con ratón en una partida real Android↔Linux.
 5. Limpiar referencias FromSoftware en docs/comentarios/nombres.
 6. Probar rendimiento de rollback en un Android medio (overlay F3/"Red": µs por paso).
 7. Checklist de release: `DEBUG_GRANT=false`, keystore de release, versión de app.

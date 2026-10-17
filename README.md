@@ -771,3 +771,10 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - Nuevo en la sim: frasco (1 carga por ronda, H / «Frasco»), Fase II del campeón, golpe sísmico del personaje, estocada tras el paso atrás.
 - Cambios para el jugador offline: el movimiento y los tiempos son exactamente los del online (sin suavizado de entrada propio); los efectos de habilidades se dibujan con las primitivas de `SimWorld`; el arco apunta por orientación/fijado (sin apuntado con ratón); el HUD del campeón muestra las 3 habilidades aunque la 3.ª llegue en Fase II.
 - Retirados: `AIController`, `FighterCombat`/`FighterBossExt`/`FighterMount`, `GroundWave`, la lógica de `Projectile`/`GroundAoE`, el modo `Arena.sim_mode`/`start_mounted` y `test_net_parity`; las pruebas antiguas de jugabilidad se portaron a `test_sim_rules`/`test_sim_ai`.
+
+## Fase 9 — Arreglos tras probar la f8 (protocolo 8)
+- Ajustes: la ✕ vuelve a la esquina del panel (la ayuda de mano izquierda ensanchaba el panel; ahora hace autowrap).
+- Habilidades de jefe: iconos vectoriales propios (`BossIcon`) y nombres cortos en la pestaña Jefe y en el HUD (antes se veían «números»: el coste y glifos que las fuentes no tienen). El ▶ cambia de habilidad de verdad offline y online (es una entrada de la sim). El campeón muestra solo sus habilidades disponibles: la 3.ª aparece en Fase II.
+- Arco: vuelve el apuntado con ratón, ahora como entrada de la sim (rumbo cuantizado en 64 pasos), igual offline y online. Se puede desactivar en Ajustes.
+- Efectos de habilidades completos (partículas, burbuja, auras, marcas de suelo con borde y destello, ondas, media luna de la ráfaga, orbes) dibujados desde el estado de la sim.
+- Revancha online: los dos eligen «Revancha», siguen conectados y empieza otra partida con los mismos ajustes y una semilla nueva acordada; si el rival vuelve al lobby, se avisa.
