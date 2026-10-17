@@ -118,7 +118,11 @@ func _ready() -> void:
 	boss_next_btn.position = Vector2(884, 278)
 	boss_next_btn.add_theme_font_size_override("font_size", 22)
 	boss_next_btn.pressed.connect(func() -> void:
-		if _player:
+		if online_mode:
+			# online: la sim lee la acción «boss_next» (flanco); se mantiene un instante
+			Input.action_press("boss_next")
+			get_tree().create_timer(0.12).timeout.connect(func() -> void: Input.action_release("boss_next"))
+		elif _player:
 			_player.cycle_boss())
 	add_child(boss_next_btn)
 	for l: Label in [round_label, timer_label, message]:
@@ -203,6 +207,8 @@ func set_touch_visible(v: bool) -> void:
 var btns: Dictionary = {} ## ronda 21: acción -> TouchScreenButton
 var btn_labels: Dictionary = {}
 var boss_next_btn: Button
+## Online: los botones táctiles solo generan acciones; la sim (SimMatch) las convierte en bits de entrada.
+var online_mode := false
 
 func _touch_button(text: String, action: String, center: Vector2, r: float, c: Color) -> void:
 	var tb := TouchScreenButton.new()

@@ -148,6 +148,7 @@ func _setup_sim_match() -> void:
 	add_child(sim_match)
 	sim_match.joystick = hud.joystick
 	if online:
+		hud.online_mode = true
 		online.local_ready = false # hasta calentar la escena (ver _process_online_hud)
 		# el anfitrión es el jugador 0 de la sim; el invitado ve su luchador (nodo player) en el hueco 1
 		if online.me == 1:
