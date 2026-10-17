@@ -310,7 +310,7 @@ func _build_ability_picker() -> void:
 	p.add_child(vb)
 
 	var top := HBoxContainer.new()
-	var tlabel := UIKit.title("CATÁLOGO DE HABILIDADES DE JEFE (MODO ADMIN)", 20, UIKit.YELLOW)
+	var tlabel := UIKit.title("CATÁLOGO DE HABILIDADES (MODO ADMIN)", 20, UIKit.YELLOW)
 	tlabel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(tlabel)
 	var close_btn := UIKit.button("Cerrar ✕", 16)
@@ -324,15 +324,26 @@ func _build_ability_picker() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vb.add_child(scroll)
 
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	scroll.add_child(stack)
+	_picker_group(stack, "De jefe", "boss")
+	_picker_group(stack, "De arma", "weapon")
+
+func _picker_group(stack: VBoxContainer, title: String, origin: String) -> void:
+	stack.add_child(UIKit.label(title, 16, UIKit.YELLOW))
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 6)
-	scroll.add_child(grid)
-
+	stack.add_child(grid)
 	var all_ids: Array = BossAbilities.all_ids()
+	var n := 0
 	for idx in all_ids.size():
 		var ab_id: String = String(all_ids[idx])
+		if BossAbilities.origin_of(ab_id) != origin:
+			continue
+		n += 1
 		var d: Dictionary = BossAbilities.def(ab_id)
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(275, 44)
@@ -351,6 +362,8 @@ func _build_ability_picker() -> void:
 			ability_picker_panel.visible = false
 		)
 		grid.add_child(b)
+	if n == 0:
+		stack.add_child(UIKit.label("Ninguna en el catálogo.", 14, UIKit.MUTED))
 
 ## Fase 9: cambiar de habilidad es un flanco de entrada de la sim (antes, offline, se cambiaba en el
 ## Fighter y SimView lo devolvía al valor de la sim en el tick siguiente: el botón «parpadeaba»).

@@ -23,6 +23,8 @@ const COST_NAMES := {"stamina": "aguante", "mana": "maná", "health": "vida"}
 const CATALOG_PATH := "res://data/abilities/catalog.json"
 
 static var _source: Dictionary = {}
+static var _origin: Dictionary = {}
+static var _weapons: Dictionary = {}
 static var _loaded := false
 
 ## Fase 9: nombre corto para botones/HUD y color propio de cada habilidad (icono BossIcon).
@@ -67,6 +69,23 @@ static func has(id: String) -> bool:
 	_ensure()
 	return _source.has(id) or HojaCatalog.has(id) or EldenCatalog.has(id)
 
+## "boss" o "weapon". El programa numérico sigue en source; el origen es origin.
+static func origin_of(id: String) -> String:
+	_ensure()
+	return String(_origin.get(id, "boss"))
+
+static func requires_weapon(id: String) -> Array:
+	_ensure()
+	var w: Variant = _weapons.get(id, [])
+	return (w as Array).duplicate() if w is Array else []
+
+static func ids_of(origin: String) -> Array:
+	var out: Array = []
+	for id: String in all_ids():
+		if origin_of(String(id)) == origin:
+			out.append(id)
+	return out
+
 ## Definición de compilación (tiempos en segundos). Sale de catalog.json → source.
 ## Hoja y Elden siguen en sus catálogos.
 static func def(id: String) -> Dictionary:
@@ -93,9 +112,19 @@ static func _ensure() -> void:
 	for a: Variant in (parsed as Dictionary).get("abilities", []):
 		if not (a is Dictionary):
 			continue
-		var id := String((a as Dictionary).get("id", ""))
-		var src: Variant = (a as Dictionary).get("source", null)
-		if id != "" and src is Dictionary:
+		var row: Dictionary = a
+		var id := String(row.get("id", ""))
+		if id == "":
+			continue
+		var org := String(row.get("origin", "boss"))
+		_origin[id] = "weapon" if org == "weapon" else "boss"
+		var req: Array = []
+		for w: Variant in row.get("requires_weapon", []):
+			if w is String and String(w) != "":
+				req.append(String(w))
+		_weapons[id] = req
+		var src: Variant = row.get("source", null)
+		if src is Dictionary:
 			_source[id] = _restore(src)
 
 static func _restore(v: Variant) -> Variant:

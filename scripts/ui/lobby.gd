@@ -1210,29 +1210,47 @@ func _build_settings() -> void:
 	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nCámara: sensibilidad de la órbita, invertir Y y ratón capturado (por defecto se orbita con clic derecho arrastrando; Esc libera el ratón). En Android, arrastra en la mitad derecha.\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
 
 
-## Ronda 31: habilidades de jefe (máx. 3 equipadas, sin recarga: cada una cuesta un recurso).
+## Ronda 31: habilidades (máx. 3 equipadas). Se separan por origin: jefe y arma.
 func _build_boss() -> void:
 	var eq: Array = gs.boss_abilities()
 	list_box.add_child(UIKit.label("Equipadas %d/%d · B usa · N cambia" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.MUTED))
-	for id: String in BossAbilities.all_ids():
+	_boss_group("De jefe", "boss", eq)
+	_boss_group("De arma", "weapon", eq)
+	detail.text = "[b]Habilidades[/b]\nLas de jefe y las de arma van aparte. Cuestan aguante, maná (Energía) o vida (nunca te dejan a 0). Recarga global de 1,4 s entre habilidades.\n\n" + BossAbilities.codex(String(eq[0]))
+
+func _boss_group(title: String, origin: String, eq: Array) -> void:
+	var ids: Array = BossAbilities.ids_of(origin)
+	list_box.add_child(UIKit.label(title, 14, UIKit.YELLOW))
+	if ids.is_empty():
+		list_box.add_child(UIKit.label("Ninguna en el catálogo.", 15, UIKit.MUTED))
+		return
+	for id: String in ids:
 		var on: bool = id in eq
-		# fase 9: icono vectorial propio (antes «✔» de la fuente, que en Android salía como caja con números)
-		var b := UIKit.button("          %s  (%s)" % [BossAbilities.def(id)["name"], BossAbilities.cost_text(id)], 17, UIKit.ORANGE if on else UIKit.BLUE)
-		b.name = "Boss_" + id
+		var need: Array = BossAbilities.requires_weapon(id)
+		var holds: bool = need.is_empty() or gs.weapon_id in need or gs.weapon2_id in need
+		var extra := ""
+		if not need.is_empty():
+			extra = "  ·  " + ", ".join(PackedStringArray(need))
+		var ability_id := String(id)
+		var req := need.duplicate()
+		var b := UIKit.button("          %s  (%s)%s" % [BossAbilities.def(ability_id)["name"], BossAbilities.cost_text(ability_id), extra], 17, UIKit.ORANGE if on else UIKit.BLUE)
+		b.name = "Boss_" + ability_id
 		b.custom_minimum_size = Vector2(370, 42)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		var ic := BossIcon.make(id, 32.0)
+		b.disabled = origin == "weapon" and not on and not holds
+		var ic := BossIcon.make(ability_id, 32.0)
 		ic.name = "Icon"
 		ic.active = on
 		ic.position = Vector2(10, 5)
 		b.add_child(ic)
 		b.pressed.connect(func() -> void:
-			gs.toggle_boss_ability(id)
+			if origin == "weapon" and not (ability_id in gs.boss_abilities()) and not (gs.weapon_id in req or gs.weapon2_id in req):
+				return
+			gs.toggle_boss_ability(ability_id)
 			gs.save_loadout()
 			_refresh_all(false)
-			detail.text = BossAbilities.codex(id))
+			detail.text = BossAbilities.codex(ability_id))
 		list_box.add_child(b)
-	detail.text = "[b]Habilidades de jefe[/b]\nCuestan aguante, maná (Energía) o vida (nunca te dejan a 0). Recarga global de 1,4 s entre habilidades.\n\n" + BossAbilities.codex(String(eq[0]))
 
 ## La ✕ sigue la esquina superior derecha del panel visible aunque su contenido lo ensanche.
 func _place_close() -> void:

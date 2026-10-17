@@ -57,6 +57,14 @@ const NEXT_KEYS := ["default", "on_hit", "on_whiff", "on_blocked"]
 const HINT_DODGE := ["roll_early", "roll_late", "roll_through", "sidestep", "jump", "distance", "parry", "block"]
 const HINT_DIR := ["side", "back", "forward", "any"]
 const REQUIRES := ["target_close", "target_far", "last_hit_landed", "phase2"]
+## Origen de la habilidad. `source` ya es el programa numérico de las 45: no se reutiliza este nombre.
+const ORIGINS := ["boss", "weapon"]
+## Alcance vertical (µm). ground_only: true es el atajo de 0,35 m. No hay campo air_reach.
+const REACH_NONE := -1
+const REACH_GROUND_UM := 350000
+const REACH_JUMP_UM := 2000000
+const REACH_LEVITATE_UM := 2500000
+const REACH_HIGH_UM := 4500000
 ## V19: nombres de otras franquicias (palabras completas, minúsculas sin tildes).
 const FORBIDDEN_NAMES := ["malenia", "margit", "radahn", "godfrey", "mohg", "morgott", "rennala", "rykard", "ranni",
 	"godrick", "maliketh", "placidusax", "miquella", "marika", "waterfowl", "elden", "fromsoftware", "fromsoft",
@@ -97,6 +105,48 @@ static func load_data(data: Variant, opts: Dictionary = {}) -> Dictionary:
 	return c.result(baked)
 
 ## FNV-1a 32 bits sobre el texto de la estructura horneada.
+## Alcance aéreo derivado: el `reach_um` más alto de las cajas. -1 = alguna caja no declara tope
+## (sin ground_only y sin reach_height_m: la sim de hoy pega a cualquier altura).
+## Proyectil y rayo no entran acá; los mira `answers_levitation`.
+static func air_reach_um(ability: Dictionary) -> int:
+	var best := 0
+	var saw := false
+	for st: Variant in ability.get("steps", []):
+		if not (st is Dictionary):
+			continue
+		for hb: Variant in (st as Dictionary).get("hitboxes", []):
+			if not (hb is Dictionary):
+				continue
+			var r := int((hb as Dictionary).get("reach_um", REACH_NONE))
+			if r < 0:
+				return REACH_NONE
+			saw = true
+			if r > best:
+				best = r
+	return best if saw else 0
+
+## V20: responde a la levitación (2,5 m) por proyectil, rayo, tope declarado ≥ 2,5 m, o caja sin tope.
+static func answers_levitation(ability: Dictionary) -> bool:
+	var reach := air_reach_um(ability)
+	if reach < 0 or reach >= REACH_LEVITATE_UM:
+		return true
+	for st: Variant in ability.get("steps", []):
+		if not (st is Dictionary):
+			continue
+		for sp: Variant in (st as Dictionary).get("spawns", []):
+			if not (sp is Dictionary):
+				continue
+			var t := int((sp as Dictionary).get("type", -1))
+			if t >= 0 and t < SPAWNS.size() and (SPAWNS[t] == "projectile" or SPAWNS[t] == "beam"):
+				return true
+	return false
+
+static func _weapon_ids() -> Dictionary:
+	var out := {}
+	for w in Catalog.weapons():
+		out[String(w.id)] = true
+	return out
+
 static func checksum(baked: Variant) -> int:
 	var h := 2166136261
 	for b in var_to_str(baked).to_utf8_buffer():
@@ -428,6 +478,14 @@ static func _catalog(c: Ctx, d: Dictionary) -> Variant:
 						if tx["sound"] == ty["sound"]:
 							c.err(p, "V03", "«%s» y «%s» comparten sonido de aviso" % [ids[x], ids[y]])
 		presets.append({"index": presets.size(), "id": pid, "name": pname, "abilities": idx})
+		# V20: advertencia de justicia. Cada preset necesita una respuesta a 2,5 m.
+		var answers := false
+		for ai: int in idx:
+			if ai >= 0 and ai < abilities.size() and abilities[ai] is Dictionary and answers_levitation(abilities[ai]):
+				answers = true
+				break
+		if not idx.is_empty() and not answers:
+			c.warn(p, "V20", "ninguna habilidad alcanza 2,5 m (proyectil, rayo o reach_height_m)")
 	# V15: fase 2 solo tiene sentido en el 3.er lugar de un preset
 	for i in abilities.size():
 		var a: Dictionary = abilities[i]
@@ -461,9 +519,29 @@ static func _names(c: Ctx, path: String, texts: Array) -> void:
 
 static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Dictionary:
 	_unknown(c, a, p, ["id", "name", "icon", "category", "tags", "unlock", "cost", "cooldown_ticks", "uses_global_cd",
-		"usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source"])
+		"usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source",
+		"origin", "requires_weapon"])
 	if a.has("source") and not (a["source"] is Dictionary):
-		c.err(_p(p, "source"), "SCHEMA", "source debe ser un objeto")
+		c.err(_p(p, "source"), "SCHEMA", "source debe ser un objeto (el programa numérico). El origen va en origin")
+	var origin := _enum(c, a, "origin", p, ORIGINS, false, "boss")
+	var weapons: Array = []
+	var wsrc := _arr(c, a, "requires_weapon", p, false)
+	var known := _weapon_ids()
+	for i in wsrc.size():
+		if not (wsrc[i] is String) or String(wsrc[i]) == "":
+			c.err("%s.requires_weapon[%d]" % [p, i], "SCHEMA", "id de arma vacío")
+			continue
+		var wid := String(wsrc[i])
+		if weapons.has(wid):
+			c.err("%s.requires_weapon[%d]" % [p, i], "SCHEMA", "arma repetida «%s»" % wid)
+			continue
+		if not known.has(wid):
+			c.err("%s.requires_weapon[%d]" % [p, i], "SCHEMA", "arma inexistente «%s»" % wid)
+		weapons.append(wid)
+	if origin == ORIGINS.find("weapon") and weapons.is_empty():
+		c.err(_p(p, "requires_weapon"), "SCHEMA", "una habilidad de arma necesita requires_weapon")
+	if origin != ORIGINS.find("weapon") and not weapons.is_empty():
+		c.err(_p(p, "requires_weapon"), "SCHEMA", "requires_weapon solo vale con origin weapon")
 	var id := _str(c, a, "id", p, true)
 	var re := RegEx.new()
 	re.compile("^[a-z][a-z0-9_]{2,31}$")
@@ -572,7 +650,8 @@ static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Di
 		_ability_rules(c, p, a, steps, intr, ssrc)
 	return {"index": ai, "id": id, "name": name, "icon": icon, "category": cat, "tags": tags, "unlock_phase": phase,
 		"cost": cost, "cooldown": cd, "uses_global_cd": 1 if gcd else 0, "usable_mask": usable, "interrupt_mask": intr,
-		"interrupt_priority": iprio, "on_interrupt": on_int, "entry": entry, "steps": steps, "ai": aiout}
+		"interrupt_priority": iprio, "on_interrupt": on_int, "entry": entry, "steps": steps, "ai": aiout,
+		"origin": origin, "requires_weapon": weapons}
 
 ## Grafo de pasos: alcanzabilidad (V05), ciclos con max_loops (V05), terminales con recuperación (V06).
 static func _graph(c: Ctx, p: String, steps: Array, entry: int, ssrc: Array) -> void:
@@ -908,7 +987,7 @@ static func _step(c: Ctx, s: Dictionary, p: String, si: int, sidx: Dictionary, i
 static func _hitbox(c: Ctx, h: Dictionary, p: String, active: int, windup: int, full: bool) -> Dictionary:
 	var allowed := ["damage_per_hit", "damage_type", "damage_scaling", "blockable", "parryable", "stun_power", "stun_scaling"]
 	if full:
-		allowed += ["id", "shape", "offset", "anchor", "ground_only", "from_tick", "to_tick", "hits", "hit_interval_ticks",
+		allowed += ["id", "shape", "offset", "anchor", "ground_only", "reach_height_m", "from_tick", "to_tick", "hits", "hit_interval_ticks",
 			"on_hit", "consumes_mark", "lifesteal_pct"]
 	_unknown(c, h, p, allowed)
 	var out := {"dmg": milli(_num(c, h, "damage_per_hit", p, true, 0.0, 0.0, 500.0)),
@@ -926,7 +1005,18 @@ static func _hitbox(c: Ctx, h: Dictionary, p: String, active: int, windup: int, 
 	out["fwd"] = off[0]
 	out["right"] = off[1]
 	out["anchor"] = _enum(c, h, "anchor", p, ANCHORS, false, "self")
-	out["ground_only"] = 1 if _bool(c, h, "ground_only", p, false) else 0
+	var ground := _bool(c, h, "ground_only", p, false)
+	out["ground_only"] = 1 if ground else 0
+	# ground_only sigue siendo el bit que lee la sim. reach_um es el tope declarado, en µm.
+	if h.has("reach_height_m"):
+		var reach_m := _num(c, h, "reach_height_m", p, true, 0.0, 0.0, 8.0)
+		out["reach_um"] = um(reach_m)
+		if ground and int(out["reach_um"]) != REACH_GROUND_UM:
+			c.err(_p(p, "reach_height_m"), "SCHEMA", "ground_only es el atajo de 0,35 m")
+	elif ground:
+		out["reach_um"] = REACH_GROUND_UM
+	else:
+		out["reach_um"] = REACH_NONE
 	var r := _range(c, h, p, 0, active, "el activo")
 	out["from"] = r[0]
 	out["to"] = r[1]
@@ -1002,7 +1092,7 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 		"spread": heading(_num(c, s, "spread_deg", p, false, 0.0, 0.0, 360.0))}
 	match SPAWNS[t]:
 		"ground_mark":
-			_unknown(c, s, p, common + ["shape", "warn_ticks", "damage", "stun_power", "knockback_mps", "blockable", "mode", "scatter_radius_m", "interval_ticks", "on"])
+			_unknown(c, s, p, common + ["shape", "warn_ticks", "damage", "stun_power", "knockback_mps", "blockable", "mode", "scatter_radius_m", "interval_ticks", "on", "hits_airborne"])
 			out["shape"] = _shape(c, s, "shape", p, true)
 			out["warn"] = _int(c, s, "warn_ticks", p, true, 30, 0, 600)
 			if int(out["warn"]) < 30:
@@ -1015,8 +1105,9 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["scatter_r"] = um(_num(c, s, "scatter_radius_m", p, false, 0.0, 0.0, 20.0))
 			out["interval"] = _int(c, s, "interval_ticks", p, false, 0, 0, 600)
 			out["on"] = _enum(c, s, "on", p, SPAWN_ON, false, "always")
+			out["hits_airborne"] = 1 if _bool(c, s, "hits_airborne", p, false) else 0
 		"ground_wave":
-			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable", "on", "knockback_mps"])
+			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable", "on", "knockback_mps", "hits_airborne"])
 			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 40.0))
 			out["range"] = um(_num(c, s, "range_m", p, true, 0.0, 0.1, 40.0))
 			out["width"] = um(_num(c, s, "width_m", p, true, 0.0, 0.1, 10.0))
@@ -1027,6 +1118,7 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["blockable"] = 1 if _bool(c, s, "blockable", p, true) else 0
 			out["on"] = _enum(c, s, "on", p, SPAWN_ON, false, "always")
 			out["knock"] = upt(_num(c, s, "knockback_mps", p, false, 6.0, 0.0, 40.0))
+			out["hits_airborne"] = 1 if _bool(c, s, "hits_airborne", p, false) else 0
 		"projectile":
 			_unknown(c, s, p, common + ["speed_mps", "homing_deg", "homing_ticks", "lifetime_ticks", "radius_m", "pierce", "reflectable_by_parry", "hitbox"])
 			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 60.0))
@@ -1040,13 +1132,14 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["hitbox"] = _hitbox(c, hb, _p(p, "hitbox"), 1, windup, false) if hb != null else null
 			if hb != null: out["blockable"] = int(out["hitbox"]["blockable"])
 		"zone":
-			_unknown(c, s, p, common + ["shape", "delay_ticks", "duration_ticks", "hitbox_every_ticks", "damage", "status"])
+			_unknown(c, s, p, common + ["shape", "delay_ticks", "duration_ticks", "hitbox_every_ticks", "damage", "status", "hits_airborne"])
 			out["shape"] = _shape(c, s, "shape", p, true)
 			out["delay"] = _int(c, s, "delay_ticks", p, false, 0, 0, 600)
 			out["duration"] = _int(c, s, "duration_ticks", p, true, 1, 1, 1200)
 			out["every"] = _int(c, s, "hitbox_every_ticks", p, true, 1, 1, 600)
 			out["dmg"] = milli(_num(c, s, "damage", p, true, 0.0, 0.0, 500.0))
 			out["status"] = _status(c, _obj(c, s, "status", p, false), _p(p, "status"))
+			out["hits_airborne"] = 1 if _bool(c, s, "hits_airborne", p, false) else 0
 		"beam":
 			_unknown(c, s, p, common + ["length_m", "width_m", "angle_deg", "duration_ticks", "tick_interval", "sweep_deg_per_sec", "damage", "stun_power"])
 			out["len"] = um(_num(c, s, "length_m", p, true, 0.0, 0.1, 40.0))

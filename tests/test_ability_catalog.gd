@@ -116,6 +116,65 @@ func _run() -> void:
 	var v18 := _mut(func(d: Dictionary) -> void: _ab(d, "hachazo_penitente")["interruptible_by"] = [])
 	check(v18["ok"] and int(v18["baked"]["abilities"][1]["interrupt_mask"]) == 0, "interruptible_by vacío = no se corta (máscara 0)")
 	_expect("V19", func(d: Dictionary) -> void: _ab(d, "saeta_brasas")["name"] = "Saeta de Malenia", "nombre de otra franquicia", "abilities[3]")
+	# --- alcance vertical, spawns de suelo, origen, V20
+	var suelo: Dictionary = b["abilities"][int(b["ability_index"]["cadena_abismo"])]["steps"][1]["hitboxes"][0]
+	check(int(suelo["ground_only"]) == 1 and int(suelo["reach_um"]) == AC.REACH_GROUND_UM, "ground_only hornea 0,35 m (350000 µm)")
+	var libre: Dictionary = b["abilities"][int(b["ability_index"]["hachazo_penitente"])]["steps"][0]["hitboxes"][0]
+	check(int(libre["ground_only"]) == 0 and int(libre["reach_um"]) == AC.REACH_NONE, "sin ground_only ni reach_height_m: sin tope (-1)")
+	var onda: Dictionary = b["abilities"][int(b["ability_index"]["hachazo_penitente"])]["steps"][0]["spawns"][0]
+	check(int(onda["hits_airborne"]) == 0, "spawn de suelo: hits_airborne por defecto false")
+	check(int(b["abilities"][0]["origin"]) == AC.ORIGINS.find("boss") and (b["abilities"][0]["requires_weapon"] as Array).is_empty(), "origin por defecto boss")
+	check(SimParams.MOUNT_HOVER_M == 1.2 and SimParams.MOUNT_HOVER_UM == 1200000, "mount_hover_m = 1,2 m")
+	check(SimParams.EIKON_FLY_M == 3.5 and SimParams.EIKON_FLY_UM == 3500000, "eikon_fly_m = 3,5 m, sin simular")
+	check(SimAI.air_reach_um(b["abilities"][int(b["ability_index"]["hachazo_penitente"])]) == AC.air_reach_um(b["abilities"][int(b["ability_index"]["hachazo_penitente"])]), "la IA usa el mismo alcance que el validador")
+	var alto := _mut(func(d: Dictionary) -> void:
+		for paso: Dictionary in _ab(d, "hachazo_penitente")["steps"]:
+			for caja: Dictionary in paso.get("hitboxes", []):
+				caja["ground_only"] = false
+				caja["reach_height_m"] = 2.5
+			for sp: Dictionary in paso.get("spawns", []):
+				if sp.get("type") == "ground_mark" or sp.get("type") == "ground_wave" or sp.get("type") == "zone":
+					sp["hits_airborne"] = true)
+	check(alto["ok"], "reach_height_m 2,5 y hits_airborne true validan %s" % AC.format_issues(alto))
+	var hb25: Dictionary = alto["baked"]["abilities"][1]["steps"][0]["hitboxes"][0]
+	check(int(hb25["reach_um"]) == AC.REACH_LEVITATE_UM and int(hb25["ground_only"]) == 0, "2,5 m → 2500000 µm y ground_only sigue en 0")
+	check(int(alto["baked"]["abilities"][1]["steps"][0]["spawns"][0]["hits_airborne"]) == 1, "hits_airborne true se hornea")
+	check(AC.air_reach_um(alto["baked"]["abilities"][1]) == AC.REACH_LEVITATE_UM, "air_reach es el reach_height_m más alto")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		var caja_suelo: Dictionary = _ab(d, "cadena_abismo")["steps"][1]["hitboxes"][0]
+		caja_suelo["ground_only"] = true
+		caja_suelo["reach_height_m"] = 2.0, "ground_only no es 0,35 m", "abilities[2].steps[1].hitboxes[0].reach_height_m")
+	var v20 := _mut(func(d: Dictionary) -> void:
+		for paso: Dictionary in _ab(d, "tormenta_ascendente")["steps"]:
+			for caja: Dictionary in paso.get("hitboxes", []):
+				caja["ground_only"] = true
+				caja.erase("reach_height_m")
+			paso["spawns"] = []
+		d["presets"] = [{"id": "solo_suelo", "name": "Solo Suelo", "abilities": ["tormenta_ascendente"]}])
+	check(v20["ok"] and _has(v20, "V20", "presets[0]", "warnings"), "preset sin respuesta a 2,5 m → aviso V20")
+	var v20b := _mut(func(d: Dictionary) -> void:
+		for paso: Dictionary in _ab(d, "tormenta_ascendente")["steps"]:
+			for caja: Dictionary in paso.get("hitboxes", []):
+				caja["ground_only"] = true
+			paso["spawns"] = []
+		_ab(d, "tormenta_ascendente")["steps"][1]["hitboxes"][0]["ground_only"] = false
+		_ab(d, "tormenta_ascendente")["steps"][1]["hitboxes"][0]["reach_height_m"] = 2.5
+		d["presets"] = [{"id": "solo_suelo", "name": "Solo Suelo", "abilities": ["tormenta_ascendente"]}])
+	check(v20b["ok"] and not _has(v20b, "V20", "presets[0]", "warnings"), "reach_height_m 2,5 responde a la levitación")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["origin"] = "weapon", "arma sin requires_weapon", "abilities[3].requires_weapon")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["origin"] = "weapon"
+		_ab(d, "saeta_brasas")["requires_weapon"] = ["espada_laser"], "arma inexistente", "abilities[3].requires_weapon[0]")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["requires_weapon"] = ["espada_escudo"], "requires_weapon en una de jefe", "abilities[3].requires_weapon")
+	var arma := _mut(func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["origin"] = "weapon"
+		_ab(d, "saeta_brasas")["requires_weapon"] = ["espada_escudo", "lanza"])
+	check(arma["ok"] and int(arma["baked"]["abilities"][3]["origin"]) == AC.ORIGINS.find("weapon"), "origin weapon con armas que existen")
+	check((arma["baked"]["abilities"][3]["requires_weapon"] as Array) == ["espada_escudo", "lanza"], "requires_weapon se hornea")
+	check(BossAbilities.origin_of("estocada") == "boss" and BossAbilities.requires_weapon("estocada").is_empty(), "las 45 siguen siendo de jefe")
+	check(BossAbilities.ids_of("weapon").is_empty() and BossAbilities.ids_of("boss").size() == BossAbilities.all_ids().size(), "el loadout separa: hoy todo es de jefe")
 	_expect("SCHEMA", func(d: Dictionary) -> void: _ab(d, "saeta_brasas")["category"] = "laser", "categoría inválida", "abilities[3].category")
 	_expect("SCHEMA", func(d: Dictionary) -> void: _ab(d, "saeta_brasas").erase("ai"), "falta ai", "abilities[3].ai")
 	_expect("SCHEMA", func(d: Dictionary) -> void: _ab(d, "hachazo_penitente")["steps"][0]["hitboxes"][0]["shape"] = {"type": "circle"}, "forma sin radio", "abilities[1].steps[0].hitboxes[0].shape.radius_m")

@@ -101,6 +101,11 @@ Valores tomados del código (`resources/`, `scripts/data/`, `SimParams.defaults(
 | Ventana de parry | 18 ticks (+0..2 online según el retardo de entrada) |
 | Arena | radio 40 m; 6 pilares |
 | Piscinas de entidades | proyectiles **12**, peligros de suelo (marcas/ondas) **16**, compartidas por los dos luchadores |
+| Salto | 1,6 m (`JUMP_VELOCITY` 8 m/s, gravedad 20 m/s²). Un golpe de **2,0 m** lo alcanza |
+| Levitación de montura | **1,2 m** (`SimParams.MOUNT_HOVER_M`, `mount_hover_m`). Queda bajo el salto: se la sigue alcanzando saltando |
+| Vuelo alto de Eikon | **3,5 m** (`SimParams.EIKON_FLY_M`, `eikon_fly_m`). Estado temporal, todavía no simulado. Hace falta un golpe de **4,5 m** |
+
+`ground_only: true` es el atajo de **0,35 m** (solo suelo: el salto lo evita). Referencias de `reach_height_m`: 0,35 solo suelo · 2,0 alcanza un salto · 2,5 alcanza la levitación · 4,5 alcanza el vuelo alto. El vuelo alto (3,5 m) queda fuera de casi todo. Cada preset igual necesita una respuesta a 2,5 m (V20).
 
 ### 2.3 Tabla tick ↔ ms (60 Hz; 1 tick = 16,67 ms)
 
@@ -214,6 +219,11 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 | `steps` | array<Step> | sí | — | **longitud variable: 1..N pasos** (no hay un número fijo; 1 es válido, 7 también). Tope práctico 16 |
 | `ai` | objeto | sí | — | §4.1 |
 | `hint` | objeto | no | — | **solo para IA y tutorial**, la sim lo ignora (§5.7) |
+| `origin` | enum | no | `"boss"` | `boss` · `weapon`. Quién otorga la habilidad. El HUD y el loadout agrupan por este campo |
+| `requires_weapon` | array<string> | si `origin` es `weapon` | `[]` | ids de armas que ya existen (`espada_escudo`, `espada_larga`, `hacha_2m`, `dagas`, `lanza`, `arco`, `ballesta`). Vacío u omitido en las de jefe. Un id que no existe es error |
+| `source` | objeto | no | — | **programa numérico de las 45**. No es el origen. No entra al horneado. No lo uses para `"boss"` / `"weapon"`: eso es `origin` |
+
+No existe `air_reach`. El validador (`AbilityCatalog.air_reach_um`) y la IA (`SimAI.air_reach_um`) lo calculan como el `reach_height_m` más alto de las cajas de la habilidad. `ground_only: true` cuenta como 0,35 m. Una caja sin tope declarado (ni `ground_only` ni `reach_height_m`) sigue sin tope: la sim de hoy pega a cualquier altura.
 
 ### 4.1 Bloque `ai`
 
@@ -226,7 +236,8 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 | `branch_weights` | objeto | — | pesos por paso destino de un `branch` (§8.3), p. ej. `{"remate_normal": 60, "remate_alt": 40}` |
 
 La IA (`net/sim/sim_ai.gd`) **lee estado**, nunca las entradas crudas del rival en el mismo tick, y decide con su
-propio RNG sembrado. Hoy solo juega offline, pero igual no debe hacer trampa.
+propio RNG sembrado. Hoy solo juega offline, pero igual no debe hacer trampa. El alcance aéreo no es un campo
+del bloque `ai`: lo calcula del `reach_height_m` más alto (§6). Todavía no cambia qué botón pulsa.
 
 ---
 
@@ -367,6 +378,7 @@ contradecir lo que la sim realmente hace. Lo único permitido es un `hint` **opc
   "offset": { "forward_m": 0.0, "right_m": 0.0 },
   "anchor": "self",
   "ground_only": false,
+  "reach_height_m": 2.0,
   "from_tick": 0, "to_tick": 6,
   "hits": 1, "hit_interval_ticks": 0,
   "damage_per_hit": 38,
@@ -385,7 +397,8 @@ contradecir lo que la sim realmente hace. Lo único permitido es un `hint` **opc
 | `shape` | objeto | — | §7.4 |
 | `offset.forward_m`, `.right_m` | number | `0` | desde el ancla, en el rumbo del atacante |
 | `anchor` | enum | `"self"` | `self` (se mueve con el atacante) · `lock_point` (posición del objetivo al `lock_at_tick`) · `spawn_point` (posición del atacante al empezar el paso) |
-| `ground_only` | bool | `false` | true = no golpea a quien está en el aire > 0,35 m (el salto lo evita) |
+| `ground_only` | bool | `false` | atajo de `reach_height_m: 0.35`. La sim **sigue leyendo este bit**: true = no golpea a quien está a más de 0,35 m. Si también escribís `reach_height_m`, tiene que ser 0,35 |
+| `reach_height_m` | number 0..8 | — | tope vertical de esta caja, en metros. En la sim es un entero en µm (`reach_um`). Referencias: 0,35 solo suelo, 2,0 alcanza un salto, 2,5 alcanza la levitación, 4,5 alcanza el vuelo alto. Si se omite y `ground_only` es false, la caja no declara tope |
 | `from_tick`, `to_tick` | int (`t_active`) | — | `0 ≤ from < to ≤ active_ticks` |
 | `hits` | int 1..20 | `1` | veces que este hitbox puede golpear al mismo objetivo |
 | `hit_interval_ticks` | int | `0` | ≥ 1 si `hits` > 1: separación mínima entre impactos |
@@ -597,10 +610,12 @@ ocupen más de **6 proyectiles** u **8 peligros** a la vez.
 
 | Tipo | Campos propios | Notas |
 |---|---|---|
-| `ground_mark` (hoy «lluvia») | `shape`, `warn_ticks` (≥ 30), `damage`, `stun_power`, `knockback_mps`, `blockable`, `mode: track\|scatter`, `scatter_radius_m`, `interval_ticks` | `scatter` usa el RNG de la sim |
-| `ground_wave` (hoy «onda») | `speed_mps`, `range_m`, `width_m`, `warn_ticks`, `ring` (bool), `knockback_mps` | siempre `ground_only` (se salta). El empuje `knockback_mps` vale **6** si se omite |
+| `ground_mark` (hoy «lluvia») | `shape`, `warn_ticks` (≥ 30), `damage`, `stun_power`, `knockback_mps`, `blockable`, `mode: track\|scatter`, `scatter_radius_m`, `interval_ticks`, `hits_airborne` | `scatter` usa el RNG de la sim. `hits_airborne` por defecto **false** |
+| `ground_wave` (hoy «onda») | `speed_mps`, `range_m`, `width_m`, `warn_ticks`, `ring` (bool), `knockback_mps`, `hits_airborne` | por defecto no pega en el aire (`hits_airborne: false`; se salta). El empuje `knockback_mps` vale **6** si se omite |
 | `projectile` | `speed_mps`, `homing_deg` (°/s), `homing_ticks`, `lifetime_ticks`, `radius_m`, `pierce` (bool), `reflectable_by_parry` (bool), `hitbox` | giro entero con tope; si esquivás, sigue de largo |
-| `zone` (persistente) | `shape`, `delay_ticks`, `duration_ticks`, `hitbox_every_ticks`, `damage`, `status` | máx. 2 por luchador |
+| `zone` (persistente) | `shape`, `delay_ticks`, `duration_ticks`, `hitbox_every_ticks`, `damage`, `status`, `hits_airborne` | máx. 2 por luchador. `hits_airborne` por defecto **false** |
+
+`hits_airborne` es de cada spawn (`ground_wave`, `ground_mark`, `zone`), no de la habilidad. Por defecto el spawn no golpea a quien está en el aire. Ponerlo en true no sube el `reach_height_m`: el alcance aéreo de la habilidad sigue saliendo de las cajas. La sim todavía no lee este bit.
 | `beam` (rayo / aliento) | `length_m`, `width_m` o `angle_deg`, `duration_ticks`, `tick_interval`, `sweep_deg_per_sec` | hoy existe como cono («aliento») |
 | `summon` | `entity`, `hp`, `lifetime_ticks`, `cap` (1..2) | el invocado vive en el estado de la sim (cuesta tamaño de estado y checksum): tope 1–2 |
 
@@ -645,6 +660,18 @@ Extensiones previstas de paso/habilidad:
 | V17 | piscinas: peor caso ≤ 6 proyectiles y ≤ 8 peligros simultáneos |
 | V18 | `interruptible_by` vacío es válido: la habilidad no se corta (solo se esquiva). No exige hiperarmadura |
 | V19 | nombres propios: nada de nombres de otras franquicias |
+| V20 | aviso: cada preset tiene al menos una habilidad que alcanza 2,5 m, por proyectil, rayo o `reach_height_m` (una caja sin tope declarado también cuenta, porque la sim de hoy pega en el aire) |
+
+### 11.1 Vuelo alto del Eikon (diseño futuro, no simulado)
+
+La altura ya está en `SimParams` (`EIKON_FLY_M` = 3,5 m, `eikon_fly_m`). No hay estado, ni gasto, ni animación.
+
+- Dura de **5 a 8 s**.
+- Gasta **maná de forma continua** mientras sigue arriba.
+- Arriba **no se puede bloquear ni hacer parry**.
+- **Bajar** tiene aviso y una recuperación castigable.
+- Casi ningún golpe lo alcanza. El que sí, declara `reach_height_m` ≥ **4,5**.
+- La levitación de la montura es otra cosa: 1,2 m (`MOUNT_HOVER_M`). Un salto (1,6 m) todavía la alcanza. La regla V20 (respuesta a 2,5 m) cubre esa levitación, no el vuelo alto.
 
 **Mecánicas prohibidas (injustas):**
 - Leer la entrada del rival para reaccionar en el mismo tick (p. ej. «se cura si el rival pulsa atacar», «contraataca
@@ -1077,6 +1104,10 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
     10 maná / 1 tajo por pulsación; la tabla dice Carga en área 1,8 s / 4,5 m y el código 2,2 s / 7,5 m. Manda el código.
 12. **IA**: decide en float con lógica específica por id; no hay bloque `ai` en los datos.
 13. **Presets**: hoy siempre son 3 ids por campeón y la 3.ª se bloquea por ranura (`boss_n`), no por habilidad.
+14. **Alcance vertical.** `reach_height_m` es por caja y se hornea a µm (`reach_um`). `ground_only: true` sigue siendo el atajo de 0,35 m y **es el bit que la sim lee**. Declarar otro alcance no cambia el golpe todavía: las habilidades que ya tienen `ground_only` dan los mismos checksums. No hay campo `air_reach`.
+15. **Alturas.** Montura a 1,2 m (`mount_hover_m`). Vuelo alto del Eikon a 3,5 m (`eikon_fly_m`), solo como parámetro. El diseño del vuelo alto está en §11.1 y no está implementado. Esos números no entran en `params_checksum`.
+16. **Origen.** `origin`: `boss` (default) o `weapon`. Las de arma llevan `requires_weapon` con ids que existen. El objeto `source` sigue siendo el programa de las 45. El HUD (catálogo admin) y la pestaña de loadout separan las dos listas. La sim no rechaza todavía una de arma si no llevás ese arma: lo hace el botón del loadout.
+17. **Spawns de suelo.** `ground_wave`, `ground_mark` y `zone` tienen `hits_airborne` (default false), por spawn. La sim no lo lee todavía.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
@@ -1114,6 +1145,8 @@ A 150 ms de RTT el rival ve tu acción ~4–5 ticks tarde, y las correcciones po
 - [ ] Si hay `branch`: cada opción con aviso distinguible y el botón `alt` con icono y etiqueta; el HUD lo muestra desde el estado de la sim.
 - [ ] Costo y recarga proporcionados al riesgo (las de vida, para efectos fuertes).
 - [ ] Nombre propio, sin referencias a otras franquicias.
+- [ ] El preset tiene alguna respuesta a 2,5 m (proyectil, rayo o `reach_height_m`). V20 avisa si no.
+- [ ] Una clavada de suelo que se esquiva saltando se queda en 0,35 m. No le subas el alcance para «tapar» la levitación: esa respuesta va en otra habilidad del preset.
 
 ---
 
@@ -1135,6 +1168,10 @@ A 150 ms de RTT el rival ve tu acción ~4–5 ticks tarde, y las correcciones po
 - `branch` con opción `alt` sin `hud_icon`/`label`, con ventana fuera del paso, o con dos opciones del mismo `input`.
 - Mecánica que reacciona al botón del rival (curarse al leer el ataque): prohibido.
 - Decimales en campos `int` (`"hits": 1.5`).
+- Llamar `source` al origen. `source` es el programa numérico. El origen es `origin`.
+- Inventar `air_reach`. Se calcula del `reach_height_m` más alto.
+- `ground_only: true` junto con `reach_height_m` distinto de 0,35.
+- Creer que `reach_height_m` o `hits_airborne` ya cambian el golpe. La sim sigue en `ground_only`.
 
 ---
 
@@ -1159,7 +1196,7 @@ Entregá:
 1. El JSON de la habilidad (un solo objeto Ability), válido, con todos los campos obligatorios.
 2. Una tabla por paso: windup/active/recovery en ticks y ms, daño por golpe y stun_power de cada hitbox.
 3. La ventana de esquiva que EMERGE (lock_at_tick → primer tick activo) y cómo se contrarresta.
-4. Las reglas V01–V19 marcadas como cumplidas (o explicá por qué no aplican).
+4. Las reglas V01–V20 marcadas como cumplidas (o explicá por qué no aplican).
 Números en la escala real (vida 80–130, fuerte de arma 18–40, robustez 30–80). Nombre original en español,
 sin nombres de otras franquicias. No inventes campos fuera del esquema.
 ```
@@ -1181,7 +1218,7 @@ godot --headless --path . --script res://tools/validate_abilities.gd -- data/abi
 - Código de salida: `0` sin errores, `1` con errores (o avisos con `--strict`), `2` sin argumento.
 - Reglas: `V01`–`V19` (§11), `SCHEMA` (tipos, enums, obligatorios, rangos), `PARSE` (JSON/archivo).
   Avisos: `ASSET` (icono/vfx/sfx inexistente → se usa el genérico), `UNKNOWN_FIELD`, `UNKNOWN_TAG`, `HINT`,
-  `FAIRNESS`, `V15`.
+  `FAIRNESS`, `V15`, `V20` (el preset no alcanza 2,5 m).
 - Desde código: `AbilityCatalog.load_file(ruta, opts)` / `load_text` / `load_data` →
   `{ok, errors, warnings, baked, hash}`. `opts.known_vfx` / `opts.known_sfx` (listas) activan el chequeo de ids
   de efectos. `baked` es de solo lectura, en enteros con las convenciones de `SimParams` (milésimas, µm, µm/tick,

@@ -12,6 +12,15 @@ const HZ := 60.0
 const A_HEAVY := 3
 const A_DASH := 4
 const A_JUMP := 5 ## fase 7: picado desde el salto
+## Alturas de referencia. No entran en el diccionario horneado ni en params_checksum:
+## la sim todavía no las aplica (el salto sigue en JUMP_VELOCITY / GRAVITY).
+## mount_hover_m: la montura levita a 1,2 m. El salto llega a 1,6 m, así que se la alcanza saltando.
+const MOUNT_HOVER_M := 1.2
+const MOUNT_HOVER_UM := 1200000
+## eikon_fly_m: vuelo alto del Eikon, 3,5 m, estado temporal. Todavía no se simula.
+## Diseño: 5–8 s, maná continuo, arriba no se bloquea ni se hace parry, bajar avisa y se castiga.
+const EIKON_FLY_M := 3.5
+const EIKON_FLY_UM := 3500000
 ## Subtipos físicos para la tabla de defensa: 0 = sin subtipo (flechas), 1..4 = PhysTypes.
 const SUBS := ["", "estandar", "cortante", "contundente", "perforante"]
 const DEF_TAB_MAX := 400 ## daño bruto máximo tabulado (por unidad)

@@ -15,6 +15,12 @@ const BOSS_DIST := 8.0 ## Fighter.BOSS_DIST
 const BOSS_REACH := 2.2
 const BOSS_SPEED := 26.0
 
+## Alcance aéreo de una habilidad horneada. No hay campo air_reach: es el reach_height_m
+## más alto de sus cajas (ground_only cuenta como 0,35 m). No cambia las decisiones de este
+## tick: el golpe sigue usando ground_only.
+static func air_reach_um(ability: Dictionary) -> int:
+	return AbilityCatalog.air_reach_um(ability)
+
 var me := 1
 var enabled := true
 var profile: AIDifficulty = preload("res://resources/ai/easy.tres")
