@@ -81,7 +81,7 @@ test("rooms expire without traffic", async () => {
 });
 
 test("version check rejects other protocols", async () => {
-  const srv = new RelayServer({ port: 0, host: "127.0.0.1", proto: 6 });
+  const srv = new RelayServer({ port: 0, host: "127.0.0.1", proto: 7 });
   const port = await srv.start();
   const a = client(); await a.bind();
   a.send(port, "C", { v: 3 });
