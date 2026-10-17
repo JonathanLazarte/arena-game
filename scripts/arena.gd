@@ -14,11 +14,10 @@ const LEGACY_MOUNT := "res://resources/mounts/horse.tres"
 ## Ronda 14: los combates empiezan A PIE (las monturas son eikons que se invocan).
 ## Las pruebas antiguas de combate montado ponen esto a true antes de cargar la escena:
 ## cada luchador recibe entonces una montura neutral (caballo de pruebas) y empieza montado.
-static var start_mounted: bool = false
 
 var player: Fighter
 var enemy: Fighter
-var ai: AIController
+var ai_profile: AIDifficulty = preload("res://resources/ai/easy.tres") ## dificultad del rival (SimAI)
 var controller: PlayerController
 var hud: HUD
 var camera: Camera3D
@@ -63,7 +62,7 @@ func _ready() -> void:
 		enemy = _make_fighter(ChampionCatalog.display_name(ch), 1, Color(0.85, 0.15, 0.15), Catalog.EIKONS[eid], cd,
 			Smithing.effective(wd, Smithing.rival_level(gs.char_level())), [], Attributes.auto_allocate(cd.id, gs.char_level()),
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(cd.id, gs.char_level())})
-		enemy.set_boss_abilities(ch["boss"] if sim_mode else ch["boss"].slice(0, 2)) # sim: la 3.ª se desbloquea en Fase II (P.boss_n)
+		enemy.set_boss_abilities(ch["boss"]) # sim: la 3.ª se desbloquea en Fase II (P.boss_n)
 		enemy.set_magic([String(ch["spell"])], String(ch["art"]))
 	elif gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
@@ -123,23 +122,16 @@ func _ready() -> void:
 	add_child(controller)
 	hud.controller = controller
 	hud.menu_opened.connect(func(o: bool) -> void: rig.menu_open = o)
-	ai = AIController.new()
-	ai.me = enemy
 	if gs and gs.from_lobby:
-		ai.profile = load(Catalog.DIFFICULTIES[gs.difficulty])
-	if champion_id != "":
-		ai.configure_champion(ChampionCatalog.by_id(champion_id))
-	add_child(ai)
+		ai_profile = load(Catalog.DIFFICULTIES[gs.difficulty])
 	lock_marker = MeshUtil.sphere(self, 0.22, Vector3.ZERO, Color(1.0, 0.82, 0.35), true)
 	lock_ring = _make_lock_ring()
 	_warm_eikons()
-	if sim_mode or online:
-		_setup_sim_match()
+	_setup_sim_match()
 	start_round()
 
 ## Modo sim: sin IA ni PlayerController; la sim decide y los Fighter solo se dibujan.
 func _setup_sim_match() -> void:
-	ai.set_physics_process(false); ai.set_process(false)
 	controller.enabled = false
 	controller.set_physics_process(false); controller.set_process(false)
 	sim_match = SimMatch.new()
@@ -169,7 +161,8 @@ func _setup_sim_match() -> void:
 			var ch := ChampionCatalog.by_id(champion_id)
 			sim_match.params[1]["boss_n"] = 2
 			sim_match.params[1]["ph2"] = {"hp_pm": 500, "rage": 540, "invuln": 51, "summon": 1 if bool(ch.get("phase2_summon", false)) else 0}
-		sim_ai = SimAI.new(1, ai.profile, randi())
+		sim_match.params[0]["buffer"] = maxi(int(round(PlayerController.buffer_window * 60.0)), 1) # ajuste del jugador
+		sim_ai = SimAI.new(1, ai_profile, randi())
 		if champion_id != "":
 			sim_ai.configure_champion(ChampionCatalog.by_id(champion_id))
 		sim_match.input_override[1] = func(_t: int) -> int: return sim_ai.think(sim_match.state, sim_match.params)
@@ -299,28 +292,13 @@ func _on_execution_cinematic(attacker: Fighter, target: Fighter, duration: float
 ## Ronda 23: hit-stop (el tiempo casi se detiene unos milisegundos, en tiempo real).
 const SHAKE_SCALE := 0.3
 static var hitstop_enabled: bool = true
-## Fase 8: toda partida (offline y online) corre sobre FightSim; los Fighter solo se dibujan.
-## false = camino antiguo (Fighter + AIController), solo para pruebas heredadas.
-static var sim_mode: bool = true
 var sim_match: SimMatch
 var sim_ai: SimAI ## IA del rival offline (emite bits de entrada de la sim)
 var net_overlay: NetOverlay
 var online: NetMatch ## partida online en curso (NetMatch.current al entrar)
 var hitstops: int = 0
-func _on_hitstop(d: float) -> void:
-	if sim_mode or not hitstop_enabled or _hs_prev > 0.0 or Engine.time_scale <= 0.0:
-		return
-	hitstops += 1
-	if is_instance_valid(player):
-		player.apply_local_hitstop(d)
-	if is_instance_valid(enemy):
-		enemy.apply_local_hitstop(d)
-	_hs_prev = Engine.time_scale # respeta la escala previa (pruebas aceleradas, capturas)
-	Engine.time_scale = _hs_prev * 0.05
-	await get_tree().create_timer(d, true, false, true).timeout
-	if _hs_prev > 0.0:
-		Engine.time_scale = _hs_prev
-		_hs_prev = 0.0
+func _on_hitstop(_d: float) -> void:
+	pass # la congelación de impacto la decide la sim (G_FREEZE)
 
 var _hs_prev: float = 0.0
 func _exit_tree() -> void:
@@ -354,16 +332,7 @@ func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 	f.team = team
 	f.color = c
 	f.eikon = load(eikon_path)
-	if start_mounted:
-		f.mount = load(LEGACY_MOUNT)
-		var m := Mount.new()
-		m.data = f.mount
-		add_child(m)
-		add_child(f)
-		f.owned_mount = m
-		f.mount_on(m)
-	else:
-		add_child(f)
+	add_child(f)
 	f.died.connect(_on_fighter_died)
 	return f
 
@@ -537,6 +506,8 @@ func _physics_process(delta: float) -> void:
 	if camera == null or player == null:
 		return
 	_process_online_hud()
+	if sim_match:
+		controller.run_toggled = sim_match.sprint_latch
 	if state == "fight" and not online:
 		time_left -= delta
 		hud.timer_label.text = str(ceili(maxf(time_left, 0.0)))
@@ -545,8 +516,6 @@ func _physics_process(delta: float) -> void:
 			var pl := player.health / player.max_health
 			var en := enemy.health / enemy.max_health
 			_on_fighter_died(enemy if pl >= en else player)
-		if state == "fight" and sim_match == null and champion_id != "" and not champion_phase2_started and enemy.alive and enemy.health <= enemy.max_health * 0.5:
-			_begin_champion_phase_two()
 	rig.active = state == "fight"
 	rig.update(delta) # ronda 25: cámara orbital (ratón / arrastre táctil), colisión con pilares
 	if shake > 0.0:
@@ -605,13 +574,6 @@ func start_round(new_match: bool = false) -> void:
 	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD, not new_match)
 	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK, not new_match)
 	enemy.rage_t = 0.0
-	if champion_id != "" and sim_match == null:
-		# El aura de Fase II no debe quedar pegada al reiniciar la ronda.
-		if enemy._kv:
-			enemy._kv.set_glow(false, Color.BLACK)
-		enemy.set_boss_abilities(ChampionCatalog.by_id(champion_id)["boss"].slice(0, 2))
-	if ai:
-		ai.champion_phase_two = false
 	if sim_ai:
 		sim_ai.reset_round()
 	if champion_id != "" and enemy._kv:
@@ -622,7 +584,7 @@ func start_round(new_match: bool = false) -> void:
 	state = "fight"
 	champion_phase2_started = false
 	time_left = ROUND_TIME
-	controller.enabled = not sim_mode and online == null
+	controller.enabled = false # la entrada la muestrea SimMatch
 	if sim_match:
 		sim_match.reset_round()
 	_update_round_label()
@@ -631,31 +593,18 @@ func start_round(new_match: bool = false) -> void:
 func _begin_champion_phase_two() -> void:
 	champion_phase2_started = true
 	var ch := ChampionCatalog.by_id(champion_id)
-	if sim_match == null: # en la sim lo resuelve FightSim._phase_two (P.ph2)
-		enemy.set_boss_abilities(ch.get("boss", [])) # desbloquea la tercera habilidad al 50 %
-		enemy.rage_t = 9.0
-		enemy.invuln = 0.85
+	# las reglas (3.ª habilidad, furia, invulnerabilidad, medidor) las aplica FightSim._phase_two
 	var phase_color := Color(1.0, 0.12, 0.04)
 	match String(ch.get("eikon", "")):
 		"lobo": phase_color = Color(0.35, 0.8, 1.0)
 		"grifo": phase_color = Color(0.95, 0.8, 0.2)
 		"golem": phase_color = Color(0.6, 0.75, 0.5)
-	if bool(ch.get("phase2_summon", false)) and sim_match == null:
-		enemy.meter = Fighter.METER_MAX
-		enemy.meter_changed.emit(enemy.meter)
 	enemy._burst_particles(phase_color)
 	if enemy._kv:
 		enemy._kv.set_glow(true, phase_color)
 	if sim_ai:
 		sim_ai.enter_champion_phase_two()
-	elif ai:
-		ai.enter_champion_phase_two()
-		if bool(ch.get("phase2_summon", false)) and enemy.can_summon():
-			enemy.summon()
 	shake = maxf(shake, 0.32)
-	if sim_match == null:
-		player.apply_local_hitstop(0.12)
-		enemy.apply_local_hitstop(0.12)
 	hud.show_message("¡Fase II! %s libera su poder" % ch.get("name", "El campeón"), 2.4)
 
 func _update_round_label() -> void:

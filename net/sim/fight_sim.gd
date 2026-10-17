@@ -284,7 +284,7 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	for k in 4:
 		if s[o + Q0 + k] != 0:
 			s[o + QA0 + k] += 1
-	while s[o + Q0] != 0 and s[o + QA0] > BUFFER_WINDOW:
+	while s[o + Q0] != 0 and s[o + QA0] > int(P[i].get("buffer", BUFFER_WINDOW)):
 		_qpop(s, o)
 	if s[o + Q0] != 0 and _do(s, P, i, s[o + Q0], true):
 		_qpop(s, o)
@@ -454,7 +454,8 @@ static func _land(s: PackedInt64Array, o: int) -> void:
 static func _request_attack(s: PackedInt64Array, P: Array, i: int, heavy: bool) -> bool:
 	var o := i * F_FIELDS
 	if s[o + BACKSTEP_T] > 0 and s[o + LOADOUT] == Load.SWORD:
-		return false # (la estocada tras el paso atrás queda fuera del ruleset reducido)
+		s[o + ROLL_ATK_BUF] = 1 # fase 8: estocada al terminar el paso atrás (Fighter.backstep_attack_queued)
+		return false
 	if s[o + ROLL_T] >= 0 and s[o + LOADOUT] == Load.SWORD and s[o + ALIVE] != 0 and s[o + ROLL_T] < P[i]["roll_if_end"]:
 		s[o + ROLL_ATK_BUF] = 1
 		return false
@@ -975,7 +976,13 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		if s[o + CRIT_T] >= CRIT_TIME:
 			s[o + CRIT_T] = -1
 	SimAbilities.update(s, P, i)
-	if s[o + BACKSTEP_T] > 0: s[o + BACKSTEP_T] -= 1
+	if s[o + BACKSTEP_T] > 0:
+		s[o + BACKSTEP_T] -= 1
+		if s[o + BACKSTEP_T] <= 0 and s[o + ROLL_ATK_BUF] != 0 and s[o + ROLL_T] < 0:
+			s[o + ROLL_ATK_BUF] = 0
+			if s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + ATK_STATE] == Atk.NONE and s[o + ST] > 0 and s[o + MOUNTED] == 0:
+				s[o + DASH_DIR] = s[o + FACE]
+				_start_attack(s, P, i, SimParams.A_DASH, false)
 	if s[o + ROLL_T] >= 0:
 		s[o + ROLL_T] += 1
 		if s[o + ROLL_ATK_BUF] != 0 and s[o + ROLL_T] >= p["roll_if_end"] and s[o + ALIVE] != 0 and s[o + STUN] <= 0:

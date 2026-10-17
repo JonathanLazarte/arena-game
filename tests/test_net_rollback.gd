@@ -66,8 +66,8 @@ func _initialize() -> void:
 			hf.engine_factory = func() -> RbEngine: var e := FightEngine.new(SimParams.defaults(), 9, true); e.gap_um = 2000000; return e
 			var rf := hf.run(1800)
 			var st: PackedInt64Array = rf["state"]
-			check(rf["mismatches"] == 0 and rf["final_equal"] and rf["common"] > 1700 and (st[FightSim.HP] < 100000 or st[FightSim.F_FIELDS + FightSim.HP] < 100000),
-				"FightSim RTT %d semilla %d: %d ticks confirmados, 0 desincronías (vida %d/%d, rollback medio %.1f)" % [rtt, sd, rf["common"], st[FightSim.HP], st[FightSim.F_FIELDS + FightSim.HP], rf["avg_rollback_len"]])
+			check(rf["mismatches"] == 0 and rf["final_equal"] and rf["common"] > 1700 and _engaged(st),
+				"FightSim RTT %d semilla %d: %d ticks confirmados, 0 desincronías (vida %d/%d, intercambios %d, rollback medio %.1f)" % [rtt, sd, rf["common"], st[FightSim.HP], st[FightSim.F_FIELDS + FightSim.HP], _exchanges(st), rf["avg_rollback_len"]])
 	# 7) fase 4: infusiones elementales y estados (sangrado/veneno/congelación) bajo rollback
 	var PI := SimParams.defaults().duplicate(true)
 	PI[0]["st_melee"] = [60000, 60000, 60000]; PI[0]["elem_melee"] = 5
@@ -85,3 +85,15 @@ func _initialize() -> void:
 		check(ri["mismatches"] == 0 and ri["final_equal"] and procs > 0, "estados + infusión RTT %d: 0 desincronías, %d estallidos de estado" % [rtt, procs])
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
+
+
+## Hubo combate: daño o al menos golpes resueltos (bloqueados, esquivados, parados). Los bots aleatorios
+## a veces solo cruzan golpes bloqueados (desde la fase 7 el movimiento les aleja más a menudo).
+func _exchanges(st: PackedInt64Array) -> int:
+	var n := 0
+	for i in 2:
+		var o := i * FightSim.F_FIELDS
+		n += st[o + FightSim.HITS] + st[o + FightSim.BLOCKS] + st[o + FightSim.DODGES] + st[o + FightSim.PARRIES] + st[o + FightSim.SHOTS]
+	return n
+func _engaged(st: PackedInt64Array) -> bool:
+	return st[FightSim.HP] < 100000 or st[FightSim.F_FIELDS + FightSim.HP] < 100000 or _exchanges(st) > 0

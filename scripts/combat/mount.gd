@@ -122,34 +122,8 @@ func is_flying() -> bool:
 func life_fraction() -> float:
 	return 1.0 if life == INF or eikon == null else clampf(life / eikon.duration, 0.0, 1.0)
 
-## Se acaba la invocación: baja al jinete (sin aturdir) y desaparece.
-func expire() -> void:
-	if life <= -1.0:
-		return
-	life = -1.0
-	if rider:
-		rider.dismount(false)
-	if is_instance_valid(owner_fighter) and owner_fighter.active_eikon == self:
-		owner_fighter.active_eikon = null
-		owner_fighter.owned_mount = null
-	expired.emit(self)
-	queue_free()
-
 func get_hit_center() -> Vector3:
 	return global_position + Vector3(0, 1.0 + data.hover, 0)
-
-## Solo se le puede golpear sin jinete (montado, los golpes van al jinete).
-func take_hit(amount: float, _from: Node3D, _kind: String) -> String:
-	if not alive or rider != null or eikon == null:
-		return "none"
-	health -= amount
-	var au := get_node_or_null("/root/Audio")
-	if au:
-		au.sfx3d("hit_eikon", global_position)
-	if health <= 0.0:
-		alive = false
-		expire()
-	return "hit"
 
 func is_companion() -> bool:
 	return eikon != null and rider == null and alive
@@ -167,112 +141,6 @@ func set_rider(r: Fighter) -> void:
 		_wander_t = 1.0
 
 var puppet := false ## fase 8: la mueve la sim (SimWorld); sin lógica propia
+## Fase 8: títere visual (SimWorld la coloca); sin lógica propia.
 func _physics_process(delta: float) -> void:
 	_update_anim(delta)
-	if puppet:
-		return
-	special_cd = maxf(special_cd - delta, 0.0)
-	if life != INF and life > -1.0:
-		life -= delta
-		if life <= 0.0 or not is_instance_valid(owner_fighter) or not owner_fighter.alive:
-			expire()
-			return
-	if rider != null:
-		return
-	_wander_t -= delta
-	if _wander_t <= 0.0:
-		_wander_t = randf_range(1.5, 3.0)
-		var to_home := MeshUtil.flat(home - global_position)
-		if to_home.length() > 3.0:
-			_wander_dir = to_home.normalized()
-		elif randf() < 0.5:
-			_wander_dir = Vector3.FORWARD.rotated(Vector3.UP, randf() * TAU)
-		else:
-			_wander_dir = Vector3.ZERO
-	attack_cd -= delta
-	recall_t = maxf(recall_t - delta, 0.0)
-	if called:
-		if is_instance_valid(owner_fighter) and owner_fighter.alive and not owner_fighter.mounted:
-			_call_step(delta)
-			return
-		called = false
-	if eikon and is_instance_valid(owner_fighter) and owner_fighter.alive and recall_t <= 0.0:
-		companion_target = MeshUtil.companion_target(global_position, get_tree(), team)
-		if companion_target:
-			_companion_step(delta)
-			return
-	if is_instance_valid(owner_fighter) and owner_fighter.alive:
-		# Eikon sin jinete: sigue de cerca a su dueño (para que pueda volver a montar)
-		var to_o := MeshUtil.flat(owner_fighter.global_position - global_position)
-		_wander_dir = to_o.normalized() * clampf((to_o.length() - 2.5) / 2.0, 0.0, 4.0) if to_o.length() > 2.5 else Vector3.ZERO
-	var v := _wander_dir * 1.5
-	velocity.x = v.x
-	velocity.z = v.z
-	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
-	move_and_slide()
-	if global_position.y < 0.0: global_position.y = 0.0 # ronda 29: nunca bajo el suelo
-	if v.length() > 0.1:
-		rotation.y = lerp_angle(rotation.y, atan2(-v.x, -v.z), delta * 3.0)
-
-## Modo ataque (compañero): persigue al objetivo y lo ataca con los datos de compañero del eikon.
-func _companion_step(delta: float) -> void:
-	var tgt := companion_target
-	var d := MeshUtil.flat(tgt.global_position - global_position)
-	var dist := d.length()
-	var v := Vector3.ZERO
-	if dist > eikon.attack_range * 0.8:
-		v = d.normalized() * eikon.move_speed * 0.7
-	velocity.x = v.x
-	velocity.z = v.z
-	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
-	move_and_slide()
-	if global_position.y < 0.0: global_position.y = 0.0 # ronda 29: nunca bajo el suelo
-	if dist > 0.1:
-		rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), delta * 6.0)
-	if dist <= eikon.attack_range and attack_cd <= 0.0:
-		attack_cd = eikon.attack_cooldown
-		attacks_done += 1
-		if eikon.attack_kind == EikonData.AttackKind.RANGED:
-			var p := Projectile.new()
-			p.team = team
-			p.shooter = self
-			p.kind = "eikon"
-			p.damage = eikon.attack_damage * _bond()
-			p.speed = 22.0
-			p.radius = 0.7
-			p.color = eikon.color
-			var origin := get_hit_center() + Vector3(0, 0.4, 0)
-			var lead: float = float(owner_fighter.get("aim_lead")) if is_instance_valid(owner_fighter) else 0.0
-			p.direction = Projectile.aim_dir(origin, tgt, p.speed, lead)
-			p.aimed_at = tgt
-			get_parent().add_child(p)
-			p.global_position = origin
-		else:
-			tgt.take_hit(eikon.attack_damage * _bond(), self, "eikon")
-			if model:
-				var tw := create_tween()
-				tw.tween_property(model, "position:z", -0.5, 0.08).as_relative()
-				tw.tween_property(model, "position:z", 0.5, 0.15).as_relative()
-
-## Viene corriendo hacia la posición actual del dueño; al llegar (y si está libre) lo monta.
-func _call_step(delta: float) -> void:
-	var o := owner_fighter
-	var d := MeshUtil.flat(o.global_position - global_position)
-	var dist := d.length()
-	var v := Vector3.ZERO
-	if dist > CALL_REACH * 0.6:
-		v = d.normalized() * maxf(data.speed, 10.0)
-	velocity.x = v.x
-	velocity.z = v.z
-	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
-	move_and_slide()
-	if global_position.y < 0.0: global_position.y = 0.0 # ronda 29: nunca bajo el suelo
-	if dist > 0.1:
-		rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), delta * 8.0)
-	if dist <= CALL_REACH and o.can_mount_now():
-		called = false
-		o.mount_on(self)
-
-## Ronda 18: Vínculo del dueño (daño del eikon).
-func _bond() -> float:
-	return float(owner_fighter.ad["eikon"]) if is_instance_valid(owner_fighter) else 1.0

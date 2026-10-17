@@ -58,7 +58,8 @@ func _initialize() -> void:
 	check(s[S.ST] < P[0]["st_max"], "voltereta gasta aguante")
 	# rodar a través de un golpe: i-frames
 	s = duel(1.8)
-	run(s, 60, light_at(0), func(t: int) -> int: return S.make_input(8, true, S.IN_ROLL if t == 16 else 0))
+	# (rodar HACIA el atacante: de lado, desde la fase 7 la voltereta sale del arco y es un fallo, no esquiva)
+	run(s, 60, light_at(0), func(t: int) -> int: return S.make_input(16, true, S.IN_ROLL) if t == 16 else 0)
 	check(s[F + S.HP] == P[1]["hp"] and s[F + S.DODGES] == 1, "i-frames de la voltereta esquivan el golpe")
 	# búfer de voltereta 0,18 s: pulsada durante la anticipación (no se puede), sale al quedar libre
 	s = duel(5.0)
