@@ -1,0 +1,18 @@
+# Example only (not deployed). One relay per region; run on the VM with: docker compose up -d --build
+services:
+  relay:
+    build: ..
+    restart: unless-stopped
+    environment:
+      PORT: "47800"
+      REGION: "sa-east"        # name shown to clients in ping results
+      GAME_PROTO: "4"          # must match NetLink.GAME_PROTO in the game build
+      GRACE_MS: "20000"        # reconnect window before the room is forfeited
+      HEALTH_PORT: "8080"
+      HEALTH_HOST: "0.0.0.0"
+    ports:
+      - "47800:47800/udp"
+      - "127.0.0.1:8080:8080/tcp"   # health/metrics: local only (tunnel or reverse-proxy if needed)
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

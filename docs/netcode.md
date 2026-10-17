@@ -188,3 +188,12 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 - Carga: start_play → fase LOAD. Cada par envía «ka» (latido) mientras calienta la escena y luego «rdy» cada 200 ms. PLAY empieza solo con ambos listos. Plazo de carga de 30 s («load_timeout»); el de juego sigue en 4 s. La arena muestra «Cargando rival...».
 - Eventos: ability (con code = AB_LAST), ability_hit, ability_interrupt, grab, cast, summon, eikon_special, eikon_hit, shield_absorb, dismount.
 - Simplificaciones: montado, la voltereta y el ataque usan los parámetros a pie; no hay variante combo-falso de la estocada ni artes de arma; la ráfaga contra un blanco en movimiento difiere del offline.
+
+## 13. Fase 5: emparejamiento, reconexión, relay endurecido
+- Servidor: el relay Node/TS ampliado (no Nakama: sin BD ni cuentas; ver server/DEPLOY.md). Un relay por región (REGION).
+- Protocolo de juego 4 (NetLink.GAME_PROTO = NetMatch.PROTO). C/J/Q llevan "v"; si no coincide, E {err:"version", need}.
+- Mensajes nuevos: 'Q' cola rápida → 'q' {pos} y luego 'M'; 'P'/'p' ping {t, region}; 'M' incluye token (24 hex) y region. 'B' {code, token} re-asocia una dirección nueva (re:1) y el otro recibe 'b' {peer}. 'F' {slot}: el rival lleva más de GRACE_MS (20 s) sin tráfico, victoria por abandono.
+- Límites: relay 200 pkt/s (ráfaga 400), control 10/s (ráfaga 20), 600 infracciones/min → bloqueo de 60 s, paquete máx. 1200 B, 5000 salas, cola de 10 s sin «K».
+- Salud: HTTP HEALTH_PORT (8080) con /healthz (JSON) y /metrics (Prometheus).
+- Cliente: tras TIMEOUT_MS (4 s) sin paquetes → reconnecting. La sim se congela, se envía 'B' por el relay cada 1 s y «rs» {ep} cada 0,5 s. Al volver, el anfitrión toma una instantánea del estado confirmado (deflate, trozos de 900 B, «snap» {ep, f, i, n, sz, b}) y ambos hacen RbSession.reset_to(estado, f) (época +1; «in»/«rdy» de otra época se descartan) y repiten LOAD/«rdy». Plazo local de 25 s («disconnected»); el relay decide antes con 'F'.
+- Repeticiones: tras una reconexión al invitado pueden faltarle entradas anteriores a f (la verificación de repetición puede fallar).
