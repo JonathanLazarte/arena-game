@@ -8,21 +8,19 @@ var fighters: Array[Fighter] = []
 var parent: Node3D
 var _pets: Array = [null, null]
 var _pet_cd: Array[int] = [0, 0]
-var _hz: Array[MeshInstance3D] = []
-var _hz_fill: Array[MeshInstance3D] = []
-var _pr: Array[MeshInstance3D] = []
+var fx: SimAbilityFx ## fase 9: efectos de habilidades, marcas, ondas y proyectiles
 
 func _init(a: Fighter, b: Fighter, p: Node3D) -> void:
 	fighters = [a, b]
 	parent = p
+	fx = SimAbilityFx.new(a, b, p)
 
 func apply(s: PackedInt64Array, P: Array) -> void:
 	if parent == null or not parent.is_inside_tree():
 		return
 	for i in 2:
 		_apply_pet(s, P, i)
-	_apply_hazards(s)
-	_apply_projectiles(s)
+	fx.apply(s, P)
 
 func clear() -> void:
 	for i in 2:
@@ -107,89 +105,3 @@ func _apply_pet(s: PackedInt64Array, P: Array, i: int) -> void:
 			e._ap.play(e._anims[2], 0.1) # ataque: la recarga se reinició
 			e._attack_anim_t = 0.5
 	_pet_cd[i] = s[o + S.EK_CD]
-
-static func _disc(parent_n: Node3D, c: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 1.0
-	cm.bottom_radius = 1.0
-	cm.height = 0.04
-	mi.mesh = cm
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = c
-	mi.material_override = m
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.visible = false
-	parent_n.add_child(mi)
-	return mi
-
-func _apply_hazards(s: PackedInt64Array) -> void:
-	while _hz.size() < S.HZ_MAX:
-		_hz.append(_disc(parent, Color(1.0, 0.25, 0.1, 0.28)))
-		_hz_fill.append(_disc(parent, Color(1.0, 0.45, 0.1, 0.5)))
-	for j in S.HZ_MAX:
-		var q := S.HZ_BASE + j * S.HZ_FIELDS
-		var ring := _hz[j]
-		var fill := _hz_fill[j]
-		var on := s[q + S.HZ_ON] != 0
-		ring.visible = on
-		fill.visible = on
-		if not on:
-			continue
-		var pos := Vector3(s[q + S.HZ_X] / 1.0e6, 0.05, s[q + S.HZ_Z] / 1.0e6)
-		if s[q + S.HZ_TYPE] == 1:
-			var r := maxf(s[q + S.HZ_R] / 1.0e6, 0.1)
-			ring.global_position = pos
-			ring.scale = Vector3(r, 1.0, r)
-			ring.rotation = Vector3.ZERO
-			var k := clampf(float(s[q + S.HZ_T]) / maxf(s[q + S.HZ_WARN], 1.0), 0.0, 1.0)
-			if s[q + S.HZ_DONE] != 0:
-				k = 1.0
-				(fill.material_override as StandardMaterial3D).albedo_color = Color(1.0, 0.85, 0.4, 0.7)
-			else:
-				(fill.material_override as StandardMaterial3D).albedo_color = Color(1.0, 0.45, 0.1, 0.5)
-			fill.global_position = pos + Vector3(0, 0.01, 0)
-			fill.scale = Vector3(r * k, 1.0, r * k)
-			fill.rotation = Vector3.ZERO
-		else:
-			# onda rastrera: franja que avanza (ancho HZ_W)
-			var w := maxf(s[q + S.HZ_W] / 1.0e6, 0.5)
-			var dir := Vector3(s[q + S.HZ_DX], 0, s[q + S.HZ_DZ]) / float(FxMath.ONE)
-			ring.global_position = pos
-			ring.rotation = Vector3(0, atan2(-dir.x, -dir.z), 0)
-			ring.scale = Vector3(w * 0.5, 6.0, 0.6)
-			fill.visible = false
-
-func _apply_projectiles(s: PackedInt64Array) -> void:
-	while _pr.size() < S.PROJ_MAX:
-		var mi := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		sm.radius = 1.0
-		sm.height = 2.0
-		mi.mesh = sm
-		var m := StandardMaterial3D.new()
-		m.emission_enabled = true
-		mi.material_override = m
-		mi.visible = false
-		parent.add_child(mi)
-		_pr.append(mi)
-	for j in S.PROJ_MAX:
-		var q := S.PROJ_BASE + j * S.PR_FIELDS
-		var mi := _pr[j]
-		# las flechas (kind 0) las dibuja SimView; aquí tajos, hechizos y ataques de eikon
-		mi.visible = s[q + S.PR_ON] != 0 and s[q + S.PR_KIND] != 0
-		if not mi.visible:
-			continue
-		var r := clampf(s[q + S.PR_R] / 1.0e6, 0.15, 1.2)
-		mi.global_position = Vector3(s[q + S.PR_X], s[q + S.PR_Y], s[q + S.PR_Z]) / 1.0e6
-		mi.scale = Vector3.ONE * r
-		var c := Color(0.6, 0.85, 1.0)
-		match int(s[q + S.PR_KIND]):
-			1: c = Color(0.85, 0.5, 1.0)
-			2: c = Color(1.0, 0.55, 0.2)
-			3: c = Color(1.0, 0.3, 0.1)
-		var m: StandardMaterial3D = mi.material_override
-		m.albedo_color = c
-		m.emission = c

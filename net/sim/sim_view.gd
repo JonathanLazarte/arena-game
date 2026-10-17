@@ -149,7 +149,7 @@ func _apply_arrows(s: PackedInt64Array) -> void:
 	for j in S.PROJ_MAX:
 		var q := S.PROJ_BASE + j * S.PR_FIELDS
 		var m := _arrows[j]
-		m.visible = s[q + S.PR_ON] != 0
+		m.visible = s[q + S.PR_ON] != 0 and s[q + S.PR_KIND] == 0 # tajos, hechizos y eikon: SimAbilityFx
 		if m.visible:
 			m.global_position = Vector3(s[q + S.PR_X] / 1000000.0, s[q + S.PR_Y] / 1000000.0, s[q + S.PR_Z] / 1000000.0)
 			m.rotation.y = atan2(-float(s[q + S.PR_VX]), -float(s[q + S.PR_VZ]))
