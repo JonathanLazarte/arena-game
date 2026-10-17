@@ -19,6 +19,8 @@ const IDS: Array[String] = [
 	"presa_verdugo", "giro_martillo", "danza_cisne", "paso_espectral",
 	"cuerno_embiste", "tajo_cruzado", "zarpazo_sangre", "barrido_cola", "daga_sagrada", "flor_umbral",
 	"presa_fauces", "giro_noble", "danza_triple", "alas_picado",
+	"onda_rastrera", "embate_sismico", "garra_suelo", "vendaval_hacha", "anillo_fuego",
+	"rayos_trazadores", "lluvia_meteoros", "lanza_celeste", "lluvia_lanzas", "lluvia_sangre", "columnas_rayo",
 ]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1

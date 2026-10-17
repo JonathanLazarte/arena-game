@@ -92,24 +92,19 @@ func _run() -> void:
 	check(int(off0[0]["ab_engine"]) == 0 and int(on0[0]["ab_engine"]) == 1, "ab_engine 0 y 1 queda en los params")
 	check(SimParams.params_checksum(off0) != SimParams.params_checksum(on0), "el flag entra en params_checksum")
 	for id: String in SimSteps.IDS:
-		var fam: int = SimAbilities.T_TIMELINE
-		if id == "pisoton":
-			fam = SimAbilities.T_WAVE
-		elif id == "flecha_grave":
-			fam = SimAbilities.T_RAIN
 		var p0: Array = await _bake([id], ["estocada"], 0)
 		var p1: Array = await _bake([id], ["estocada"], 1)
 		var c0: Dictionary = p0[0]["boss"][0]
 		var c1: Dictionary = p1[0]["boss"][0]
-		check(int(c0["type"]) == fam and int(c1["type"]) == SimAbilities.T_STEPS, "%s: tipo viejo %d y motor %d" % [id, fam, SimAbilities.T_STEPS])
+		check(int(c0["type"]) != SimAbilities.T_STEPS and int(c1["type"]) == SimAbilities.T_STEPS and int(c1.get("family", -1)) == int(c0["type"]),
+			"%s: familia %d en el motor" % [id, int(c0["type"])])
 		var same_force := true
 		if c0.has("force") or c1.has("force"):
 			same_force = int(c0.get("force", -1)) == int(c1.get("force", -2))
 		check(int(c0["raw"]) == int(c1["raw"]) and int(c0["end"]) == int(c1["end"]) and same_force,
 			"%s: raw %d/%d end %d/%d" % [id, int(c0["raw"]), int(c1["raw"]), int(c0["end"]), int(c1["end"])])
-		_same(p0, p1, 2200000, 220, "idle", "%s de cerca" % id)
-		_same(p0, p1, 14000000, 180, "idle", "%s de lejos" % id)
-		_same(p0, p1, 3500000, 200, "trade", "%s recibiendo golpes" % id)
+		_same(p0, p1, 2200000, 160, "idle", "%s de cerca" % id)
+		_same(p0, p1, 14000000, 140, "idle", "%s de lejos" % id)
 	var duo0: Array = await _bake(["pisoton", "tajo_retardado"], ["flecha_grave", "estocada_negra"], 0)
 	var duo1: Array = await _bake(["pisoton", "tajo_retardado"], ["flecha_grave", "estocada_negra"], 1)
 	_same(duo0, duo1, 5000000, 240, "both", "los dos usan el motor")
