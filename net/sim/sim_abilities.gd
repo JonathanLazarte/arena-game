@@ -1,0 +1,911 @@
+class_name SimAbilities
+extends RefCounted
+## Habilidades de jefe en la simulación determinista (BossAbilities + BossAbilitiesExt): estocada,
+## carga en área, ráfaga teledirigida, escudo de maná (100 % invulnerable), combo de la pausa falsa,
+## salto con caída y las 13 ampliadas (timeline, ondas, lluvia, aliento, furia y contragolpe).
+## Reglas: recarga global de 1,4 s tras cada habilidad (la ráfaga encadena consigo misma), coste en
+## aguante/maná/vida (la vida nunca baja a 0), imbloqueables = tipo «jefe» (sin bloqueo ni parry).
+## Todo en enteros: los tiempos se hornean a ticks con SimParams.tk() sobre la MISMA expresión en
+## segundos que usa el offline (Fighter / FighterBossExt), con el factor de aviso online fijo.
+## Las marcas de suelo y ondas viven en la piscina HZ_* del estado; la cinemática de agarre es solo
+## presentación (GRAB_T / GRABS, la sim ya resolvió posición, daño y aturdimiento).
+
+## Factor de aviso online (Fighter.telegraph_k): fijo para los dos pares (PC y móvil juegan igual).
+const TELE_ONLINE := 1.12
+const GLOBAL_CD := 85 # tk(Fighter.BOSS_GLOBAL_CD = 1,4 s)
+enum { T_ESTOCADA, T_CARGA, T_RAFAGA, T_ESCUDO, T_COMBO, T_SALTO, T_TIMELINE = 10, T_WAVE, T_RAIN, T_BREATH, T_RAGE, T_COUNTER }
+## AB_FL: bits de la habilidad en curso
+const FL_LANDED := 1
+const FL_COUNTERED := 2
+const FL_VANISHED := 4
+const FL_STAGGERED := 8
+const FL_QUEUED := 16
+const FL_READY := 32
+const FL_FINISHER := 64
+const FL_LOCKED := 256
+const FL_FLICK0 := 512
+const FL_FLICK1 := 1024
+const ELEM_FUEGO := 5
+
+static func ids() -> Array:
+	return BossAbilities.all_ids()
+
+static func code_of(id: String) -> int:
+	return ids().find(id)
+
+# ---------------- Horneado (SimParams) ----------------
+static func _tk(sec: float) -> int:
+	return SimParams.tk(sec)
+
+static func _turn(deg_s: float) -> int:
+	return maxi(int(round(deg_s / 60.0 * 256.0 / 360.0)), 1)
+
+static func _um(m: float) -> int:
+	return SimParams.um(m)
+
+static func _ml(v: float) -> int:
+	return SimParams.milli(v)
+
+## Daño base y fuerzas (Fighter.ab_damage / ab_force) sin rabia ni furia (se aplican en vivo).
+static func compile_all(f: Fighter) -> Array:
+	var out: Array = []
+	for id: String in f.boss_ids:
+		var c := compile(f, id)
+		if not c.is_empty():
+			out.append(c)
+	return out
+
+static func compile(f: Fighter, id: String) -> Dictionary:
+	var d := BossAbilities.def(id)
+	if d.is_empty():
+		return {}
+	var tk := TELE_ONLINE
+	var w := f.melee()
+	var dm := SimParams._dmg_mult(f)
+	var magia := float(f.ad.get("magia", 100.0)) / 100.0
+	var base := (w.light_damage if d.get("light", false) else w.heavy_damage) * dm * float(d.get("dmg", 0.0))
+	if d.get("magic", false):
+		base *= magia
+	var st_k := float(f.tfx["stamina_cost"])
+	var phys_f := StunRules.str_force(float(f.attributes().get("fuerza", 10))) + StunRules.weapon_force(w)
+	var sd := float(f.ad.get("stun_dealt", 1.0))
+	var mag_f := StunRules.magic_force(float(f.ad.get("magia", 100.0)))
+	var fphys := func(a: float) -> int: return _ml((phys_f + a) * sd)
+	var fmag := func(a: float) -> int: return _ml(mag_f + a)
+	var cost := float(d.get("cost", 0.0))
+	if id == "combo_falso":
+		cost /= float(maxi((d.get("hits", []) as Array).size(), 1))
+	var ct := ["stamina", "mana", "health"].find(String(d.get("cost_type", "stamina")))
+	var c := {"code": code_of(id), "id": id, "cost_type": ct, "cost": _ml(cost * (st_k if ct == 0 else 1.0)),
+		"unbl": 1 if BossAbilities.is_unblockable(id) else 0, "resist": _ml(float(d.get("resist", 0.0))),
+		"raw": _ml(base), "type": -1}
+	match id:
+		"estocada":
+			c["type"] = T_ESTOCADA
+			c["raw"] = _ml(w.heavy_damage * dm * Fighter.BOSS_DMG_MULT)
+			c["charge"] = _tk(Fighter.BOSS_CHARGE)
+			c["track"] = _tk(Fighter.BOSS_TRACK)
+			c["home_t"] = _tk(Fighter.BOSS_LUNGE_HOME_T)
+			c["home"] = int(round(Fighter.BOSS_HOME_DEG / 60.0 * 256000.0 / 360.0))
+			c["spd"] = _um(Fighter.BOSS_SPEED / 60.0)
+			c["dist"] = _um(Fighter.BOSS_DIST)
+			c["reach"] = _um(Fighter.BOSS_REACH)
+			c["cos_arc"] = SimParams.cos_q(Fighter.BOSS_ARC_DEG)
+			c["rec_hit"] = _tk(Fighter.BOSS_RECOVER_HIT)
+			c["rec_miss"] = _tk(Fighter.BOSS_RECOVER_MISS)
+		"carga_area":
+			c["type"] = T_CARGA
+			c["r"] = _um(float(d["radius"]))
+			c["warn"] = _tk(float(d["windup"]))
+			c["force"] = fmag.call(float(d["force"]))
+			c["end"] = _tk(float(d["windup"]) + float(d["recovery"]))
+		"rafaga":
+			c["type"] = T_RAFAGA
+			c["w"] = _tk(float(d["windup"]))
+			c["turn"] = _turn(360.0)
+			c["count"] = int(d["count"])
+			c["spd"] = _um(float(d["speed"]) / 60.0)
+			c["life"] = _tk(float(d["life"]))
+			c["radius"] = _um(float(d.get("radius", 0.7)))
+			c["force"] = fmag.call(float(d["force"]))
+			c["home_t"] = _tk(float(d["home_time"]))
+			c["home"] = int(round(float(d["home_deg"]) / 60.0 * 256000.0 / 360.0))
+			c["pitch"] = int(round(float(d.get("home_pitch_deg", 24.0)) / 60.0 * 256000.0 / 360.0))
+			c["end"] = _tk(float(d["windup"]) + float(d["recovery"]))
+		"escudo_mana":
+			c["type"] = T_ESCUDO
+			c["w"] = _tk(float(d["windup"]))
+			c["end"] = _tk(float(d["windup"]) + float(d["active"]))
+		"combo_falso":
+			c["type"] = T_COMBO
+			var hs: Array = []
+			for h: Array in d["hits"]:
+				hs.append([_ml(float(h[1])), fphys.call(float(h[2]))])
+			c["hits"] = hs
+			c["stage"] = _tk(float(d["stage_windup"]))
+			c["final"] = _tk(float(d["final_stage_time"]))
+			c["leap0"] = _tk(float(d["final_stage_time"]) - float(d["final_leap_time"]))
+			c["chain"] = _tk(float(d.get("chain_window", 1.15)))
+			c["recovery"] = _tk(float(d["recovery"]))
+			c["strike_r"] = _um(float(d["strike_radius"]))
+			c["turn"] = _turn(float(d["turn_deg"]))
+			c["lunge_t"] = _tk(float(d["stage_windup"]) - float(d["lunge_time"]))
+			c["lunge_spd"] = _um(float(d["lunge_speed"]) / 60.0)
+			c["lunge_dist_v"] = _um(float(d["lunge_dist"]) / float(d["lunge_time"]) / 60.0)
+			c["stop"] = _um(float(d["lunge_stop_dist"]))
+			c["retreat"] = _um(float(d["final_retreat_speed"]) / 60.0)
+			c["slam_r"] = _um(float(d["slam_radius"]))
+			c["slam_warn"] = _tk(float(d.get("slam_warn", 0.25)))
+			c["slam_k"] = _ml(float(d.get("slam_mult", 0.7)))
+			c["slam_force"] = fphys.call(float(d.get("slam_force", 48.0)))
+			c["stagger"] = _tk(StunRules.STAGGER_T)
+			c["resist_final"] = 1000
+		"salto_caida":
+			c["type"] = T_SALTO
+			c["air0"] = _tk(0.05) + 1
+			c["lock"] = _tk(float(d["lock"]))
+			c["land"] = _tk(float(d["land"]))
+			c["lock_us"] = int(round(float(d["lock"]) * 1000000.0))
+			c["span_us"] = int(round((float(d["land"]) - float(d["lock"])) * 1000000.0))
+			c["warn"] = _tk(float(d["land"]) - float(d["lock"]))
+			c["r"] = _um(float(d["radius"]))
+			c["force"] = fphys.call(float(d["force"]))
+			c["end"] = _tk(float(d["land"]) + float(d["recovery"]))
+	if c["type"] >= 0:
+		return c
+	match String(d.get("type", "")):
+		"timeline":
+			c["type"] = T_TIMELINE
+			var hits: Array = d["hits"]
+			var hs: Array = []
+			for h: Array in hits:
+				var th := float(h[0]) * tk
+				hs.append([_tk(th), _ml(float(h[1])), fphys.call(float(h[2])), _um((float(h[3]) if h.size() > 3 else 0.0) / 60.0),
+					_tk(th - 0.06), _tk(th - 0.25), _tk(th + 0.04)])
+			c["hits"] = hs
+			var unbl := bool(d.get("unblockable", false))
+			c["kind"] = 3 if unbl or String(d.get("kind", "melee")) == "jefe" else 0
+			c["sub"] = SimParams.sub_code(w.phys_type)
+			c["pd_pm"] = SimParams.pm(2.0 * w.poise_damage_mult * float(PhysTypes.POISE_MOD.get(w.phys_type, 1.0)) * float(f.ad["impacto"])) if c["kind"] == 0 else 2000
+			c["counter_pm"] = SimParams.pm(float(PhysTypes.COUNTER_DMG.get(w.phys_type, 1.15)))
+			c["reach"] = _um(float(d.get("reach", 2.8)))
+			c["gap"] = _um(float(d.get("reach", 2.6)) * 0.55)
+			c["cos_arc"] = SimParams.cos_q(float(d.get("arc", 60.0)))
+			c["track"] = _turn(float(d.get("track", 180.0)))
+			c["end"] = _tk(float(hits[-1][0]) * tk + float(d.get("recovery", 0.9)))
+			c["grab"] = 1 if d.get("grab", false) else 0
+			c["grab_stun"] = _tk(float(d.get("grab_stun", 1.1)))
+			c["grab_t"] = _tk(0.8)
+			c["grab_d"] = _um(1.1)
+			c["abort"] = 1 if d.get("abort_on_miss", false) else 0
+			c["miss_t"] = c["end"] - _tk(float(d.get("miss_extra", 0.5)) + float(d.get("recovery", 0.9)))
+			c["hit_if"] = 1 if d.get("hit_iframes", false) else 0
+			c["parry_cancel"] = 1 if id == "danza_cisne" else 0
+			c["vanish"] = _tk(float(d["vanish"]) * tk) if d.has("vanish") else -1
+			c["reappear"] = _tk(float(hits[0][0]) * tk - 0.2)
+			c["blink"] = _um(float(d.get("blink_dist", 2.4)))
+			var fl: Array = d.get("flicker", [])
+			c["flick0"] = _tk(float(fl[0]) * tk) if fl.size() > 1 else -1
+			c["flick1"] = _tk(float(fl[1]) * tk) if fl.size() > 1 else -1
+			c["slam_r"] = _um(float(d.get("slam_radius", 0.0)))
+			c["slam_warn"] = _tk(float(d.get("slam_warn", 0.35)))
+			c["slam_k"] = _ml(float(d.get("slam_mult", 0.65)))
+			c["slam_force"] = fphys.call(float(d.get("slam_force", 40.0)))
+			c["slam_last"] = 1 if d.get("slam_on_last", false) else 0
+			c["block_cost"] = 0
+		"wave":
+			c["type"] = T_WAVE
+			c["w"] = _tk(float(d["windup"]) * tk)
+			c["turn"] = _turn(240.0)
+			var cnt := int(d.get("count", 3))
+			var spread := float(d.get("spread_deg", 18.0))
+			var offs: Array = []
+			for i in cnt:
+				var ang: float = (i * spread) if d.get("ring", false) else (i - (cnt - 1) * 0.5) * spread
+				offs.append(-int(round(ang * 256.0 / 360.0))) # rotated(UP, +a) = rumbo − a
+			c["offs"] = offs
+			c["spd"] = _um(float(d["speed"]) / 60.0)
+			c["range"] = _um(float(d["range"]))
+			c["width"] = _um(float(d["width"]))
+			c["warn"] = _tk(float(d["warn"]) * tk)
+			c["force"] = fphys.call(float(d.get("force", 30.0)))
+			c["end"] = _tk(float(d["windup"]) * tk + float(d.get("recovery", 0.8)))
+		"rain":
+			c["type"] = T_RAIN
+			var cnt := int(d["count"])
+			var iv := float(d["interval"])
+			var ft: Array = []
+			for i in cnt:
+				ft.append(_tk(float(d["windup"]) * tk + i * iv))
+			c["fire"] = ft
+			c["scatter"] = 1 if String(d.get("mode", "track")) != "track" else 0
+			c["scatter_r"] = _um(float(d.get("scatter_r", 7.5)))
+			c["r"] = _um(float(d["radius"]))
+			c["warn"] = _tk(float(d["tele"]) * tk)
+			c["force"] = fmag.call(float(d.get("force", 25.0)))
+			c["knock"] = _um(float(d.get("knock", 6.0)) / 60.0)
+			c["end"] = _tk(float(d["windup"]) * tk + (cnt - 1) * iv + float(d.get("recovery", 0.6)))
+		"breath":
+			c["type"] = T_BREATH
+			c["w"] = _tk(float(d["windup"]) * tk)
+			c["w_end"] = _tk(float(d["windup"]) * tk + float(d["duration"]))
+			var t := float(d.get("tick", 0.3))
+			var n := 0
+			while t > 0.0 and n < 1000:
+				t -= 1.0 / 60.0
+				n += 1
+			c["tick"] = n
+			c["range"] = _um(float(d.get("range", 7.5)))
+			c["cos_arc"] = SimParams.cos_q(float(d.get("arc", 28.0)))
+			c["turn"] = _turn(float(d.get("turn_deg", 70.0)))
+			c["elem"] = SimParams.SUBS.size() + SimParams.ELEMS.find(String(d.get("element", "fuego")))
+			c["force"] = fmag.call(float(d.get("force", 8.0)))
+			c["end"] = _tk(float(d["windup"]) * tk + float(d["duration"]) + float(d.get("recovery", 1.1)))
+		"rage":
+			c["type"] = T_RAGE
+			c["w"] = _tk(float(d["windup"]) * tk)
+			c["dur"] = _tk(float(d.get("duration", 9.0)))
+			c["end"] = _tk(float(d["windup"]) * tk + float(d.get("recovery", 0.3)))
+		"counter":
+			c["type"] = T_COUNTER
+			c["w"] = _tk(float(d["windup"]) * tk)
+			c["ws"] = _tk(float(d["windup"]) * tk + float(d["stance"]) * tk)
+			c["rec_hit"] = _tk(float(d["recovery_hit"]))
+			c["end_miss"] = _tk(float(d["windup"]) * tk + float(d["stance"]) * tk + float(d["recovery_miss"]))
+			c["reach"] = _um(float(d.get("reach", 4.0)))
+			c["c_raw"] = _ml(w.heavy_damage * dm * float(d.get("cmult", 1.6)))
+			c["c_force"] = fphys.call(float(d.get("cforce", 55.0)))
+	return c
+
+# ---------------- Utilidades ----------------
+static func _ab(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
+	return P[i]["boss"][s[i * FightSim.F_FIELDS + FightSim.AB_SLOT]]
+
+static func is_shield(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	return s[o + FightSim.AB_SLOT] >= 0 and int(_ab(s, P, i)["type"]) == T_ESCUDO
+
+## Daño en vivo: furia con vida baja y furia de fase (+30 %).
+static func raw_live(s: PackedInt64Array, P: Array, i: int, raw: int) -> int:
+	var o := i * FightSim.F_FIELDS
+	if P[i].get("furia_pm", 0) > 0 and s[o + FightSim.HP] * 1000 < P[i]["hp"] * FightSim.FURIA_HP_PM:
+		raw = raw * (1000 + P[i]["furia_pm"]) / 1000
+	if s[o + FightSim.RAGE_T] > 0:
+		raw = raw * 1300 / 1000
+	return raw
+
+static func _tdir(s: PackedInt64Array, i: int) -> int:
+	var o := i * FightSim.F_FIELDS
+	var b := FightSim._opp(i)
+	if s[b + FightSim.ALIVE] != 0 and FightSim._dist_to_opp(s, i) > 100000:
+		return FightSim._dir_to_opp(s, i)
+	return s[o + FightSim.FACE]
+
+## ¿El rival está a tiro? dist <= alcance + radio y dentro del arco (cos_arc ×4096).
+static func _in_reach(s: PackedInt64Array, P: Array, i: int, reach: int, cos_arc: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var b := FightSim._opp(i)
+	if s[b + FightSim.ALIVE] == 0:
+		return false
+	var dx: int = s[b + FightSim.X] - s[o + FightSim.X]
+	var dz: int = s[b + FightSim.Z] - s[o + FightSim.Z]
+	var l := FxMath.length(dx, dz)
+	if l > reach + P[1 - i]["hit_radius"]:
+		return false
+	if l > 200000:
+		var f: int = s[o + FightSim.FACE]
+		return dx * FxMath.COS[f] + dz * FxMath.SIN[f] >= cos_arc * l
+	return true
+
+static func clamp_world(s: PackedInt64Array, P: Array, o: int) -> void:
+	var r := FxMath.length(s[o + FightSim.X], s[o + FightSim.Z])
+	var lim := FightSim.ARENA_R - 450000
+	if r > lim:
+		s[o + FightSim.X] = s[o + FightSim.X] * lim / r
+		s[o + FightSim.Z] = s[o + FightSim.Z] * lim / r
+	if P[0].get("pillars", 0) != 0:
+		for k in 6:
+			var dx: int = s[o + FightSim.X] - FightSim.PILLARS[k * 2]
+			var dz: int = s[o + FightSim.Z] - FightSim.PILLARS[k * 2 + 1]
+			var dl := FxMath.length(dx, dz)
+			if dl < FightSim.PILLAR_BODY_R:
+				if dl < 1000:
+					dx = FxMath.COS[s[o + FightSim.FACE]]; dz = FxMath.SIN[s[o + FightSim.FACE]]; dl = FxMath.ONE
+				s[o + FightSim.X] = FightSim.PILLARS[k * 2] + dx * FightSim.PILLAR_BODY_R / dl
+				s[o + FightSim.Z] = FightSim.PILLARS[k * 2 + 1] + dz * FightSim.PILLAR_BODY_R / dl
+
+## Marca de suelo (GroundAoE) o onda (GroundWave) en la piscina. Devuelve el índice o -1 (llena).
+static func spawn_hz(s: PackedInt64Array, owner: int, typ: int, x: int, z: int, warn: int, r: int, raw: int, force: int, knock: int, unbl: int, dir: int = 0, spd: int = 0, rng: int = 0, width: int = 0) -> int:
+	for j in FightSim.HZ_MAX:
+		var q := FightSim.HZ_BASE + j * FightSim.HZ_FIELDS
+		if s[q + FightSim.HZ_ON] != 0:
+			continue
+		for k in FightSim.HZ_FIELDS:
+			s[q + k] = 0
+		s[q + FightSim.HZ_ON] = 1
+		s[q + FightSim.HZ_TYPE] = typ
+		s[q + FightSim.HZ_OWNER] = owner
+		s[q + FightSim.HZ_X] = x
+		s[q + FightSim.HZ_Z] = z
+		s[q + FightSim.HZ_WARN] = warn
+		s[q + FightSim.HZ_R] = r
+		s[q + FightSim.HZ_RAW] = raw
+		s[q + FightSim.HZ_FORCE] = force
+		s[q + FightSim.HZ_KNOCK] = knock
+		s[q + FightSim.HZ_UNBL] = unbl
+		s[q + FightSim.HZ_DX] = FxMath.COS[dir & 255]
+		s[q + FightSim.HZ_DZ] = FxMath.SIN[dir & 255]
+		s[q + FightSim.HZ_SPD] = spd
+		s[q + FightSim.HZ_RANGE] = rng
+		s[q + FightSim.HZ_W] = width
+		return j
+	return -1
+
+static func _grounded(s: PackedInt64Array, b: int) -> bool:
+	return s[b + FightSim.AB_AIR] == 0
+
+## Avance de marcas y ondas (después de los luchadores y proyectiles, como nodos añadidos después).
+static func hazards(s: PackedInt64Array, P: Array) -> void:
+	for j in FightSim.HZ_MAX:
+		var q := FightSim.HZ_BASE + j * FightSim.HZ_FIELDS
+		if s[q + FightSim.HZ_ON] == 0:
+			continue
+		s[q + FightSim.HZ_T] += 1
+		var owner: int = s[q + FightSim.HZ_OWNER]
+		var b := FightSim._opp(owner)
+		if s[q + FightSim.HZ_TYPE] == 1:
+			if s[q + FightSim.HZ_DONE] != 0:
+				if s[q + FightSim.HZ_T] >= s[q + FightSim.HZ_WARN] + 24:
+					s[q + FightSim.HZ_ON] = 0
+				continue
+			if s[q + FightSim.HZ_T] < s[q + FightSim.HZ_WARN]:
+				continue
+			s[q + FightSim.HZ_DONE] = 1
+			if s[b + FightSim.ALIVE] == 0:
+				continue
+			var dx: int = s[b + FightSim.X] - s[q + FightSim.HZ_X]
+			var dz: int = s[b + FightSim.Z] - s[q + FightSim.HZ_Z]
+			var l := FxMath.length(dx, dz)
+			if l > s[q + FightSim.HZ_R] or not _grounded(s, b):
+				continue
+			var res := FightSim._take_hit(s, P, owner, 5, s[q + FightSim.HZ_RAW], 0, s[q + FightSim.HZ_FORCE], 2000, 1000, 0, -1, [], s[q + FightSim.HZ_UNBL] != 0)
+			if res == 1:
+				var kv: int = s[q + FightSim.HZ_KNOCK]
+				if l > 100000:
+					s[b + FightSim.KX] = dx * kv / l
+					s[b + FightSim.KZ] = dz * kv / l
+				else:
+					s[b + FightSim.KX] = FxMath.COS[s[b + FightSim.FACE]] * kv / FxMath.ONE
+					s[b + FightSim.KZ] = FxMath.SIN[s[b + FightSim.FACE]] * kv / FxMath.ONE
+				s[owner * FightSim.F_FIELDS + FightSim.AB_HITS] += 1
+		else:
+			if s[q + FightSim.HZ_T] < s[q + FightSim.HZ_WARN]:
+				continue
+			var stp: int = s[q + FightSim.HZ_SPD]
+			s[q + FightSim.HZ_X] += s[q + FightSim.HZ_DX] * stp / FxMath.ONE
+			s[q + FightSim.HZ_Z] += s[q + FightSim.HZ_DZ] * stp / FxMath.ONE
+			s[q + FightSim.HZ_TRAV] += stp
+			if s[q + FightSim.HZ_TRAV] >= s[q + FightSim.HZ_RANGE] or FxMath.length(s[q + FightSim.HZ_X], s[q + FightSim.HZ_Z]) > FightSim.ARENA_R + 2000000:
+				s[q + FightSim.HZ_ON] = 0
+				continue
+			if P[0].get("pillars", 0) != 0 and FightSim._in_pillar(s[q + FightSim.HZ_X], s[q + FightSim.HZ_Z], FightSim.PILLAR_ARROW_R):
+				s[q + FightSim.HZ_ON] = 0
+				continue
+			if s[q + FightSim.HZ_DONE] != 0 or s[b + FightSim.ALIVE] == 0:
+				continue
+			var rx: int = s[b + FightSim.X] - s[q + FightSim.HZ_X]
+			var rz: int = s[b + FightSim.Z] - s[q + FightSim.HZ_Z]
+			var hr: int = P[1 - owner]["hit_radius"]
+			var along: int = absi(rx * s[q + FightSim.HZ_DX] + rz * s[q + FightSim.HZ_DZ]) / FxMath.ONE
+			var side: int = absi(rx * s[q + FightSim.HZ_DZ] - rz * s[q + FightSim.HZ_DX]) / FxMath.ONE
+			if along > 600000 + hr / 2 + stp or side > s[q + FightSim.HZ_W] / 2 + hr / 2:
+				continue
+			s[q + FightSim.HZ_DONE] = 1
+			if not _grounded(s, b):
+				continue
+			var res2 := FightSim._take_hit(s, P, owner, 5, s[q + FightSim.HZ_RAW], 0, s[q + FightSim.HZ_FORCE], 2000, 1000, 0)
+			if res2 == 1:
+				s[b + FightSim.KX] = s[q + FightSim.HZ_DX] * s[q + FightSim.HZ_KNOCK] / FxMath.ONE
+				s[b + FightSim.KZ] = s[q + FightSim.HZ_DZ] * s[q + FightSim.HZ_KNOCK] / FxMath.ONE
+				s[owner * FightSim.F_FIELDS + FightSim.AB_HITS] += 1
+
+# ---------------- Entrada ----------------
+static func cycle(s: PackedInt64Array, P: Array, i: int) -> void:
+	var n: int = (P[i].get("boss", []) as Array).size()
+	if n > 1:
+		s[i * FightSim.F_FIELDS + FightSim.AB_SEL] = (s[i * FightSim.F_FIELDS + FightSim.AB_SEL] + 1) % n
+
+static func _cost_ok(s: PackedInt64Array, i: int, ab: Dictionary) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var c: int = ab["cost"]
+	match int(ab["cost_type"]):
+		0: return s[o + FightSim.ST] >= c and s[o + FightSim.EXH] <= 0
+		1: return s[o + FightSim.MANA] >= c
+		2: return s[o + FightSim.HP] - c > 0
+	return false
+
+static func _pay(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var c: int = ab["cost"]
+	match int(ab["cost_type"]):
+		0: FightSim._spend(s, P, i, c)
+		1: s[o + FightSim.MANA] -= c
+		2: s[o + FightSim.HP] = maxi(s[o + FightSim.HP] - c, 1000)
+
+static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var boss: Array = P[i].get("boss", [])
+	if slot < 0 or slot >= boss.size():
+		return false
+	var ab: Dictionary = boss[slot]
+	if s[o + FightSim.MOUNTED] != 0 or s[o + FightSim.ALIVE] == 0 or s[o + FightSim.STUN] > 0 or s[o + FightSim.EXH] > 0 or s[o + FightSim.CAST_T] > 0 or s[o + FightSim.CRIT_T] >= 0:
+		return false
+	if s[o + FightSim.BS_PH] != 0 or s[o + FightSim.AB_SLOT] >= 0 or s[o + FightSim.BACKSTEP_T] > 0:
+		return false
+	if s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.PARRY_STATE] != FightSim.Parry.NONE or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.SWAP_T] > 0:
+		return false
+	if s[o + FightSim.SHOT_STATE] == FightSim.Shot.DRAW or s[o + FightSim.SHOT_STATE] == FightSim.Shot.RECOVER:
+		return false
+	if int(ab["type"]) != T_ESCUDO and s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
+		return false
+	if s[o + FightSim.BOSS_CD] > 0 and not (int(ab["type"]) == T_RAFAGA and s[o + FightSim.AB_LAST] == int(ab["code"])):
+		return false
+	return _cost_ok(s, i, ab)
+
+static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var boss: Array = P[i].get("boss", [])
+	if boss.is_empty():
+		return false
+	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, boss.size() - 1)
+	var ab: Dictionary = boss[slot]
+	if int(ab["type"]) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
+		if (s[o + FightSim.AB_FL] & FL_QUEUED) != 0 or s[o + FightSim.AB_FIRED] >= (ab["hits"] as Array).size():
+			return false
+		if not _cost_ok(s, i, ab):
+			_end_combo(s, P, i, true)
+			return true
+		_pay(s, P, i, ab)
+		s[o + FightSim.AB_FL] |= FL_QUEUED
+		return true
+	if not can_use(s, P, i, slot):
+		return false
+	_pay(s, P, i, ab)
+	s[o + FightSim.AB_LAST] = ab["code"]
+	s[o + FightSim.AB_STARTS] += 1
+	_start(s, P, i, slot)
+	return true
+
+static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
+	var o := i * FightSim.F_FIELDS
+	var ab: Dictionary = P[i]["boss"][slot]
+	s[o + FightSim.BLOCKING] = 0
+	var dir := _tdir(s, i)
+	s[o + FightSim.FACE] = dir
+	if int(ab["type"]) == T_ESTOCADA:
+		s[o + FightSim.BS_PH] = 1
+		s[o + FightSim.BS_T] = 0
+		s[o + FightSim.BS_TRAV] = 0
+		s[o + FightSim.BS_HIT] = 0
+		s[o + FightSim.BS_DIR] = dir * 1000
+		return
+	s[o + FightSim.AB_SLOT] = slot
+	s[o + FightSim.AB_T] = 0
+	s[o + FightSim.AB_FIRED] = 0
+	s[o + FightSim.AB_FL] = 0
+	s[o + FightSim.AB_VX] = 0
+	s[o + FightSim.AB_VZ] = 0
+	s[o + FightSim.AB_AIR] = 0
+	s[o + FightSim.AB_IMM] = 0
+	s[o + FightSim.AB_TICK] = 0
+	s[o + FightSim.AB_WAIT] = 0
+	s[o + FightSim.AB_HZ] = -1
+	s[o + FightSim.AB_FX] = s[o + FightSim.X]
+	s[o + FightSim.AB_FZ] = s[o + FightSim.Z]
+	var b := FightSim._opp(i)
+	s[o + FightSim.AB_X] = s[b + FightSim.X] if s[b + FightSim.ALIVE] != 0 else s[o + FightSim.X] + FxMath.COS[dir] * 6000000 / FxMath.ONE
+	s[o + FightSim.AB_Z] = s[b + FightSim.Z] if s[b + FightSim.ALIVE] != 0 else s[o + FightSim.Z] + FxMath.SIN[dir] * 6000000 / FxMath.ONE
+	if int(ab["type"]) == T_CARGA:
+		s[o + FightSim.AB_HZ] = spawn_hz(s, i, 1, s[o + FightSim.X], s[o + FightSim.Z], ab["warn"], ab["r"], raw_live(s, P, i, ab["raw"]), ab["force"], 150000, 0)
+
+## Fin de la habilidad (Fighter._end_ability): recarga global; si se corta, su carga no estalla.
+static func end_ability(s: PackedInt64Array, o: int, interrupted: bool) -> void:
+	if s[o + FightSim.AB_SLOT] < 0:
+		return
+	s[o + FightSim.BOSS_CD] = GLOBAL_CD
+	if interrupted:
+		s[o + FightSim.AB_INTR] += 1
+		var hz: int = s[o + FightSim.AB_HZ]
+		if hz >= 0:
+			var q := FightSim.HZ_BASE + hz * FightSim.HZ_FIELDS
+			if s[q + FightSim.HZ_ON] != 0 and s[q + FightSim.HZ_DONE] == 0 and s[q + FightSim.HZ_TYPE] == 1:
+				s[q + FightSim.HZ_ON] = 0
+	s[o + FightSim.AB_SLOT] = -1
+	s[o + FightSim.AB_T] = 0
+	s[o + FightSim.AB_VX] = 0
+	s[o + FightSim.AB_VZ] = 0
+	s[o + FightSim.AB_AIR] = 0
+	s[o + FightSim.AB_IMM] = 0
+	s[o + FightSim.AB_HZ] = -1
+	s[o + FightSim.AB_FL] = 0
+
+static func _end_combo(s: PackedInt64Array, P: Array, i: int, penalize: bool) -> void:
+	var o := i * FightSim.F_FIELDS
+	var n: int = (_ab(s, P, i)["hits"] as Array).size()
+	end_ability(s, o, penalize and s[o + FightSim.AB_FIRED] < n)
+	if penalize and s[o + FightSim.ALIVE] != 0:
+		s[o + FightSim.EXH] = maxi(s[o + FightSim.EXH], P[i]["exhaust"])
+
+## Súper-armadura de la habilidad en curso (Fighter.ab_resist).
+static func resist_pm(s: PackedInt64Array, P: Array, i: int) -> int:
+	var o := i * FightSim.F_FIELDS
+	var ab := _ab(s, P, i)
+	if int(ab["type"]) == T_COMBO:
+		var n: int = (ab["hits"] as Array).size()
+		if s[o + FightSim.AB_FIRED] == n - 1 and s[o + FightSim.AB_T] < int(ab["final"]):
+			return ab["resist_final"]
+	return ab["resist"]
+
+## Postura de contragolpe: si le golpean en la ventana, no recibe daño y castiga (tipo jefe).
+static func counter_trigger(s: PackedInt64Array, P: Array, d: int, att: int) -> bool:
+	var o := d * FightSim.F_FIELDS
+	if s[o + FightSim.AB_SLOT] < 0:
+		return false
+	var ab := _ab(s, P, d)
+	if int(ab["type"]) != T_COUNTER or (s[o + FightSim.AB_FL] & FL_COUNTERED) != 0:
+		return false
+	if s[o + FightSim.AB_T] < int(ab["w"]) or s[o + FightSim.AB_T] > int(ab["ws"]):
+		return false
+	s[o + FightSim.AB_FL] |= FL_COUNTERED
+	s[o + FightSim.AB_T] = ab["ws"]
+	var a := att * FightSim.F_FIELDS
+	var dx: int = s[a + FightSim.X] - s[o + FightSim.X]
+	var dz: int = s[a + FightSim.Z] - s[o + FightSim.Z]
+	var l := FxMath.length(dx, dz)
+	if l > 100000:
+		s[o + FightSim.FACE] = FxMath.dir_of(dx, dz, s[o + FightSim.FACE])
+	if l <= int(ab["reach"]) + P[att]["hit_radius"]:
+		var res := FightSim._take_hit(s, P, d, 3, raw_live(s, P, d, ab["c_raw"]), 4, ab["c_force"], 2000, 1000, 0)
+		if res == 1:
+			s[o + FightSim.AB_HITS] += 1
+	return true
+
+# ---------------- Actualización por tick ----------------
+static func update(s: PackedInt64Array, P: Array, i: int) -> void:
+	var o := i * FightSim.F_FIELDS
+	if s[o + FightSim.BOSS_CD] > 0: s[o + FightSim.BOSS_CD] -= 1
+	if s[o + FightSim.RAGE_T] > 0: s[o + FightSim.RAGE_T] -= 1
+	if s[o + FightSim.GRAB_T] > 0: s[o + FightSim.GRAB_T] -= 1
+	if s[o + FightSim.BS_PH] != 0:
+		_estocada(s, P, i)
+	if s[o + FightSim.AB_SLOT] < 0:
+		return
+	if s[o + FightSim.ALIVE] == 0:
+		end_ability(s, o, true)
+		return
+	s[o + FightSim.AB_T] += 1
+	s[o + FightSim.AB_VX] = 0
+	s[o + FightSim.AB_VZ] = 0
+	var ab := _ab(s, P, i)
+	match int(ab["type"]):
+		T_CARGA:
+			if s[o + FightSim.AB_T] >= int(ab["end"]):
+				end_ability(s, o, false)
+		T_RAFAGA: _rafaga(s, P, i, ab)
+		T_ESCUDO:
+			if s[o + FightSim.AB_T] >= int(ab["w"]):
+				s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 3)
+			if s[o + FightSim.AB_T] >= int(ab["end"]):
+				s[o + FightSim.INVULN] = 0
+				end_ability(s, o, false)
+		T_COMBO: _combo(s, P, i, ab)
+		T_SALTO: _salto(s, P, i, ab)
+		T_TIMELINE: _timeline(s, P, i, ab)
+		T_WAVE: _wave(s, P, i, ab)
+		T_RAIN: _rain(s, P, i, ab)
+		T_BREATH: _breath(s, P, i, ab)
+		T_RAGE:
+			if s[o + FightSim.AB_FIRED] == 0 and s[o + FightSim.AB_T] >= int(ab["w"]):
+				s[o + FightSim.AB_FIRED] = 1
+				s[o + FightSim.RAGE_T] = ab["dur"]
+			if s[o + FightSim.AB_T] >= int(ab["end"]):
+				end_ability(s, o, false)
+		T_COUNTER:
+			var done: bool = s[o + FightSim.AB_T] >= int(ab["ws"]) + int(ab["rec_hit"]) if (s[o + FightSim.AB_FL] & FL_COUNTERED) != 0 else s[o + FightSim.AB_T] >= int(ab["end_miss"])
+			if done:
+				end_ability(s, o, false)
+	# inmunidad (Fighter.ab_immune): escudo tras su anticipación, o en el aire (salto / combo)
+	if s[o + FightSim.AB_SLOT] >= 0:
+		var t := int(_ab(s, P, i)["type"])
+		s[o + FightSim.AB_IMM] = 1 if (t == T_ESCUDO and s[o + FightSim.AB_T] >= int(_ab(s, P, i)["w"])) or ((t == T_SALTO or t == T_COMBO) and s[o + FightSim.AB_AIR] != 0) else 0
+
+static func _estocada(s: PackedInt64Array, P: Array, i: int) -> void:
+	var o := i * FightSim.F_FIELDS
+	var ab: Dictionary = {}
+	for c: Dictionary in P[i].get("boss", []):
+		if int(c["type"]) == T_ESTOCADA:
+			ab = c
+	if ab.is_empty() or s[o + FightSim.ALIVE] == 0:
+		_end_boss(s, o)
+		return
+	s[o + FightSim.BS_T] += 1
+	if s[o + FightSim.BS_PH] == 1 or s[o + FightSim.BS_PH] == 2:
+		s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 3)
+	match s[o + FightSim.BS_PH]:
+		1:
+			if s[o + FightSim.BS_T] <= int(ab["track"]):
+				s[o + FightSim.BS_DIR] = _tdir(s, i) * 1000
+				s[o + FightSim.FACE] = s[o + FightSim.BS_DIR] / 1000
+			if s[o + FightSim.BS_T] >= int(ab["charge"]):
+				s[o + FightSim.BS_PH] = 2
+				s[o + FightSim.BS_T] = 0
+		2:
+			if s[o + FightSim.BS_T] <= int(ab["home_t"]):
+				var cur: int = s[o + FightSim.BS_DIR]
+				var want: int = _tdir(s, i) * 1000
+				var dd: int = ((want - cur + 128000) % 256000 + 256000) % 256000 - 128000
+				var hr: int = ab["home"]
+				s[o + FightSim.BS_DIR] = ((cur + clampi(dd, -hr, hr)) % 256000 + 256000) % 256000
+			var f: int = (s[o + FightSim.BS_DIR] / 1000) & 255
+			s[o + FightSim.FACE] = f
+			var stp: int = ab["spd"]
+			s[o + FightSim.X] += FxMath.COS[f] * stp / FxMath.ONE
+			s[o + FightSim.Z] += FxMath.SIN[f] * stp / FxMath.ONE
+			clamp_world(s, P, o)
+			s[o + FightSim.VX] = 0
+			s[o + FightSim.VZ] = 0
+			s[o + FightSim.BS_TRAV] += stp
+			if _in_reach(s, P, i, ab["reach"], ab["cos_arc"]):
+				var res := FightSim._take_hit(s, P, i, 3, raw_live(s, P, i, ab["raw"]), 4, -1, 2000, 1000, 0)
+				if res == 1 or res == 2:
+					s[o + FightSim.BS_HIT] = 1
+					if res == 1:
+						s[o + FightSim.AB_HITS] += 1
+			if s[o + FightSim.BS_HIT] != 0 or s[o + FightSim.BS_TRAV] >= int(ab["dist"]):
+				s[o + FightSim.BS_PH] = 3
+				s[o + FightSim.BS_T] = 0
+				s[o + FightSim.INVULN] = 0
+		3:
+			if s[o + FightSim.BS_T] >= (int(ab["rec_hit"]) if s[o + FightSim.BS_HIT] != 0 else int(ab["rec_miss"])):
+				_end_boss(s, o)
+
+static func _end_boss(s: PackedInt64Array, o: int) -> void:
+	if s[o + FightSim.BS_PH] != 0:
+		s[o + FightSim.BOSS_CD] = GLOBAL_CD
+	if s[o + FightSim.BS_PH] == 1 or s[o + FightSim.BS_PH] == 2:
+		s[o + FightSim.INVULN] = 0
+	s[o + FightSim.BS_PH] = 0
+	s[o + FightSim.BS_T] = 0
+
+static func _rafaga(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	if s[o + FightSim.AB_T] < int(ab["w"]):
+		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
+	while s[o + FightSim.AB_FIRED] < int(ab["count"]) and s[o + FightSim.AB_T] >= int(ab["w"]):
+		var f: int = s[o + FightSim.FACE]
+		var ox: int = s[o + FightSim.X] + FxMath.COS[f] * 1000000 / FxMath.ONE
+		var oz: int = s[o + FightSim.Z] + FxMath.SIN[f] * 1000000 / FxMath.ONE
+		FightSim.spawn_proj(s, i, 1, ox, oz, FightSim.HIT_CENTER_Y + 300000, f, ab["spd"], ab["life"], ab["radius"], raw_live(s, P, i, ab["raw"]),
+			ab["force"], -1, 0, ab["home_t"], ab["home"], ab["pitch"], true)
+		s[o + FightSim.AB_FIRED] += 1
+	if s[o + FightSim.AB_T] >= int(ab["end"]):
+		end_ability(s, o, false)
+
+static func _timeline(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var t: int = s[o + FightSim.AB_T]
+	var hits: Array = ab["hits"]
+	var b := FightSim._opp(i)
+	if int(ab["flick0"]) >= 0:
+		if t >= int(ab["flick0"]): s[o + FightSim.AB_FL] |= FL_FLICK0
+		if t >= int(ab["flick1"]): s[o + FightSim.AB_FL] |= FL_FLICK1
+	if int(ab["vanish"]) >= 0:
+		if t >= int(ab["vanish"]) and t < int(ab["reappear"]):
+			s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 5)
+			s[o + FightSim.AB_FL] |= FL_VANISHED
+		elif (s[o + FightSim.AB_FL] & FL_VANISHED) != 0 and t >= int(ab["reappear"]):
+			s[o + FightSim.AB_FL] &= ~FL_VANISHED
+			if s[b + FightSim.ALIVE] != 0:
+				var bf := (s[b + FightSim.FACE] + 128) & 255
+				s[o + FightSim.X] = s[b + FightSim.X] + FxMath.COS[bf] * int(ab["blink"]) / FxMath.ONE
+				s[o + FightSim.Z] = s[b + FightSim.Z] + FxMath.SIN[bf] * int(ab["blink"]) / FxMath.ONE
+				clamp_world(s, P, o)
+				s[o + FightSim.FACE] = _tdir(s, i)
+	if s[o + FightSim.AB_FIRED] < hits.size():
+		var h: Array = hits[s[o + FightSim.AB_FIRED]]
+		if s[b + FightSim.ALIVE] != 0 and t < int(h[4]):
+			s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["track"])
+		if int(h[3]) > 0 and t >= int(h[5]) and t < int(h[6]):
+			var gap := FightSim._dist_to_opp(s, i) if s[b + FightSim.ALIVE] != 0 else 99000000
+			if gap > int(ab["gap"]):
+				s[o + FightSim.AB_VX] = FxMath.COS[s[o + FightSim.FACE]] * int(h[3]) / FxMath.ONE
+				s[o + FightSim.AB_VZ] = FxMath.SIN[s[o + FightSim.FACE]] * int(h[3]) / FxMath.ONE
+		if t >= int(h[0]):
+			if int(ab["hit_if"]) != 0:
+				s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 9)
+			var landed := _strike(s, P, i, ab, h)
+			if s[o + FightSim.AB_SLOT] < 0:
+				return # cortada por un parry
+			s[o + FightSim.AB_FIRED] += 1
+			if not landed and int(ab["abort"]) != 0 and s[o + FightSim.AB_FIRED] == 1:
+				s[o + FightSim.AB_FIRED] = hits.size()
+				s[o + FightSim.AB_T] = ab["miss_t"]
+	if s[o + FightSim.AB_T] >= int(ab["end"]):
+		end_ability(s, o, false)
+
+static func _strike(s: PackedInt64Array, P: Array, i: int, ab: Dictionary, h: Array) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var b := FightSim._opp(i)
+	var any_hit := false
+	if _in_reach(s, P, i, ab["reach"], ab["cos_arc"]):
+		var raw := raw_live(s, P, i, int(ab["raw"]) * int(h[1]) / 1000)
+		var res := FightSim._take_hit(s, P, i, ab["kind"], raw, ab["sub"], h[2], ab["pd_pm"], ab["counter_pm"], P[i]["atk"][SimParams.A_HEAVY]["block_cost"])
+		if res == 3 and int(ab["parry_cancel"]) != 0:
+			end_ability(s, o, true)
+			return false
+		if res == 1 or res == 2:
+			any_hit = true
+			s[o + FightSim.AB_FL] |= FL_LANDED
+			s[o + FightSim.AB_HITS] += 1
+			if res == 1 and int(ab["grab"]) != 0 and s[o + FightSim.AB_FIRED] == 0:
+				s[o + FightSim.GRABS] += 1
+				s[b + FightSim.GRAB_T] = ab["grab_t"]
+				FightSim._apply_stun(s, b, ab["grab_stun"])
+				var f: int = s[o + FightSim.FACE]
+				s[b + FightSim.X] = s[o + FightSim.X] + FxMath.COS[f] * int(ab["grab_d"]) / FxMath.ONE
+				s[b + FightSim.Z] = s[o + FightSim.Z] + FxMath.SIN[f] * int(ab["grab_d"]) / FxMath.ONE
+				clamp_world(s, P, b)
+	var last_ok: bool = int(ab["slam_last"]) == 0 or s[o + FightSim.AB_FIRED] >= (ab["hits"] as Array).size() - 1
+	if any_hit and last_ok and int(ab["slam_r"]) > 0:
+		var f2: int = s[o + FightSim.FACE]
+		spawn_hz(s, i, 1, s[o + FightSim.X] + FxMath.COS[f2] * 1200000 / FxMath.ONE, s[o + FightSim.Z] + FxMath.SIN[f2] * 1200000 / FxMath.ONE,
+			ab["slam_warn"], ab["slam_r"], raw_live(s, P, i, int(ab["raw"]) * int(ab["slam_k"]) / 1000), ab["slam_force"], 150000, 0)
+	return any_hit
+
+static func _wave(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var t: int = s[o + FightSim.AB_T]
+	if t < int(ab["w"]):
+		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
+	if s[o + FightSim.AB_FIRED] == 0 and t >= int(ab["w"]):
+		var raw := raw_live(s, P, i, ab["raw"])
+		for off: int in ab["offs"]:
+			var dir: int = (s[o + FightSim.FACE] + off) & 255
+			spawn_hz(s, i, 2, s[o + FightSim.X] + FxMath.COS[dir] * 1000000 / FxMath.ONE, s[o + FightSim.Z] + FxMath.SIN[dir] * 1000000 / FxMath.ONE,
+				ab["warn"], 0, raw, ab["force"], 100000, 0, dir, ab["spd"], ab["range"], ab["width"])
+		s[o + FightSim.AB_FIRED] = (ab["offs"] as Array).size()
+	if t >= int(ab["end"]):
+		end_ability(s, o, false)
+
+static func _rain(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var b := FightSim._opp(i)
+	var ft: Array = ab["fire"]
+	while s[o + FightSim.AB_FIRED] < ft.size() and s[o + FightSim.AB_T] >= int(ft[s[o + FightSim.AB_FIRED]]):
+		var f: int = s[o + FightSim.FACE]
+		var px: int = s[o + FightSim.X] + FxMath.COS[f] * 5000000 / FxMath.ONE
+		var pz: int = s[o + FightSim.Z] + FxMath.SIN[f] * 5000000 / FxMath.ONE
+		if int(ab["scatter"]) == 0:
+			if s[b + FightSim.ALIVE] != 0:
+				px = s[b + FightSim.X]
+				pz = s[b + FightSim.Z]
+		else:
+			var a: int = FightSim.rng_next(s) & 255
+			var u: int = FightSim.rng_next(s) % 1000000
+			var rad: int = FxMath.isqrt(u * 1000000) * int(ab["scatter_r"]) / 1000000
+			var cx: int = s[b + FightSim.X] if s[b + FightSim.ALIVE] != 0 else s[o + FightSim.X]
+			var cz: int = s[b + FightSim.Z] if s[b + FightSim.ALIVE] != 0 else s[o + FightSim.Z]
+			px = cx + FxMath.COS[a] * rad / FxMath.ONE
+			pz = cz + FxMath.SIN[a] * rad / FxMath.ONE
+		spawn_hz(s, i, 1, px, pz, ab["warn"], ab["r"], raw_live(s, P, i, ab["raw"]), ab["force"], ab["knock"], ab["unbl"])
+		s[o + FightSim.AB_FIRED] += 1
+	if s[o + FightSim.AB_T] >= int(ab["end"]):
+		end_ability(s, o, false)
+
+static func _breath(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var t: int = s[o + FightSim.AB_T]
+	if t < int(ab["w_end"]):
+		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
+	if t >= int(ab["w"]) and t < int(ab["w_end"]):
+		s[o + FightSim.AB_TICK] -= 1
+		if s[o + FightSim.AB_TICK] <= 0:
+			s[o + FightSim.AB_TICK] = ab["tick"]
+			s[o + FightSim.AB_FIRED] += 1
+			if _in_reach(s, P, i, ab["range"], ab["cos_arc"]):
+				var res := FightSim._take_hit(s, P, i, 4, raw_live(s, P, i, ab["raw"]), 0, ab["force"], 2000, 1000, 0, ab["elem"])
+				if res == 1 or res == 2:
+					s[o + FightSim.AB_HITS] += 1
+	if t >= int(ab["end"]):
+		end_ability(s, o, false)
+
+static func _salto(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var t: int = s[o + FightSim.AB_T]
+	var b := FightSim._opp(i)
+	if t < int(ab["land"]):
+		s[o + FightSim.AB_AIR] = 1 if t >= int(ab["air0"]) else 0
+		if (s[o + FightSim.AB_FL] & FL_LOCKED) == 0 and s[b + FightSim.ALIVE] != 0:
+			s[o + FightSim.AB_X] = s[b + FightSim.X]
+			s[o + FightSim.AB_Z] = s[b + FightSim.Z]
+		if t >= int(ab["lock"]) and (s[o + FightSim.AB_FL] & FL_LOCKED) == 0:
+			s[o + FightSim.AB_FL] |= FL_LOCKED
+			s[o + FightSim.AB_FX] = s[o + FightSim.X]
+			s[o + FightSim.AB_FZ] = s[o + FightSim.Z]
+			s[o + FightSim.AB_HZ] = spawn_hz(s, i, 1, s[o + FightSim.AB_X], s[o + FightSim.AB_Z], ab["warn"], ab["r"], raw_live(s, P, i, ab["raw"]), ab["force"], 150000, 0)
+		if t >= int(ab["lock"]):
+			var num: int = t * 1000000 / 60 - int(ab["lock_us"])
+			var den: int = maxi(int(ab["span_us"]), 1)
+			num = clampi(num, 0, den)
+			s[o + FightSim.X] = s[o + FightSim.AB_FX] + (s[o + FightSim.AB_X] - s[o + FightSim.AB_FX]) * num / den
+			s[o + FightSim.Z] = s[o + FightSim.AB_FZ] + (s[o + FightSim.AB_Z] - s[o + FightSim.AB_FZ]) * num / den
+			clamp_world(s, P, o)
+		var dx: int = s[o + FightSim.AB_X] - s[o + FightSim.X]
+		var dz: int = s[o + FightSim.AB_Z] - s[o + FightSim.Z]
+		if FxMath.length(dx, dz) > 100000:
+			s[o + FightSim.FACE] = FxMath.dir_of(dx, dz, s[o + FightSim.FACE])
+	else:
+		s[o + FightSim.AB_AIR] = 0
+		if t >= int(ab["end"]):
+			end_ability(s, o, false)
+
+static func _combo(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var hits: Array = ab["hits"]
+	var n := hits.size()
+	var b := FightSim._opp(i)
+	if (s[o + FightSim.AB_FL] & FL_READY) != 0:
+		s[o + FightSim.AB_T] -= 1 # en espera el reloj de la etapa no corre (ab_combo_wait sí)
+		s[o + FightSim.AB_WAIT] += 1
+		if s[o + FightSim.AB_FIRED] >= n:
+			if s[o + FightSim.AB_WAIT] >= int(ab["recovery"]):
+				_end_combo(s, P, i, true)
+			return
+		if (s[o + FightSim.AB_FL] & FL_QUEUED) != 0:
+			s[o + FightSim.AB_FL] &= ~(FL_QUEUED | FL_READY)
+			s[o + FightSim.AB_WAIT] = 0
+			s[o + FightSim.AB_T] = 0
+			if s[o + FightSim.AB_FIRED] == n - 1:
+				s[o + FightSim.AB_FL] |= FL_FINISHER
+			return
+		if s[o + FightSim.AB_WAIT] >= int(ab["chain"]):
+			_end_combo(s, P, i, true)
+		return
+	var t: int = s[o + FightSim.AB_T]
+	var final_hit: bool = s[o + FightSim.AB_FIRED] == n - 1
+	var strike: int = ab["final"] if final_hit else ab["stage"]
+	if final_hit and t >= int(ab["leap0"]) and t < strike:
+		s[o + FightSim.AB_AIR] = 1
+		if s[b + FightSim.ALIVE] != 0:
+			var ax: int = s[o + FightSim.X] - s[b + FightSim.X]
+			var az: int = s[o + FightSim.Z] - s[b + FightSim.Z]
+			var al := FxMath.length(ax, az)
+			if al > 100000:
+				s[o + FightSim.AB_VX] = ax * int(ab["retreat"]) / al
+				s[o + FightSim.AB_VZ] = az * int(ab["retreat"]) / al
+	if s[b + FightSim.ALIVE] != 0 and FightSim._dist_to_opp(s, i) > 100000:
+		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
+		if not final_hit and t >= int(ab["lunge_t"]) and t < strike:
+			var gap := FightSim._dist_to_opp(s, i)
+			if gap > int(ab["stop"]):
+				var remaining: int = maxi(strike - t, 1)
+				var v: int = mini(int(ab["lunge_spd"]), mini(int(ab["lunge_dist_v"]), (gap - int(ab["stop"])) / remaining))
+				s[o + FightSim.AB_VX] = FxMath.COS[s[o + FightSim.FACE]] * v / FxMath.ONE
+				s[o + FightSim.AB_VZ] = FxMath.SIN[s[o + FightSim.FACE]] * v / FxMath.ONE
+	if t >= strike:
+		s[o + FightSim.AB_AIR] = 0
+		var h: Array = hits[s[o + FightSim.AB_FIRED]]
+		if s[b + FightSim.ALIVE] != 0 and FightSim._dist_to_opp(s, i) <= int(ab["strike_r"]) + P[1 - i]["hit_radius"]:
+			var res := FightSim._take_hit(s, P, i, 3, raw_live(s, P, i, int(ab["raw"]) * int(h[0]) / 1000), 4, h[1], 2000, 1000, 0)
+			if res == 1 and (s[o + FightSim.AB_FL] & FL_STAGGERED) == 0:
+				FightSim._apply_stun(s, b, ab["stagger"])
+				s[o + FightSim.AB_FL] |= FL_STAGGERED
+			if res == 1 or res == 2:
+				s[o + FightSim.AB_HITS] += 1
+		if s[o + FightSim.AB_FIRED] == n - 1:
+			var f: int = s[o + FightSim.FACE]
+			spawn_hz(s, i, 1, s[o + FightSim.X] + FxMath.COS[f] * 1000000 / FxMath.ONE, s[o + FightSim.Z] + FxMath.SIN[f] * 1000000 / FxMath.ONE,
+				ab["slam_warn"], ab["slam_r"], raw_live(s, P, i, int(ab["raw"]) * int(ab["slam_k"]) / 1000), ab["slam_force"], 150000, 0)
+		s[o + FightSim.AB_FIRED] += 1
+		s[o + FightSim.AB_FL] |= FL_READY
+		s[o + FightSim.AB_WAIT] = 0

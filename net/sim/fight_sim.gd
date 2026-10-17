@@ -1,7 +1,7 @@
 class_name FightSim
 extends RefCounted
-## Simulación determinista online, reglas reducidas (espada+escudo y arco; sin monturas, eikons,
-## magia ni habilidades de jefe). Estado = PackedInt64Array plano (guardar/cargar = duplicate()).
+## Simulación determinista online: espada+escudo y arco, infusiones/estados, pilares, habilidades
+## de jefe (SimAbilities), magia y eikons/monturas (SimMagic). Estado = PackedInt64Array plano (guardar/cargar = duplicate()).
 ## Enteros en todo: µm, milésimas, ‰ y ticks a 60 Hz. Mismo orden de reglas que Fighter/FighterCombat.
 
 # ---------------- Entrada (un int por jugador y tick) ----------------
@@ -15,6 +15,12 @@ const IN_ROLL := 1 << 10
 const IN_SPRINT := 1 << 11
 const IN_SWAP := 1 << 12
 const IN_LOCK := 1 << 13       # fijado al rival
+const IN_BOSS := 1 << 14       # habilidad de jefe seleccionada (pulsar)
+const IN_BOSS_NEXT := 1 << 15  # cambiar de habilidad de jefe
+const IN_SPELL := 1 << 16      # lanzar el hechizo seleccionado
+const IN_SPELL_NEXT := 1 << 17 # cambiar de hechizo
+const IN_EIKON := 1 << 18      # invocar eikon / especial del eikon montado
+const IN_MOUNT := 1 << 19      # desmontar del eikon montable
 
 static func make_input(dir32: int, move: bool, buttons: int) -> int:
 	return (dir32 & IN_DIR_MASK) | (IN_MOVE if move else 0) | buttons
@@ -37,15 +43,31 @@ enum {
 	PREV_IN, ATK_HOLD, HEAVY_FIRED, Q0, Q1, Q2, Q3, QA0, QA1, QA2, QA3, PREV_STUN, SPRINT_PM,
 	BU0, BU1, BU2, SN0, SN1, SN2, LK0, LK1, LK2, PROC0, PROC1, PROC2, POISON_T, POISON_E, FROST_T,
 	HITS, BLOCKS, PARRIES, DODGES, STAGGERS, STUNS, GUARD_BREAKS, STANCE_BREAKS, DMG_DEALT, CRITS, SHOTS,
+	# Fase 4: habilidades de jefe (SimAbilities). AB_SLOT = ranura en curso (-1 nada); BS_* = estocada.
+	MANA, BOSS_CD, AB_SLOT, AB_T, AB_FIRED, AB_FL, AB_X, AB_Z, AB_FX, AB_FZ, AB_TICK, AB_WAIT, AB_AIR, AB_IMM,
+	AB_VX, AB_VZ, AB_SEL, AB_LAST, AB_HZ, RAGE_T, BS_PH, BS_T, BS_DIR, BS_TRAV, BS_HIT, KX, KZ, GRAB_T,
+	# magia, eikon y montura (SimMagic)
+	CAST_T, CAST_SLOT, SP_SEL, SCD0, SCD1, SCD2, SCD3, SKIN_T, METER, EK_T, EK_X, EK_Z, EK_HP, EK_CD, EK_SPC,
+	MOUNTED, MSTANCE, MDASH_T,
+	# contadores de eventos de fase 4
+	AB_STARTS, AB_HITS, AB_INTR, GRABS, SPELLS, SUMMONS, EK_SPECIALS, EK_HITS, SHIELD_ABSORB, DISMOUNTS,
 	F_FIELDS
 }
 const P_BASE := 2 * F_FIELDS
 enum { G_FRAME, G_FREEZE, G_RNG, G_HITSTOP_ON, G_WINS0, G_WINS1, G_ROUND, G_END_T, G_FIELDS }
 ## G_END_T: ticks desde que cayó un luchador en esta ronda (0 = ronda en curso). FightEngine reinicia la ronda.
 const PROJ_BASE := P_BASE + G_FIELDS
-const PROJ_MAX := 8
-enum { PR_ON, PR_OWNER, PR_X, PR_Z, PR_Y, PR_VX, PR_VZ, PR_VY, PR_LIFE, PR_RAW, PR_FORCE, PR_DODGED, PR_FIELDS }
-const SIZE := PROJ_BASE + PROJ_MAX * PR_FIELDS
+const PROJ_MAX := 12
+## PR_KIND: 0 flecha, 1 tajo de jefe (eikon), 2 hechizo (eikon), 3 eikon (especial/ataque a distancia).
+## PR_HEAD: rumbo en milésimas de índice (0..255999) para el autoseguimiento; PR_HOME_T: ticks que persigue.
+enum { PR_ON, PR_OWNER, PR_X, PR_Z, PR_Y, PR_VX, PR_VZ, PR_VY, PR_LIFE, PR_RAW, PR_FORCE, PR_DODGED,
+	PR_KIND, PR_HEAD, PR_PITCH, PR_HOME_T, PR_HOME_RATE, PR_PITCH_RATE, PR_SPD, PR_ELEM, PR_R, PR_ST, PR_FIELDS }
+## Marcas de suelo (GroundAoE = 1) y ondas rastreras (GroundWave = 2): piscina fija en el estado.
+const HZ_BASE := PROJ_BASE + PROJ_MAX * PR_FIELDS
+const HZ_MAX := 16
+enum { HZ_ON, HZ_TYPE, HZ_OWNER, HZ_X, HZ_Z, HZ_T, HZ_WARN, HZ_R, HZ_RAW, HZ_FORCE, HZ_KNOCK, HZ_DX, HZ_DZ,
+	HZ_SPD, HZ_RANGE, HZ_TRAV, HZ_W, HZ_DONE, HZ_UNBL, HZ_KIND, HZ_FIELDS }
+const SIZE := HZ_BASE + HZ_MAX * HZ_FIELDS
 
 const ARENA_R := 40000000     # µm (muro circular)
 ## Pilares de la arena (Arena._build_arena: 6 en el anillo de 23,8 m, a 30° + i·60°), en µm. Constantes
@@ -54,6 +76,8 @@ const PILLARS := [11900000, 20611405, 23800000, 0, 11900000, -20611405, -1190000
 const PILLAR_BODY_R := 1650000 # Fighter: radio de obstáculo 1,5 + cuerpo 0,45 − 0,3 de margen
 const PILLAR_ARROW_R := 1500000 # Projectile: radio de obstáculo 1,5 m
 const SEP_FOOT := 1600000     # µm (Fighter.SEPARATION_FOOT)
+const SEP_MOUNT := 3000000    # µm (Fighter.SEPARATION, montado)
+const KNOCK_DECAY := 11111    # µm/tick por tick (40 m/s²)
 const STAMINA_ATK_SLOW_PM := 300
 const HEAVY_HOLD := 24        # ticks (Fighter.HEAVY_HOLD 0,4 s)
 const BLOCK_HOLD := 0         # el bit de escudo ya es "mantener" (el control táctil decide toque/mantener)
@@ -124,6 +148,13 @@ static func initial(params: Array, seed_v: int = 1, hitstop: bool = true) -> Pac
 		s[o + SINCE_SPEND] = 1000
 		s[o + SINCE_HIT] = 1000
 		s[o + SN0] = 540; s[o + SN1] = 540; s[o + SN2] = 540
+		s[o + AB_SLOT] = -1
+		s[o + AB_LAST] = -1
+		s[o + AB_HZ] = -1
+		s[o + CAST_SLOT] = -1
+		s[o + MANA] = p.get("mana_max", 0)
+		s[o + METER] = p.get("meter0", 0)
+		s[o + SP_SEL] = p.get("spell_sel0", 0)
 	s[P_BASE + G_RNG] = (seed_v * 2654435761 + 1) & 0x7FFFFFFF
 	s[P_BASE + G_HITSTOP_ON] = 1 if hitstop else 0
 	return s
@@ -166,6 +197,7 @@ static func step(s: PackedInt64Array, params: Array, in0: int, in1: int) -> void
 	_update(s, params, 0, in0)
 	_update(s, params, 1, in1)
 	_projectiles(s, params)
+	SimAbilities.hazards(s, params)
 	s[g + G_FRAME] += 1
 	if s[g + G_END_T] > 0:
 		s[g + G_END_T] += 1
@@ -205,6 +237,18 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		_try(s, P, i, Act.PARRY)
 	if pressed & IN_ROLL:
 		_try(s, P, i, Act.ROLL)
+	if pressed & IN_BOSS_NEXT:
+		SimAbilities.cycle(s, P, i)
+	if pressed & IN_BOSS:
+		SimAbilities.press(s, P, i)
+	if pressed & IN_SPELL_NEXT:
+		SimMagic.cycle_spell(s, P, i)
+	if pressed & IN_SPELL:
+		SimMagic.cast(s, P, i)
+	if pressed & IN_EIKON:
+		SimMagic.eikon_button(s, P, i)
+	if pressed & IN_MOUNT:
+		SimMagic.dismount(s, P, i, false)
 	# búfer: envejece, caduca y reintenta la cabeza
 	for k in 4:
 		if s[o + Q0 + k] != 0:
@@ -255,7 +299,7 @@ static func _opp(i: int) -> int:
 	return (1 - i) * F_FIELDS
 
 static func _can_act(s: PackedInt64Array, o: int) -> bool:
-	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0
+	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0
 
 static func _spend(s: PackedInt64Array, P: Array, i: int, v: int) -> void:
 	var o := i * F_FIELDS
@@ -446,8 +490,15 @@ static func _shoot(s: PackedInt64Array, P: Array, i: int) -> bool:
 	return true
 
 static func _apply_stun(s: PackedInt64Array, o: int, t: int) -> void:
-	if s[o + STUN_IMM] > 0:
+	if s[o + BS_PH] == 1 or s[o + BS_PH] == 2:
+		return # la estocada de jefe no se interrumpe
+	if s[o + STUN_IMM] > 0 or s[o + AB_IMM] != 0:
 		return
+	if s[o + AB_SLOT] >= 0:
+		SimAbilities.end_ability(s, o, true)
+	if s[o + CAST_T] > 0:
+		s[o + CAST_T] = 0
+		s[o + CAST_SLOT] = -1
 	s[o + STUN] = maxi(s[o + STUN], t)
 	if s[o + ATK_STATE] != Atk.NONE:
 		_cancel_attack(s, o)
@@ -456,7 +507,9 @@ static func _robust_eff(s: PackedInt64Array, P: Array, i: int) -> int:
 	var o := i * F_FIELDS
 	var r: int = P[i]["robust"]
 	var resist := 0
-	if s[o + ATK_STATE] == Atk.WINDUP:
+	if s[o + AB_SLOT] >= 0:
+		resist = SimAbilities.resist_pm(s, P, i) + (1000 if s[o + RAGE_T] > 0 else 0)
+	elif s[o + ATK_STATE] == Atk.WINDUP:
 		var a: Dictionary = _atk(P, i, s)
 		resist = a["resist_pm"]
 		if s[o + ATK_IDX] == SimParams.A_HEAVY:
@@ -467,7 +520,9 @@ static func _robust_eff(s: PackedInt64Array, P: Array, i: int) -> int:
 
 static func _add_stun_force(s: PackedInt64Array, P: Array, i: int, force: int) -> int:
 	var o := i * F_FIELDS
-	if force <= 0 or s[o + ALIVE] == 0 or s[o + STUN_IMM] > 0 or s[o + INVULN] > 0:
+	if force <= 0 or s[o + ALIVE] == 0 or s[o + STUN_IMM] > 0 or s[o + INVULN] > 0 or s[o + AB_IMM] != 0:
+		return 0
+	if s[o + BS_PH] == 1 or s[o + BS_PH] == 2:
 		return 0
 	if s[o + STUN_WIN] <= 0:
 		s[o + STUN_ACC] = 0
@@ -494,6 +549,11 @@ static func _add_stun_force(s: PackedInt64Array, P: Array, i: int, force: int) -
 			s[o + STAGGER_T] = 0
 			_apply_stun(s, o, T_STUN)
 		3:
+			if s[o + MOUNTED] != 0:
+				s[o + STUNS] += 1
+				_apply_stun(s, o, T_STUN)
+				_reset_stun(s, o)
+				return lv
 			s[o + KNOCKDOWNS] += 1
 			s[o + STAGGER_T] = 0
 			s[o + BLOCKING] = 0
@@ -586,23 +646,42 @@ static func _in_pillar(x: int, z: int, r: int) -> bool:
 			return true
 	return false
 
-static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int) -> int:
+## Medidor de eikon (Fighter.add_meter): v en milésimas, escalado por medidor × talismán.
+static func _meter(s: PackedInt64Array, P: Array, i: int, v: int) -> void:
+	var o := i * F_FIELDS
+	s[o + METER] = clampi(s[o + METER] + v * int(P[i].get("meter_pm", 1000)) / 1000, 0, METER_MAX)
+
+const METER_MAX := 100000
+const BOSS_POISE_PM := 3000
+const EIKON_BLOCK_PM := 500
+const COUNTER_EIKON_K_PM := 1200 # StunRules.EIKON_K
+## kind: 0 cuerpo a cuerpo, 1 flecha, 2 crítico, 3 jefe (imbloqueable, sin parry), 4 eikon (el escudo
+## deja pasar el 50 %), 5 área (como eikon; Inmunidad). elem: código de def_tab para kind 4 (-1 = el
+## del eikon del atacante). st: acumulación de estado propia (milésimas) o [] = la del arma/eikon.
+## unbl: marca de suelo imbloqueable. force < 0 = fuerza por defecto del tipo.
+## Devuelve 0 nada, 1 golpe, 2 bloqueo, 3 parry (o contragolpe de postura), 4 esquiva.
+static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int, elem: int = -1, st: Array = [], unbl: bool = false) -> int:
 	var d := 1 - att
 	var a := att * F_FIELDS
 	var b := d * F_FIELDS
 	if s[b + ALIVE] == 0:
 		return 0
 	if s[b + INVULN] > 0:
+		if s[b + AB_IMM] != 0:
+			s[b + SHIELD_ABSORB] += 1
 		return 4
 	var rt: int = s[b + ROLL_T]
 	if rt >= P[d]["roll_start"] and rt < P[d]["roll_if_end"]:
 		s[b + DODGES] += 1
 		return 4
 	var frontal := _in_front(s, b, a)
-	if s[b + PARRY_STATE] == Parry.ACTIVE and frontal and kind != 2:
+	if kind != 5 and SimAbilities.counter_trigger(s, P, d, att):
+		return 3
+	if s[b + PARRY_STATE] == Parry.ACTIVE and frontal and kind <= 1:
 		if kind == 0:
 			_apply_stun(s, a, P[d]["parry_stagger"])
 			s[a + RIPOSTE_T] = P[d]["parry_stagger"]
+		_meter(s, P, d, 15000)
 		s[b + PARRIES] += 1
 		s[b + PARRY_STATE] = Parry.NONE
 		if P[d].get("parry_stamina", 0) > 0:
@@ -613,17 +692,23 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var mult := 1000
 	if s[b + PARRY_STATE] == Parry.RECOVERY:
 		mult = PARRY_EXPOSED_PM
-	if s[b + BLOCKING] != 0 and frontal and kind != 2:
+	if s[b + BLOCKING] != 0 and frontal and kind != 2 and kind != 3 and not unbl:
 		s[b + BLOCKS] += 1
 		if kind == 1:
 			_spend(s, P, d, P[att]["arrow_block_cost"])
 			_hit_status(s, P, att, kind, BLOCK_STATUS_PM)
+		elif kind >= 4:
+			_damage(s, a, b, raw * mult / 1000 * maxi(EIKON_BLOCK_PM, EXH_BLOCK_PM if s[b + EXH] > 0 else 0) / 1000)
+			_hit_status_ext(s, P, att, kind, st, BLOCK_STATUS_PM)
+			_spend(s, P, d, P[d].get("eikon_block_cost", 30000))
+			_meter(s, P, d, 3000)
 		else:
 			s[b + GC_T] = GC_WINDOW
 			var chip: int = EXH_BLOCK_PM if s[b + EXH] > 0 else P[d]["chip_pm"]
 			_damage(s, a, b, raw * mult / 1000 * chip / 1000)
-			_hit_status(s, P, att, kind, BLOCK_STATUS_PM)
+			_hit_status_ext(s, P, att, kind, st, BLOCK_STATUS_PM)
 			_spend(s, P, d, block_cost)
+			_meter(s, P, d, 3000)
 		if s[b + ST] <= 0:
 			s[b + GUARD_BREAKS] += 1
 			s[b + BLOCKING] = 0
@@ -632,29 +717,52 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	if s[b + RIPOSTE_T] > 0 and kind == 0:
 		mult = mult * RIPOSTE_PM / 1000
 		s[b + RIPOSTE_T] = 0
-	var counter := kind != 2 and (s[b + ATK_STATE] == Atk.WINDUP or s[b + ATK_STATE] == Atk.ACTIVE)
+	var counter := kind <= 1 and (s[b + ATK_STATE] == Atk.WINDUP or s[b + ATK_STATE] == Atk.ACTIVE or s[b + CAST_T] > 0)
 	if counter:
 		mult = mult * counter_pm / 1000
 	var amount := raw * mult / 1000
-	var el: int = P[att].get("elem_arrow" if kind == 1 else "elem_melee", 0) if kind != 2 else 0
+	var el: int = P[att].get("elem_arrow" if kind == 1 else "elem_melee", 0) if kind <= 1 else 0
 	if el > 0:
 		amount = _incoming(P, d, sub, amount / 2) + _incoming(P, d, el, amount - amount / 2) # infusión: mitad física, mitad elemental
+	elif kind == 4:
+		amount = _incoming(P, d, elem if elem >= 0 else int(P[att].get("eikon_elem", 0)), amount)
+	elif kind == 3:
+		amount = _incoming(P, d, 4, amount) # jefe: físico perforante
+	elif kind == 5:
+		amount = _incoming(P, d, 0, amount)
 	else:
 		amount = _incoming(P, d, sub, amount)
+	if kind >= 4:
+		amount = amount * (1000 - int(P[d].get("sagrado_pm", 0))) / 1000
+	if kind == 5:
+		amount = amount * int(P[d].get("aoe_pm", 1000)) / 1000
 	if s[b + FROST_T] > 0:
 		amount = amount * FROST_TAKEN_PM / 1000
 	if s[b + STUN_IMM] > 0 and s[b + KNOCKDOWNS] > 0:
 		amount = amount * GETUP_DMG_PM / 1000
+	if s[b + SKIN_T] > 0:
+		amount = amount * (1000 - int(P[d].get("skin_red_pm", 0))) / 1000
 	_damage(s, a, b, amount)
-	_hit_status(s, P, att, kind, 1000)
+	_meter(s, P, d, 5000)
+	_hit_status_ext(s, P, att, kind, st, 1000)
 	s[b + SINCE_HIT] = 0
 	var pd := amount * pd_pm / 1000
+	if s[b + SKIN_T] > 0:
+		pd = pd * 1000 / maxi(int(P[d].get("skin_poise_pm", 1000)), 1)
 	if counter:
 		pd = pd * COUNTER_POISE_PM / 1000
 		force = force * COUNTER_FORCE_PM / 1000
+	if kind == 3:
+		pd = pd * BOSS_POISE_PM / 1000
+	if force < 0:
+		match kind:
+			3: force = 60000
+			4: force = amount * COUNTER_EIKON_K_PM / 1000
+			5: force = 40000
+			_: force = 0
 	if kind != 2:
 		s[b + STANCE] -= pd
-	if s[b + STANCE] <= 0 and s[b + ALIVE] != 0:
+	if s[b + STANCE] <= 0 and s[b + ALIVE] != 0 and s[b + MOUNTED] == 0:
 		s[b + STANCE] = P[d]["stance_max"]
 		s[b + STANCE_BROKEN_T] = STANCE_BREAK_T
 		s[b + STANCE_BREAKS] += 1
@@ -665,7 +773,24 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 		return 1
 	if kind != 2:
 		_add_stun_force(s, P, d, force)
+	if s[b + MOUNTED] != 0 and s[b + ALIVE] != 0:
+		SimMagic.mount_stance_hit(s, P, d, amount * (2400 if amount >= 14000 else 1400) / 1000)
 	return 1
+
+## Estado del golpe: el propio del ataque (hechizo) si lo trae; si no, el del arma (cuerpo a cuerpo /
+## flecha) o el del eikon del atacante (golpes de tipo eikon: Lobo = congelación).
+static func _hit_status_ext(s: PackedInt64Array, P: Array, att: int, kind: int, st: Array, pm_v: int) -> void:
+	if not st.is_empty():
+		for k in st.size():
+			if int(st[k]) > 0:
+				_add_status(s, P, att, k, int(st[k]) * pm_v / 1000)
+	elif kind <= 1:
+		_hit_status(s, P, att, kind, pm_v)
+	elif kind == 4:
+		var es: Array = P[att].get("eikon_st", [])
+		for k in es.size():
+			if int(es[k]) > 0:
+				_add_status(s, P, att, k, int(es[k]) * pm_v / 1000)
 
 # ---------------- Actualización del luchador (Fighter._physics_process) ----------------
 static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
@@ -708,6 +833,14 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if s[o + STANCE_BROKEN_T] > 0: s[o + STANCE_BROKEN_T] -= 1
 	if s[o + SINCE_HIT] > STANCE_DELAY:
 		s[o + STANCE] = mini(s[o + STANCE] + p["stance_regen"], p["stance_max"])
+	# medidor pasivo, maná y magia (Fighter: antes del intercambio)
+	if s[o + ALIVE] != 0 and s[o + METER] < METER_MAX and s[o + EK_T] <= 0 and s[o + MOUNTED] == 0:
+		_meter(s, P, i, 20)
+	if s[o + MANA] < p.get("mana_max", 0):
+		var fr: int = s[P_BASE + G_FRAME]
+		var rg: int = p.get("mana_regen", 0) # milésimas/s, repartido exacto por ticks
+		s[o + MANA] = mini(s[o + MANA] + (rg * (fr + 1)) / 60 - (rg * fr) / 60, p["mana_max"])
+	SimMagic.update(s, P, i)
 	if s[o + CRIT_T] >= 0:
 		s[o + CRIT_T] += 1
 		if s[o + CRIT_DONE] == 0 and s[o + CRIT_T] >= CRIT_HIT_AT:
@@ -719,6 +852,7 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 					s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], 7)
 		if s[o + CRIT_T] >= CRIT_TIME:
 			s[o + CRIT_T] = -1
+	SimAbilities.update(s, P, i)
 	if s[o + BACKSTEP_T] > 0: s[o + BACKSTEP_T] -= 1
 	if s[o + ROLL_T] >= 0:
 		s[o + ROLL_T] += 1
@@ -801,6 +935,10 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> voi
 	var res := _take_hit(s, P, i, 0, raw, a["sub"], force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], a["block_cost"])
 	if res == 1 or res == 2 or res == 3:
 		s[o + ATK_LANDED] = 1
+	if res == 1:
+		_meter(s, P, i, 18000 if heavy else 12000)
+	elif res == 2:
+		_meter(s, P, i, 3000)
 	if res == 1:
 		s[o + HITS] += 1
 		if (heavy or was_open) and s[P_BASE + G_HITSTOP_ON] != 0:
@@ -896,12 +1034,97 @@ static func _release(s: PackedInt64Array, P: Array, i: int, charged: bool) -> vo
 		s[q + PR_RAW] = p["arrow_raw_ch"] if charged and p.has("arrow_raw_ch") else p["arrow_raw"]
 		s[q + PR_FORCE] = p["arrow_force_ch"] if charged else p["arrow_force"]
 		s[q + PR_DODGED] = 0
+		s[q + PR_KIND] = 0
+		s[q + PR_HOME_T] = 0
+		s[q + PR_ELEM] = -1
+		s[q + PR_ST] = 0
+		s[q + PR_R] = p["arrow_radius"]
+
+## Lanza un proyectil mágico/eikon desde (ox, y0, oz) hacia el centro del rival (o al frente).
+## spd µm/tick; home_rate/pitch_rate en milésimas de rumbo por tick; home_t en ticks.
+static func spawn_proj(s: PackedInt64Array, owner: int, kind: int, ox: int, oz: int, y0: int, face: int, spd: int, life: int, radius: int, raw: int, force: int, elem: int, st_slot: int, home_t: int, home_rate: int, pitch_rate: int, aim: bool) -> int:
+	var slot := -1
+	for j in PROJ_MAX:
+		if s[PROJ_BASE + j * PR_FIELDS + PR_ON] == 0:
+			slot = j
+			break
+	if slot < 0:
+		return -1
+	var b := _opp(owner)
+	var head: int = face * 1000
+	var pitch := 0
+	if aim and s[b + ALIVE] != 0:
+		var tx: int = s[b + X] - ox
+		var tz: int = s[b + Z] - oz
+		var ty: int = HIT_CENTER_Y - y0
+		var hl := FxMath.length(tx, tz)
+		if hl > 0 or ty != 0:
+			head = FxMath.dir_of(tx, tz, face) * 1000
+			pitch = FxMath.ddiff(0, FxMath.dir_of(hl, ty, 0)) * 1000
+	var q := PROJ_BASE + slot * PR_FIELDS
+	s[q + PR_ON] = 1
+	s[q + PR_OWNER] = owner
+	s[q + PR_X] = ox
+	s[q + PR_Z] = oz
+	s[q + PR_Y] = y0
+	s[q + PR_LIFE] = life
+	s[q + PR_RAW] = raw
+	s[q + PR_FORCE] = force
+	s[q + PR_DODGED] = 0
+	s[q + PR_KIND] = kind
+	s[q + PR_HEAD] = head
+	s[q + PR_PITCH] = pitch
+	s[q + PR_HOME_T] = home_t
+	s[q + PR_HOME_RATE] = home_rate
+	s[q + PR_PITCH_RATE] = pitch_rate
+	s[q + PR_SPD] = spd
+	s[q + PR_ELEM] = elem
+	s[q + PR_R] = radius
+	s[q + PR_ST] = st_slot
+	_proj_vel(s, q)
+	return slot
+
+static func _proj_vel(s: PackedInt64Array, q: int) -> void:
+	var h: int = (s[q + PR_HEAD] / 1000) & 255
+	var pt: int = (s[q + PR_PITCH] / 1000) & 255
+	var spd: int = s[q + PR_SPD]
+	var horiz: int = spd * FxMath.COS[pt] / FxMath.ONE
+	s[q + PR_VX] = FxMath.COS[h] * horiz / FxMath.ONE
+	s[q + PR_VZ] = FxMath.SIN[h] * horiz / FxMath.ONE
+	s[q + PR_VY] = FxMath.SIN[pt] * spd / FxMath.ONE
+
+## Autoseguimiento limitado (Projectile.home_*): gira en horizontal y en vertical hacia el centro
+## del rival; si el rival queda a más de 90° del rumbo, deja de perseguir (lo rebasó).
+static func _proj_home(s: PackedInt64Array, q: int) -> void:
+	var b := _opp(s[q + PR_OWNER])
+	s[q + PR_HOME_T] -= 1
+	if s[b + ALIVE] == 0:
+		return
+	var wx: int = s[b + X] - s[q + PR_X]
+	var wz: int = s[b + Z] - s[q + PR_Z]
+	var wy: int = HIT_CENTER_Y - s[q + PR_Y]
+	if wx * wx + wz * wz + wy * wy <= 200000 * 200000:
+		return
+	if wx * s[q + PR_VX] + wz * s[q + PR_VZ] + wy * s[q + PR_VY] < 0:
+		s[q + PR_HOME_T] = 0
+		return
+	var cur: int = s[q + PR_HEAD]
+	var want: int = FxMath.dir_of(wx, wz, cur / 1000) * 1000
+	var dd: int = ((want - cur + 128000) % 256000 + 256000) % 256000 - 128000
+	var rate: int = s[q + PR_HOME_RATE]
+	s[q + PR_HEAD] = ((cur + clampi(dd, -rate, rate)) % 256000 + 256000) % 256000
+	var wp: int = FxMath.ddiff(0, FxMath.dir_of(FxMath.length(wx, wz), wy, 0)) * 1000
+	var pr: int = s[q + PR_PITCH_RATE]
+	s[q + PR_PITCH] += clampi(wp - s[q + PR_PITCH], -pr, pr)
+	_proj_vel(s, q)
 
 static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 	for j in PROJ_MAX:
 		var q := PROJ_BASE + j * PR_FIELDS
 		if s[q + PR_ON] == 0:
 			continue
+		if s[q + PR_HOME_T] > 0 and s[q + PR_HOME_RATE] > 0:
+			_proj_home(s, q)
 		s[q + PR_X] += s[q + PR_VX]
 		s[q + PR_Z] += s[q + PR_VZ]
 		s[q + PR_Y] += s[q + PR_VY]
@@ -921,19 +1144,34 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 		var ex: int = s[q + PR_X] - s[b + X]
 		var ez: int = s[q + PR_Z] - s[b + Z]
 		var ey: int = s[q + PR_Y] - HIT_CENTER_Y
-		var r: int = P[owner]["arrow_radius"] + P[1 - owner]["hit_radius"]
+		var r: int = s[q + PR_R] + P[1 - owner]["hit_radius"]
 		if ex * ex + ez * ez + ey * ey < r * r:
-			var res := _take_hit(s, P, owner, 1, s[q + PR_RAW], 0, s[q + PR_FORCE], 2000, P[owner]["counter_arrow_pm"], 0)
+			var res: int
+			if s[q + PR_KIND] == 0:
+				res = _take_hit(s, P, owner, 1, s[q + PR_RAW], 0, s[q + PR_FORCE], 2000, P[owner]["counter_arrow_pm"], 0)
+			else:
+				var st: Array = []
+				if s[q + PR_ST] > 0:
+					st = P[owner]["spells"][s[q + PR_ST] - 1].get("st", [])
+				res = _take_hit(s, P, owner, 4, s[q + PR_RAW], 0, s[q + PR_FORCE], 2000, 1000, 0, s[q + PR_ELEM], st)
 			if res == 4:
 				s[q + PR_DODGED] = 1
+				s[q + PR_HOME_T] = 0
 				continue
 			if res == 3: # reflejo: invierte la dirección y cambia de bando
 				s[q + PR_VX] = -s[q + PR_VX]
 				s[q + PR_VZ] = -s[q + PR_VZ]
 				s[q + PR_VY] = -s[q + PR_VY]
+				s[q + PR_HEAD] = (s[q + PR_HEAD] + 128000) % 256000
+				s[q + PR_PITCH] = -s[q + PR_PITCH]
+				s[q + PR_HOME_T] = 0
 				s[q + PR_OWNER] = 1 - owner
 				s[q + PR_LIFE] = P[owner].get("arrow_reflect_life", 120)
 				continue
+			if res == 1 and s[q + PR_KIND] != 3:
+				_meter(s, P, owner, 8000)
+			if res == 1 and s[q + PR_KIND] == 3:
+				s[owner * F_FIELDS + EK_HITS] += 1
 			s[q + PR_ON] = 0 # (hits_landed offline solo cuenta cuerpo a cuerpo)
 
 static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
@@ -941,7 +1179,8 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var p: Dictionary = P[i]
 	var b := _opp(i)
 	var moving := (inp & IN_MOVE) != 0
-	if s[o + ALIVE] == 0 or s[o + STUN] > 0 or s[o + CRIT_T] >= 0:
+	var ab_moving: bool = s[o + AB_SLOT] >= 0 and not SimAbilities.is_shield(s, P, i)
+	if s[o + ALIVE] == 0 or s[o + STUN] > 0 or s[o + CRIT_T] >= 0 or s[o + CAST_T] > 0 or s[o + BS_PH] != 0 or ab_moving:
 		moving = false
 	var want_block: bool = (inp & IN_BLOCK) != 0 # sin escudo el control local no envía IN_BLOCK
 	var wb: bool = want_block and s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + ROLL_T] < 0 and s[o + BACKSTEP_T] <= 0 and s[o + LOADOUT] == Load.SWORD and s[o + SWAP_T] <= 0 and s[o + ATK_STATE] == Atk.NONE and s[o + PARRY_STATE] == Parry.NONE
@@ -951,6 +1190,8 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var amount_pm := 0
 	if moving:
 		amount_pm = 500 if (inp & IN_HALF) else 1000
+		if s[o + AB_SLOT] >= 0:
+			amount_pm /= 2 # escudo de maná: te mueves despacio
 	var mdir := ((inp & IN_DIR_MASK) * 8) & 255
 	var tvx := 0
 	var tvz := 0
@@ -959,6 +1200,11 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var turn: int = 0 if turning_locked else p["turn"]
 	var sprint_req: bool = (inp & IN_SPRINT) != 0 and amount_pm > 300 and s[o + EXH] <= 0 and not wb and s[o + ST] > 0 and s[o + SHOT_STATE] == Shot.NONE
 	var spd: int = p["speed"]
+	if s[o + MOUNTED] != 0:
+		spd = p.get("m_speed", spd)
+		turn = 0 if turning_locked else p.get("m_turn", turn)
+	if s[o + RAGE_T] > 0:
+		spd = spd * 1150 / 1000
 	if locked:
 		s[o + FACE] = FxMath.turn_toward(s[o + FACE], _dir_to_opp(s, i), turn * 18 / 10)
 		if amount_pm > 0:
@@ -1036,6 +1282,9 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		if st_v != Vector2i.ZERO:
 			s[o + VX] = 0
 			s[o + VZ] = 0
+	elif ab_moving:
+		vx = s[o + AB_VX]
+		vz = s[o + AB_VZ]
 	elif s[o + BACKSTEP_T] > 0:
 		var bf := (s[o + FACE] + 128) & 255
 		vx = FxMath.COS[bf] * p["backstep_v"] / FxMath.ONE
@@ -1053,12 +1302,24 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 			rv = maxi(2 * p["roll_drift"] * (rec - (rt - fast)) / (rec * rec), 0)
 		vx = FxMath.COS[s[o + ROLL_DIR]] * rv / FxMath.ONE
 		vz = FxMath.SIN[s[o + ROLL_DIR]] * rv / FxMath.ONE
+	# empujón (apply_knockback): se suma y se frena 40 m/s²
+	vx += s[o + KX]
+	vz += s[o + KZ]
+	if s[o + KX] != 0 or s[o + KZ] != 0:
+		var kl := FxMath.length(s[o + KX], s[o + KZ])
+		if kl <= KNOCK_DECAY:
+			s[o + KX] = 0
+			s[o + KZ] = 0
+		else:
+			s[o + KX] -= s[o + KX] * KNOCK_DECAY / kl
+			s[o + KZ] -= s[o + KZ] * KNOCK_DECAY / kl
 	# separación blanda (v += dir * (min - d) * 8 por segundo)
 	var sx: int = s[o + X] - s[b + X]
 	var sz: int = s[o + Z] - s[b + Z]
 	var sl := FxMath.length(sx, sz)
-	if sl < SEP_FOOT:
-		var push := (SEP_FOOT - sl) * 8 / 60
+	var sep := SEP_MOUNT if (s[o + MOUNTED] != 0 or s[b + MOUNTED] != 0) else SEP_FOOT
+	if sl < sep:
+		var push := (sep - sl) * 8 / 60
 		if sl > 10000:
 			vx += sx * push / sl
 			vz += sz * push / sl

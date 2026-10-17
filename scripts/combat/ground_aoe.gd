@@ -18,6 +18,7 @@ var damage: float = 20.0
 var stun_time: float = 0.5 ## (ronda 31: sin uso; ver stun_force)
 var stun_force: float = StunRules.AOE_FORCE ## ronda 31: fuerza acumulada
 var knock: float = 9.0
+var unblockable: bool = false ## el escudo no la para (habilidad imbloqueable)
 var hidden: bool = false ## ronda 32: sin anillo de aviso (salto con caída)
 var t: float = 0.0
 var detonated: bool = false
@@ -123,6 +124,7 @@ func _detonate() -> void:
 			continue
 		if n is Fighter:
 			(n as Fighter).incoming_stun_force = stun_force
+			(n as Fighter).incoming_unblockable = unblockable
 		var res: String = n.take_hit(damage, source if is_instance_valid(source) else self, "aoe")
 		if n is Fighter:
 			(n as Fighter).incoming_stun_force = -1.0

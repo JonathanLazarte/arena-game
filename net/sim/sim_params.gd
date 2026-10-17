@@ -168,6 +168,9 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	p["arrow_radius"] = um(0.5)
 	p["arrow_block_cost"] = milli(Fighter.COST_BLOCKED_ARROW * float(o.tfx["stamina_cost"]))
 	p["counter_arrow_pm"] = pm(float(PhysTypes.COUNTER_DMG["estandar"]))
+	# Fase 4: habilidades de jefe, magia, eikon y montura (cubiertos por params_checksum)
+	p["boss"] = SimAbilities.compile_all(f)
+	SimMagic.bake(f, p)
 	return p
 
 ## damage_mult sin la parte que depende del estado (furia con vida baja): la sim la aplica en vivo.
@@ -284,7 +287,7 @@ static func online_tuning(ps: Array, lenience: int) -> Array:
 		p["net_lenience"] = lenience
 	return out
 
-const ELEMS := ["fuego", "magico", "sagrado"] ## códigos 5..7 tras SUBS en def_tab
+const ELEMS := ["fuego", "magico", "sagrado", "rayo", "hielo"] ## códigos 5..9 tras SUBS en def_tab
 
 static func _elem_code(w: WeaponDef) -> int:
 	if w == null: return 0

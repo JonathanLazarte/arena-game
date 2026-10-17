@@ -171,6 +171,7 @@ static func _update_rain(f: Fighter, _delta: float, d: Dictionary, _prev: float,
 		var aoe := GroundAoE.spawn(f.get_parent(), f, f.team, pos, float(d["radius"]), float(d["tele"]) * tk, f.ab_damage(f.ab_id))
 		aoe.stun_force = f.ab_force(float(d.get("force", 25.0)), true)
 		aoe.knock = float(d.get("knock", 6.0))
+		aoe.unblockable = bool(d.get("unblockable", false))
 		f.ab_fired += 1
 		f._snd("eikon_wind", -3.0)
 	if f.ab_t >= w + (cnt - 1) * iv + float(d.get("recovery", 0.6)):

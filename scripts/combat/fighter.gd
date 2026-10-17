@@ -1773,6 +1773,8 @@ func apply_stun(t: float) -> void:
 func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 	_hit_element = incoming_element
 	_hit_status = incoming_status
+	var unbl_in := incoming_unblockable
+	incoming_unblockable = false
 	incoming_element = ""
 	incoming_status = {}
 	if not alive:
@@ -1808,7 +1810,9 @@ func take_hit(amount: float, from: Node3D, _kind: String) -> String:
 		return "parry"
 	if parry_state == Parry.RECOVERY:
 		amount *= PARRY_EXPOSED_MULT
-	if blocking and frontal:
+	# Imbloqueable (habilidades de jefe con unblockable / tipo «jefe»): el escudo no la para.
+	var unblockable := _kind == "jefe" or unbl_in
+	if blocking and frontal and not unblockable:
 		if _kind == "arrow":
 			spend_stamina(COST_BLOCKED_ARROW) # flecha anulada por completo
 			_apply_blocked_status(from, _kind)
@@ -2232,6 +2236,7 @@ func is_boss_invulnerable() -> bool:
 
 func _update_boss(delta: float) -> void:
 	boss_cd = maxf(boss_cd - delta, 0.0)
+	rage_t = maxf(rage_t - delta, 0.0) # (antes solo bajaba con otra habilidad en curso)
 	for k: String in ab_cds.keys():
 		ab_cds[k] = maxf(float(ab_cds[k]) - delta, 0.0)
 	if boss_phase == Boss.NONE:
@@ -2596,6 +2601,7 @@ func charged_shot_kind() -> String:
 # ---------------- Ronda 31: habilidades de jefe (BossAbilities) ----------------
 var telegraph_k: float = 1.12 if OS.has_feature("mobile") else 1.0 ## ronda 33: avisos +12 % en móvil
 var rage_t: float = 0.0
+var incoming_unblockable: bool = false ## lo pone una marca de suelo imbloqueable antes de take_hit
 var ab_ext_hit_landed: bool = false
 var ab_counter_triggered: bool = false
 var ab_vanished: bool = false
@@ -2746,7 +2752,6 @@ func _update_ability(delta: float) -> void:
 		_end_ability(true)
 		return
 	var d := ab_def()
-	rage_t = maxf(rage_t - delta, 0.0)
 	var prev := ab_t
 	ab_t += delta
 	ab_vel = Vector3.ZERO
