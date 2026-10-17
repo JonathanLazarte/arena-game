@@ -2,6 +2,10 @@
 
 > Prompt listo para pegar en Grok Build (modelo local). No es documentación de diseño: las reglas duraderas
 > siguen en `docs/design.md` y el esquema en `docs/abilities_guide.md`.
+>
+> Hoja Escarlata ya corre (ronda 48): `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog` y lo
+> ejecuta `SimCatalog` reusando `AB_*`, sin campos nuevos y sin subir el protocolo. No la reescribas ni la
+> migres otra vez. Este prompt es para las 45 anteriores.
 
 ---
 

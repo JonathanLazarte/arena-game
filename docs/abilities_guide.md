@@ -1176,8 +1176,8 @@ Antes de aceptar lo que devuelva: pasalo por el validador (§17), la checklist (
 
 ## 17. Cómo validar un catálogo
 
-Cargador, validador y horneado: `net/sim/ability_catalog.gd` (`AbilityCatalog`). La sim **todavía no lo usa**
-(no cambia ninguna habilidad actual ni los checksums); es la base del futuro motor genérico de pasos.
+Cargador, validador y horneado: `net/sim/ability_catalog.gd` (`AbilityCatalog`). Las 45 anteriores no pasan por aquí.
+Hoja Escarlata sí: `SimCatalog` ejecuta ese horneado (§13.5). El motor genérico del resto sigue pendiente.
 
 ```bash
 godot --headless --path . --script res://tools/validate_abilities.gd -- data/abilities/catalog.example.json
