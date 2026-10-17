@@ -28,8 +28,11 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
 	v.add_child(UIKit.title("Jugar online", 28, UIKit.YELLOW))
-	v.add_child(UIKit.label("Servidor (relay) para salas por código:", 15))
-	relay_edit = _edit(v, "mi-relay.example.com:47800")
+	v.add_child(UIKit.label("Servidores relay por región (sa=host:47800, us=host2:47800):", 15))
+	relay_edit = _edit(v, "sa=mi-relay.example.com:47800")
+	var row0 := HBoxContainer.new(); v.add_child(row0)
+	_btn(row0, "Partida rápida", quick_match)
+	_btn(row0, "Medir ping / región", ping_regions)
 	var row := HBoxContainer.new(); v.add_child(row)
 	_btn(row, "Crear sala", create_room)
 	code_edit = _edit(row, "CÓDIGO")
@@ -74,13 +77,35 @@ func _save() -> void:
 	cf.set_value("online", "lan_ip", ip_edit.text.strip_edges())
 	cf.save(CFG)
 
+var regions: NetRegions
+var _quick_after_ping := false
+var chosen := {} ## servidor elegido por ping (o el primero)
+
 func _relay() -> Array:
 	var t := relay_edit.text.strip_edges()
 	if t == "":
 		status_label.text = "Escribe la dirección del servidor relay (ver docs/netcode.md) o usa LAN."
 		return []
-	var parts := t.rsplit(":", true, 1)
-	return [parts[0], int(parts[1]) if parts.size() == 2 else NetLink.DEFAULT_RELAY_PORT]
+	if not chosen.is_empty() and t.contains(String(chosen["host"])):
+		return [chosen["host"], chosen["port"]]
+	var l := NetRegions.parse(t)
+	return [l[0]["host"], l[0]["port"]]
+
+func ping_regions(then_quick: bool = false) -> void:
+	if relay_edit.text.strip_edges() == "":
+		_relay(); return
+	_save()
+	regions = NetRegions.new(); regions.start(relay_edit.text)
+	_quick_after_ping = then_quick
+	status_label.text = "Midiendo ping a %d servidor(es)…" % regions.servers.size()
+
+func quick_match() -> void:
+	if chosen.is_empty() and NetRegions.parse(relay_edit.text).size() > 1:
+		ping_regions(true); return
+	var r := _relay()
+	if r.is_empty(): return
+	_new_link(); link.quick_match(r[0], r[1])
+	status_label.text = "Buscando rival en %s…" % r[0]
 
 func _new_link() -> void:
 	if link: link.close()
@@ -143,6 +168,15 @@ func cancel() -> void:
 	queue_free()
 
 func _physics_process(_d: float) -> void:
+	if regions:
+		regions.poll()
+		if regions.done:
+			var b := regions.best()
+			status_label.text = "Ping: %s.%s" % [regions.summary(), " Elegido: %s." % b["name"] if not b.is_empty() else " Ningún servidor respondió."]
+			chosen = b
+			regions = null
+			if _quick_after_ping and not b.is_empty():
+				quick_match()
 	if link == null:
 		return
 	if m == null:
@@ -163,7 +197,9 @@ func _physics_process(_d: float) -> void:
 			status_label.text = "Conectando con %s:%d desde 0.0.0.0:%d… saludos enviados %d, respuestas %d%s" % [link.peer_ip, link.peer_port, link.bound_port, link.hellos_sent, link.hellos_recv, _lan_warn]
 		match link.state:
 			NetLink.St.WAITING:
-				if link.mode == "relay":
+				if link.mode == "relay" and link.queue_pos >= 0:
+					status_label.text = "En cola de partida rápida (%s)… esperando rival." % (link.region if link.region != "" else "relay")
+				elif link.mode == "relay":
 					status_label.text = "Sala creada. Código: %s\nCompártelo con tu rival." % link.code
 			NetLink.St.FAILED:
 				status_label.text = "Error: %s" % _err(link.error)
@@ -192,4 +228,5 @@ func _err(e: String) -> String:
 	if e == "lan_timeout" and link:
 		return "sin respuesta de %s:%d tras %d saludos. Comprueba: misma wifi (no la de invitados), la IP correcta (la que muestra el anfitrión), cortafuegos del anfitrión con UDP %d permitido (Fedora/firewalld: sudo firewall-cmd --add-port=%d/udp --permanent && sudo firewall-cmd --reload; Ubuntu/ufw: sudo ufw allow %d/udp; Windows: permitir el juego en redes privadas) y que el router no aísle clientes." % [link.peer_ip, link.peer_port, link.hellos_sent, NetLink.LAN_PORT, NetLink.LAN_PORT, NetLink.LAN_PORT]
 	return {"no_room": "no existe esa sala", "room_full": "la sala está llena", "code_taken": "código en uso",
-		"version": "versión distinta del juego", "disconnected": "sin respuesta del rival"}.get(e, e)
+		"version": "versión distinta del juego (actualiza la app)", "busy": "servidor lleno, prueba más tarde",
+		"bad_token": "sesión caducada", "reconnect_failed": "no se pudo reconectar", "disconnected": "sin respuesta del rival"}.get(e, e)
