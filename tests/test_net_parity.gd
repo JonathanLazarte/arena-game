@@ -50,6 +50,32 @@ func _run() -> void:
 		["flecha con adelanto (blanco andando)", 12.0, 160, [[0, 0, "swap", 0], [0, 1, "move_on", 8], [40, 0, "shoot", 0]], {"lead": 1.0}],
 		["pasiva furia (vida baja)", 1.8, 60, [[2, 0, "light", 0]], {"chars": ["berserker", ""], "hp": [25.0, -1.0]}],
 		["pasiva curación", 1.8, 420, [[2, 0, "light", 0]], {"chars": ["", "paladin"]}],
+		# ---- Fase 4: habilidades de jefe (aviso online 1,12), magia ----
+		["jefe: estocada", 6.0, 220, [[2, 0, "boss", 0]], {"boss": [["estocada"], []]}],
+		["jefe: estocada esquivada rodando", 6.0, 220, [[2, 0, "boss", 0], [100, 1, "roll", 8]], {"boss": [["estocada"], []]}],
+		["jefe: estocada imbloqueable", 6.0, 220, [[0, 1, "block_on", 0], [2, 0, "boss", 0]], {"boss": [["estocada"], []]}],
+		["jefe: carga en área", 3.0, 200, [[2, 0, "boss", 0]], {"boss": [["carga_area"], []]}],
+		["jefe: ráfaga teledirigida", 9.0, 160, [[2, 0, "boss", 0]], {"boss": [["rafaga"], []]}],
+		["jefe: escudo de maná (100 % invulnerable)", 1.8, 120, [[2, 1, "boss", 0], [12, 0, "light", 0], [50, 0, "light", 0]], {"boss": [[], ["escudo_mana"]]}],
+		["jefe: combo de la pausa falsa", 2.5, 300, [[2, 0, "boss", 0], [50, 0, "boss", 0], [100, 0, "boss", 0], [150, 0, "boss", 0]], {"boss": [["combo_falso"], []]}],
+		["jefe: salto con caída", 6.0, 200, [[2, 0, "boss", 0]], {"boss": [["salto_caida"], []]}],
+		["jefe: tajo retardado", 2.5, 200, [[2, 0, "boss", 0]], {"boss": [["tajo_retardado"], []]}],
+		["jefe: presa del verdugo (agarre)", 2.5, 220, [[2, 0, "boss", 0]], {"boss": [["presa_verdugo"], []]}],
+		["jefe: giro devastador", 2.5, 220, [[2, 0, "boss", 0]], {"boss": [["giro_martillo"], []]}],
+		["jefe: danza del cisne", 2.5, 260, [[2, 0, "boss", 0]], {"boss": [["danza_cisne"], []]}],
+		["jefe: danza del cisne bloqueada", 2.5, 260, [[0, 1, "block_on", 0], [2, 0, "boss", 0]], {"boss": [["danza_cisne"], []]}],
+		["jefe: paso espectral", 4.0, 200, [[2, 0, "boss", 0]], {"boss": [["paso_espectral"], []]}],
+		["jefe: onda rastrera", 6.0, 200, [[2, 0, "boss", 0]], {"boss": [["onda_rastrera"], []]}],
+		["jefe: rayos trazadores", 6.0, 260, [[2, 0, "boss", 0]], {"boss": [["rayos_trazadores"], []]}],
+		["jefe: aliento de dragón", 4.0, 260, [[2, 0, "boss", 0]], {"boss": [["aliento_dragon"], []]}],
+		["jefe: furia de fase + ligero", 1.8, 120, [[2, 0, "boss", 0], [60, 0, "light", 0]], {"boss": [["furia_fase"], []]}],
+		["jefe: postura de contragolpe", 1.8, 160, [[2, 1, "boss", 0], [40, 0, "light", 0]], {"boss": [[], ["postura_contra"]]}],
+		["jefe: embate sísmico", 4.0, 240, [[2, 0, "boss", 0]], {"boss": [["embate_sismico"], []]}],
+		["jefe: lanza celeste", 5.0, 220, [[2, 0, "boss", 0]], {"boss": [["lanza_celeste"], []]}],
+		["jefe: lanza celeste imbloqueable", 5.0, 220, [[0, 1, "block_on", 0], [2, 0, "boss", 0]], {"boss": [["lanza_celeste"], []]}],
+		["magia: chispa ígnea", 8.0, 120, [[2, 0, "spell", 0]], {"spells": [["chispa"], []]}],
+		["magia: aliento helado", 3.0, 120, [[2, 0, "spell", 0]], {"spells": [["aliento_helado"], []]}],
+		["magia: piel de piedra", 1.8, 120, [[2, 1, "spell", 0], [60, 0, "light", 0]], {"spells": [[], ["piel_de_piedra"]]}],
 		["talismán: parry devuelve aguante", 1.8, 60, [[2, 0, "light", 0], [20, 1, "parry", 0]], {"trinkets": [[], ["eco_templado"]]}],
 	]
 	var all_params_ok := true
@@ -130,6 +156,11 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 			f.set_equipment(5, EquipStats.rival_armor("caballero", 5), w2)
 		if setup.has("trinkets"):
 			f.set_trinkets(setup["trinkets"][i])
+		f.telegraph_k = SimAbilities.TELE_ONLINE
+		if setup.has("boss"):
+			f.set_boss_abilities(setup["boss"][i])
+		if setup.has("spells"):
+			f.set_magic(setup["spells"][i], "")
 		world.add_child(f)
 		f.secondary = w2
 		if setup.has("lead"):
@@ -172,6 +203,8 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 					f.move_input = _dir_off(int(e[3]))
 					f.dash()
 				"swap": f.swap_loadout()
+				"boss": f.boss_skill(f.selected_boss())
+				"spell": f.cast_spell()
 				"move_on": holds[int(e[1])]["move"] = int(e[3])
 				"move_off": holds[int(e[1])].erase("move")
 				"sprint_on": f.want_sprint = true
@@ -257,6 +290,8 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 				var d32: int = (int(e[3]) + (16 if i == 1 else 0)) & 31
 				ins[i][t] |= S.IN_ROLL | S.IN_MOVE | d32
 			"swap": ins[i][t] |= S.IN_SWAP
+			"boss": ins[i][t] |= S.IN_BOSS
+			"spell": ins[i][t] |= S.IN_SPELL
 			"move_on":
 				var md: int = (int(e[3]) + (16 if i == 1 else 0)) & 31
 				for k in range(t, n): ins[i][k] = (ins[i][k] & ~S.IN_DIR_MASK) | S.IN_MOVE | md

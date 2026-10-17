@@ -2,7 +2,7 @@ class_name NetLoadout
 extends RefCounted
 ## Equipo del lobby como datos puros para enviarlo al rival y reconstruir los dos Fighter igual en
 ## ambos pares (el params_checksum del bake lo verifica). Solo ids, niveles y números: nada de
-## recursos ni rutas. Lo que el ruleset online ignora (magia, eikon, habilidades de jefe) no viaja.
+## recursos ni rutas. Fase 4: también eikon, hechizos, arte, sello y habilidades de jefe (el bake los cubre).
 const MAX_LEVEL := 99
 
 static func from_game_state(gs: Node) -> Dictionary:
@@ -20,7 +20,24 @@ static func from_game_state(gs: Node) -> Dictionary:
 		"attrs": Dictionary(gs.char_attrs()).duplicate(),
 		"armor": Dictionary(gs.armor_eq).duplicate(),
 		"trinkets": Array(gs.equipped_trinkets()).duplicate(),
+		"eikon": String(gs.eikon_id),
+		"spells": Array(gs.equipped_spells()).duplicate(),
+		"art": String(gs.weapon_art()),
+		"seal": String(gs.equipped_eikon_seal),
+		"boss": Array(gs.boss_abilities()).duplicate(),
 	}
+
+static func _strs(v: Variant, n: int) -> Array:
+	var out: Array = []
+	if v is Array:
+		for x in (v as Array).slice(0, n): out.append(String(x).left(40))
+	return out
+
+## Eikon, magia y jefe en un Fighter ya creado (ambos pares igual). Llamar antes de add_child.
+static func apply_extras(f: Fighter, a: Dictionary) -> void:
+	f.eikon = load(String(a.get("eikon_path", Catalog.EIKONS["fenix"])))
+	f.set_magic(a.get("spells", []), String(a.get("art", "")), String(a.get("seal", "")))
+	f.set_boss_abilities(a.get("boss", []))
 
 static func _weapon(e: Variant) -> WeaponDef:
 	if not (e is Array) or (e as Array).size() < 3 or String(e[0]) == "":
@@ -58,4 +75,7 @@ static func fighter_args(lo: Dictionary) -> Dictionary:
 	for v in (lo.get("trinkets", []) if lo.get("trinkets") is Array else []): trinkets.append(String(v))
 	return {"name": String(lo.get("name", "Rival")).left(32), "cd": cd, "wd": wd, "skills": skills, "attrs": attrs,
 		"eqp": {"level": clampi(int(lo.get("level", 1)), 1, MAX_LEVEL), "armor": armor, "w2": w2, "left_hand": lh_id,
-			"offhand": off, "shield": w2_id == "escudo", "trinkets": trinkets}}
+			"offhand": off, "shield": w2_id == "escudo", "trinkets": trinkets},
+		"eikon_path": Catalog.EIKONS.get(String(lo.get("eikon", "fenix")), Catalog.EIKONS["fenix"]),
+		"spells": _strs(lo.get("spells", []), 4), "art": String(lo.get("art", "")).left(40),
+		"seal": String(lo.get("seal", "")).left(40), "boss": _strs(lo.get("boss", []), 3)}

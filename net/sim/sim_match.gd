@@ -101,7 +101,7 @@ func _net_step() -> void:
 		return
 	if net.phase == NetMatch.Ph.OVER:
 		_ended = true
-		var w := local_slot if net.status in ["forfeit_win", "peer_left", "disconnected"] else 1 - local_slot
+		var w := local_slot if net.status in ["forfeit_win", "peer_left", "disconnected", "load_timeout"] else 1 - local_slot
 		net.save_replay()
 		match_ended.emit(w, net.status)
 		return
@@ -160,7 +160,22 @@ func sample_device(i: int) -> int:
 	elif _hand_prev[i]:
 		parry = _hand_t[i] < HAND_HOLD
 	_hand_prev[i] = hand
-	return SimView.pack_input(world_move(i, mv), mv.length() < 0.6 and mv.length() > 0.2, atk, block, parry, roll, sprint, swap, _lock[i])
+	var v := SimView.pack_input(world_move(i, mv), mv.length() < 0.6 and mv.length() > 0.2, atk, block, parry, roll, sprint, swap, _lock[i])
+	if i == local_slot:
+		v |= extra_buttons()
+	return v
+
+## Fase 4: botones de jefe, magia, eikon y montura (la sim detecta el flanco de pulsación).
+const EXTRA_ACTIONS := {"boss": FightSim.IN_BOSS, "boss_next": FightSim.IN_BOSS_NEXT, "spell": FightSim.IN_SPELL,
+	"spell_next": FightSim.IN_SPELL_NEXT, "summon": FightSim.IN_EIKON, "special": FightSim.IN_EIKON, "mount": FightSim.IN_MOUNT}
+var hud_buttons := 0 ## botones táctiles del HUD (los fija la arena)
+static func extra_buttons_from(held: Callable) -> int:
+	var v := 0
+	for a: String in EXTRA_ACTIONS:
+		if InputMap.has_action(a) and held.call(a): v |= int(EXTRA_ACTIONS[a])
+	return v
+func extra_buttons() -> int:
+	return extra_buttons_from(func(a: String) -> bool: return Input.is_action_pressed(a)) | hud_buttons
 
 ## Stick (x derecha, y abajo) -> mundo: relativo a la cámara para el jugador 1, al rival para el 2.
 func world_move(i: int, mv: Vector2) -> Vector3:

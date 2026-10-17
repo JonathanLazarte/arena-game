@@ -35,7 +35,7 @@ func _play(ms: Array[NetMatch], ticks: int, corrupt_at: int = -1) -> void:
 	for k in ticks:
 		for i in 2:
 			if rng.randf() < 0.25: cur[i] = (rng.randi() & 0x1FFF) | FightSim.IN_LOCK
-			if ms[i].phase == NetMatch.Ph.PLAY: ms[i].play_step(cur[i])
+			if ms[i].phase in [NetMatch.Ph.LOAD, NetMatch.Ph.PLAY]: ms[i].play_step(cur[i])
 		if k == corrupt_at: ms[1].session.state[FightSim.HP] -= 1
 		var wait := t0 + int((k + 1) * NetMatch.TICK_MS) - Time.get_ticks_msec()
 		if wait > 0: OS.delay_msec(wait)

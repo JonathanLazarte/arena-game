@@ -739,7 +739,7 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, ab: Dictionary, h: Ar
 	var any_hit := false
 	if _in_reach(s, P, i, ab["reach"], ab["cos_arc"]):
 		var raw := raw_live(s, P, i, int(ab["raw"]) * int(h[1]) / 1000)
-		var res := FightSim._take_hit(s, P, i, ab["kind"], raw, ab["sub"], h[2], ab["pd_pm"], ab["counter_pm"], P[i]["atk"][SimParams.A_HEAVY]["block_cost"])
+		var res := FightSim._take_hit(s, P, i, ab["kind"], raw, ab["sub"], h[2], ab["pd_pm"], ab["counter_pm"], P[i]["atk"][SimParams.A_HEAVY if raw >= 14000 else 0]["block_cost"])
 		if res == 3 and int(ab["parry_cancel"]) != 0:
 			end_ability(s, o, true)
 			return false

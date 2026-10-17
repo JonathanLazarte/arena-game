@@ -31,7 +31,7 @@ static func bake(f: Fighter, p: Dictionary) -> void:
 	p["mana_max"] = SimParams.milli(f.energy_max)
 	p["mana_regen"] = SimParams.milli(float(f.ad["energia_regen"]))
 	p["meter_pm"] = SimParams.pm(float(f.ad["medidor"]) * float(f.tfx["eikon_rate"]))
-	p["meter0"] = SimParams.milli(f.meter)
+	p["meter0"] = 0 # online siempre empieza con el medidor vacío (el valor vivo no es determinista)
 	p["sagrado_pm"] = SimParams.pm(float(f.ad["sagrado"]))
 	p["aoe_pm"] = SimParams.pm(EquipStats.resist_mult("inmunidad", f.eq, f.eq_ref)) if not f.eq.is_empty() else 1000
 	p["eikon_block_cost"] = SimParams.milli(Fighter.COST_BLOCKED_EIKON * float(f.tfx["stamina_cost"]))

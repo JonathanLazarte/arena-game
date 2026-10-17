@@ -16,7 +16,17 @@ const SYNC_COOLDOWN := 12
 
 static var current: NetMatch ## partida en curso para la arena (la crea el panel online)
 
-enum Ph { HELLO, PING, START, PLAY, OVER }
+enum Ph { HELLO, PING, START, LOAD, PLAY, OVER }
+## Carga de la arena: cada par avisa «rdy» al tener escena y sim listas; la sesión arranca solo
+## cuando ambos lo están. Mientras, el límite de desconexión es LOAD_TIMEOUT_MS (no 4 s).
+const LOAD_TIMEOUT_MS := 30000
+const READY_EVERY_MS := 200
+var peer_ready := false
+var _ready_at := 0
+var _load_started := 0
+## false mientras la escena local aún calienta sombreadores/recursos: se envían latidos «ka», no «rdy».
+var local_ready := true
+var load_ms := 0 ## lo que tardó en arrancar (pruebas / overlay)
 var phase: Ph = Ph.HELLO
 var link: NetLink
 var me := 0
@@ -136,17 +146,59 @@ func start_play(params: Array, spawn: Array[int] = []) -> void:
 	engine.spawn = spawn
 	session = RbSession.new(me, input_delay, 8, engine)
 	session.params_hash = SimParams.params_checksum(params)
-	phase = Ph.PLAY
+	phase = Ph.LOAD
+	_load_started = NetLink.now_ms()
+	link.last_recv_ms = _load_started # nuestra propia carga no cuenta como silencio del rival
+	_ready_at = 0
+
+## Mientras la escena del otro par carga: avisar «rdy», contestar pings, aceptar ya sus entradas.
+func _load_step(t: int) -> void:
+	for m: Dictionary in _drain():
+		_handle(m, t)
+	if status != "":
+		phase = Ph.OVER
+		return
+	if link.peer_left:
+		status = "peer_left"; phase = Ph.OVER; return
+	if t - link.last_recv_ms > LOAD_TIMEOUT_MS:
+		status = "load_timeout"; phase = Ph.OVER; return
+	if t >= _ready_at:
+		_ready_at = t + READY_EVERY_MS
+		link.send_msg({"t": "rdy" if local_ready else "ka"}, true) # también sirve de latido
+	if peer_ready and local_ready:
+		phase = Ph.PLAY
+		load_ms = t - _load_started
+		link.last_recv_ms = maxi(link.last_recv_ms, t)
+		for i in 2: link.send_msg({"t": "rdy"}, true)
+
+## ¿Esperando a que cargue el rival? (la arena muestra «Cargando rival…»)
+func waiting_peer() -> bool:
+	return phase == Ph.LOAD
 
 # ---------------- partida ----------------
 ## Un tick físico. Devuelve true si la sim avanzó.
 func play_step(local_input: int) -> bool:
+	if phase == Ph.LOAD:
+		link.poll()
+		_load_step(NetLink.now_ms())
+		return false
 	if phase != Ph.PLAY:
 		return false
 	link.poll()
 	var t := NetLink.now_ms()
 	for m: Dictionary in _drain():
+		_handle(m, t)
+	_after_msgs(t)
+	if phase != Ph.PLAY:
+		return false
+	return _play_tick(local_input, t)
+
+func _handle(m: Dictionary, t: int) -> void:
 		match String(m.get("t", "")):
+			"rdy":
+				peer_ready = true
+				if phase == Ph.PLAY and int(m.get("_r", 0)) == 0:
+					link.send_msg({"t": "rdy", "_r": 1}) # el rival sigue cargando: que nos vea listos
 			"in":
 				session.receive_packet(m)
 				peer_ack = maxi(peer_ack, int(m.get("ack", -1)))
@@ -164,6 +216,8 @@ func play_step(local_input: int) -> bool:
 				status = "forfeit_win"; phase = Ph.OVER
 			"bad_params":
 				status = "params_mismatch"; phase = Ph.OVER
+
+func _after_msgs(t: int) -> void:
 	if session.params_mismatch and status == "":
 		for i in 3: link.send_msg({"t": "bad_params"}, true) # el rival no puede detectarlo si dejamos de enviar
 		status = "params_mismatch"; phase = Ph.OVER
@@ -171,8 +225,8 @@ func play_step(local_input: int) -> bool:
 		status = "peer_left"; phase = Ph.OVER
 	if t - link.last_recv_ms > TIMEOUT_MS and status == "":
 		status = "disconnected"; phase = Ph.OVER
-	if phase != Ph.PLAY:
-		return false
+
+func _play_tick(local_input: int, t: int) -> bool:
 	# sincronía: si vamos por delante del rival (estimado con el RTT), cedemos un tick
 	var advanced := false
 	var est_peer := float(peer_frame) + rtt_ms * 0.5 / TICK_MS

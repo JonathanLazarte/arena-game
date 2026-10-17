@@ -43,7 +43,7 @@ func _physics_process(_d: float) -> bool:
 		if link.ready_to_play():
 			m = NetMatch.new(link)
 		return false
-	if m.phase != NetMatch.Ph.PLAY and m.phase != NetMatch.Ph.OVER:
+	if not (m.phase in [NetMatch.Ph.LOAD, NetMatch.Ph.PLAY, NetMatch.Ph.OVER]):
 		if m.prelude_step():
 			m.start_play(params)
 		elif m.status != "":

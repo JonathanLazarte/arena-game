@@ -148,6 +148,7 @@ func _setup_sim_match() -> void:
 	add_child(sim_match)
 	sim_match.joystick = hud.joystick
 	if online:
+		online.local_ready = false # hasta calentar la escena (ver _process_online_hud)
 		# el anfitrión es el jugador 0 de la sim; el invitado ve su luchador (nodo player) en el hueco 1
 		if online.me == 1:
 			player.global_position = Vector3(0, 0.2, -SPAWN_DIST); player.facing = Vector3.BACK
@@ -169,7 +170,8 @@ func _setup_sim_match() -> void:
 
 const ONLINE_END_TEXT := {"ko": "", "forfeit_win": "El rival abandonó", "forfeit_loss": "Abandonaste",
 	"peer_left": "El rival se fue", "disconnected": "Conexión perdida", "desync": "Desincronía (informe guardado)",
-	"params_mismatch": "Versiones distintas", "version": "Versiones distintas"}
+	"params_mismatch": "Versiones distintas", "version": "Versiones distintas",
+	"load_timeout": "El rival no terminó de cargar"}
 func _on_online_ended(winner_slot: int, reason: String) -> void:
 	if state == "over":
 		return
@@ -194,6 +196,7 @@ func leave_online() -> void:
 func _process_online_hud() -> void:
 	if not online or sim_match == null:
 		return
+	_process_loading()
 	var w: Array = sim_match.last_confirmed_wins
 	if int(w[0]) != _shown_wins[0] or int(w[1]) != _shown_wins[1]:
 		_shown_wins = [int(w[0]), int(w[1])]
@@ -204,6 +207,28 @@ func _process_online_hud() -> void:
 		_update_round_label()
 	hud.timer_label.text = "%d ms" % int(online.rtt_ms)
 var _shown_wins := [0, 0]
+var _warm_frames := 0
+var _loading_label: Label
+
+## Carga online: dibujar unos fotogramas (compila sombreadores y sube recursos) antes de avisar «listo»;
+## mientras el rival carga se muestra «Cargando rival…» en vez de una pantalla negra.
+func _process_loading() -> void:
+	if not online.local_ready:
+		_warm_frames += 1
+		if _warm_frames >= WARM_FRAMES:
+			online.local_ready = true
+	var waiting := online.waiting_peer()
+	if waiting and _loading_label == null:
+		var cl := CanvasLayer.new(); cl.layer = 50; add_child(cl)
+		_loading_label = Label.new()
+		_loading_label.text = "Cargando rival..."
+		_loading_label.add_theme_font_size_override("font_size", 40)
+		_loading_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		_loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cl.add_child(_loading_label)
+	if _loading_label:
+		_loading_label.visible = waiting
+const WARM_FRAMES := 4
 
 func _on_sim_event(ev: Dictionary) -> void:
 	match String(ev["kind"]):
@@ -286,7 +311,10 @@ func _make_online_fighter(lo: Dictionary, fallback: String, team: int, c: Color)
 	var a := NetLoadout.fighter_args(lo)
 	if a.is_empty():
 		return _make_fighter(fallback, team, c, EIKONS[0])
-	return _make_fighter(String(a["name"]), team, c, EIKONS[0], a["cd"], a["wd"], a["skills"], a["attrs"], a["eqp"])
+	var f := _make_fighter(String(a["name"]), team, c, String(a["eikon_path"]), a["cd"], a["wd"], a["skills"], a["attrs"], a["eqp"])
+	f.set_magic(a["spells"], String(a["art"]), String(a["seal"]))
+	f.set_boss_abilities(a["boss"])
+	return f
 
 func _make_fighter(n: String, team: int, c: Color, eikon_path: String,
 		cd: CharacterDef = null, wd: WeaponDef = null, sk: Array = [], at: Dictionary = {}, eqp: Dictionary = {}) -> Fighter:

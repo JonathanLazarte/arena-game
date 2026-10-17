@@ -932,6 +932,8 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> voi
 	var raw: int = a["raw"] * ck / 1000
 	if P[i].get("furia_pm", 0) > 0 and s[o + HP] * 1000 < P[i]["hp"] * FURIA_HP_PM:
 		raw = raw * (1000 + P[i]["furia_pm"]) / 1000
+	if s[o + RAGE_T] > 0:
+		raw = raw * 1300 / 1000 # furia de fase
 	var res := _take_hit(s, P, i, 0, raw, a["sub"], force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], a["block_cost"])
 	if res == 1 or res == 2 or res == 3:
 		s[o + ATK_LANDED] = 1

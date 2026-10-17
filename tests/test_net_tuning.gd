@@ -36,7 +36,7 @@ func _play(ms: Array[NetMatch], ticks: int, on_tick: Callable = Callable()) -> v
 		if on_tick.is_valid(): on_tick.call(k)
 		for i in 2:
 			if rng.randf() < 0.25: cur[i] = (rng.randi() & 0x1FFF) | FightSim.IN_LOCK
-			if ms[i].phase == NetMatch.Ph.PLAY: ms[i].play_step(cur[i])
+			if ms[i].phase in [NetMatch.Ph.LOAD, NetMatch.Ph.PLAY]: ms[i].play_step(cur[i])
 		var wait := t0 + int((k + 1) * NetMatch.TICK_MS) - Time.get_ticks_msec()
 		if wait > 0: OS.delay_msec(wait)
 
@@ -138,6 +138,8 @@ func _test_loadouts() -> void:
 	var bad := {"char": "no_existe", "w": ["???", 999, "x"], "attrs": {"fuerza": 99999}, "level": -4}
 	var ba := NetLoadout.fighter_args(bad)
 	check(ba["cd"] != null and ba["wd"] != null and int(ba["eqp"]["level"]) == 1, "equipo: datos inválidos del rival se sanean")
+	var ex := NetLoadout.fighter_args({"char": "berserker", "eikon": "lobo", "spells": ["a", "b", "c", "d", "e"], "boss": ["x", "y", "z", "w"], "seal": "s"})
+	check(String(ex["eikon_path"]) == Catalog.EIKONS["lobo"] and ex["spells"].size() == 4 and ex["boss"].size() == 3 and lo_host.has("boss") and lo_host.has("spells") and lo_host.has("eikon"), "equipo: eikon/hechizos/sello/jefe viajan y se acotan")
 	var ms := _pair(47671, 5.0, [lo_host, lo_guest])
 	check(ms[0].peer_loadout.get("char") == "arquero" and ms[1].peer_loadout.get("char") == "berserker", "equipo: cada par recibe el del rival en el saludo")
 	NetMatch.current = ms[1] # la arena hace de invitado
@@ -156,9 +158,13 @@ func _test_loadouts() -> void:
 		var q: Dictionary = a["eqp"]
 		f.set_equipment(int(q["level"]), q["armor"], q["w2"], String(q["left_hand"]), q["offhand"], bool(q["shield"]))
 		f.set_trinkets(q["trinkets"])
+		NetLoadout.apply_extras(f, a)
 		w.add_child(f); host_f.append(f)
 	await process_frame
 	var hp := SimParams.bake(host_f[0], host_f[1])
+	for si in 2:
+		for k in hp[si]:
+			if str(hp[si][k]) != str(ar.sim_match.params[si].get(k)): print("DIFF ", si, " ", k, " host=", str(hp[si][k]).left(300), " arena=", str(ar.sim_match.params[si].get(k)).left(300))
 	check(SimParams.params_checksum(hp) == SimParams.params_checksum(ar.sim_match.params), "equipo: el bake del anfitrión coincide con el del invitado (params_checksum)")
 	ms[0].start_play(hp, ar.sim_match.engine.spawn)
 	var rng := RandomNumberGenerator.new(); rng.seed = 3
