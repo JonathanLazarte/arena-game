@@ -743,7 +743,7 @@ func _boss_situ(ab: Dictionary, dist: float, fd: float) -> bool:
 		return dist > 3.5 and health() > 45.0 and g(S.RAGE_T) <= 0
 	if id == "guardia_reflejo":
 		return dist < 3.8 and og(S.ATK_STATE) == S.Atk.WINDUP
-	match int(ab.get("type", -1)):
+	match int(ab.get("family", ab.get("type", -1))):
 		SimAbilities.T_TIMELINE: return dist < 4.5 and fd > 0.4
 		SimAbilities.T_WAVE: return dist > 2.5 and dist < 12.0
 		SimAbilities.T_RAIN, SimAbilities.T_RAFAGA: return dist > 4.5 and dist < 16.0

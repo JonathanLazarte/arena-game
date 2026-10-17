@@ -68,7 +68,8 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 	var ab := _ab_of(P, i, slot)
 	var id := String(ab.get("id", ""))
 	var typ := int(ab.get("type", -1))
-	var steps_timeline := typ == A.T_STEPS and int(ab.get("family", -1)) == A.T_TIMELINE
+	var fam := int(ab.get("family", typ))
+	var steps_timeline := typ == A.T_STEPS and fam == A.T_TIMELINE
 	var fl: int = s[o + S.AB_FL]
 	var t: int = s[o + S.AB_T]
 	# activación nueva: otra ranura o el reloj vuelve atrás
@@ -124,13 +125,13 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 		elif typ == A.T_CATALOG and f._kv:
 			f._kv.flash_sword_trail(ab_color(id))
 			trails[i] += 1
-		elif typ == A.T_BREATH:
+		elif fam == A.T_BREATH:
 			_burst(f, i, ab_color(id))
 			_cone_t[i] = 20
 	_fired[i] = fired if slot >= 0 else 0
 	_breath_cone(s, ab, f, i)
 	# --- contragolpe: destello azul al activarse ---
-	var ctr := slot >= 0 and typ == A.T_COUNTER and (fl & A.FL_COUNTERED) != 0
+	var ctr := slot >= 0 and fam == A.T_COUNTER and (fl & A.FL_COUNTERED) != 0
 	if ctr and not _countered[i]:
 		_burst(f, i, Color(0.4, 0.7, 1.0))
 	_countered[i] = ctr
@@ -188,7 +189,7 @@ func _estocada_fx(s: PackedInt64Array, P: Array, f: Fighter, i: int, ph: int) ->
 		return
 	var charge := 1
 	for ab: Dictionary in P[i].get("boss", []):
-		if int(ab.get("type", -1)) == A.T_ESTOCADA:
+		if int(ab.get("family", ab.get("type", -1))) == A.T_ESTOCADA:
 			charge = maxi(int(ab.get("charge", 1)), 1)
 	var k := clampf(float(s[o + S.BS_T]) / charge, 0.0, 1.0) if ph == 1 else 1.0
 	f._boss_fx.scale_amount_min = lerpf(0.3, 1.4, k)
@@ -199,7 +200,7 @@ func _estocada_fx(s: PackedInt64Array, P: Array, f: Fighter, i: int, ph: int) ->
 func _breath_cone(s: PackedInt64Array, ab: Dictionary, f: Fighter, i: int) -> void:
 	if _cone_t[i] > 0:
 		_cone_t[i] -= 1
-	var on := _cone_t[i] > 0 and s[i * S.F_FIELDS + S.ALIVE] != 0 and int(ab.get("type", -1)) == A.T_BREATH
+	var on := _cone_t[i] > 0 and s[i * S.F_FIELDS + S.ALIVE] != 0 and int(ab.get("family", ab.get("type", -1))) == A.T_BREATH
 	if on and _cone[i] == null:
 		var rng := float(ab.get("range", 7500000)) / 1.0e6
 		var cos_arc := float(ab.get("cos_arc", 3617)) / float(FxMath.ONE)

@@ -784,10 +784,10 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - El área de Flor Umbral y Picado de Alas sale aunque el cuerpo no conecte (`slam_always`). Lluvia de Lanzas, Columnas de Rayo y Lanza Celeste dibujan columna. Saeta Oscura y Orbe Lunar persiguen como la Ráfaga y se pueden repetir al terminar.
 - La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.
 
-## Etapa 1 — Motor de pasos (protocolo 9)
-- Detrás del flag `ab_engine` (apagado por defecto, entra en `params_checksum`) corre `SimSteps`: anticipación, activo, recuperación, cajas, tracking, arremetida con tope, armadura, `next`, `cancel_into` y `branch` (primera pulsación, búfer, empate por orden).
-- Migradas al catálogo `data/abilities/catalog.json`, con los mismos checksums que el camino viejo: Tajo Retardado, Estocada Negra, Pisotón y Flecha Grave. La recarga, el corte por aturdimiento y el costo de vida no cambian. Prueba: `tests/test_step_engine.gd`.
-- El protocolo pasa a 9 porque el flag es parte de los params. Los bits de entrada y el layout del estado no cambian.
+## Motor de pasos (protocolo 9, etapa 2)
+- Detrás del flag `ab_engine` (apagado por defecto, entra en `params_checksum`) `SimSteps` envuelve el programa viejo de las habilidades en `SimSteps.IDS`: líneas de tiempo, ondas, lluvias y alientos. El catálogo aporta `interruptible_by` y los eventos. El grafo (`next`, `cancel_into`, `branch`) está en el motor y todavía no ejecuta estas habilidades.
+- En reposo los checksums coinciden con el camino viejo. `interruptible_by` vacío no corta con aturdimiento: solo se esquiva. La recarga sigue siendo la global de 85 ticks. Prueba: `tests/test_step_engine.gd`.
+- El protocolo es 9 porque el flag es parte de los params. Los bits de entrada y el layout del estado no cambian.
 
 ## Ronda 48 — Hoja Escarlata
 - Las 45 habilidades de jefe quedan como estaban (copia en `docs/backup/habilidades_ronda46/`). No se pasaron al esquema nuevo.

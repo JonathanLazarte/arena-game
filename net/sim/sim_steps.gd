@@ -1,17 +1,15 @@
 class_name SimSteps
 extends RefCounted
-## Motor de pasos (etapa 1). Con SimParams.ab_engine == 1 ejecuta las habilidades migradas
-## del catálogo `data/abilities/catalog.json`. Apagado, no se usa.
+## Motor de pasos. Con SimParams.ab_engine == 1, las de IDS se envuelven: el programa
+## numérico sigue siendo el del camino viejo y el catálogo aporta la máscara y los eventos.
+## Apagado, no se usa.
 ##
 ## Reloj: update() ya sumó 1 a AB_T. t_step = AB_T - 1. Los ticks del JSON están en t_step
 ## (0 = primer tick). El camino viejo compara contra AB_T: un umbral H del viejo es el tick
 ## H - 1 del catálogo. Así el mismo golpe cae en el mismo tick.
 ##
-## Checksum: estas cuatro no prenden FL_CATALOG ni escriben campos que el camino viejo deja
-## en cero (AB_TICK, AB_WAIT, AB_IMM). La recarga sigue siendo la global de 85, el costo de
-## vida se rechaza si dejaría 0 (SimAbilities._cost_ok) y cualquier aturdimiento corta.
-## El daño del catálogo, en esta etapa, es el multiplicador del fuerte del arma (el esquema
-## aún no tiene ese escalado: ver la pregunta al final de la etapa).
+## No prende FL_CATALOG. La recarga es la global de 85 y el costo de vida se rechaza si
+## dejaría 0. interruptible_by vacío no corta con aturdimiento: solo se esquiva.
 
 const PATH := "res://data/abilities/catalog.json"
 const IDS: Array[String] = [
@@ -21,6 +19,7 @@ const IDS: Array[String] = [
 	"presa_fauces", "giro_noble", "danza_triple", "alas_picado",
 	"onda_rastrera", "embate_sismico", "garra_suelo", "vendaval_hacha", "anillo_fuego",
 	"rayos_trazadores", "lluvia_meteoros", "lanza_celeste", "lluvia_lanzas", "lluvia_sangre", "columnas_rayo",
+	"aliento_dragon", "aliento_rayo", "aliento_escarcha", "chorro_lava",
 ]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1

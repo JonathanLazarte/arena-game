@@ -1078,11 +1078,11 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
-Las 45 no se migraron todas (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Cuatro del catálogo general (`data/abilities/catalog.json`: Tajo Retardado, Estocada Negra, Pisotón y Flecha Grave) las puede ejecutar `SimSteps` si `ab_engine` es 1; por defecto sigue el camino viejo. El protocolo es 9 porque ese flag entra en los params.
+Las 45 están en `data/abilities/catalog.json` y siguen definidas en `BossAbilities` (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las de `SimSteps.IDS` (líneas de tiempo, ondas, lluvias y alientos) las envuelve `SimSteps` si `ab_engine` es 1: el programa numérico es el viejo y el catálogo aporta `interruptible_by` y los eventos. Por defecto el flag es 0. El protocolo es 9 porque ese flag entra en los params.
 
-Adaptaciones de estas cuatro respecto del esquema:
+Adaptaciones respecto del esquema:
 
-- Un solo `BOSS_CD`: al terminar, `max(GLOBAL_CD, cooldown)`. La global de la sim es 85 ticks (`tk(1,4)`); el esquema usa 84.
+- La recarga del motor de pasos es la global de 85 ticks (`tk(1,4)`). El `cooldown` propio no se usa en la etapa 2; más adelante será `max(global, propia)`. Hoja (`FL_CATALOG`) sí hace `max(GLOBAL_CD, cooldown)`. El esquema anota 84.
 - La zona de Floración son anillos sucesivos (marcas de suelo), no un charco. El sangrado suma a la acumulación que ya existe.
 - `self_invuln` en modo `stun_immune` no usa `AB_IMM` (eso contaría el golpe como esquivado): no aturde y el daño entra × `dmg_taken_pct`.
 - Hiperarmadura: no acumula robustez. Superarmadura: suma robustez con la fórmula que ya existe.
@@ -1169,7 +1169,7 @@ Antes de aceptar lo que devuelva: pasalo por el validador (§17), la checklist (
 ## 17. Cómo validar un catálogo
 
 Cargador, validador y horneado: `net/sim/ability_catalog.gd` (`AbilityCatalog`). Las 45 anteriores no pasan por aquí.
-Hoja Escarlata sí: `SimCatalog` ejecuta ese horneado (§13.5). El motor genérico del resto sigue pendiente.
+Hoja Escarlata sí: `SimCatalog` ejecuta ese horneado (§13.5). El motor de pasos, con `ab_engine` en 1, envuelve el programa viejo de las habilidades en `SimSteps.IDS`. El horneado del catálogo documenta la máscara y los eventos; todavía no es el programa numérico.
 
 ```bash
 godot --headless --path . --script res://tools/validate_abilities.gd -- data/abilities/catalog.example.json
