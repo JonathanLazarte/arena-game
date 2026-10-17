@@ -34,7 +34,7 @@ func _run() -> void:
 	cfg.set_value("loadout", "eikon_id", "dragon")
 	cfg.save(gs.save_path)
 	gs.load_loadout()
-	check(gs.weapon_id == "arco" and gs.eikon_id == "fenix", "valores inválidos se corrigen (arma %s, eikon %s)" % [gs.weapon_id, gs.eikon_id])
+	check(gs.weapon_id == gs.main_weapon_default("arquero") and gs.eikon_id == "fenix", "valores inválidos se corrigen (arma %s, eikon %s)" % [gs.weapon_id, gs.eikon_id])
 	# La partida usa el equipamiento
 	gs.set_character("berserker")
 	gs.weapon_id = "hacha_2m"

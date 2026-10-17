@@ -30,7 +30,7 @@ func _run() -> void:
 	check(gs.can_buy("character", "caballero") == "ya", "el propio ya está desbloqueado")
 	check(gs.character_id == "caballero" and gs.weapon_id == "espada_escudo", "comprar no cambia de personaje")
 	gs.switch_character("arquero")
-	check(gs.character_id == "arquero" and gs.weapon_id == "arco", "cambiar al nuevo: su arma por defecto")
+	check(gs.character_id == "arquero" and gs.weapon_id == gs.main_weapon_default("arquero"), "cambiar al nuevo: su arma principal por defecto (el arco va de secundaria)")
 	gs.switch_character("caballero")
 	check(gs.character_id == "caballero" and gs.weapon_id == "espada_escudo" and not gs.switch_character("paladin"), "volver conserva el equipo; no se cambia a uno bloqueado")
 	gs.save_loadout()

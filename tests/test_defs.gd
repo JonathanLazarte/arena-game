@@ -21,7 +21,7 @@ func _run() -> void:
 		check(l.has_all(["damage", "windup", "active", "recovery", "stamina"]), "%s: datos de ataque completos" % w.id)
 	for k: String in ["espada_larga", "espada_escudo", "hacha_2m", "dagas", "lanza", "arco"]:
 		check(ids.has(k), "existe el arma " + k)
-	check(not Catalog.weapon("espada_larga").allows_shield and Catalog.weapon("espada_escudo").allows_shield and Catalog.weapon("lanza").allows_shield, "escudo: espada y escudo / lanza sí, espada larga no")
+	check(not Catalog.weapon("espada_larga").allows_shield and Catalog.weapon("lanza").allows_shield, "escudo: lanza sí, espada larga no (el escudo de «espada y escudo» va en la mano izquierda)")
 	for c in cs:
 		check(c.display_name != "" and c.role != "" and c.description != "" and c.passive_name != "", "%s: nombre, rol, descripción y pasiva" % c.id)
 		check(c.allows(c.default_weapon) and ResourceLoader.exists(c.model_path) and ResourceLoader.exists(c.texture_path), "%s: arma por defecto compatible y modelo existe" % c.id)

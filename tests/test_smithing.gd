@@ -27,7 +27,7 @@ func _run() -> void:
 	var w5 := Smithing.effective(w, 5, "")
 	check(w5 != w and w.upgrade_level == 0 and w5.upgrade_level == 5, "la mejora no toca el recurso compartido")
 	check(is_equal_approx(w5.upgrade_dmg_mult, 1.3) and w5.scaling["fuerza"] > w.scaling["fuerza"], "+5: +30 % daño base y más escalado")
-	check(w5.display_name == "Espada y escudo +5", "nombre «+5» (%s)" % w5.display_name)
+	check(w5.display_name == w.display_name + " +5", "nombre «+5» (%s)" % w5.display_name)
 	var ar0: float = EquipStats.attack_rating(cab, w, at)["total"]
 	var ar5: float = EquipStats.attack_rating(cab, w5, at)["total"]
 	var ar10: float = EquipStats.attack_rating(cab, Smithing.effective(w, 10, ""), at)["total"]
@@ -65,7 +65,7 @@ func _run() -> void:
 	check(gs.buy_stone("piedra_2") == "nivel", "la Piedra II requiere nivel de cuenta")
 	check(gs.buy_stone("piedra_1") == "ok" and gs.material("piedra_1") == 1, "comprar Piedra I en la Tienda")
 	check(gs.infuse("espada_escudo", "sangrante") == "ok" and gs.weapon_infusion("espada_escudo") == "sangrante", "infusión Sangrante")
-	check(gs.eff_weapon("espada_escudo").display_name == "Espada y escudo sangrante +3", "nombre del arma infusionada (%s)" % gs.eff_weapon("espada_escudo").display_name)
+	check(gs.eff_weapon("espada_escudo").display_name == Catalog.weapon("espada_escudo").display_name + " sangrante +3", "nombre del arma infusionada (%s)" % gs.eff_weapon("espada_escudo").display_name)
 	check(gs.sheet()["resist"].size() > 0, "la ficha usa el arma mejorada")
 	# Recompensas
 	var m0: int = gs.material("piedra_1")

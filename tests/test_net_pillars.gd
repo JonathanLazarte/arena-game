@@ -1,5 +1,5 @@
 extends SceneTree
-## Fase 4: pilares de la arena en la sim (cuerpo y flechas), paridad con el Fighter real.
+## Fase 4: pilares de la arena en la sim (cuerpo y flechas), activados en la arena real.
 var fails := 0
 func check(c: bool, msg: String) -> void:
 	print(("PASS  " if c else "FAIL  ") + msg)
@@ -38,25 +38,11 @@ func _run() -> void:
 	for t in 30: e0.step(s0, FightSim.IN_ATK | FightSim.IN_LOCK, FightSim.IN_LOCK)
 	for t in 200: e0.step(s0, FightSim.IN_LOCK, FightSim.IN_LOCK)
 	check(s0[FightSim.F_FIELDS + FightSim.HP] < hp1, "control: sin pilares la misma flecha impacta")
-	# 3) paridad: Fighter real en la arena andando contra el pilar
+	# 3) en la arena real los pilares quedan activados en los params (fase 8: ya no hay Fighter offline que comparar)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var ar: Arena = current_scene as Arena
-	ar.controller.enabled = false
-	ar.controller.set_physics_process(false)
-	ar.time_left = 1.0e9
-	var f := ar.player
-	f.global_position = Vector3(20, 0.2, 0)
-	ar.enemy.global_position = Vector3(-30, 0.2, 0)
-	var off_min := 99.0
-	for t in 240:
-		f.move_input = Vector3(1, 0, 0)
-		await physics_frame
-		off_min = minf(off_min, Vector2(f.global_position.x - 23.8, f.global_position.z).length())
-	var bp := SimParams.bake(ar.player, ar.enemy)
-	check(int(bp[0]["pillars"]) == 1, "bake en la arena: pilares activados")
-	print("      distancia mínima al pilar: offline %.2f m, sim %.2f m" % [off_min, mind / 1.0e6])
-	check(absf(off_min - mind / 1.0e6) < 0.15, "paridad: el luchador se detiene a la misma distancia del pilar (±0,15 m)")
+	check(int(ar.sim_match.params[0]["pillars"]) == 1, "bake en la arena: pilares activados")
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)

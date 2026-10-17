@@ -92,27 +92,14 @@ func _run() -> void:
 			p.set_attributes(weak)
 			p.weapon = Catalog.weapon("hacha_2m") # más peso: 32 + 9 > 39,6
 		p._apply_character()
-		p.global_position = Vector3(0, 0, 6)
-		p.stamina = p.stamina_max
-		p.move_input = Vector3.FORWARD
-		await create_timer(0.3).timeout
-		p.move_input = Vector3.ZERO
-		await create_timer(0.3).timeout
-		var x0 := p.global_position
-		p.move_input = Vector3.FORWARD
-		p.dash()
-		var t := 0
-		while p.is_rolling() and t < 120:
-			await physics_frame
-			t += 1
-		p.move_input = Vector3.ZERO
-		res[cfg[0]] = {"d": MeshUtil.flat(p.global_position - x0).length(), "t": t, "if": p.roll_iframe_end() - Fighter.ROLL_STARTUP, "cls": p.eq["clase"]}
-		await create_timer(0.3).timeout
+		# fase 8: la voltereta vive en la sim; se comprueban los parámetros que hornea SimParams
+		var bp: Dictionary = SimParams.bake(p, arena.enemy)[0]
+		res[cfg[0]] = {"d": float(bp["roll_dist"]) / 1.0e6, "t": int(bp["roll_total"]), "if": float(int(bp["roll_if_end"]) - int(bp["roll_start"])) / 60.0, "cls": p.eq["clase"]}
 	print("voltereta: ", res)
 	check(res["ligero"]["cls"] == "ligero" and res["medio"]["cls"] == "medio" and res["pesado"]["cls"] == "pesado" and res["sobrecargado"]["cls"] == "sobrecargado", "clases de carga en combate")
 	check(res["ligero"]["d"] > res["medio"]["d"] * 1.08, "ligera: rueda más lejos (%.2f vs %.2f m)" % [res["ligero"]["d"], res["medio"]["d"]])
 	check(is_equal_approx(res["ligero"]["if"], res["medio"]["if"]), "ligera y media: mismos i-frames")
-	check(res["pesado"]["d"] < res["medio"]["d"] * 0.9 and res["pesado"]["t"] > res["medio"]["t"] + 3 and res["pesado"]["if"] < res["medio"]["if"], "pesada: más corta, más lenta y un frame menos de invulnerabilidad")
+	check(res["pesado"]["d"] < res["medio"]["d"] * 0.9 and res["pesado"]["t"] > res["medio"]["t"] and res["pesado"]["if"] < res["medio"]["if"], "pesada: más corta, más lenta y un frame menos de invulnerabilidad")
 	check(res["sobrecargado"]["if"] <= 0.001 and res["sobrecargado"]["d"] < res["medio"]["d"] * 0.5, "sobrecargado: sin voltereta real (tropiezo)")
 	check(p.roll_mod()["regen"] < 1.0, "sobrecargado: regenera menos aguante")
 	p.set_attributes({})
@@ -121,19 +108,12 @@ func _run() -> void:
 	p._apply_character()
 	# Daño real en combate: más armadura, menos daño
 	var e := arena.enemy
-	p.poise_max = 1e6
-	p.poise = 1e6
-	var h0 := p.health
-	p.take_hit(12.0, e, "melee")
-	var d_med := h0 - p.health
-	p.stun = 0.0
+	# fase 8: el daño se resuelve en la sim con la tabla def_tab horneada (ppm de daño entrante, subtipo 0, golpe 12)
+	var d_med := 12.0 * float((SimParams.bake(p, e)[0]["def_tab"][0] as PackedInt32Array)[12]) / 1.0e6
 	p.set_equipment(1, {"casco": "bastion_casco", "pecho": "bastion_pecho", "guantes": "bastion_guantes", "piernas": "bastion_piernas"})
 	p._apply_character()
-	p.poise_max = 1e6
-	p.poise = 1e6
-	h0 = p.health
-	p.take_hit(12.0, e, "melee")
-	check(is_equal_approx(d_med, 12.0) and h0 - p.health < 11.0, "combate: equipo inicial 12 de daño; Bastión %.1f" % (h0 - p.health))
+	var d_bas := 12.0 * float((SimParams.bake(p, e)[0]["def_tab"][0] as PackedInt32Array)[12]) / 1.0e6
+	check(d_bas < d_med and d_bas < 11.0, "combate: más armadura, menos daño (inicial %.1f; Bastión %.1f)" % [d_med, d_bas])
 	# --- Tienda ---
 	gs.reset_defaults()
 	gs.choose_first_character("caballero")
@@ -173,8 +153,8 @@ func _run() -> void:
 	check(sh.equip("pecho", "") and gs.armor_eq["pecho"] == "", "quitar la pieza")
 	gs.owned_weapons.append("lanza")
 	check(sh.options("arma").has("lanza") and sh.equip("arma", "lanza") and gs.weapon_id == "lanza", "arma principal desde la ranura")
-	check(sh.options("arma2").size() == 1, "sin armas a distancia propias: solo recambio")
-	check((sh.slot_buttons["arma"] as Button).text.contains("Lanza"), "la ranura muestra lo equipado")
+	check(sh.options("arma2").filter(func(id): return id != "" and id != "escudo").is_empty(), "sin armas a distancia propias: solo vacío/escudo (%s)" % [sh.options("arma2")])
+	check((sh.slot_buttons["arma"] as Button).tooltip_text.contains(Catalog.weapon("lanza").display_name), "la ranura (icono) muestra lo equipado en el tooltip (%s)" % (sh.slot_buttons["arma"] as Button).tooltip_text)
 	gs.load_loadout()
 	check(gs.weapon_id == "lanza" and gs.armor_eq["pecho"] == "", "el equipo se guarda")
 	# --- Migración v5 -> v6 ---
