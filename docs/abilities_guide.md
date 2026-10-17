@@ -1086,7 +1086,7 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
-Las 45 no se migraron (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. El protocolo sigue en 8.
+Las 45 no se migraron todas (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Cuatro del catálogo general (`data/abilities/catalog.json`: Tajo Retardado, Estocada Negra, Pisotón y Flecha Grave) las puede ejecutar `SimSteps` si `ab_engine` es 1; por defecto sigue el camino viejo. El protocolo es 9 porque ese flag entra en los params.
 
 Adaptaciones de estas cuatro respecto del esquema:
 
