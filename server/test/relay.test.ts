@@ -30,12 +30,12 @@ test("create, join, relay, leave", async () => {
   const port = await srv.start();
   const a = client(), b = client();
   await a.bind(); await b.bind();
-  a.send(port, "C", { v: 9 });
+  a.send(port, "C", { v: 10 });
   const w = await a.next();
   assert.equal(String.fromCharCode(w[0]), "W");
   const code = body(w).code as string;
   assert.match(code, /^[A-Z2-9]{5}$/);
-  b.send(port, "J", { v: 9, code: code.toLowerCase() });
+  b.send(port, "J", { v: 10, code: code.toLowerCase() });
   const ma = await a.next(), mb = await b.next();
   assert.equal(String.fromCharCode(ma[0]), "M");
   assert.equal(body(ma).slot, 0); assert.equal(body(mb).slot, 1);
@@ -56,15 +56,15 @@ test("errors: unknown code, full room, taken code; requested code", async () => 
   const port = await srv.start();
   const a = client(), b = client(), c = client();
   await a.bind(); await b.bind(); await c.bind();
-  c.send(port, "J", { v: 9, code: "NOPE1" });
+  c.send(port, "J", { v: 10, code: "NOPE1" });
   assert.equal(body(await c.next()).err, "no_room");
-  a.send(port, "C", { v: 9, code: "test42" });
+  a.send(port, "C", { v: 10, code: "test42" });
   assert.equal(body(await a.next()).code, "TEST42");
-  c.send(port, "C", { v: 9, code: "TEST42" });
+  c.send(port, "C", { v: 10, code: "TEST42" });
   assert.equal(body(await c.next()).err, "code_taken");
-  b.send(port, "J", { v: 9, code: "TEST42" });
+  b.send(port, "J", { v: 10, code: "TEST42" });
   await a.next(); await b.next();
-  c.send(port, "J", { v: 9, code: "TEST42" });
+  c.send(port, "J", { v: 10, code: "TEST42" });
   assert.equal(body(await c.next()).err, "room_full");
   a.close(); b.close(); c.close(); await srv.stop();
 });
@@ -73,7 +73,7 @@ test("rooms expire without traffic", async () => {
   const srv = new RelayServer({ port: 0, host: "127.0.0.1", roomTtlMs: 50 });
   const port = await srv.start();
   const a = client(); await a.bind();
-  a.send(port, "C", { v: 9 }); await a.next();
+  a.send(port, "C", { v: 10 }); await a.next();
   assert.equal(srv.rooms.size, 1);
   srv.sweep(Date.now() + 1000);
   assert.equal(srv.rooms.size, 0);
@@ -81,12 +81,12 @@ test("rooms expire without traffic", async () => {
 });
 
 test("version check rejects other protocols", async () => {
-  const srv = new RelayServer({ port: 0, host: "127.0.0.1", proto: 9 });
+  const srv = new RelayServer({ port: 0, host: "127.0.0.1", proto: 10 });
   const port = await srv.start();
   const a = client(); await a.bind();
   a.send(port, "C", { v: 3 });
   const e = await a.next();
-  assert.equal(String.fromCharCode(e[0]), "E"); assert.equal(body(e).err, "version"); assert.equal(body(e).need, 9);
+  assert.equal(String.fromCharCode(e[0]), "E"); assert.equal(body(e).err, "version"); assert.equal(body(e).need, 10);
   a.send(port, "Q"); assert.equal(body(await a.next()).err, "version");
   assert.equal(srv.stats.version_rejects, 2);
   a.close(); await srv.stop();
@@ -99,10 +99,10 @@ test("quick match pairs two queued players in the region; ping reports region", 
   a.send(port, "P", { t: 123 });
   const p = await a.next();
   assert.equal(String.fromCharCode(p[0]), "p"); assert.equal(body(p).t, 123); assert.equal(body(p).region, "sa-east");
-  a.send(port, "Q", { v: 9 });
+  a.send(port, "Q", { v: 10 });
   const q = await a.next(); assert.equal(String.fromCharCode(q[0]), "q"); assert.equal(body(q).pos, 0);
   assert.equal(srv.queue.length, 1);
-  b.send(port, "Q", { v: 9 });
+  b.send(port, "Q", { v: 10 });
   const ma = body(await a.next()), mb = body(await b.next());
   assert.equal(ma.slot, 0); assert.equal(mb.slot, 1); assert.equal(ma.code, mb.code); assert.equal(ma.region, "sa-east");
   assert.ok(ma.token.length >= 16 && ma.token !== mb.token);
@@ -115,9 +115,9 @@ test("queue entries expire; X leaves the queue", async () => {
   const srv = new RelayServer({ port: 0, host: "127.0.0.1", queueTtlMs: 50 });
   const port = await srv.start();
   const a = client(); await a.bind();
-  a.send(port, "Q", { v: 9 }); await a.next();
+  a.send(port, "Q", { v: 10 }); await a.next();
   srv.sweep(Date.now() + 1000); assert.equal(srv.queue.length, 0);
-  a.send(port, "Q", { v: 9 }); await a.next();
+  a.send(port, "Q", { v: 10 }); await a.next();
   a.send(port, "X"); await new Promise((r) => setTimeout(r, 50)); assert.equal(srv.queue.length, 0);
   a.close(); await srv.stop();
 });
@@ -127,8 +127,8 @@ test("reconnect with session token from a new address; bad token rejected", asyn
   const port = await srv.start();
   const a = client(), b = client(), b2 = client(), z = client();
   await a.bind(); await b.bind(); await b2.bind(); await z.bind();
-  a.send(port, "C", { v: 9 }); const code = body(await a.next()).code;
-  b.send(port, "J", { v: 9, code }); await a.next(); const tb = body(await b.next()).token;
+  a.send(port, "C", { v: 10 }); const code = body(await a.next()).code;
+  b.send(port, "J", { v: 10, code }); await a.next(); const tb = body(await b.next()).token;
   z.send(port, "B", { code, token: "deadbeefdeadbeef" }); assert.equal(body(await z.next()).err, "bad_token");
   b2.send(port, "B", { code, token: tb });
   const re = body(await b2.next()); assert.equal(re.re, 1); assert.equal(re.slot, 1);
@@ -144,8 +144,8 @@ test("abandon past the grace window: the remaining player gets F (forfeit)", asy
   const srv = new RelayServer({ port: 0, host: "127.0.0.1", graceMs: 1000 });
   const port = await srv.start();
   const a = client(), b = client(); await a.bind(); await b.bind();
-  a.send(port, "C", { v: 9 }); const code = body(await a.next()).code;
-  b.send(port, "J", { v: 9, code }); await a.next(); await b.next();
+  a.send(port, "C", { v: 10 }); const code = body(await a.next()).code;
+  b.send(port, "J", { v: 10, code }); await a.next(); await b.next();
   const r = srv.rooms.get(code)!; r.members[1].seen -= 5000; // guest silent
   srv.sweep();
   const f = await a.next(); assert.equal(String.fromCharCode(f[0]), "F"); assert.equal(body(f).slot, 1);
@@ -158,8 +158,8 @@ test("hardening: size cap, rate limit, ban, bad json, room cap", async () => {
   const port = await srv.start();
   const a = client(), b = client(), c = client(); await a.bind(); await b.bind(); await c.bind();
   a.send(port, "C", Buffer.from("{nope")); assert.equal(body(await a.next()).err, "bad_request");
-  a.send(port, "C", { v: 9 }); await a.next();
-  c.send(port, "C", { v: 9 }); assert.equal(body(await c.next()).err, "busy");
+  a.send(port, "C", { v: 10 }); await a.next();
+  c.send(port, "C", { v: 10 }); assert.equal(body(await c.next()).err, "busy");
   a.send(port, "R", Buffer.alloc(500)); await new Promise((r) => setTimeout(r, 30));
   assert.equal(srv.stats.dropped_size, 1);
   for (let i = 0; i < 12; i++) b.send(port, "P", { t: i });

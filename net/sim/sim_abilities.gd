@@ -547,6 +547,36 @@ static func variation(s: PackedInt64Array, P: Array, i: int) -> bool:
 	s[o + FightSim.AB_FL] |= FL_QUEUED | FL_VARIANT
 	return true
 
+## La ventana del remate alternativo (bit 21). La vista solo lee esto.
+static func alt_window(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	if s[o + FightSim.AB_SLOT] < 0:
+		return false
+	var ab := _ab(s, P, i)
+	if int(ab.get("type", -1)) == T_CATALOG:
+		return SimCatalog.alt_window(s, P, i)
+	if int(ab.get("type", -1)) == T_STEPS and int(ab.get("graph", 0)) != 0:
+		return SimSteps.alt_window(s, P, i)
+	if kind_of(ab) != T_COMBO:
+		return false
+	var hits: Array = ab.get("hits", [])
+	if hits.is_empty():
+		return false
+	var fl: int = s[o + FightSim.AB_FL]
+	if (fl & (FL_QUEUED | FL_VARIANT | FL_FINISHER)) != 0:
+		return false
+	return s[o + FightSim.AB_FIRED] == hits.size() - 1
+
+static func alt_label(s: PackedInt64Array, P: Array, i: int) -> String:
+	if not alt_window(s, P, i):
+		return ""
+	var ab := _ab(s, P, i)
+	if int(ab.get("type", -1)) == T_CATALOG:
+		return SimCatalog.alt_label(s, P, i)
+	if kind_of(ab) == T_COMBO:
+		return "Estocada"
+	return ""
+
 static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 	var o := i * FightSim.F_FIELDS
 	var ab: Dictionary = P[i]["boss"][slot]

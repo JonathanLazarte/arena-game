@@ -22,6 +22,7 @@ const IDS: Array[String] = [
 	"aliento_dragon", "aliento_rayo", "aliento_escarcha", "chorro_lava",
 	"saeta_oscura", "orbe_lunar",
 	"furia_fase", "grito_guerra", "postura_contra", "guardia_reflejo",
+	"estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso", "salto_caida",
 ]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1
@@ -281,6 +282,22 @@ static func resist_now(s: PackedInt64Array, P: Array, i: int) -> int:
 	if ts >= int(ab["arm0"]) and ts < int(ab["arm1"]):
 		return int(ab.get("resist", 0))
 	return 0
+
+## Ventana de la opción alt, sin escribir el estado.
+static func alt_window(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var ab := SimAbilities._ab(s, P, i)
+	if int(ab.get("graph", 0)) == 0:
+		return false
+	var step := _gstep(ab, s[o + FightSim.AB_FIRED])
+	var br: Variant = step.get("branch", null)
+	if not (br is Dictionary):
+		return false
+	if (s[o + FightSim.AB_FL] & SimAbilities.FL_READY) != 0:
+		return false
+	var t := s[o + FightSim.AB_T] - 1
+	var b: Dictionary = br
+	return t >= int(b["from"]) - int(b.get("buffer", 0)) and t < int(b["to"])
 
 static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 	var o := i * FightSim.F_FIELDS

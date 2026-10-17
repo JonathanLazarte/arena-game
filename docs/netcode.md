@@ -233,9 +233,10 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 - **Efectos de habilidades** (`SimAbilityFx`, desde `SimWorld`): brillo del arma por habilidad (blanco en el parpadeo del tajo retardado), aura de partículas y filo incandescente en la estocada, burbuja del escudo de maná, desaparición/estallidos del paso espectral, rastro de espada en cada golpe de timeline, cono y chispas del aliento, aura roja de la furia, estallido del contragolpe, marcas de suelo con anillo + relleno que crece + borde + destello que se desvanece (oculta en el salto con caída, tinte por habilidad en las lluvias, columna de luz en la lanza celeste), ondas con línea de aviso y cresta, y proyectiles: media luna dorada (kind 1), orbe con estela (hechizo, kind 2; eikon, kind 3, color del eikon). Solo lee el estado (`test_ability_fx` comprueba que no lo modifica).
 - Protocolo 8 en `net_link.gd`, relay (`index.ts`, `relay.ts`, tests, `DEPLOY.md`, docker-compose).
 
-## 18. Etapa 1 del motor de pasos (protocolo 9)
+## 18. Motor de pasos (protocolo 10)
 - Los params horneados llevan `ab_engine` (0 o 1). Entra en `params_checksum`. Por defecto es 0 y las 45 habilidades siguen en `SimAbilities`.
-- Con `ab_engine = 1`, `SimSteps` envuelve el programa viejo de las habilidades en `SimSteps.IDS` (líneas de tiempo, ondas, lluvias, alientos, ráfagas, furias y contragolpes). El estado usa los mismos campos `AB_*`; no cambia el layout ni los bits de entrada. En reposo los checksums coinciden con el camino viejo. Si `interruptible_by` no nombra el aturdimiento, ese golpe no corta el casteo: ahí el checksum difiere a propósito.
+- Con `ab_engine = 1`, `SimSteps` envuelve el programa viejo de las 45 habilidades (`SimSteps.IDS`). El estado usa los mismos campos `AB_*`; no cambia el layout. En reposo los checksums coinciden con el camino viejo. Si `interruptible_by` no nombra el aturdimiento, ese golpe no corta el casteo: ahí el checksum difiere a propósito.
+- El bit 21 (`IN_BOSS_VAR`) es el `alt` de la ventana que calcula la sim (`SimAbilities.alt_window`). El protocolo 10 marca ese significado. `SimView` vuelca la ventana y la etiqueta; el HUD no decide por id.
 - La recarga del motor es la global de 85 ticks (el `cooldown` propio no se usa). El costo de vida se rechaza si el golpe dejaría 0.
 - Los eventos de paso salen de `SimEvents` con clave `frame:ab_ev:<jugador>:<code>:<paso>:<id>` y `SimFx` no los duplica tras un rollback.
 - Protocolo 9: un cliente de la fase 9 (protocolo 8) no entra al relay.

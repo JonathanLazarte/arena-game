@@ -147,6 +147,7 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 	var br1 := -1
 	var brbuf := 0
 	var brd := -1
+	var blab := ""
 	if br is Dictionary:
 		br0 = int(br.get("from", -1))
 		br1 = int(br.get("to", -1))
@@ -157,6 +158,7 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 				continue
 			if int((op as Dictionary).get("input", 0)) == 1:
 				bra = int((op as Dictionary).get("step", -1))
+				blab = String((op as Dictionary).get("label", ""))
 			elif int((op as Dictionary).get("input", 0)) == 0:
 				brs = int((op as Dictionary).get("step", -1))
 	var nxt := -1
@@ -203,7 +205,7 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 		"inv1": int(inv.get("to", -1)) if inv is Dictionary else -1,
 		"invpm": int(inv.get("dmg_taken_pm", 1000)) if inv is Dictionary else 1000,
 		"nxt": nxt,
-		"br0": br0, "br1": br1, "brbuf": brbuf, "brs": brs, "bra": bra, "brd": brd,
+		"br0": br0, "br1": br1, "brbuf": brbuf, "brs": brs, "bra": bra, "brd": brd, "blab": blab,
 		"spawn": 0 if spawn.is_empty() else 1,
 		"spat": int(spawn.get("at", -1)),
 		"spr": int(sp_shape.get("r", 0)),
@@ -292,6 +294,22 @@ static func cancel_zones(s: PackedInt64Array, owner: int) -> void:
 			continue
 		if s[q + FightSim.HZ_TYPE] == 1 and s[q + FightSim.HZ_DONE] == 0:
 			s[q + FightSim.HZ_ON] = 0
+
+static func alt_window(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	if not _alive(s, o):
+		return false
+	var step := _step_of(s, P, i)
+	if step.is_empty() or int(step.get("br0", -1)) < 0 or String(step.get("blab", "")) == "":
+		return false
+	var t := _t(s, o)
+	return t >= int(step["br0"]) - int(step.get("brbuf", 0)) and t < int(step["br1"])
+
+static func alt_label(s: PackedInt64Array, P: Array, i: int) -> String:
+	var o := i * FightSim.F_FIELDS
+	if not _alive(s, o):
+		return ""
+	return String(_step_of(s, P, i).get("blab", ""))
 
 static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 	var o := i * FightSim.F_FIELDS

@@ -1065,12 +1065,11 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 7. **Imbloqueable = sin parry** (golpe tipo 3). Se mantiene.
 8. **Cuándo se puede usar:** `SimAbilities.can_use` (suelo, sin montar, sin frasco, sin agotamiento, espada salvo el escudo). Se mantiene.
 9. **Ondas:** `knockback_mps` por defecto 6.
-10. **Remate alternativo / bit `alt`**: existe `IN_BOSS_VAR` (bit 21, acción `boss_variation`, tecla `M`, botón táctil
-   «Estocada»), pero **solo** lo entiende `combo_falso`, y la visibilidad del botón la calcula `hud.gd` a partir de
-   `ab_id`/`ab_fired` del `Fighter` (que vuelca SimView). **No existe** un `branch` genérico ni un bit `alt` genérico
-   en el empaquetado de entradas. Propuesta: reutilizar el bit 21 como `alt` (el único libre es el 31, que el paquete
-   `PackedInt32Array` no usa), así que `alt2` hoy no tiene bit. Cambiar la semántica de los bits implica subir el
-   protocolo (ver `docs/HANDOFF.md` §3).
+10. **Remate alternativo.** El bit 21 (`IN_BOSS_VAR`, acción `boss_variation`, tecla `M`) es el `alt` de la
+    ventana abierta: la pausa falsa (remate en estocada), una rama de Hoja y, si el motor de pasos trae `branch`,
+    esa rama. `alt2` no tiene bit (el 31 no se envía). El protocolo es 10 por ese significado. El botón del HUD
+    se muestra solo mientras `SimAbilities.alt_window` es verdad; `SimView` vuelca ese flag y la etiqueta
+    (`Estocada`, o el `label` de la opción). La vista no decide la ventana.
 11. **Desfases de la tabla de las 6 base** (`docs/design.md`): la tabla dice Ráfaga 30 maná / 3 tajos y el código
     10 maná / 1 tajo por pulsación; la tabla dice Carga en área 1,8 s / 4,5 m y el código 2,2 s / 7,5 m. Manda el código.
 12. **IA**: decide en float con lógica específica por id; no hay bloque `ai` en los datos.
@@ -1078,7 +1077,7 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
-Las 45 están en `data/abilities/catalog.json` y siguen definidas en `BossAbilities` (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las de `SimSteps.IDS` (líneas de tiempo, ondas, lluvias, alientos, ráfagas, furias y contragolpes) las envuelve `SimSteps` si `ab_engine` es 1: el programa numérico es el viejo y el catálogo aporta `interruptible_by` y los eventos. Por defecto el flag es 0. El protocolo es 9 porque ese flag entra en los params.
+Las 45 están en `data/abilities/catalog.json` y siguen definidas en `BossAbilities` (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las 45 de `SimSteps.IDS` las envuelve `SimSteps` si `ab_engine` es 1: el programa numérico es el viejo y el catálogo aporta `interruptible_by` y los eventos. Por defecto el flag es 0. El protocolo es 10: el 9 metió `ab_engine` en los params y el 10 generaliza el bit 21 como `alt`.
 
 Adaptaciones respecto del esquema:
 

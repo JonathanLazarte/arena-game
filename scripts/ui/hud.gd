@@ -457,8 +457,11 @@ func _update_contextual_buttons() -> void:
 	(btns["left_hand"] as TouchScreenButton).visible = tv and not _player.mounted
 	(btns["swap_weapon"] as TouchScreenButton).visible = tv and _player.secondary != null
 	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
-	var combo_hits: Array = BossAbilities.def("combo_falso").get("hits", [])
-	(btns["boss_variation"] as TouchScreenButton).visible = tv and not _player.mounted and _player.ab_id == "combo_falso" and _player.ab_fired == combo_hits.size() - 1
+	var alt := btns["boss_variation"] as TouchScreenButton
+	alt.visible = tv and not _player.mounted and _player.ab_alt_open
+	var alt_lab := _player.ab_alt_label if _player.ab_alt_label != "" else "Estocada"
+	if alt.visible and _changed(btn_labels["boss_variation"], alt_lab):
+		(btn_labels["boss_variation"] as Label).text = alt_lab
 	if boss_next_btn:
 		boss_next_btn.visible = not _player.mounted and _player.avail_boss_ids().size() > 1
 	# Ronda 31: sin recarga; habilidad seleccionada y su coste

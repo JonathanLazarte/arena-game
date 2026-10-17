@@ -110,6 +110,16 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.ab_locked = (s[o + S.AB_FL] & SimAbilities.FL_LOCKED) != 0
 	var abk: int = s[o + S.AB_SLOT]
 	f.ab_id = String(f.boss_ids[abk]) if abk >= 0 and abk < f.boss_ids.size() else ""
+	f.ab_fired = s[o + S.AB_FIRED]
+	var abfl: int = s[o + S.AB_FL]
+	f.ab_combo_finisher = (abfl & SimAbilities.FL_FINISHER) != 0
+	f.ab_combo_variant = (abfl & SimAbilities.FL_VARIANT) != 0
+	f.ab_alt_open = false
+	f.ab_alt_label = ""
+	if not params.is_empty() and abk >= 0:
+		var pi := o / S.F_FIELDS
+		f.ab_alt_open = SimAbilities.alt_window(s, params, pi)
+		f.ab_alt_label = SimAbilities.alt_label(s, params, pi)
 	f.stance_broken_t = s[o + S.STANCE_BROKEN_T] / hz
 	f.guard_counter_t = s[o + S.GC_T] / hz
 	f.invuln = s[o + S.INVULN] / hz

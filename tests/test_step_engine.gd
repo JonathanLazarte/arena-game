@@ -37,7 +37,7 @@ func _inputs(t: int, kind: String) -> Array:
 		ia |= FightSim.IN_BOSS
 	if kind == "both" and t == 10:
 		ib |= FightSim.IN_BOSS
-	if kind == "chain" and t == 140:
+	if kind == "chain" and t == 130:
 		ia |= FightSim.IN_BOSS
 	if kind == "punish" and t >= 50 and t < 56:
 		ib |= FightSim.IN_ATK
@@ -119,7 +119,7 @@ func _run() -> void:
 			_same(p0, p1, 2200000, 180, "punish", "%s castiga" % id)
 			var pun: Dictionary = _roll(p0, 2200000, 180, "punish")
 			check(int(pun["s"][FightSim.AB_HITS]) >= 1, "%s: el castigo conecta (%d)" % [id, int(pun["s"][FightSim.AB_HITS])])
-		if id in ["saeta_oscura", "orbe_lunar"]:
+		if id in ["saeta_oscura", "orbe_lunar", "rafaga"]:
 			_same(p0, p1, 8000000, 220, "chain", "%s encadenada" % id)
 			var chained: Dictionary = _roll(p0, 8000000, 220, "chain")
 			check(int(chained["s"][FightSim.AB_STARTS]) >= 2, "%s: la segunda sale durante la recarga (%d)" % [id, int(chained["s"][FightSim.AB_STARTS])])
@@ -176,11 +176,42 @@ func _run() -> void:
 			dup = true
 	check(not dup and fx.cancelled == 0, "rollback: sin eventos duplicados ni cancelados de más (cancelados %d)" % fx.cancelled)
 	check(FightSim.checksum(rs) == int((played["sums"] as Array)[159]), "la re-simulación cae en el mismo estado")
+	await _combo_alt()
 	await _interrupts()
 	await _graph()
 	SimParams.ab_engine = 0
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
+
+func _combo_alt() -> void:
+	var off: Array = await _bake(["combo_falso"], ["estocada"], 0)
+	var on: Array = await _bake(["combo_falso"], ["estocada"], 1)
+	var n: int = (off[0]["boss"][0]["hits"] as Array).size()
+	var ea := FightEngine.new(off, 7, true)
+	var eb := FightEngine.new(on, 7, true)
+	var sa := ea.initial()
+	var sb := eb.initial()
+	sa[FightSim.AB_SLOT] = 0
+	sb[FightSim.AB_SLOT] = 0
+	sa[FightSim.AB_FIRED] = n - 1
+	sb[FightSim.AB_FIRED] = n - 1
+	sa[FightSim.AB_FL] = SimAbilities.FL_READY
+	sb[FightSim.AB_FL] = SimAbilities.FL_READY
+	sa[FightSim.AB_T] = 1
+	sb[FightSim.AB_T] = 1
+	check(SimAbilities.alt_window(sa, off, 0) and SimAbilities.alt_label(sa, off, 0) == "Estocada", "la pausa falsa abre la ventana de estocada")
+	check(SimAbilities.variation(sa, off, 0) and SimAbilities.variation(sb, on, 0), "el bit alt elige el remate en los dos caminos")
+	check(not SimAbilities.alt_window(sa, off, 0), "elegido el remate, la ventana se cierra")
+	var same := true
+	for _t in 40:
+		ea.step(sa, FightSim.IN_LOCK, FightSim.IN_LOCK)
+		eb.step(sb, FightSim.IN_LOCK, FightSim.IN_LOCK)
+		if FightSim.checksum(sa) != FightSim.checksum(sb):
+			same = false
+			check(false, "remate alternativo: difiere (%s)" % _first_diff(sa, sb))
+			break
+	if same:
+		check(true, "remate alternativo: 40 ticks idénticos")
 
 func _interrupts() -> void:
 	var viejo: Array = await _bake(["tajo_retardado"], ["estocada"], 0)

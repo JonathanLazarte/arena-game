@@ -1200,7 +1200,9 @@ var ab_hop: float = 0.0 ## altura visual del salto con caída
 var ab_lock_pos: Vector3 = Vector3.ZERO
 var ab_locked: bool = false
 var ab_from: Vector3 = Vector3.ZERO
-var ab_fired: int = 0 ## tajos lanzados / golpes dados
+var ab_fired: int = 0 ## tajos lanzados / golpes dados (lo escribe SimView)
+var ab_alt_open: bool = false ## ventana del remate alternativo, según la sim
+var ab_alt_label: String = ""
 var ab_marker: Node3D
 var ab_aoe: Node3D
 var ab_bubble: MeshInstance3D
