@@ -193,6 +193,7 @@ func sample_device(i: int) -> int:
 	var v := SimView.pack_input(world_move(i, mv), mv.length() < 0.6 and mv.length() > 0.2, atk, block, parry, roll, sprint, swap, _lock[i])
 	if i == local_slot:
 		v |= extra_buttons()
+		v |= aim_input(i)
 		var held := v
 		# toque que empezó y acabó entre dos ticks: sin bit mantenido, pulso de un tick
 		for a: String in _tap_seen:
@@ -202,6 +203,45 @@ func sample_device(i: int) -> int:
 		_tap_seen.clear()
 		v |= _take_pulse()
 	return v
+
+## Fase 9: apuntado del arco con el ratón (PC). Con el arco en la mano y sin controles táctiles,
+## el rumbo hacia el punto del suelo bajo el cursor (o el frente de la cámara si el ratón está
+## capturado) viaja en la entrada (FightSim.aim_bits) y la sim lo usa: igual offline y online.
+static var mouse_aim := true
+## Pruebas: fuerza un punto de mira en el mundo (sin ratón real).
+var aim_world_override: Variant = null
+
+func aim_input(i: int) -> int:
+	if not mouse_aim or i != local_slot or state.size() == 0 or fighters.size() < 2:
+		return 0
+	if state[i * FightSim.F_FIELDS + FightSim.LOADOUT] != FightSim.Load.BOW:
+		return 0
+	var f := fighters[i]
+	var target: Vector3
+	if aim_world_override != null:
+		target = aim_world_override
+	else:
+		if (joystick and joystick.visible) or camera == null or not camera.is_inside_tree():
+			return 0
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			target = f.global_position + MeshUtil.flat(-camera.global_transform.basis.z) * 10.0
+		else:
+			var vp := camera.get_viewport()
+			var mp := vp.get_mouse_position()
+			if not Rect2(Vector2.ZERO, vp.get_visible_rect().size).has_point(mp):
+				return 0
+			var from := camera.project_ray_origin(mp)
+			var dir := camera.project_ray_normal(mp)
+			if absf(dir.y) < 0.001:
+				return 0
+			var t := (1.0 - from.y) / dir.y # plano a la altura del pecho
+			if t <= 0.0:
+				return 0
+			target = from + dir * t
+	var d := MeshUtil.flat(target - f.global_position)
+	if d.length() < 0.6:
+		return 0
+	return FightSim.aim_bits(FxMath.dir_of(SimParams.um(d.x), SimParams.um(d.z)))
 
 ## Fase 4: botones de jefe, magia, eikon y montura (la sim detecta el flanco de pulsación).
 const EXTRA_ACTIONS := {"boss": FightSim.IN_BOSS, "boss_next": FightSim.IN_BOSS_NEXT, "spell": FightSim.IN_SPELL,

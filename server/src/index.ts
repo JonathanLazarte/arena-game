@@ -7,7 +7,7 @@ const port = num(env.PORT ?? process.argv[2], 47800);
 const host = env.HOST ?? "0.0.0.0";
 const srv = new RelayServer({
   port, host, log: (s) => console.log(new Date().toISOString(), s),
-  region: env.REGION ?? "local", proto: num(env.GAME_PROTO, 7), graceMs: num(env.GRACE_MS, 20_000),
+  region: env.REGION ?? "local", proto: num(env.GAME_PROTO, 8), graceMs: num(env.GRACE_MS, 20_000),
   maxPacket: num(env.MAX_PACKET, 1200), maxRooms: num(env.MAX_ROOMS, 5000),
   relayRate: num(env.RELAY_RATE, 200), ctlRate: num(env.CTL_RATE, 10),
 });

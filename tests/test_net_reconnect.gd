@@ -47,7 +47,7 @@ func _same(ms: Array[NetMatch], from: int) -> Array[int]:
 
 func _run() -> void:
 	rng.seed = 9
-	check(NetMatch.PROTO == 7 and NetLink.GAME_PROTO == 7, "protocolo 7 (relay rechaza versiones distintas)")
+	check(NetMatch.PROTO == 8 and NetLink.GAME_PROTO == 8, "protocolo 8 (relay rechaza versiones distintas)")
 	var ms := _pair(47661)
 	_play(ms, 3000)
 	check(ms[0].phase == NetMatch.Ph.PLAY and ms[1].phase == NetMatch.Ph.PLAY, "partida en curso")

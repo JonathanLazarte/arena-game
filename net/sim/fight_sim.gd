@@ -25,6 +25,17 @@ const IN_ART := 1 << 20        # arte del arma (botón «Habilidad» sin habilid
 const IN_BOSS_VAR := 1 << 21   # variante: remate en estocada del combo de la pausa falsa
 const IN_JUMP := 1 << 22       # salto (fase 7)
 const IN_FLASK := 1 << 23      # frasco de curación (fase 8)
+# fase 9 (protocolo 8): apuntado del arco con el ratón. Bits 24-29 = rumbo de apuntado en 64 pasos
+# (×4 = rumbo 0..255 de la sim), bit 30 = hay apuntado. El bit 31 no se usa (el paquete es int32).
+const AIM_SHIFT := 24
+const AIM_MASK := 63
+const IN_AIM := 1 << 30
+
+static func aim_bits(heading256: int) -> int:
+	return IN_AIM | ((((heading256 + 2) >> 2) & AIM_MASK) << AIM_SHIFT)
+
+static func aim_heading(inp: int) -> int:
+	return (((inp >> AIM_SHIFT) & AIM_MASK) * 4) & 255
 
 static func make_input(dir32: int, move: bool, buttons: int) -> int:
 	return (dir32 & IN_DIR_MASK) | (IN_MOVE if move else 0) | buttons
@@ -1176,6 +1187,9 @@ static func _release(s: PackedInt64Array, P: Array, i: int, charged: bool) -> vo
 	var o := i * F_FIELDS
 	var b := _opp(i)
 	var p: Dictionary = P[i]
+	var aimed := (s[o + PREV_IN] & IN_AIM) != 0
+	if aimed:
+		s[o + FACE] = aim_heading(s[o + PREV_IN]) # la flecha sale hacia el punto de mira
 	var f: int = s[o + FACE]
 	var ox: int = s[o + X] + FxMath.COS[f] * 1400000 / FxMath.ONE
 	var oz: int = s[o + Z] + FxMath.SIN[f] * 1400000 / FxMath.ONE
@@ -1189,7 +1203,8 @@ static func _release(s: PackedInt64Array, P: Array, i: int, charged: bool) -> vo
 	var tz: int = s[b + Z] - oz
 	var ty := HIT_CENTER_Y - ARROW_Y0
 	var hl := FxMath.length(tx, tz)
-	if s[b + ALIVE] != 0 and (hl == 0 or (tx * FxMath.COS[f] + tz * FxMath.SIN[f]) > -819 * hl):
+	# apuntado de ratón: solo corrige hacia el rival si la mira está a menos de ~14° de él
+	if s[b + ALIVE] != 0 and (hl == 0 or (tx * FxMath.COS[f] + tz * FxMath.SIN[f]) > (3974 if aimed else -819) * hl):
 		var l3 := FxMath.isqrt(tx * tx + tz * tz + ty * ty)
 		var lead: int = p.get("aim_lead_pm", 0)
 		if lead > 0 and spd > 0:
@@ -1392,6 +1407,9 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var tvx := 0
 	var tvz := 0
 	var locked := (inp & IN_LOCK) != 0 and s[b + ALIVE] != 0
+	# fase 9: con el arco tensado (o al pulsar) y apuntado de ratón, se encara al punto de mira y se
+	# desplaza como fijado (strafe), en lugar de hacia el rival o la dirección de marcha
+	var aim_on := (inp & IN_AIM) != 0 and s[o + LOADOUT] == Load.BOW and s[o + ALIVE] != 0 and (s[o + SHOT_STATE] == Shot.DRAW or (inp & IN_ATK) != 0)
 	var turning_locked: bool = s[o + ATK_STATE] == Atk.ACTIVE or s[o + ATK_STATE] == Atk.RECOVERY or (s[o + AIR] != 0 and s[o + MOUNTED] == 0)
 	var turn: int = 0 if turning_locked else p["turn"]
 	var sprint_req: bool = (inp & IN_SPRINT) != 0 and amount_pm > 300 and s[o + EXH] <= 0 and not wb and s[o + ST] > 0 and s[o + SHOT_STATE] == Shot.NONE
@@ -1401,8 +1419,8 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		turn = 0 if turning_locked else p.get("m_turn", turn)
 	if s[o + RAGE_T] > 0:
 		spd = spd * 1150 / 1000
-	if locked:
-		s[o + FACE] = FxMath.turn_toward(s[o + FACE], _dir_to_opp(s, i), turn * 18 / 10)
+	if locked or aim_on:
+		s[o + FACE] = FxMath.turn_toward(s[o + FACE], aim_heading(inp) if aim_on else _dir_to_opp(s, i), turn * 18 / 10)
 		if amount_pm > 0:
 			var fdot: int = (FxMath.COS[mdir] * FxMath.COS[s[o + FACE]] + FxMath.SIN[mdir] * FxMath.SIN[s[o + FACE]]) / FxMath.ONE # ×4096
 			var k: int

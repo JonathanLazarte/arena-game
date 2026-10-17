@@ -95,6 +95,7 @@ func save_settings() -> void:
 	cfg.set_value("control", "cam_sens", CameraRig.sensitivity) # ronda 25
 	cfg.set_value("control", "cam_invert", CameraRig.invert_y)
 	cfg.set_value("control", "cam_capture", CameraRig.capture_mouse)
+	cfg.set_value("control", "mouse_aim", SimMatch.mouse_aim)
 	cfg.save(settings_path)
 
 ## Ronda 23: ventana del búfer de entrada (Ajustes → Controles).
@@ -111,6 +112,7 @@ func load_settings() -> void:
 		CameraRig.sensitivity = clampf(float(cfg.get_value("control", "cam_sens", 1.0)), 0.2, 3.0)
 		CameraRig.invert_y = bool(cfg.get_value("control", "cam_invert", false))
 		CameraRig.capture_mouse = bool(cfg.get_value("control", "cam_capture", false))
+		SimMatch.mouse_aim = bool(cfg.get_value("control", "mouse_aim", true))
 		PlayerController.buffer_window = clampf(float(cfg.get_value("control", "buffer", PlayerController.BUFFER_WINDOW)), 0.1, 1.5)
 	for b: String in BUSES:
 		set_volume(b, volumes[b], false)

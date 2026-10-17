@@ -1196,8 +1196,17 @@ func _build_settings() -> void:
 		CameraRig.capture_mouse = on
 		if au: au.save_settings())
 	orow.add_child(cap)
+	var aim := CheckBox.new()
+	aim.name = "MouseAim"
+	aim.text = "Arco: apuntar con ratón"
+	aim.button_pressed = SimMatch.mouse_aim
+	aim.toggled.connect(func(on: bool) -> void:
+		SimMatch.mouse_aim = on
+		if au: au.save_settings())
 	list_box.add_child(orow)
 	list_box.move_child(orow, 3)
+	list_box.add_child(aim)
+	list_box.move_child(aim, 4)
 	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nCámara: sensibilidad de la órbita, invertir Y y ratón capturado (por defecto se orbita con clic derecho arrastrando; Esc libera el ratón). En Android, arrastra en la mitad derecha.\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
 
 

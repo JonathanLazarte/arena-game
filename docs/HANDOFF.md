@@ -42,11 +42,11 @@ Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (
 - **`SimView`** (`sim_view.gd`): estado → nodos `Fighter` (`sim_driven = true`), suavizado visual de correcciones; nunca realimenta la sim. **`SimMatch`**: bucle local (muestrea dispositivo, teclado+táctil, camera-relative → mundo) y stepping online.
 - **Eventos rollback-safe** (`sim_events.gd` + `sim_fx.gd`): eventos con tick; online se retienen 2 ticks (`hold_ticks`) y se cancelan si la resim no los regenera; acciones propias instantáneas.
 - **`NetLink`** (`net/online/net_link.gd`): UDP crudo (`PacketPeerUDP`, IPv4). Relay (sala por código, partida rápida, ping por región, token de reconexión), NAT punch P/Q y fallback por relay, **LAN** en `0.0.0.0:47801/udp` con broadcast "Buscar". **`NetMatch`**: handshake (`hi`+loadout → ping/pong → `start` delay/seed → `go`), fase LOAD (`ka`/`rdy`, 30 s), paquete `in`, sync de ventaja, desync → `user://net/desync_*.json`, replays `user://net/replay_*.json` verificables (incluye resyncs), reconexión con snapshot deflate en trozos de 900 B.
-- **Protocolo = 7** (fase 8: FLASK_T/FLASKS/PH2 en el estado, IN_FLASK). Al cambiar el layout del estado, bits de entrada, params o mensajes, subí en **todos** estos lugares:
-  1. `net/online/net_link.gd` → `const GAME_PROTO := 7` (`NetMatch.PROTO` lo hereda).
-  2. `server/src/index.ts` → default `num(env.GAME_PROTO, 7)` (y la env `GAME_PROTO` del relay desplegado).
-  3. `server/test/relay.test.ts` → `{ v: 7 }` (y `proto`/`need` del test de versión) en los envíos.
-  4. `tests/test_net_reconnect.gd` (check `== 7`) y revisar `tests/test_net_relay5.gd`, `tests/net_client.gd`.
+- **Protocolo = 8** (fase 9: apuntado IN_AIM bits 24-30 y mensajes de revancha; fase 8: FLASK_T/FLASKS/PH2, IN_FLASK). Al cambiar el layout del estado, bits de entrada, params o mensajes, subí en **todos** estos lugares:
+  1. `net/online/net_link.gd` → `const GAME_PROTO := 8` (`NetMatch.PROTO` lo hereda).
+  2. `server/src/index.ts` → default `num(env.GAME_PROTO, 8)` (y la env `GAME_PROTO` del relay desplegado).
+  3. `server/test/relay.test.ts` → `{ v: 8 }` (y `proto`/`need` del test de versión) en los envíos.
+  4. `tests/test_net_reconnect.gd` (check `== 8`) y revisar `tests/test_net_relay5.gd`, `tests/net_client.gd`.
   5. Docs: `server/DEPLOY.md`, `docs/netcode.md`, `docs/design.md` .
 - **Relay** (`server/`): Node/TS, UDP 47800, HTTP 8080 `/healthz` y `/metrics`. Salas (código 5 chars), cola rápida, tokens 96 bits, gracia 20 s → 'F' abandono, rate limits, baneos, paquete máx. 1200 B, check de versión.
 
