@@ -245,6 +245,10 @@ func _guest_snap(m: Dictionary) -> void:
 
 func _resync_apply(st: PackedInt64Array, f: int) -> void:
 	resyncs.append([f, st.duplicate()])
+	# los checksums posteriores al último tick confirmado salieron de entradas predichas: no valen
+	var cf := confirmed_frame()
+	for k: int in session.checksums.keys():
+		if k > cf: session.checksums.erase(k)
 	session.reset_to(st, f)
 	reconnecting = false
 	reconnects += 1
@@ -415,7 +419,7 @@ func replay_dict() -> Dictionary:
 	var a: Array[int] = []; var b: Array[int] = []
 	for f in n:
 		var l: int = session.local_in.get(f, 0)
-		var r: int = session.remote_in.get(f, 0)
+		var r: int = session.remote_in.get(f, session.predicted.get(f, 0)) # sin confirmar antes de un reinicio: lo que se simuló
 		a.append(l if me == 0 else r)
 		b.append(r if me == 0 else l)
 	var ck := {}
@@ -450,8 +454,10 @@ static func verify_replay(d: Dictionary) -> Array[int]:
 	var rs := {}
 	for r: Variant in d.get("resync", []): rs[int(r[0])] = str_to_var(String(r[1]))
 	for f in a.size():
-		if rs.has(f): s = (rs[f] as PackedInt64Array).duplicate() # reconexión: estado acordado
-		e.step(s, int(a[f]), int(b[f]))
+		if rs.has(f + 1): # reconexión: el estado acordado sustituye al resultado del tick f
+			s = (rs[f + 1] as PackedInt64Array).duplicate()
+		else:
+			e.step(s, int(a[f]), int(b[f]))
 		if ck.has(str(f)) and int(ck[str(f)]) != e.checksum(s):
 			bad.append(f)
 	return bad
