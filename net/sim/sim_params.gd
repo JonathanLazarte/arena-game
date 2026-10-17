@@ -94,6 +94,7 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	var conc := EquipStats.resist_mult("concentracion", f.eq, f.eq_ref) if not f.eq.is_empty() else 1.0
 	p["guard_break_t"] = tk(Fighter.GUARD_BREAK_STAGGER * conc)
 	p["max_combo"] = f.max_combo()
+	p["pillars"] = 1 if Projectile.obstacles.size() == 6 else 0 # la arena real los tiene
 	p["has_bow"] = 1 if f.secondary != null else 0
 	# Ataques
 	var atks: Array = []

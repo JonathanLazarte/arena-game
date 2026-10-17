@@ -48,6 +48,11 @@ enum { PR_ON, PR_OWNER, PR_X, PR_Z, PR_Y, PR_VX, PR_VZ, PR_VY, PR_LIFE, PR_RAW, 
 const SIZE := PROJ_BASE + PROJ_MAX * PR_FIELDS
 
 const ARENA_R := 40000000     # µm (muro circular)
+## Pilares de la arena (Arena._build_arena: 6 en el anillo de 23,8 m, a 30° + i·60°), en µm. Constantes
+## precalculadas para no depender de sin/cos de coma flotante en cada plataforma.
+const PILLARS := [11900000, 20611405, 23800000, 0, 11900000, -20611405, -11900000, -20611405, -23800000, 0, -11900000, 20611405]
+const PILLAR_BODY_R := 1650000 # Fighter: radio de obstáculo 1,5 + cuerpo 0,45 − 0,3 de margen
+const PILLAR_ARROW_R := 1500000 # Projectile: radio de obstáculo 1,5 m
 const SEP_FOOT := 1600000     # µm (Fighter.SEPARATION_FOOT)
 const STAMINA_ATK_SLOW_PM := 300
 const HEAVY_HOLD := 24        # ticks (Fighter.HEAVY_HOLD 0,4 s)
@@ -575,6 +580,12 @@ static func _status_tick(s: PackedInt64Array, i: int) -> void:
 		s[o + POISON_E] = e + 1
 		_damage(s, (1 - i) * F_FIELDS, o, (POISON_DPS_MILLI * (e + 1)) / 60 - (POISON_DPS_MILLI * e) / 60)
 
+static func _in_pillar(x: int, z: int, r: int) -> bool:
+	for k in 6:
+		if FxMath.length(x - PILLARS[k * 2], z - PILLARS[k * 2 + 1]) < r:
+			return true
+	return false
+
 static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int) -> int:
 	var d := 1 - att
 	var a := att * F_FIELDS
@@ -898,6 +909,9 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 		if s[q + PR_LIFE] <= 0 or FxMath.length(s[q + PR_X], s[q + PR_Z]) > ARENA_R + 2000000 or s[q + PR_Y] < -1000000:
 			s[q + PR_ON] = 0
 			continue
+		if P[0].get("pillars", 0) != 0 and _in_pillar(s[q + PR_X], s[q + PR_Z], PILLAR_ARROW_R):
+			s[q + PR_ON] = 0
+			continue
 		if s[q + PR_DODGED] != 0:
 			continue
 		var owner: int = s[q + PR_OWNER]
@@ -1059,6 +1073,17 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if r > lim:
 		s[o + X] = s[o + X] * lim / r
 		s[o + Z] = s[o + Z] * lim / r
+	if P[i].get("pillars", 0) != 0:
+		for k in 6:
+			var dx: int = s[o + X] - PILLARS[k * 2]
+			var dz: int = s[o + Z] - PILLARS[k * 2 + 1]
+			var dl := FxMath.length(dx, dz)
+			if dl < PILLAR_BODY_R:
+				if dl < 1000:
+					var pf := s[o + FACE]
+					dx = FxMath.COS[pf]; dz = FxMath.SIN[pf]; dl = FxMath.ONE
+				s[o + X] = PILLARS[k * 2] + dx * PILLAR_BODY_R / dl
+				s[o + Z] = PILLARS[k * 2 + 1] + dz * PILLAR_BODY_R / dl
 
 ## Paso adelante del ataque: reparte step_total de forma lineal en la ventana (último 45 % de la
 ## anticipación + golpe), imantado al rival y sin atravesarlo (se detiene a hit_radius + 0,8 m).
