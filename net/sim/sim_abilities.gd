@@ -638,7 +638,7 @@ static func counter_trigger(s: PackedInt64Array, P: Array, d: int, att: int) -> 
 	if s[o + FightSim.AB_SLOT] < 0:
 		return false
 	var ab := _ab(s, P, d)
-	if int(ab["type"]) != T_COUNTER or (s[o + FightSim.AB_FL] & FL_COUNTERED) != 0:
+	if kind_of(ab) != T_COUNTER or (s[o + FightSim.AB_FL] & FL_COUNTERED) != 0:
 		return false
 	if s[o + FightSim.AB_T] < int(ab["w"]) or s[o + FightSim.AB_T] > int(ab["ws"]):
 		return false

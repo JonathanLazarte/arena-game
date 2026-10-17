@@ -21,6 +21,7 @@ const IDS: Array[String] = [
 	"rayos_trazadores", "lluvia_meteoros", "lanza_celeste", "lluvia_lanzas", "lluvia_sangre", "columnas_rayo",
 	"aliento_dragon", "aliento_rayo", "aliento_escarcha", "chorro_lava",
 	"saeta_oscura", "orbe_lunar",
+	"furia_fase", "grito_guerra", "postura_contra", "guardia_reflejo",
 ]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1

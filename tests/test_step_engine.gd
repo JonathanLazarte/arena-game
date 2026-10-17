@@ -39,6 +39,8 @@ func _inputs(t: int, kind: String) -> Array:
 		ib |= FightSim.IN_BOSS
 	if kind == "chain" and t == 140:
 		ia |= FightSim.IN_BOSS
+	if kind == "punish" and t >= 50 and t < 56:
+		ib |= FightSim.IN_ATK
 	if kind == "trade" and t >= 12 and t % 18 < 5:
 		ib |= FightSim.IN_ATK
 	return [ia, ib]
@@ -103,10 +105,20 @@ func _run() -> void:
 		var same_force := true
 		if c0.has("force") or c1.has("force"):
 			same_force = int(c0.get("force", -1)) == int(c1.get("force", -2))
-		check(int(c0["raw"]) == int(c1["raw"]) and int(c0["end"]) == int(c1["end"]) and same_force,
-			"%s: raw %d/%d end %d/%d" % [id, int(c0["raw"]), int(c1["raw"]), int(c0["end"]), int(c1["end"])])
+		var same_end := true
+		if c0.has("end") or c1.has("end"):
+			same_end = int(c0.get("end", -1)) == int(c1.get("end", -2))
+		if c0.has("end_miss") or c1.has("end_miss"):
+			same_end = same_end and int(c0.get("end_miss", -1)) == int(c1.get("end_miss", -2))
+		var end_show: int = int(c0.get("end", c0.get("end_miss", -1)))
+		check(int(c0["raw"]) == int(c1["raw"]) and same_end and same_force,
+			"%s: raw %d/%d end %d" % [id, int(c0["raw"]), int(c1["raw"]), end_show])
 		_same(p0, p1, 2200000, 160, "idle", "%s de cerca" % id)
 		_same(p0, p1, 14000000, 140, "idle", "%s de lejos" % id)
+		if id in ["postura_contra", "guardia_reflejo"]:
+			_same(p0, p1, 2200000, 180, "punish", "%s castiga" % id)
+			var pun: Dictionary = _roll(p0, 2200000, 180, "punish")
+			check(int(pun["s"][FightSim.AB_HITS]) >= 1, "%s: el castigo conecta (%d)" % [id, int(pun["s"][FightSim.AB_HITS])])
 		if id in ["saeta_oscura", "orbe_lunar"]:
 			_same(p0, p1, 8000000, 220, "chain", "%s encadenada" % id)
 			var chained: Dictionary = _roll(p0, 8000000, 220, "chain")

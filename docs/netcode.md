@@ -235,7 +235,7 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 
 ## 18. Etapa 1 del motor de pasos (protocolo 9)
 - Los params horneados llevan `ab_engine` (0 o 1). Entra en `params_checksum`. Por defecto es 0 y las 45 habilidades siguen en `SimAbilities`.
-- Con `ab_engine = 1`, `SimSteps` envuelve el programa viejo de las habilidades en `SimSteps.IDS` (líneas de tiempo, ondas, lluvias, alientos y ráfagas). El estado usa los mismos campos `AB_*`; no cambia el layout ni los bits de entrada. En reposo los checksums coinciden con el camino viejo. Si `interruptible_by` no nombra el aturdimiento, ese golpe no corta el casteo: ahí el checksum difiere a propósito.
+- Con `ab_engine = 1`, `SimSteps` envuelve el programa viejo de las habilidades en `SimSteps.IDS` (líneas de tiempo, ondas, lluvias, alientos, ráfagas, furias y contragolpes). El estado usa los mismos campos `AB_*`; no cambia el layout ni los bits de entrada. En reposo los checksums coinciden con el camino viejo. Si `interruptible_by` no nombra el aturdimiento, ese golpe no corta el casteo: ahí el checksum difiere a propósito.
 - La recarga del motor es la global de 85 ticks (el `cooldown` propio no se usa). El costo de vida se rechaza si el golpe dejaría 0.
 - Los eventos de paso salen de `SimEvents` con clave `frame:ab_ev:<jugador>:<code>:<paso>:<id>` y `SimFx` no los duplica tras un rollback.
 - Protocolo 9: un cliente de la fase 9 (protocolo 8) no entra al relay.
