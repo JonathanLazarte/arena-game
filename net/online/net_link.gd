@@ -54,6 +54,10 @@ var bound_port := 0
 var hellos_sent := 0
 var hellos_recv := 0      ## anfitrión: saludos recibidos; invitado: respuestas recibidas
 var lan_timeout_ms := 8000
+## Fase 7: sin ninguna respuesta del relay en este plazo → FAILED "relay_unreachable" (nunca se queda colgado).
+var relay_timeout_ms := 5000
+var relay_seen := false
+var _relay_deadline := 0
 var _lan_deadline := 0
 var found_hosts: Dictionary = {} ## búsqueda LAN: "ip" -> {name, ms}
 var host_name := ""
@@ -69,6 +73,7 @@ func create_room(relay_host: String, port: int = DEFAULT_RELAY_PORT, want_code: 
 	if not _set_relay(relay_host, port): return
 	mode = "relay"
 	_ctl = _msg("C", {"v": GAME_PROTO, "code": want_code} if want_code != "" else {"v": GAME_PROTO})
+	_arm_relay_timeout()
 	state = St.CONNECTING
 	_retry_at = 0
 
@@ -79,6 +84,7 @@ func join_room(relay_host: String, port: int, room_code: String) -> void:
 	code = room_code.strip_edges().to_upper()
 	_ctl = _msg("J", {"v": GAME_PROTO, "code": code})
 	_join_deadline = now_ms() + join_wait_ms
+	_arm_relay_timeout()
 	state = St.CONNECTING
 	_retry_at = 0
 
@@ -88,6 +94,7 @@ func quick_match(relay_host: String, port: int = DEFAULT_RELAY_PORT) -> void:
 	if not _set_relay(relay_host, port): return
 	mode = "relay"
 	_ctl = _msg("Q", {"v": GAME_PROTO})
+	_arm_relay_timeout()
 	state = St.CONNECTING
 	_retry_at = 0
 
@@ -174,8 +181,12 @@ func _set_relay(host: String, port: int) -> bool:
 	relay_ip = host if host.is_valid_ip_address() else IP.resolve_hostname(host, IP.TYPE_IPV4)
 	relay_port = port
 	if relay_ip == "":
-		_fail("no se encuentra el servidor %s" % host); return false
+		_fail("relay_dns:%s" % host); return false
 	return true
+
+func _arm_relay_timeout() -> void:
+	relay_seen = false
+	_relay_deadline = now_ms() + relay_timeout_ms
 
 func _fail(msg: String) -> void:
 	error = msg
@@ -241,6 +252,9 @@ func poll() -> void:
 				_raw(PackedByteArray([0x53]), bc, _disc_port, true) # 'S'
 			hellos_sent += 1
 		else:
+			if not relay_seen and _relay_deadline > 0 and t >= _relay_deadline:
+				_fail("relay_unreachable")
+				return
 			_raw(_ctl, relay_ip, relay_port, true)
 	if state == St.PUNCHING:
 		if t >= _retry_at:
@@ -262,6 +276,7 @@ func _on_packet(b: PackedByteArray, ip: String, port: int) -> void:
 	if b.is_empty(): return
 	bytes_in += b.size()
 	var from_relay := ip == relay_ip and port == relay_port
+	if from_relay: relay_seen = true
 	var from_peer := ip == peer_ip and port == peer_port
 	var t := char(b[0])
 	if from_relay:

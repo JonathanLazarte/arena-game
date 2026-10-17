@@ -81,10 +81,13 @@ var regions: NetRegions
 var _quick_after_ping := false
 var chosen := {} ## servidor elegido por ping (o el primero)
 
+const NO_RELAY_TEXT := "No hay servidor relay configurado: la partida rápida y las salas con código lo necesitan. Juega por LAN (misma wifi: «LAN: crear» / «LAN: unirse») o despliega un relay (server/DEPLOY.md) y escribe aquí su dirección."
+const RELAY_HINT := " Mientras tanto juega por LAN (misma wifi) o despliega un relay siguiendo server/DEPLOY.md."
+
 func _relay() -> Array:
 	var t := relay_edit.text.strip_edges()
 	if t == "":
-		status_label.text = "Escribe la dirección del servidor relay (ver docs/netcode.md) o usa LAN."
+		status_label.text = NO_RELAY_TEXT
 		return []
 	if not chosen.is_empty() and t.contains(String(chosen["host"])):
 		return [chosen["host"], chosen["port"]]
@@ -172,7 +175,7 @@ func _physics_process(_d: float) -> void:
 		regions.poll()
 		if regions.done:
 			var b := regions.best()
-			status_label.text = "Ping: %s.%s" % [regions.summary(), " Elegido: %s." % b["name"] if not b.is_empty() else " Ningún servidor respondió."]
+			status_label.text = "Ping: %s.%s" % [regions.summary(), " Elegido: %s." % b["name"] if not b.is_empty() else " Ningún servidor relay respondió." + RELAY_HINT]
 			chosen = b
 			regions = null
 			if _quick_after_ping and not b.is_empty():
@@ -223,6 +226,10 @@ func _physics_process(_d: float) -> void:
 		link.close(); link = null; m = null
 
 func _err(e: String) -> String:
+	if e == "relay_unreachable":
+		return "el servidor relay %s no responde (%d s sin respuesta). ¿Está desplegado y con UDP %d abierto?%s" % [link.relay_ip if link else "", (link.relay_timeout_ms if link else 5000) / 1000, NetLink.DEFAULT_RELAY_PORT, RELAY_HINT]
+	if e.begins_with("relay_dns:"):
+		return "no se encuentra el servidor relay «%s» (DNS).%s" % [e.get_slice(":", 1), RELAY_HINT]
 	if e.begins_with("port_busy"):
 		return "el puerto UDP %s está ocupado (¿otra copia del juego abierta?)" % e.get_slice(":", 1)
 	if e == "lan_timeout" and link:
