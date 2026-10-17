@@ -1,0 +1,1037 @@
+{
+  "version": 1,
+  "tick_rate": 60,
+  "abilities": [
+    {
+      "id": "tormenta_ascendente",
+      "name": "Tormenta Ascendente",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "aerial",
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 34,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 600,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "despegue",
+          "windup_ticks": 24,
+          "active_ticks": 1,
+          "recovery_ticks": 0,
+          "telegraph": {
+            "id": "tg_tormenta_remolino",
+            "style": "body_pose",
+            "color": "#7FD4FF",
+            "sound": "sfx_tele_tormenta",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Se agacha y lo envuelve un remolino celeste."
+          },
+          "tracking": {
+            "deg_per_sec": 360,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 90
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 24,
+            "to_tick": 25,
+            "height_m": 2.5,
+            "speed_mps": 10,
+            "max_distance_m": 6,
+            "target_mode": "target",
+            "stop_at_m": 1.5
+          },
+          "next": {
+            "default": "tajo_aereo_1"
+          },
+          "events": [
+            {
+              "id": "ev_polvo",
+              "tick": 24,
+              "vfx": "vfx_dust_ring",
+              "sfx": "sfx_leap"
+            }
+          ]
+        },
+        {
+          "id": "tajo_aereo_1",
+          "windup_ticks": 12,
+          "active_ticks": 5,
+          "recovery_ticks": 4,
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 21,
+            "poise_bonus_pct": 50,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 8,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 0,
+            "to_tick": 21,
+            "height_m": 2.5,
+            "speed_mps": 6,
+            "max_distance_m": 2,
+            "target_mode": "facing"
+          },
+          "hitboxes": [
+            {
+              "id": "hb_t1",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.6,
+                "angle_deg": 120
+              },
+              "from_tick": 0,
+              "to_tick": 5,
+              "hits": 1,
+              "damage_per_hit": 14,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 12
+            }
+          ],
+          "next": {
+            "default": "tajo_aereo_2"
+          },
+          "events": [
+            {
+              "id": "ev_t1",
+              "tick": 12,
+              "vfx": "vfx_trail_cyan",
+              "sfx": "sfx_swing_air"
+            }
+          ]
+        },
+        {
+          "id": "tajo_aereo_2",
+          "windup_ticks": 14,
+          "active_ticks": 5,
+          "recovery_ticks": 2,
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 21,
+            "poise_bonus_pct": 50,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 0,
+            "to_tick": 21,
+            "height_m": 2.8,
+            "speed_mps": 4,
+            "max_distance_m": 1.5,
+            "target_mode": "facing"
+          },
+          "hitboxes": [
+            {
+              "id": "hb_t2",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.6,
+                "angle_deg": 120
+              },
+              "from_tick": 0,
+              "to_tick": 5,
+              "hits": 1,
+              "damage_per_hit": 16,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 14
+            }
+          ],
+          "next": {
+            "default": "caida"
+          },
+          "events": [
+            {
+              "id": "ev_t2",
+              "tick": 14,
+              "vfx": "vfx_trail_cyan",
+              "sfx": "sfx_swing_air"
+            }
+          ]
+        },
+        {
+          "id": "caida",
+          "windup_ticks": 20,
+          "active_ticks": 4,
+          "recovery_ticks": 42,
+          "telegraph": {
+            "id": "tg_tormenta_caida",
+            "style": "ground_ring",
+            "color": "#7FD4FF",
+            "sound": "sfx_tele_caida",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.2
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 20
+            },
+            "at_tick": 0
+          },
+          "tracking": {
+            "deg_per_sec": 0,
+            "lock_at_tick": 0,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "slam",
+            "from_tick": 0,
+            "to_tick": 20,
+            "target_mode": "lock_point",
+            "max_distance_m": 3
+          },
+          "hitboxes": [
+            {
+              "id": "hb_caida",
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.2
+              },
+              "anchor": "self",
+              "ground_only": true,
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 24,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 38,
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 7,
+                  "duration_ticks": 8
+                }
+              }
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_golpe",
+              "tick": 20,
+              "vfx": "vfx_crack_ring",
+              "sfx": "sfx_slam",
+              "camera_shake": 2
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 7.0,
+        "weight": 12,
+        "use_when": [
+          "target_in_range",
+          "target_recovering"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Bloqueá los tajos y rodá cuando el círculo se llene."
+      }
+    },
+    {
+      "id": "hachazo_penitente",
+      "name": "Hachazo del Penitente",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "unblockable",
+        "delayed",
+        "tracking"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 26,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 420,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "knockdown"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 20,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "golpe_tardio",
+          "windup_ticks": 75,
+          "active_ticks": 6,
+          "recovery_ticks": 54,
+          "telegraph": {
+            "id": "tg_hachazo_ambar",
+            "style": "weapon_glow",
+            "color": "#FFB347",
+            "sound": "sfx_tele_hachazo",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Hoja ámbar en alto; parpadea en blanco antes del golpe."
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 81,
+            "poise_bonus_pct": 80,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 220,
+            "lock_at_tick": 66,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 69,
+            "to_tick": 81,
+            "speed_mps": 7,
+            "max_distance_m": 1.4,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_hachazo",
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.0,
+                "angle_deg": 110
+              },
+              "from_tick": 0,
+              "to_tick": 6,
+              "hits": 1,
+              "damage_per_hit": 40,
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 40,
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 5,
+                  "duration_ticks": 6
+                }
+              }
+            }
+          ],
+          "spawns": [
+            {
+              "id": "sp_onda",
+              "type": "ground_mark",
+              "at_tick": 81,
+              "anchor": "self",
+              "offset": {
+                "forward_m": 1.5
+              },
+              "count": 1,
+              "shape": {
+                "type": "circle",
+                "radius_m": 4.5
+              },
+              "warn_ticks": 30,
+              "damage": 26,
+              "stun_power": 40,
+              "blockable": true
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_amague",
+              "tick": 34,
+              "vfx": "vfx_flash_white",
+              "sfx": "sfx_fake_swing"
+            },
+            {
+              "id": "ev_destello",
+              "tick": 60,
+              "vfx": "vfx_flash_white",
+              "sfx": "sfx_blade_ring"
+            },
+            {
+              "id": "ev_impacto",
+              "tick": 75,
+              "vfx": "vfx_crack",
+              "sfx": "sfx_heavy_hit",
+              "on": "hit"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 1.0,
+        "range_max": 4.0,
+        "weight": 10,
+        "use_when": [
+          "target_in_range",
+          "target_blocking"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Esperá el segundo destello y recién ahí rodá."
+      }
+    },
+    {
+      "id": "cadena_abismo",
+      "name": "Cadena del Abismo",
+      "icon": "generic",
+      "category": "grab",
+      "tags": [
+        "unblockable"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 0,
+        "mana": 28,
+        "health": 0
+      },
+      "cooldown_ticks": 540,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 18,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "lanzar_cadena",
+          "windup_ticks": 30,
+          "active_ticks": 8,
+          "recovery_ticks": 6,
+          "telegraph": {
+            "id": "tg_cadena_violeta",
+            "style": "ground_line",
+            "color": "#9B59FF",
+            "sound": "sfx_tele_cadena",
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 8,
+                "width_m": 1.2
+              },
+              "anchor": "self",
+              "fill_ticks": 30
+            },
+            "at_tick": 0,
+            "text": "Línea violeta en el suelo hacia vos y ruido de eslabones."
+          },
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 22,
+            "post_lock_deg_per_sec": 0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_cadena",
+              "shape": {
+                "type": "line",
+                "length_m": 8,
+                "width_m": 1.2
+              },
+              "from_tick": 0,
+              "to_tick": 8,
+              "hits": 1,
+              "damage_per_hit": 6,
+              "damage_scaling": "magic",
+              "damage_type": "magico",
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 0,
+              "stun_scaling": "none",
+              "on_hit": {
+                "force": {
+                  "type": "pull",
+                  "strength_mps": 12,
+                  "duration_ticks": 18,
+                  "max_distance_m": 3.5,
+                  "breakable_by": [
+                    "roll"
+                  ]
+                }
+              }
+            }
+          ],
+          "next": {
+            "default": "golpe_suelo",
+            "on_whiff": "fallo"
+          }
+        },
+        {
+          "id": "golpe_suelo",
+          "windup_ticks": 18,
+          "active_ticks": 4,
+          "recovery_ticks": 48,
+          "telegraph": {
+            "id": "tg_cadena_suelo",
+            "style": "ground_ring",
+            "color": "#C9A0FF",
+            "sound": "sfx_tele_slam_vacio",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 2.8
+              },
+              "anchor": "self",
+              "fill_ticks": 18
+            },
+            "at_tick": 0
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 22,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_suelo",
+              "shape": {
+                "type": "circle",
+                "radius_m": 2.8
+              },
+              "ground_only": true,
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 30,
+              "damage_scaling": "magic",
+              "damage_type": "magico",
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 45,
+              "stun_scaling": "magic",
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 8,
+                  "duration_ticks": 10
+                }
+              }
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_slam",
+              "tick": 18,
+              "vfx": "vfx_void_burst",
+              "sfx": "sfx_slam",
+              "camera_shake": 2
+            }
+          ]
+        },
+        {
+          "id": "fallo",
+          "windup_ticks": 1,
+          "active_ticks": 1,
+          "recovery_ticks": 36,
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_recoge",
+              "tick": 0,
+              "vfx": null,
+              "sfx": "sfx_chain_retract"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 3.5,
+        "range_max": 8.0,
+        "weight": 8,
+        "use_when": [
+          "target_far",
+          "target_healing"
+        ]
+      },
+      "hint": {
+        "dodge": "sidestep",
+        "text": "Salí de la línea violeta; si te engancha, rodá para soltarte."
+      }
+    },
+    {
+      "id": "saeta_brasas",
+      "name": "Saeta de Brasas",
+      "icon": "generic",
+      "category": "ranged",
+      "tags": [
+        "projectile"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 0,
+        "mana": 18,
+        "health": 0
+      },
+      "cooldown_ticks": 240,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl1",
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "steps": [
+        {
+          "id": "disparo",
+          "windup_ticks": 24,
+          "active_ticks": 1,
+          "recovery_ticks": 30,
+          "telegraph": {
+            "id": "tg_saeta_brasa",
+            "style": "weapon_glow",
+            "color": "#FF5A1F",
+            "sound": "sfx_tele_brasa",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "La mano se enciende en naranja y chisporrotea."
+          },
+          "tracking": {
+            "deg_per_sec": 300,
+            "lock_at_tick": 20,
+            "post_lock_deg_per_sec": 0
+          },
+          "spawns": [
+            {
+              "id": "sp_saeta",
+              "type": "projectile",
+              "at_tick": 24,
+              "anchor": "self",
+              "offset": {
+                "forward_m": 1.0
+              },
+              "count": 3,
+              "spread_deg": 14,
+              "speed_mps": 18,
+              "homing_deg": 40,
+              "homing_ticks": 30,
+              "lifetime_ticks": 120,
+              "radius_m": 0.5,
+              "pierce": false,
+              "reflectable_by_parry": true,
+              "hitbox": {
+                "damage_per_hit": 9,
+                "damage_type": "fuego",
+                "damage_scaling": "magic",
+                "blockable": true,
+                "parryable": true,
+                "stun_power": 10,
+                "stun_scaling": "magic"
+              }
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_disparo",
+              "tick": 24,
+              "vfx": "vfx_ember_burst",
+              "sfx": "sfx_fire_cast"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 6.0,
+        "range_max": 18.0,
+        "weight": 10,
+        "use_when": [
+          "target_far"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_early",
+        "text": "Rodá a través del abanico o bloqueá; un parry la devuelve."
+      }
+    },
+    {
+      "id": "martillo_runico",
+      "name": "Furia del Martillo Rúnico",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 30,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 540,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "golpe_1",
+          "windup_ticks": 30,
+          "active_ticks": 6,
+          "recovery_ticks": 16,
+          "telegraph": {
+            "id": "tg_martillo_runas",
+            "style": "weapon_glow",
+            "color": "#3FE0A0",
+            "sound": "sfx_tele_runas",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Runas verdes se encienden en el arma."
+          },
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 30
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 26,
+            "to_tick": 36,
+            "speed_mps": 8,
+            "max_distance_m": 2.0,
+            "target_mode": "facing",
+            "stop_at_m": 1.2
+          },
+          "hitboxes": [
+            {
+              "id": "hb_g1",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.6,
+                "angle_deg": 100
+              },
+              "from_tick": 0,
+              "to_tick": 6,
+              "damage_per_hit": 18,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 20
+            }
+          ],
+          "cancel_into": {
+            "window_from_tick": 40,
+            "window_to_tick": 52,
+            "steps": [
+              "golpe_2"
+            ],
+            "only_on": "any",
+            "trigger": "auto"
+          },
+          "next": {
+            "default": "golpe_2"
+          }
+        },
+        {
+          "id": "golpe_2",
+          "windup_ticks": 26,
+          "active_ticks": 6,
+          "recovery_ticks": 40,
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 20,
+            "post_lock_deg_per_sec": 30
+          },
+          "hitboxes": [
+            {
+              "id": "hb_g2",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 140
+              },
+              "from_tick": 0,
+              "to_tick": 6,
+              "damage_per_hit": 20,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 24
+            }
+          ],
+          "branch": {
+            "window_from_tick": 32,
+            "window_to_tick": 66,
+            "time_base": "step",
+            "only_on": "any",
+            "buffer_ticks": 6,
+            "commit": "window_end",
+            "options": [
+              {
+                "input": "skill",
+                "step": "remate_caida"
+              },
+              {
+                "input": "alt",
+                "step": "remate_embestida",
+                "hud_icon": "generic",
+                "label": "Embestida",
+                "extra_cost": {
+                  "stamina": 10
+                }
+              }
+            ],
+            "default_if_no_input": "end"
+          },
+          "next": {
+            "default": null
+          }
+        },
+        {
+          "id": "remate_caida",
+          "windup_ticks": 40,
+          "active_ticks": 4,
+          "recovery_ticks": 48,
+          "extra_cost": {
+            "stamina": 6
+          },
+          "telegraph": {
+            "id": "tg_martillo_caida",
+            "style": "ground_ring",
+            "color": "#3FE0A0",
+            "sound": "sfx_tele_caida_runas",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 4.0
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 16
+            },
+            "at_tick": 24
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 44,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 4,
+            "to_tick": 40,
+            "height_m": 3.2,
+            "target_mode": "lock_point",
+            "max_distance_m": 5,
+            "stop_at_m": 0.5
+          },
+          "hitboxes": [
+            {
+              "id": "hb_caida",
+              "shape": {
+                "type": "circle",
+                "radius_m": 4.0
+              },
+              "ground_only": true,
+              "from_tick": 0,
+              "to_tick": 4,
+              "damage_per_hit": 28,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 48
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_caida",
+              "tick": 40,
+              "vfx": "vfx_rune_crack",
+              "sfx": "sfx_slam",
+              "camera_shake": 2
+            }
+          ]
+        },
+        {
+          "id": "remate_embestida",
+          "windup_ticks": 30,
+          "active_ticks": 14,
+          "recovery_ticks": 45,
+          "telegraph": {
+            "id": "tg_martillo_embestida",
+            "style": "ground_line",
+            "color": "#FF8A3D",
+            "sound": "sfx_tele_embestida",
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 6.5,
+                "width_m": 1.6
+              },
+              "anchor": "self",
+              "fill_ticks": 30
+            },
+            "at_tick": 0
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 44,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 300,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 30,
+            "to_tick": 44,
+            "speed_mps": 22,
+            "max_distance_m": 6.5,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_emb",
+              "shape": {
+                "type": "line",
+                "length_m": 1.8,
+                "width_m": 1.6
+              },
+              "from_tick": 0,
+              "to_tick": 14,
+              "damage_per_hit": 32,
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 50
+            }
+          ],
+          "next": {
+            "default": null
+          }
+        }
+      ],
+      "ai": {
+        "range_min": 1.5,
+        "range_max": 5.0,
+        "weight": 10,
+        "use_when": [
+          "target_in_range"
+        ],
+        "branch_weights": {
+          "remate_caida": 55,
+          "remate_embestida": 45
+        }
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "text": "Tras el segundo golpe mirá el suelo: círculo = caída (saltá o salí), línea = embestida (al costado)."
+      }
+    }
+  ],
+  "presets": [
+    {
+      "id": "tempestad_rocosa",
+      "name": "Tempestad Rocosa",
+      "abilities": [
+        "tormenta_ascendente",
+        "hachazo_penitente",
+        "cadena_abismo"
+      ],
+      "notes": "Ejemplo: presión aérea, castigo de pánico y control."
+    },
+    {
+      "id": "forjador_brasas",
+      "name": "Forjador de Brasas",
+      "abilities": [
+        "saeta_brasas",
+        "martillo_runico"
+      ],
+      "notes": "Ejemplo de preset con 2 habilidades."
+    }
+  ]
+}

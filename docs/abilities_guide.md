@@ -170,7 +170,7 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 {
   "id": "hachazo_penitente",
   "name": "Hachazo del Penitente",
-  "icon": "res://assets/ui/abilities/hachazo_penitente.png",
+  "icon": "generic",
   "category": "melee",
   "tags": ["unblockable", "delayed"],
   "unlock": { "phase": 1 },
@@ -192,7 +192,7 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 |---|---|---|---|---|
 | `id` | string | sí | — | `^[a-z][a-z0-9_]{2,31}$`, único en el catálogo. Nunca se renombra (entra en replays/checksums) |
 | `name` | string | sí | — | nombre visible en español, original |
-| `icon` | string (ruta `res://`) | sí | — | imagen existente; el HUD la usa en el botón |
+| `icon` | string | sí | — | `generic` (icono procedural de `BossIcon`), `boss:<id>` (icono procedural de una habilidad existente) o una ruta `res://` a una imagen. Si la ruta no existe: aviso `ASSET` y se usa el genérico |
 | `category` | enum | sí | — | `melee` · `ranged` · `magic` · `grab` · `buff` · `summon` · `zone` · `counter` · `movement` |
 | `tags` | array<string> | no | `[]` | conocidos: `unblockable`, `delayed`, `multi_hit`, `aerial`, `mana_shield`, `tracking`, `aoe`, `projectile`. `mana_shield` habilita la invulnerabilidad total (§5.3) |
 | `unlock.phase` | int | no | `1` | `1` (siempre) o `2` (solo en Fase II del dueño) |
@@ -510,7 +510,7 @@ opciones y ramas anidadas; cada remate alternativo puede tener su propio costo y
   "commit": "window_end",
   "options": [
     { "input": "skill", "step": "remate_caida" },
-    { "input": "alt", "step": "remate_embestida", "hud_icon": "res://assets/ui/abilities/alt_embestida.png", "label": "Embestida", "extra_cost": { "stamina": 10 }, "requires": [] }
+    { "input": "alt", "step": "remate_embestida", "hud_icon": "generic", "label": "Embestida", "extra_cost": { "stamina": 10 }, "requires": [] }
   ],
   "default_if_no_input": "end"
 }
@@ -669,7 +669,7 @@ Salta hacia el objetivo, dos tajos en el aire y caída con golpe en área. 4 pas
 {
   "id": "tormenta_ascendente",
   "name": "Tormenta Ascendente",
-  "icon": "res://assets/ui/abilities/tormenta_ascendente.png",
+  "icon": "generic",
   "category": "melee",
   "tags": ["aerial", "multi_hit"],
   "unlock": { "phase": 1 },
@@ -746,7 +746,7 @@ pero no la voltereta a tiempo.
 {
   "id": "hachazo_penitente",
   "name": "Hachazo del Penitente",
-  "icon": "res://assets/ui/abilities/hachazo_penitente.png",
+  "icon": "generic",
   "category": "melee",
   "tags": ["unblockable", "delayed", "tracking"],
   "unlock": { "phase": 1 },
@@ -795,7 +795,7 @@ La onda posterior (aviso 30 ticks) castiga a quien se queda pegado.
 {
   "id": "cadena_abismo",
   "name": "Cadena del Abismo",
-  "icon": "res://assets/ui/abilities/cadena_abismo.png",
+  "icon": "generic",
   "category": "grab",
   "tags": ["unblockable"],
   "unlock": { "phase": 1 },
@@ -853,7 +853,7 @@ exposición. El golpe al suelo es bloqueable y se evita saltando.
 {
   "id": "saeta_brasas",
   "name": "Saeta de Brasas",
-  "icon": "res://assets/ui/abilities/saeta_brasas.png",
+  "icon": "generic",
   "category": "ranged",
   "tags": ["projectile"],
   "unlock": { "phase": 1 },
@@ -893,7 +893,7 @@ recuperación del segundo golpe.
 {
   "id": "martillo_runico",
   "name": "Furia del Martillo Rúnico",
-  "icon": "res://assets/ui/abilities/martillo_runico.png",
+  "icon": "generic",
   "category": "melee",
   "tags": ["multi_hit"],
   "unlock": { "phase": 1 },
@@ -929,7 +929,7 @@ recuperación del segundo golpe.
         "window_from_tick": 32, "window_to_tick": 66, "time_base": "step", "only_on": "any", "buffer_ticks": 6, "commit": "window_end",
         "options": [
           { "input": "skill", "step": "remate_caida" },
-          { "input": "alt", "step": "remate_embestida", "hud_icon": "res://assets/ui/abilities/alt_embestida.png", "label": "Embestida", "extra_cost": { "stamina": 10 } }
+          { "input": "alt", "step": "remate_embestida", "hud_icon": "generic", "label": "Embestida", "extra_cost": { "stamina": 10 } }
         ],
         "default_if_no_input": "end"
       },
