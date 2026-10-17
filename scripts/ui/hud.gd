@@ -160,6 +160,8 @@ func _ready() -> void:
 	hb.add_theme_constant_override("separation", 16)
 	vb.add_child(hb)
 	var btn := UIKit.button("Revancha", 21)
+	btn.name = "RematchButton"
+	rematch_btn = btn
 	btn.custom_minimum_size = Vector2(190, 56)
 	btn.pressed.connect(func() -> void: restart_requested.emit())
 	hb.add_child(btn)
@@ -209,6 +211,13 @@ var btns: Dictionary = {} ## ronda 21: acción -> TouchScreenButton
 var btn_labels: Dictionary = {}
 var boss_next_btn: Button
 var boss_icon: BossIcon
+var rematch_btn: Button
+
+## Fase 9: estado del botón de revancha online («Esperando al rival…», desactivado si se fue).
+func set_rematch(text: String, enabled: bool) -> void:
+	if rematch_btn:
+		rematch_btn.text = text
+		rematch_btn.disabled = not enabled
 var sim_match: SimMatch ## fase 9: ▶ pulsa IN_BOSS_NEXT en la sim (offline y online)
 var enemy_boss_strip: HBoxContainer ## habilidades del rival (la 3.ª del campeón aparece en la Fase II)
 

@@ -199,6 +199,7 @@ func play_step(local_input: int) -> bool:
 	if phase == Ph.LOAD:
 		link.poll()
 		_load_step(NetLink.now_ms())
+		_rematch_tick(NetLink.now_ms())
 		return false
 	if phase != Ph.PLAY:
 		return false
@@ -207,6 +208,7 @@ func play_step(local_input: int) -> bool:
 	for m: Dictionary in _drain():
 		_handle(m, t)
 	_after_msgs(t)
+	_rematch_tick(t)
 	if phase != Ph.PLAY or reconnecting:
 		return false # congelado mientras se reconecta
 	return _play_tick(local_input, t)
@@ -288,6 +290,16 @@ func _handle(m: Dictionary, t: int) -> void:
 			"start": link.send_msg({"t": "go"}) # el anfitrión aún no recibió nuestro «go»
 			"bye":
 				status = "forfeit_win"; phase = Ph.OVER
+			"rm":
+				if int(m.get("n", -1)) == rematch_n:
+					peer_wants_rematch = true
+				elif me == 0 and int(m.get("n", -1)) == rematch_n - 1 and not _rmgo.is_empty():
+					link.send_msg(_rmgo, true) # el invitado no recibió el «rmgo»: reenviar
+			"rmno":
+				peer_declined = true
+			"rmgo":
+				if me == 1 and int(m.get("n", -1)) == rematch_n and want_rematch:
+					_restart(int(m["seed"]), int(m["ep"]))
 			"bad_params":
 				status = "params_mismatch"; phase = Ph.OVER
 
@@ -391,6 +403,75 @@ func _check_desync() -> void:
 			peer_ck.erase(f)
 		elif f < session.frame - 200:
 			peer_ck.erase(f)
+
+# ---------------- revancha (fase 9) ----------------
+## Tras un final normal («ko») los dos pares siguen conectados (la sim sigue corriendo sin efecto y
+## mantiene vivo el enlace). Cada uno elige: request_rematch() o decline_rematch(). Con los dos de
+## acuerdo, el anfitrión elige una semilla nueva y una época nueva y envía «rmgo»; ambos reinician la
+## sesión con los MISMOS params (mismo params_hash) y pasan por la fase LOAD («rdy») como al empezar.
+signal rematch_started
+var rematch_n := 0 ## revanchas ya jugadas (numera los mensajes)
+var want_rematch := false
+var peer_wants_rematch := false
+var peer_declined := false
+var _rm_at := 0
+var _rmgo: Dictionary = {}
+
+func can_rematch() -> bool:
+	return status == "" and not peer_declined and link != null and not (link.state in [NetLink.St.FAILED, NetLink.St.CLOSED])
+
+func request_rematch() -> void:
+	if not can_rematch():
+		return
+	want_rematch = true
+	_rm_at = 0
+
+func decline_rematch() -> void:
+	for i in 3:
+		link.send_msg({"t": "rmno"}, true)
+
+func _rematch_tick(t: int) -> void:
+	if not want_rematch:
+		return
+	if t >= _rm_at:
+		_rm_at = t + 250
+		link.send_msg({"t": "rm", "n": rematch_n}, true)
+	if me == 0 and peer_wants_rematch and status == "":
+		var sd := 1 + randi() % 100000
+		while sd == seed_v:
+			sd = 1 + randi() % 100000
+		_rmgo = {"t": "rmgo", "n": rematch_n, "seed": sd, "ep": epoch + 1}
+		for i in 2: link.send_msg(_rmgo, true)
+		_restart(sd, epoch + 1)
+
+func _restart(sd: int, ep: int) -> void:
+	seed_v = sd
+	epoch = ep
+	rematch_n += 1
+	want_rematch = false
+	peer_wants_rematch = false
+	peer_declined = false
+	status = ""
+	var params := engine.params
+	var spawn := engine.spawn
+	engine = FightEngine.new(params, seed_v, true)
+	engine.rounds = true
+	engine.spawn = spawn
+	var ph := session.params_hash
+	session = RbSession.new(me, start_delay, 8, engine)
+	session.params_hash = ph
+	input_delay = start_delay
+	peer_ready = false
+	peer_ack = -1; peer_frame = -1; adv_avg = 0.0
+	peer_ck.clear(); checked_to = -1; desync_frame = -1; desync_report = ""
+	resyncs = []; _snap_out = []; _snap_in = {}
+	reconnecting = false
+	_want_up = 0; _want_down = 0; _delay_cool = 0
+	phase = Ph.LOAD
+	_ready_at = 0
+	_load_started = NetLink.now_ms()
+	link.last_recv_ms = _load_started
+	rematch_started.emit()
 
 func forfeit() -> void:
 	if link.ready_to_play():

@@ -45,6 +45,7 @@ func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> v
 		params_hash = net.session.params_hash # incluye el ajuste online (holgura de parada)
 		fx.hold_ticks = net.fx_hold_ticks
 		fx.local_slot = local_slot
+		net.rematch_started.connect(_on_net_rematch)
 	else:
 		engine = FightEngine.new(params, 1, true)
 	engine.fx = fx
@@ -54,6 +55,23 @@ func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> v
 	view = SimView.new(a, b, parent)
 	view.params = params
 	view.smooth = net != null
+
+signal rematch_started
+## Fase 9: revancha online acordada. Sesión nueva (mismos params, semilla nueva): efectos nuevos
+## (las claves de evento empiezan otra vez en el tick 0) y la vista vuelve al estado inicial.
+func _on_net_rematch() -> void:
+	engine = net.engine
+	var cb := fx.callback
+	fx = SimFx.new()
+	fx.hold_ticks = net.fx_hold_ticks
+	fx.local_slot = local_slot
+	fx.callback = cb
+	engine.fx = fx
+	_ended = false
+	last_confirmed_wins = [0, 0]
+	state = net.session.state
+	view.apply(state)
+	rematch_started.emit()
 
 static func spawn_of(a: Fighter, b: Fighter) -> Array[int]:
 	var sp: Array[int] = []

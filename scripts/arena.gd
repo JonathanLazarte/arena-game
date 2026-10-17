@@ -98,7 +98,7 @@ func _ready() -> void:
 	add_child(hud)
 	hud.bind(player, enemy)
 	hud.restart_requested.connect(func() -> void:
-		if online: leave_online(); UIKit.go("res://scenes/lobby.tscn")
+		if online: _request_online_rematch()
 		else: restart_match())
 	hud.lobby_requested.connect(func() -> void:
 		leave_online()
@@ -154,6 +154,7 @@ func _setup_sim_match() -> void:
 			enemy.global_position = Vector3(0, 0.2, -SPAWN_DIST); enemy.facing = Vector3.BACK
 			sim_match.setup(player, enemy, self, online)
 		sim_match.match_ended.connect(_on_online_ended)
+		sim_match.rematch_started.connect(_on_online_rematch)
 		net_overlay = NetOverlay.new(online)
 		add_child(net_overlay)
 		time_left = 1.0e9
@@ -187,19 +188,69 @@ func _on_online_ended(winner_slot: int, reason: String) -> void:
 	var t: String = ONLINE_END_TEXT.get(reason, reason)
 	if t != "":
 		hud.show_message(t, 4.0)
+	if reason == "ko" and online.can_rematch():
+		# fase 9: seguimos conectados para la revancha (la sim sigue corriendo y mantiene el enlace)
+		hud.set_rematch("Revancha", true)
+		return
+	hud.set_rematch("Revancha", false)
 	online.link.close()
 	NetMatch.current = null
+
+## Fase 9: revancha online. Ambos la piden → NetMatch reinicia la sesión (mismos params, semilla
+## nueva) y SimMatch emite rematch_started; si el rival vuelve al lobby se avisa aquí.
+func _request_online_rematch() -> void:
+	if online == null or not online.can_rematch():
+		hud.set_rematch("Revancha", false)
+		return
+	online.request_rematch()
+	hud.set_rematch("Esperando…", false)
+	hud.show_message("Revancha pedida: esperando al rival", 3.0)
+
+var _rematch_note := ""
+func _process_rematch() -> void:
+	if online == null or state != "over":
+		return
+	var note := ""
+	if online.peer_declined:
+		note = "El rival volvió al lobby"
+	elif online.status in ["peer_left", "disconnected", "reconnect_failed", "forfeit_win"]:
+		note = "El rival se fue"
+	elif online.peer_wants_rematch and not online.want_rematch:
+		note = "El rival quiere la revancha"
+	if note != _rematch_note:
+		_rematch_note = note
+		if note != "":
+			hud.show_message(note, 4.0)
+		if note != "" and note != "El rival quiere la revancha":
+			hud.set_rematch("Revancha", false)
+
+func _on_online_rematch() -> void:
+	_rematch_note = ""
+	player.hits_landed = 0
+	player.parries_landed = 0
+	wins = [0, 0]
+	_shown_wins = [0, 0]
+	round_num = 1
+	hud.end_panel.visible = false
+	hud.set_rematch("Revancha", true)
+	hud.set_touch_visible(true)
+	start_round(true)
+	hud.show_message("¡Revancha!", 1.5)
 
 ## Abandono / volver al lobby durante una partida online.
 func leave_online() -> void:
 	if online and state != "over":
 		online.forfeit()
 		online.link.close()
+	elif online and online.link and not (online.link.state in [NetLink.St.FAILED, NetLink.St.CLOSED]):
+		online.decline_rematch() # fase 9: el rival ve «volvió al lobby»
+		online.link.close()
 	NetMatch.current = null
 
 func _process_online_hud() -> void:
 	if not online or sim_match == null:
 		return
+	_process_rematch()
 	_process_loading()
 	var w: Array = sim_match.last_confirmed_wins
 	if int(w[0]) != _shown_wins[0] or int(w[1]) != _shown_wins[1]:
