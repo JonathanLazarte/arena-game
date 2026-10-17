@@ -1,0 +1,134 @@
+# HANDOFF — Arena de Eikons (para Grok Build)
+
+Proyecto de Jonathan: luchador de arena 1v1 en **Godot 4.7.2** (GDScript), offline contra IA y online P2P con rollback. Vas a seguir el desarrollo **en local, en su PC Fedora Linux**. Repo: `https://github.com/JonathanLazarte/arena-game` (rama `master`, base de este handoff: `3fb3bd4`).
+
+Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (reglas duraderas y números), `docs/netcode.md` (online, §9–§15), `docs/determinism_audit.md`, `server/README.md`, `server/DEPLOY.md`.
+
+---
+
+## 1. Mapa de carpetas
+| Ruta | Qué hay |
+|---|---|
+| `project.godot`, `export_presets.cfg` | Proyecto y presets (Android, Windows, Linux) |
+| `scenes/` | `arena.tscn`, lobby, etc. |
+| `scripts/arena.gd` | Arena (muro circular, pilares), rondas, cámara, hit-stop, modo online |
+| `scripts/combat/` | `fighter.gd` (~3000 líneas) + componentes `fighter_combat.gd`, `fighter_mount.gd`, `fighter_magic.gd`, `fighter_boss_ext.gd`, `boss_abilities_ext.gd`; `mount.gd`, `eikon.gd`, `projectile.gd`, `ground_aoe.gd`, `ground_wave.gd`, `status_fx.gd` |
+| `scripts/ai/` | `ai_controller.gd` (IA por fases), `ai_difficulty.gd` |
+| `scripts/data/` | Datos: `stun_rules.gd`, `boss_abilities.gd`, `attributes.gd`, defs de armas/monturas/eikons |
+| `scripts/ui/` | `hud.gd`, `touch_stick.gd`, `lobby.gd`, `first_run.gd`, ficha, árbol de habilidades, tienda… |
+| `scripts/core/` | `command_processor.gd`, `player_command.gd` (controladores internos) |
+| `scripts/game_state.gd` | Progresión, guardado, `DEBUG_GRANT` |
+| `net/` | Prototipo rollback (`rb_sim/rb_session/rb_engine/rb_harness`) |
+| `net/sim/` | Sim determinista online (ver §3) |
+| `net/online/` | Transporte, lobby online, overlay, regiones, loadout |
+| `server/` | Relay Node 20 + TypeScript (`src/relay.ts`, `src/index.ts`, `test/`, `Dockerfile`, `deploy/` compose, `fly.toml`) |
+| `tests/` | Tests headless `test_*.gd`, bench, capturas |
+| `tools/` | `build_mixamo_libs.gd`, `retarget_kaykit.gd` |
+| `assets/` | Modelos, audio, **animaciones Mixamo** (`assets/animations/mixamo/*.fbx`, `lib_*.res`) |
+
+## 2. Arquitectura offline
+- **Fighter** (`CharacterBody3D`): estado de movimiento/combate en floats y timers por `delta`; `move_and_slide`. Delegá en componentes: **FighterCombat** (combos, fuerte/carga, bloqueo, parry, aturdimiento en 3 niveles, postura, críticos), **FighterMount** (montar/desmontar, embestida montada, alcance/daño montado), **FighterMagic** (maná, hechizos, eikons/invocaciones, escudo de maná), **fighter_boss_ext** (19 habilidades de jefe: estocada + 18; máx. 3 equipadas, B usa / N cambia; recarga global 1,4 s; telegrafía ×1,12 en móvil).
+- Animación sigue al estado (nunca al revés); golpes = ventanas de tiempo + distancia/ángulo (sin Area3D) → por eso se pudo portar a una sim por ticks.
+- **IA** (`ai_controller.gd`): rodea, se compromete, se retira/descansa; rueda estocada y ráfaga, huye de la carga, esquiva el salto_caida. Usa `randf` (no determinista; online no hay IA).
+- **HUD/lobby**: `hud.gd` + `touch_stick.gd` (multitáctil; botones Atacar, Parry/Escudo, Rodar, Correr, Saltar, Jefe/▶, magia, eikon, montura…). `lobby.gd` → personajes, armas, equipo; botón `ONLINE` abre `OnlinePanel`.
+
+## 3. Arquitectura online
+- **Modelo**: rollback P2P estilo GGPO. Solo viajan inputs. Sim pura de enteros a **60 Hz**; jamás lee delta, reloj, `Engine.time_scale` ni física del árbol.
+- **`net/sim/fight_sim.gd`**: estado = un `PackedInt64Array` (2 luchadores × N campos + globales: frame, freeze de hit-stop, RNG xorshift, rondas `G_WINS0/1`, `G_ROUND`, `G_END_T` + pools: proyectiles 12, hazards 16). `SIZE` se calcula al final de las constantes de layout. Unidades: posición µm, velocidad µm/tick, HP/aguante en milésimas, multiplicadores ‰, timers en ticks, rumbo 0..255. Checksum FNV-1a. Save/load = `duplicate()`.
+- **Bits de entrada**: 0–4 rumbo (32), 5 move, 6 medio stick, 7 atacar, 8 bloquear, 9 parry, 10 rodar, 11 correr, 12 swap, 13 fijar, 14 IN_BOSS, 15 IN_BOSS_NEXT, 16 IN_SPELL, 17 IN_SPELL_NEXT, 18 IN_EIKON, 19 IN_MOUNT, 20 IN_ART, 21 IN_BOSS_VAR, 22 IN_JUMP. Flancos derivados en la sim (`prev_input` en estado).
+- **`fx_math.gd`**: trig por tabla, sqrt/atan2 enteros. **`sim_abilities.gd`**, **`sim_magic.gd`**: jefe, magia, eikons, montura.
+- **`SimParams.bake(a, b)`**: se calcula una vez por partida desde los dos `Fighter` reales (personaje, arma, atributos, armadura, amuletos, loadout). Pre-resuelve daño/tablas de defensa por par atacante→defensor; duraciones vía `tk()` (replica la acumulación float offline). `params_checksum()` se intercambia: si difiere → `params_mismatch`. Lenience de parry online según delay inicial (`lenience_for_delay`).
+- **`RbSession`** (`net/rb_session.gd`): input delay (1–4, adaptativo en partida con histéresis), predicción (repite último input), ventana 8 ticks, resim, stall, checksums confirmados, `reset_to(estado, f)` con épocas (reconexión). `fight_engine.gd` = adaptador RbEngine.
+- **`SimView`** (`sim_view.gd`): estado → nodos `Fighter` (`sim_driven = true`), suavizado visual de correcciones; nunca realimenta la sim. **`SimMatch`**: bucle local (muestrea dispositivo, teclado+táctil, camera-relative → mundo) y stepping online.
+- **Eventos rollback-safe** (`sim_events.gd` + `sim_fx.gd`): eventos con tick; online se retienen 2 ticks (`hold_ticks`) y se cancelan si la resim no los regenera; acciones propias instantáneas.
+- **`NetLink`** (`net/online/net_link.gd`): UDP crudo (`PacketPeerUDP`, IPv4). Relay (sala por código, partida rápida, ping por región, token de reconexión), NAT punch P/Q y fallback por relay, **LAN** en `0.0.0.0:47801/udp` con broadcast "Buscar". **`NetMatch`**: handshake (`hi`+loadout → ping/pong → `start` delay/seed → `go`), fase LOAD (`ka`/`rdy`, 30 s), paquete `in`, sync de ventaja, desync → `user://net/desync_*.json`, replays `user://net/replay_*.json` verificables (incluye resyncs), reconexión con snapshot deflate en trozos de 900 B.
+- **Protocolo = 6.** Al cambiar el layout del estado, bits de entrada, params o mensajes, subí en **todos** estos lugares:
+  1. `net/online/net_link.gd` → `const GAME_PROTO := 6` (`NetMatch.PROTO` lo hereda).
+  2. `server/src/index.ts` → default `num(env.GAME_PROTO, 6)` (y la env `GAME_PROTO` del relay desplegado).
+  3. `server/test/relay.test.ts` → `{ v: 6 }` en los envíos.
+  4. `tests/test_net_reconnect.gd` (check `== 6`) y revisar `tests/test_net_relay5.gd`, `tests/net_client.gd`.
+  5. Docs: `server/DEPLOY.md`, `docs/netcode.md`, `docs/design.md` (sección de salto menciona protocolo 6).
+- **Relay** (`server/`): Node/TS, UDP 47800, HTTP 8080 `/healthz` y `/metrics`. Salas (código 5 chars), cola rápida, tokens 96 bits, gracia 20 s → 'F' abandono, rate limits, baneos, paquete máx. 1200 B, check de versión.
+
+## 4. LA REGLA CLAVE
+**Todo cambio de jugabilidad se hace DOS veces: en el código offline (Fighter y componentes) Y en `net/sim` (FightSim/SimAbilities/SimMagic/SimParams), con un escenario de paridad en `tests/test_net_parity.gd`.** Si no, online desincroniza o se comporta distinto que offline. Además: si cambia el layout de estado o los bits → subir protocolo (§3). Nada de floats, `randf`, nodos ni reloj dentro de la sim. Correr también `test_fight_sim`, `test_net_rollback`, `test_net_abilities`, `test_net_online`.
+
+## 5. Tests headless
+```bash
+cd ~/arena-game            # o donde esté el repo
+godot --headless --path . --import                      # primera vez / tras agregar assets
+godot --headless --path . -s res://tests/test_combat.gd
+godot --headless --path . -s res://tests/test_net_parity.gd
+godot --headless --path . -s res://tests/test_ai.gd -- 1   # semilla opcional
+# todos:
+for t in tests/test_*.gd; do echo "== $t"; godot --headless --path . -s "res://$t" 2>&1 | tail -3; done
+# bench rollback:
+godot --headless --path . -s res://tests/bench_net_rollback.gd -- 2 8
+# relay:
+cd server && npm ci && npm test && GODOT=$(which godot) npm run test:e2e
+```
+- **Fallas preexistentes**: ~20 tests viejos (rondas offline antiguas que quedaron desfasadas por retunes) fallan desde antes; no son regresiones. Antes de cambiar nada corré la suite completa y guardá la lista como línea base; compará contra ella.
+- **Flaky**: `tests/test_round25.gd` (posicional; se alejó de la pared en `0a48422` pero sigue intermitente).
+- Los tests online/paridad (`test_net_*`, `test_fight_sim`) deben pasar al 100 %.
+
+## 6. Exportar (solo Android y Linux; Jonathan no quiere otros)
+Plantillas 4.7.2: Editor → *Manage Export Templates* o descomprimir el `.tpz` en `~/.local/share/godot/export_templates/4.7.2.stable/`.
+
+**Android sin Android Studio (Fedora):**
+```bash
+sudo dnf install java-17-openjdk-devel unzip
+mkdir -p ~/Android/Sdk/cmdline-tools && cd ~/Android/Sdk/cmdline-tools
+# bajar commandlinetools-linux-*_latest.zip de developer.android.com/studio#command-tools
+unzip commandlinetools-linux-*.zip && mv cmdline-tools latest
+export ANDROID_HOME=~/Android/Sdk; export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+sdkmanager --licenses
+sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-35"
+keytool -genkeypair -v -keystore ~/debug.keystore -storepass android -alias androiddebugkey -keypass android \
+  -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+```
+Editor Settings → Export → Android: `java_sdk_path` (`/usr/lib/jvm/java-17-openjdk`), `android_sdk_path` (`~/Android/Sdk`), debug keystore/usuario/clave (`androiddebugkey`/`android`). El preset ya tiene arm64-v8a + armeabi-v7a, `permissions/internet=true` (imprescindible para online), sin Gradle.
+```bash
+godot --headless --path . --export-debug Android ../out/arena-game-debug.apk
+adb install -r ../out/arena-game-debug.apk
+```
+Para instalar por sideload en el teléfono hay que **desactivar Play Protect** (Play Store → Play Protect → ⚙ → desactivar análisis), si no bloquea el APK.
+
+**Linux:** `godot --headless --path . --export-release Linux ../out/linux/ArenaGame.x86_64` (o `--export-debug`) y `chmod +x`.
+
+**Firewall Fedora para LAN** (host de partida LAN):
+```bash
+sudo firewall-cmd --add-port=47801/udp --permanent && sudo firewall-cmd --reload
+```
+
+## 7. Relay (NO desplegado → partida rápida/salas por código no funcionan hasta desplegarlo; LAN sí)
+Local: `cd server && npm ci && npm run build && PORT=47800 REGION=local npm start` (o `docker build -t arena-relay . && docker run -p 47800:47800/udp arena-relay`). En el juego: campo relay `127.0.0.1:47800` o `sa=host:47800, us=...`.
+Deploy recomendado: Oracle Cloud Always Free, São Paulo, `server/deploy` con `docker compose up -d --build`; abrir UDP 47800 en VCN y en el firewall de la VM; no exponer 8080. Detalle en `server/DEPLOY.md`.
+
+## 8. Reglas del proyecto
+- Código verificado con **tests headless**; agregar test para cada feature/arreglo.
+- **Commit + push frecuentes** (checkpoints pequeños, mensajes tipo `phase7c: ...`).
+- `docs/design.md` = solo datos/reglas duraderas (no bitácora; el historial va en README/netcode).
+- **Evitar nombres y assets de FromSoftware** (Elden Ring, Dark Souls, etc.): nombres propios, números propios.
+- `DEBUG_GRANT` en `scripts/game_state.gd` debe quedar en **`false`** antes de cualquier release (hoy está en false; `--debug-grant` por CLI para pruebas).
+- `assets/` y las animaciones Mixamo **están trackeadas en git aunque `.gitignore` las cubra — no las borres ni las "limpies"**. Si agregás nuevas, `git add -f`.
+- Builds: solo Android + Linux.
+- Textos de UI en español.
+
+## 9. Retune de movimiento reciente (fase 7, offline = online)
+Andar 8,3 m/s, correr ×1,3. `FOOT_MOVE_ACCEL` 90 m/s², `FOOT_SPRINT_ACCEL` 75, `FOOT_BRAKE_ACCEL` 120, `SPRINT_RAMP_UP/DOWN` 0,06/0,08 s (online 278/208 ‰ por tick), `TURN_RATE_DEG` 1080 °/s (online 13 rumbos/tick), `STEER_TURN_MULT` 2,0 (>150° frena recto), `INPUT_SMOOTH` 0,03 s (solo offline). Atacando 30 %, bloqueando 45 %, agotado 60 %, aterrizaje 40 % por 0,18 s. Salto 8 m/s, gravedad 20 (×1,8 picado), 12 aguante, sin control aéreo. Dash montado conserva velocidad de locomoción (paridad).
+
+## 10. Huecos conocidos
+1. `NetLink` resuelve el DNS del relay **sincrónicamente** (`IP.resolve_hostname` en `net_link.gd` ~l.119 y ~l.181): congela la UI si el DNS tarda. Pasar a `IP.resolve_hostname_queue_item` + poll.
+2. Referencias a Elden Ring / Dark Souls en docs y comentarios (README rondas 9/25, `docs/design.md`, `docs/ELDEN_RING_REFERENCIA.md`, comentarios "estilo ER") → limpiar/renombrar.
+3. ~20 tests viejos fallando + `test_round25` flaky.
+4. Relay sin desplegar; IPv4 solo.
+5. Pendiente de design: Erika sin FBX de Mixamo.
+
+## 11. Próximos pasos (prioridad)
+1. Correr la suite completa y registrar línea base de fallas.
+2. Desplegar el relay (Oracle São Paulo) y probar partida rápida Android↔Linux real; anotar IP/host en la config por defecto.
+3. DNS asíncrono en `NetLink`.
+4. Arreglar o reescribir los ~20 tests viejos y estabilizar `test_round25`.
+5. Limpiar referencias FromSoftware en docs/comentarios/nombres.
+6. Probar rendimiento de rollback en un Android medio (overlay F3/"Red": µs por paso).
+7. Checklist de release: `DEBUG_GRANT=false`, keystore de release, versión de app.
