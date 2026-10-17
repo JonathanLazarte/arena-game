@@ -71,6 +71,11 @@ func _run() -> void:
 	_play(ms, 4000)
 	r = _same(ms, ms[0].session.base_frame)
 	check(ms[0].phase == NetMatch.Ph.PLAY and ms[1].phase == NetMatch.Ph.PLAY and ms[0].epoch == ms[1].epoch and r[1] == 0 and r[0] > 100, "segundo corte (solo invitado): época %d, %d ticks comunes" % [ms[0].epoch, r[0]])
+	for k in 2:
+		var rp := ms[k].replay_dict()
+		var path := ms[k].save_replay("user://net_reco_replay_%d.json" % k)
+		var ld: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+		check(rp["resync"].size() == 2 and NetMatch.verify_replay(rp).is_empty() and NetMatch.verify_replay(ld).is_empty() and rp["ck"].size() > 30, "repetición del %s reproducible tras 2 reconexiones (%d checksums)" % [["anfitrión", "invitado"][k], rp["ck"].size()])
 	# abandono: el invitado desaparece para siempre
 	for m in ms: m.grace_ms = 3000
 	ms[1].link.blackout = true

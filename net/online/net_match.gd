@@ -39,6 +39,8 @@ var _rs_at := 0
 var _snap_out: Array = []
 var _snap_at := 0
 var _snap_in: Dictionary = {}
+## Resincronizaciones de la partida [[tick, estado]] (la repetición continúa desde ellas).
+var resyncs: Array = []
 var load_ms := 0 ## lo que tardó en arrancar (pruebas / overlay)
 var phase: Ph = Ph.HELLO
 var link: NetLink
@@ -242,6 +244,7 @@ func _guest_snap(m: Dictionary) -> void:
 	_resync_apply(v, int(m["f"]))
 
 func _resync_apply(st: PackedInt64Array, f: int) -> void:
+	resyncs.append([f, st.duplicate()])
 	session.reset_to(st, f)
 	reconnecting = false
 	reconnects += 1
@@ -420,7 +423,8 @@ func replay_dict() -> Dictionary:
 		if f < n and f % 10 == 9:
 			ck[str(f)] = session.checksums[f]
 	return {"proto": PROTO, "ph": session.params_hash, "params": var_to_str(engine.params), "seed": seed_v,
-		"delay": input_delay, "me": me, "spawn": Array(engine.spawn), "in0": a, "in1": b, "ck": ck}
+		"delay": input_delay, "me": me, "spawn": Array(engine.spawn), "in0": a, "in1": b, "ck": ck,
+		"resync": resyncs.map(func(r: Array) -> Array: return [r[0], var_to_str(r[1])])}
 
 func save_replay(path: String = "") -> String:
 	if path == "":
@@ -443,7 +447,10 @@ static func verify_replay(d: Dictionary) -> Array[int]:
 	var bad: Array[int] = []
 	var ck: Dictionary = d["ck"]
 	var a: Array = d["in0"]; var b: Array = d["in1"]
+	var rs := {}
+	for r: Variant in d.get("resync", []): rs[int(r[0])] = str_to_var(String(r[1]))
 	for f in a.size():
+		if rs.has(f): s = (rs[f] as PackedInt64Array).duplicate() # reconexión: estado acordado
 		e.step(s, int(a[f]), int(b[f]))
 		if ck.has(str(f)) and int(ck[str(f)]) != e.checksum(s):
 			bad.append(f)
