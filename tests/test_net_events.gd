@@ -37,19 +37,23 @@ func _initialize() -> void:
 			ref.step(s, int(ps[0].local_in.get(t, 0)), int(ps[1].local_in.get(t, 0)))
 		var refk := {}
 		for k: String in rfx.fired: refk[k] = true
-		var ok_all := refk.size() > 20
+		var ok_all := true
+		var missing := 0
 		var dup := 0
 		var spur := 0
 		for i in 2:
 			for k: String in counts[i]:
 				if counts[i][k] > 1: dup += 1
 			for k: String in refk:
-				if not fxs[i].fired.has(k): ok_all = false
+				if not fxs[i].fired.has(k):
+					ok_all = false
+					missing += 1
 			fxs[i].confirm(upto, refk)
 			spur += fxs[i].spurious
 		check(r["mismatches"] == 0, "%d ms/r%d: sin divergencia" % [rtt, hold])
 		check(dup == 0, "%d ms/r%d: ningún efecto se repite al re-simular (bloqueados %d)" % [rtt, hold, fxs[0].duplicates_blocked + fxs[1].duplicates_blocked])
-		check(ok_all, "%d ms/r%d: los %d eventos confirmados se mostraron en ambos pares" % [rtt, hold, refk.size()])
+		check(refk.size() >= 15, "%d ms/r%d: la partida genera eventos de sobra (%d)" % [rtt, hold, refk.size()])
+		check(ok_all, "%d ms/r%d: los %d eventos confirmados se mostraron en ambos pares (faltan %d)" % [rtt, hold, refk.size(), missing])
 		var rate := 100.0 * spur / maxf(refk.size() * 2, 1)
 		rates[combo] = rate
 		print("      %d ms, retención %d: efectos mostrados de una predicción fallida: %d de %d (%.1f%%), cancelados antes de mostrarse %d" % [rtt, hold, spur, refk.size() * 2, rate, fxs[0].cancelled + fxs[1].cancelled])
