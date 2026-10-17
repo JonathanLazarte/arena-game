@@ -103,6 +103,8 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.boss_dir = Vector3(FxMath.COS[s[o + S.BS_DIR] & 255] / 4096.0, 0.0, FxMath.SIN[s[o + S.BS_DIR] & 255] / 4096.0)
 	f.boss_cd = s[o + S.BOSS_CD] / hz
 	f.boss_sel = s[o + S.AB_SEL]
+	if not params.is_empty():
+		f.boss_avail = SimAbilities.boss_avail(s, params, 0 if o == 0 else 1)
 	f.ab_t = s[o + S.AB_T] / hz
 	f.ab_air = s[o + S.AB_AIR] != 0
 	f.ab_locked = (s[o + S.AB_FL] & SimAbilities.FL_LOCKED) != 0

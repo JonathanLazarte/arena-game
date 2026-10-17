@@ -117,14 +117,15 @@ func _ready() -> void:
 	boss_next_btn.custom_minimum_size = Vector2(44, 44)
 	boss_next_btn.position = Vector2(884, 278)
 	boss_next_btn.add_theme_font_size_override("font_size", 22)
-	boss_next_btn.pressed.connect(func() -> void:
-		if online_mode:
-			# online: la sim lee la acción «boss_next» (flanco); se mantiene un instante
-			Input.action_press("boss_next")
-			get_tree().create_timer(0.12).timeout.connect(func() -> void: Input.action_release("boss_next"))
-		elif _player:
-			_player.cycle_boss())
+	boss_next_btn.pressed.connect(_on_boss_next)
 	add_child(boss_next_btn)
+	# fase 9: icono de la habilidad seleccionada dentro del botón «Jefe» (sin glifos de fuente)
+	var btb := btns["boss"] as TouchScreenButton
+	boss_icon = BossIcon.make("", 30.0)
+	boss_icon.name = "BossIcon"
+	boss_icon.position = Vector2(-15, -34)
+	btb.add_child(boss_icon)
+	(btn_labels["boss"] as Label).position = Vector2(-38, -2)
 	for l: Label in [round_label, timer_label, message]:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
@@ -207,6 +208,18 @@ func set_touch_visible(v: bool) -> void:
 var btns: Dictionary = {} ## ronda 21: acción -> TouchScreenButton
 var btn_labels: Dictionary = {}
 var boss_next_btn: Button
+var boss_icon: BossIcon
+var sim_match: SimMatch ## fase 9: ▶ pulsa IN_BOSS_NEXT en la sim (offline y online)
+var enemy_boss_strip: HBoxContainer ## habilidades del rival (la 3.ª del campeón aparece en la Fase II)
+
+## Fase 9: cambiar de habilidad es un flanco de entrada de la sim (antes, offline, se cambiaba en el
+## Fighter y SimView lo devolvía al valor de la sim en el tick siguiente: el botón «parpadeaba»).
+func _on_boss_next() -> void:
+	if sim_match:
+		sim_match.pulse(FightSim.IN_BOSS_NEXT)
+	else:
+		Input.action_press("boss_next")
+		get_tree().create_timer(0.12).timeout.connect(func() -> void: Input.action_release("boss_next"))
 ## Online: los botones táctiles solo generan acciones; la sim (SimMatch) las convierte en bits de entrada.
 var online_mode := false
 
@@ -438,12 +451,16 @@ func _update_contextual_buttons() -> void:
 	var combo_hits: Array = BossAbilities.def("combo_falso").get("hits", [])
 	(btns["boss_variation"] as TouchScreenButton).visible = tv and not _player.mounted and _player.ab_id == "combo_falso" and _player.ab_fired == combo_hits.size() - 1
 	if boss_next_btn:
-		boss_next_btn.visible = not _player.mounted and _player.boss_ids.size() > 1
+		boss_next_btn.visible = not _player.mounted and _player.avail_boss_ids().size() > 1
 	# Ronda 31: sin recarga; habilidad seleccionada y su coste
 	var bid := _player.selected_boss()
 	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if bid != "" and _player.boss_cost_ok(bid) else Color(1, 1, 1, 0.45)
 	if _changed(btn_labels["boss"], bid):
-		(btn_labels["boss"] as Label).text = (String(BossAbilities.def(bid)["name"]).split(" ")[0] + "\n" + BossAbilities.cost_text(bid)) if bid != "" else "Jefe"
+		(btn_labels["boss"] as Label).text = BossAbilities.short_name(bid) if bid != "" else "Jefe"
+		if boss_icon:
+			boss_icon.id = bid
+			boss_icon.visible = bid != ""
+	_update_enemy_strip()
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
 	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)
@@ -473,6 +490,12 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 	_build_pause_menu() # ronda 30
 	name_p.text = player.display_name
 	name_e.text = enemy.display_name
+	enemy_boss_strip = HBoxContainer.new()
+	enemy_boss_strip.name = "EnemyBoss"
+	enemy_boss_strip.add_theme_constant_override("separation", 4)
+	enemy_boss_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	enemy_boss_strip.position = Vector2(1280 - 20 - 3 * 34, 60)
+	root_control().add_child(enemy_boss_strip)
 	# Respuesta al pulsar Eikon (E / botón): antes no pasaba nada visible si el medidor no estaba lleno
 	player.summon_failed.connect(_on_summon_failed)
 	# Ronda 42: avisos breves sobre el luchador implicado.
@@ -758,3 +781,30 @@ func close_pause() -> void:
 	if controller:
 		controller.menu_hold = false
 	menu_opened.emit(false)
+
+## Fase 9: iconos de las habilidades de jefe disponibles del rival; resalta la que está usando.
+## Solo las que la sim permite ahora (la 3.ª del campeón no aparece hasta su Fase II).
+var _strip_key: Array = []
+func _update_enemy_strip() -> void:
+	if enemy_boss_strip == null or not is_instance_valid(_enemy):
+		return
+	var ids: Array = _enemy.avail_boss_ids() if _enemy.boss_ids.size() > 0 and String(_enemy.boss_ids[0]) != "" else []
+	var key := [ids, _enemy.ab_id if _enemy.ab_id != "" else ("estocada" if _enemy.boss_phase != 0 else "")]
+	if key == _strip_key:
+		return
+	_strip_key = key
+	for c in enemy_boss_strip.get_children():
+		c.queue_free()
+	enemy_boss_strip.visible = ids.size() > 0 and (_enemy_shows_bosses())
+	for id: String in ids:
+		var ic := BossIcon.make(id, 30.0)
+		ic.name = "E_" + id
+		ic.active = key[1] == id
+		ic.tooltip_text = String(BossAbilities.def(id).get("name", id))
+		enemy_boss_strip.add_child(ic)
+	enemy_boss_strip.position.x = 1280 - 20 - ids.size() * 34
+
+## El rival aleatorio offline lleva la habilidad por defecto: solo se muestra en campeones y online.
+var show_enemy_bosses := false
+func _enemy_shows_bosses() -> bool:
+	return show_enemy_bosses or online_mode

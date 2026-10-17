@@ -31,6 +31,7 @@ func _run() -> void:
 	check(h.size() >= 3 and float(h[-1][0]) > float(h[0][0]) * 2.0, "combo falso: varias etapas con la pausa falsa más larga al final (diseño actual)")
 	var rd := BossAbilities.def("rafaga")
 	check(int(rd["count"]) >= 1 and float(rd["home_deg"]) <= 90.0, "ráfaga: intervalos amplios, área ancha, persigue toda su vida")
+	gs.char_boss[gs.character_id] = ["estocada", "rafaga", "combo_falso"]
 	gs.from_lobby = true
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
@@ -43,14 +44,32 @@ func _run() -> void:
 	var e := arena.enemy
 	arena.controller.set_physics_process(false)
 	# --- HUD: flecha para cambiar de habilidad ---
-	p.set_boss_abilities(["estocada", "rafaga", "combo_falso"])
 	await process_frame
 	await process_frame
 	var bn: Button = arena.hud.boss_next_btn
 	check(bn != null and bn.visible, "botón ▶ de habilidad de jefe visible (PC y táctil)")
-	p.boss_sel = 0
+	check(p.selected_boss() == "estocada", "empieza en la primera habilidad")
+	# fase 9: el ▶ es un flanco de entrada de la sim; la selección no vuelve atrás en los ticks siguientes
 	bn.pressed.emit()
-	check(p.selected_boss() == "rafaga", "el botón cambia la habilidad seleccionada")
+	for k in 6: await physics_frame
+	check(p.selected_boss() == "rafaga", "▶ cambia a la siguiente habilidad (%s)" % p.selected_boss())
+	for k in 20: await physics_frame
+	check(p.selected_boss() == "rafaga", "la selección se mantiene (no parpadea de vuelta)")
+	bn.pressed.emit()
+	bn.pressed.emit() # dos toques seguidos: dos cambios
+	for k in 10: await physics_frame
+	check(p.selected_boss() == "estocada", "dos toques rápidos = dos cambios (%s)" % p.selected_boss())
+	# toque de teclado N más corto que un tick (pulsar y soltar en el mismo fotograma)
+	var ev := InputEventAction.new(); ev.action = "boss_next"; ev.pressed = true
+	Input.parse_input_event(ev)
+	var ev2 := InputEventAction.new(); ev2.action = "boss_next"; ev2.pressed = false
+	Input.parse_input_event(ev2)
+	for k in 6: await physics_frame
+	check(p.selected_boss() == "rafaga", "toque breve de N también cambia (%s)" % p.selected_boss())
+	var bi: BossIcon = arena.hud.boss_icon
+	await process_frame
+	check(bi != null and bi.id == "rafaga" and bi.visible, "el botón Jefe muestra el icono de la seleccionada")
+	check((arena.hud.btn_labels["boss"] as Label).text == "Ráfaga", "y su nombre corto sin números (%s)" % (arena.hud.btn_labels["boss"] as Label).text)
 	# --- Pose de carga del fuerte desde que se mantiene ---
 	_fresh(p)
 	p.global_position = Vector3(0, 0, 0)

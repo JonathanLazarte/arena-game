@@ -1207,10 +1207,16 @@ func _build_boss() -> void:
 	list_box.add_child(UIKit.label("Equipadas %d/%d · B usa · N cambia" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.MUTED))
 	for id: String in BossAbilities.all_ids():
 		var on: bool = id in eq
-		var b := UIKit.button(("✔ " if on else "   ") + "%s  (%s)" % [BossAbilities.def(id)["name"], BossAbilities.cost_text(id)], 17, UIKit.ORANGE if on else UIKit.BLUE)
+		# fase 9: icono vectorial propio (antes «✔» de la fuente, que en Android salía como caja con números)
+		var b := UIKit.button("          %s  (%s)" % [BossAbilities.def(id)["name"], BossAbilities.cost_text(id)], 17, UIKit.ORANGE if on else UIKit.BLUE)
 		b.name = "Boss_" + id
 		b.custom_minimum_size = Vector2(370, 42)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var ic := BossIcon.make(id, 32.0)
+		ic.name = "Icon"
+		ic.active = on
+		ic.position = Vector2(10, 5)
+		b.add_child(ic)
 		b.pressed.connect(func() -> void:
 			gs.toggle_boss_ability(id)
 			gs.save_loadout()

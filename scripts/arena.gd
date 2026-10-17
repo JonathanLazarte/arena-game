@@ -139,6 +139,8 @@ func _setup_sim_match() -> void:
 	sim_match.camera = camera
 	add_child(sim_match)
 	sim_match.joystick = hud.joystick
+	hud.sim_match = sim_match
+	hud.show_enemy_bosses = champion_id != ""
 	if online:
 		hud.online_mode = true
 		online.local_ready = false # hasta calentar la escena (ver _process_online_hud)

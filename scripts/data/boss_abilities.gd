@@ -44,6 +44,27 @@ const DEFS := {
 		"tele": "El rival se eleva y queda suspendido; empieza a bajar = muévete."},
 }
 
+## Fase 9: nombre corto para botones/HUD y color propio de cada habilidad (icono BossIcon).
+const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfaga", "escudo_mana": "Escudo",
+	"combo_falso": "Pausa falsa", "salto_caida": "Caída", "tajo_retardado": "Tajo lento", "presa_verdugo": "Presa",
+	"giro_martillo": "Giro", "danza_cisne": "Danza", "paso_espectral": "Paso", "onda_rastrera": "Onda",
+	"rayos_trazadores": "Rayos", "lluvia_meteoros": "Meteoros", "aliento_dragon": "Aliento", "furia_fase": "Furia",
+	"postura_contra": "Contragolpe", "embate_sismico": "Embate", "lanza_celeste": "Lanza"}
+const BASE_COLORS := {"estocada": Color(1.0, 0.3, 0.12), "carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(1.0, 0.82, 0.3),
+	"escudo_mana": Color(0.3, 1.0, 1.0), "combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}
+
+static func short_name(id: String) -> String:
+	if SHORT.has(id):
+		return String(SHORT[id])
+	var d := def(id)
+	return String(d.get("name", id)).split(" ")[0] if not d.is_empty() else id
+
+static func color_of(id: String) -> Color:
+	if BASE_COLORS.has(id):
+		return BASE_COLORS[id]
+	var d := def(id)
+	return d.get("color", Color(0.9, 0.85, 0.7)) if not d.is_empty() else Color(0.9, 0.85, 0.7)
+
 static func all_ids() -> Array:
 	return ORDER + EXT_ORDER
 

@@ -114,6 +114,35 @@ func _net_step() -> void:
 		net.save_replay()
 		match_ended.emit(w2, "ko")
 
+## Fase 9: pulsación garantizada de un botón (▶, toques breves): el bit sale exactamente en un
+## tick muestreado y al siguiente no, así la sim ve un único flanco aunque el toque dure menos que
+## un tick o el botón de la interfaz no tenga acción mantenida. Varias pulsaciones se encolan con un
+## tick libre entre ellas.
+var _pulses: Array[int] = []
+var _pulse_gap := 0
+func pulse(bit: int) -> void:
+	if _pulses.size() < 8:
+		_pulses.append(bit)
+
+func _take_pulse() -> int:
+	if _pulse_gap != 0:
+		_pulse_gap = 0
+		return 0
+	if _pulses.is_empty():
+		return 0
+	_pulse_gap = 1
+	return _pulses.pop_front()
+
+## Toques de teclado/táctiles más cortos que un tick: se convierten en pulso (si no, se perderían).
+const PULSE_ACTIONS := ["boss_next", "spell_next", "boss", "spell", "flask", "boss_variation"]
+func _input(ev: InputEvent) -> void:
+	if not running or ev.is_echo():
+		return
+	for a: String in PULSE_ACTIONS:
+		if InputMap.has_action(a) and ev.is_action_pressed(a):
+			_tap_seen[a] = Engine.get_physics_frames()
+var _tap_seen := {}
+
 func _sample(i: int) -> int:
 	if input_override[i].is_valid():
 		return int(input_override[i].call(tick_n))
@@ -164,6 +193,14 @@ func sample_device(i: int) -> int:
 	var v := SimView.pack_input(world_move(i, mv), mv.length() < 0.6 and mv.length() > 0.2, atk, block, parry, roll, sprint, swap, _lock[i])
 	if i == local_slot:
 		v |= extra_buttons()
+		var held := v
+		# toque que empezó y acabó entre dos ticks: sin bit mantenido, pulso de un tick
+		for a: String in _tap_seen:
+			var bit: int = EXTRA_ACTIONS.get(a, 0)
+			if bit != 0 and (held & bit) == 0 and not Input.is_action_pressed(a) and not _pulses.has(bit):
+				_pulses.append(bit)
+		_tap_seen.clear()
+		v |= _take_pulse()
 	return v
 
 ## Fase 4: botones de jefe, magia, eikon y montura (la sim detecta el flanco de pulsación).

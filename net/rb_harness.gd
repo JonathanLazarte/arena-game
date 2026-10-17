@@ -16,6 +16,7 @@ var bot_change := 0.25
 var bot_or := 0 ## bits siempre pulsados (p. ej. fijado)
 var last_peers: Array[RbSession] = [] ## pares de la última ejecución (para inspección en pruebas)
 var params_hash := [0, 0] ## params_checksum de cada par (0 = sin comprobación)
+var input_fn: Callable ## fase 9: entrada guionizada func(par: int, tick: int, bot: int) -> int (vacío = solo bots)
 var corrupt_at := -1 ## prueba negativa: altera el estado del par 1 en ese tick (simula una fuente no determinista)
 
 func run(ticks: int) -> Dictionary:
@@ -47,7 +48,10 @@ func run(ticks: int) -> Dictionary:
 			var p := peers[i]
 			if k < ticks and bots[i].randf() < bot_change: # cambia de intención ~cada 4 ticks
 				cur_in[i] = (bots[i].randi() & bot_mask) | bot_or
-			p.add_local_input(cur_in[i] if k < ticks else 0)
+			var li := cur_in[i] if k < ticks else 0
+			if input_fn.is_valid() and k < ticks:
+				li = int(input_fn.call(i, k, li))
+			p.add_local_input(li)
 			var t0 := Time.get_ticks_usec()
 			p.tick()
 			if i == 1 and p.frame == corrupt_at:

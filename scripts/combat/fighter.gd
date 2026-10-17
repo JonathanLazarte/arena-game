@@ -1183,7 +1183,8 @@ var ab_combo_wait: float = 0.0
 var ab_combo_finisher: bool = false
 var ab_combo_variant: bool = false
 var boss_ids: Array = BossAbilities.DEFAULT.duplicate() ## equipadas (máx. 3)
-var boss_sel: int = 0
+var boss_sel: int = 0 ## lo escribe SimView (AB_SEL); cambiar = flanco IN_BOSS_NEXT en la sim
+var boss_avail: int = 99 ## habilidades disponibles ahora (SimAbilities.boss_avail: la 3.ª del campeón llega en Fase II)
 var ab_id: String = "" ## habilidad en curso (la estocada usa boss_phase)
 var ab_t: float = 0.0
 var ab_vel: Vector3 = Vector3.ZERO
@@ -1213,10 +1214,9 @@ func selected_boss() -> String:
 		return ""
 	return String(boss_ids[clampi(boss_sel, 0, boss_ids.size() - 1)])
 
-func cycle_boss() -> String:
-	if boss_ids.size() > 1:
-		boss_sel = (boss_sel + 1) % boss_ids.size()
-	return selected_boss()
+## Habilidades que se pueden usar/seleccionar ahora (las de más allá de boss_avail están ocultas).
+func avail_boss_ids() -> Array:
+	return boss_ids.slice(0, mini(boss_avail, boss_ids.size()))
 
 func ab_def() -> Dictionary:
 	return BossAbilities.def(ab_id)
