@@ -8,19 +8,15 @@ func _run() -> void:
 	await process_frame
 	var arena: Arena = current_scene as Arena
 	arena.sim_ai.enabled = false
-	arena.player.dismount(false)
-	arena.enemy.dismount(false)
+	pass # fase 8: dismount() vive en la sim (pulsar el bit vía sim_match.input_override)
+	pass # fase 8: dismount() vive en la sim (pulsar el bit vía sim_match.input_override)
 	await create_timer(0.3).timeout
-	arena.player.owned_mount.global_position = Vector3(-12, 0.2, 10)
-	arena.player.owned_mount.home = Vector3(-12, 0.2, 10)
-	arena.enemy.owned_mount.global_position = Vector3(12, 0.2, 10)
-	arena.enemy.owned_mount.home = Vector3(12, 0.2, 10)
 	await create_timer(0.5).timeout
 	arena.enemy.global_position = arena.player.global_position + arena.player.facing * 3.0 + arena.player.facing.cross(Vector3.UP) * 1.2
 	arena.enemy.facing = -arena.player.facing
 	arena.enemy.want_block = true
 	await create_timer(0.6).timeout
-	arena.player.attack_light()
+	pass # fase 8: attack_light() vive en la sim (pulsar el bit vía sim_match.input_override)
 	await create_timer(0.3).timeout
 	var path := "/workspace/out/arena-shot2.png"
 	var args := OS.get_cmdline_user_args()

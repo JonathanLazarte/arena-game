@@ -67,9 +67,10 @@ godot --headless --path . -s res://tests/bench_net_rollback.gd -- 2 8
 # relay:
 cd server && npm ci && npm test && GODOT=$(which godot) npm run test:e2e
 ```
-- **Fallas preexistentes**: ~20 tests viejos (rondas offline antiguas que quedaron desfasadas por retunes) fallan desde antes; no son regresiones. Antes de cambiar nada corré la suite completa y guardá la lista como línea base; compará contra ella.
-- **Flaky**: `tests/test_round25.gd` (posicional; se alejó de la pared en `0a48422` pero sigue intermitente).
-- Los tests online/paridad (`test_net_*`, `test_fight_sim`) deben pasar al 100 %.
+- **Fase 8**: las pruebas antiguas de jugabilidad del Fighter offline se portaron a la sim (`test_sim_rules`, `test_sim_ai`) o se retiraron; las secciones retiradas de los tests por rondas llevan el comentario `[fase 8] retirado` con el motivo. Los tests de datos/UI se ajustaron al diseño actual.
+- Línea base: toda la suite pasa salvo `test_ui_audio` (la ✕ de Ajustes no sigue el ancho del panel, UI) y los flaky de abajo. `test_net_relay5/matchmaking/reconnect` necesitan el relay local (`cd server && npm run test:e2e`).
+- **Flaky**: `test_net_events` (a veces 1 evento de diferencia predicho/confirmado bajo carga), `test_round25` (posicional).
+- Los tests online/sim (`test_net_*`, `test_fight_sim`, `test_sim_*`) deben pasar al 100 %.
 
 ## 6. Exportar (solo Android y Linux; Jonathan no quiere otros)
 Plantillas 4.7.2: Editor → *Manage Export Templates* o descomprimir el `.tpz` en `~/.local/share/godot/export_templates/4.7.2.stable/`.
@@ -114,21 +115,21 @@ Deploy recomendado: Oracle Cloud Always Free, São Paulo, `server/deploy` con `d
 - Builds: solo Android + Linux.
 - Textos de UI en español.
 
-## 9. Retune de movimiento reciente (fase 7, offline = online)
-Andar 8,3 m/s, correr ×1,3. `FOOT_MOVE_ACCEL` 90 m/s², `FOOT_SPRINT_ACCEL` 75, `FOOT_BRAKE_ACCEL` 120, `SPRINT_RAMP_UP/DOWN` 0,06/0,08 s (online 278/208 ‰ por tick), `TURN_RATE_DEG` 1080 °/s (online 13 rumbos/tick), `STEER_TURN_MULT` 2,0 (>150° frena recto), `INPUT_SMOOTH` 0,03 s (solo offline). Atacando 30 %, bloqueando 45 %, agotado 60 %, aterrizaje 40 % por 0,18 s. Salto 8 m/s, gravedad 20 (×1,8 picado), 12 aguante, sin control aéreo. Dash montado conserva velocidad de locomoción (paridad).
+## 9. Movimiento (fase 7, vive en la sim)
+Andar 8,3 m/s, correr ×1,3; aceleraciones, giro (13 rumbos/tick) y frenado en `fight_sim.gd`. Atacando 30 %, bloqueando 45 %, agotado 60 %, aterrizaje 40 % por 0,18 s. Salto 8 m/s, gravedad 20 (×1,8 picado), 12 aguante, sin control aéreo. Offline ya no aplica suavizado de entrada propio.
 
 ## 10. Huecos conocidos
 1. `NetLink` resuelve el DNS del relay **sincrónicamente** (`IP.resolve_hostname` en `net_link.gd` ~l.119 y ~l.181): congela la UI si el DNS tarda. Pasar a `IP.resolve_hostname_queue_item` + poll.
 2. Referencias a Elden Ring / Dark Souls en docs y comentarios (README rondas 9/25, `docs/design.md`, `docs/ELDEN_RING_REFERENCIA.md`, comentarios "estilo ER") → limpiar/renombrar.
-3. ~20 tests viejos fallando + `test_round25` flaky.
+3. `test_ui_audio` (✕ de Ajustes) falla; `test_net_events` y `test_round25` flaky.
+6. Fase 8: el HUD del campeón muestra las 3 habilidades aunque la 3.ª se desbloquee en Fase II; offline no hay apuntado con ratón del arco (sigue facing/fijado); visuales de habilidades offline = primitivas de SimWorld.
 4. Relay sin desplegar; IPv4 solo.
 5. Pendiente de design: Erika sin FBX de Mixamo.
 
 ## 11. Próximos pasos (prioridad)
-1. Correr la suite completa y registrar línea base de fallas.
 2. Desplegar el relay (Oracle São Paulo) y probar partida rápida Android↔Linux real; anotar IP/host en la config por defecto.
 3. DNS asíncrono en `NetLink`.
-4. Arreglar o reescribir los ~20 tests viejos y estabilizar `test_round25`.
+4. Estabilizar `test_net_events`/`test_round25`; arreglar la ✕ de Ajustes; visuales completos de habilidades sobre eventos de la sim.
 5. Limpiar referencias FromSoftware en docs/comentarios/nombres.
 6. Probar rendimiento de rollback en un Android medio (overlay F3/"Red": µs por paso).
 7. Checklist de release: `DEBUG_GRANT=false`, keystore de release, versión de app.

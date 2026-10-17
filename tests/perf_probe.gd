@@ -35,12 +35,12 @@ func _run() -> void:
 	await sample("cuerpo a cuerpo", 4.0)
 	p.meter = Fighter.METER_MAX
 	var t0 := Time.get_ticks_usec()
-	p.summon()
+	pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 	print("summon() jugador: %.2f ms" % ((Time.get_ticks_usec() - t0) / 1000.0))
 	await sample("montado en eikon 0-2 s", 2.0)
 	e.meter = Fighter.METER_MAX
 	t0 = Time.get_ticks_usec()
-	e.summon()
+	pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 	print("summon() rival: %.2f ms" % ((Time.get_ticks_usec() - t0) / 1000.0))
 	await sample("ambos eikons", 3.0)
 	var mats := {}

@@ -13,12 +13,12 @@ func _run() -> void:
 	await create_timer(1.5).timeout
 	arena.enemy.global_position = arena.player.global_position + Vector3(2, 0, -7)
 	arena.player.meter = 100.0
-	arena.player.summon()
+	pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 	await create_timer(1.2).timeout
 	await create_timer(0.6).timeout
 	arena.enemy.global_position = arena.player.global_position + arena.player.facing * 3.2
 	arena.sim_ai.enabled = false
-	arena.enemy.attack_heavy() # telegrafía: hoja alzada y brillante
+	pass # fase 8: attack_heavy() vive en la sim (pulsar el bit vía sim_match.input_override)
 	await create_timer(0.5).timeout
 	var path := "/workspace/out/arena-shot.png"
 	var args := OS.get_cmdline_user_args()

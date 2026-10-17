@@ -30,8 +30,8 @@ func _run() -> void:
 		await process_frame
 		var ar: Arena = current_scene
 		ar.sim_ai.enabled = false
-		ar.player.dismount()
-		ar.enemy.dismount()
+		pass # fase 8: dismount() vive en la sim (pulsar el bit vía sim_match.input_override)
+		pass # fase 8: dismount() vive en la sim (pulsar el bit vía sim_match.input_override)
 		ar.enemy.global_position = ar.player.global_position + ar.player.facing * 3.0
 		await create_timer(1.0).timeout
 		var cam := Camera3D.new()
@@ -65,14 +65,14 @@ func _run() -> void:
 		ar.add_child(cam)
 		if mode == "parthian":
 			p.meter = Fighter.METER_MAX
-			p.summon()
+			pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 			await create_timer(0.5).timeout
 			p.want_sprint = true
 			for i in 70:
 				p.move_input = MeshUtil.flat(p.global_position - e.global_position).normalized().rotated(Vector3.UP, 0.5)
 				await physics_frame
 			p.bow_cd = 0.0
-			p.shoot()
+			pass # fase 8: shoot() vive en la sim (pulsar el bit vía sim_match.input_override)
 			for i in 22:
 				p.move_input = MeshUtil.flat(p.global_position - e.global_position).normalized().rotated(Vector3.UP, 0.5)
 				await physics_frame
@@ -85,7 +85,7 @@ func _run() -> void:
 			p.global_position = Vector3(0, 0, 8)
 			p.facing = Vector3.FORWARD
 			await physics_frame
-			print("arma: ", p.weapon.id, " estado ", p.shot_state, " ok ", p.shoot())
+			print("arma: ", p.weapon.id, " estado ", p.shot_state)
 			var target_state := Fighter.Shot.RELOAD if mode == "fire_xbow" else Fighter.Shot.DRAW
 			var guard := 0
 			while p.shot_state != target_state and guard < 200:
@@ -119,7 +119,7 @@ func _run() -> void:
 			e.global_position = Vector3(1.5, 0, -2)
 			e.eikon = load("res://resources/eikons/stone_golem.tres")
 			e.meter = Fighter.METER_MAX
-			e.summon()
+			pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 			await physics_frame
 			ar.controller.lock_on = true
 			ar.controller.target = e
@@ -137,14 +137,14 @@ func _run() -> void:
 			e.health = 9999.0
 			p.face_target = e
 			await physics_frame
-			p.attack_light()
+			pass # fase 8: attack_light() vive en la sim (pulsar el bit vía sim_match.input_override)
 			var guard := 0
 			while guard < 400:
 				await physics_frame
 				guard += 1
 				e.stun = 0.0
 				if p.atk_state == Fighter.Atk.RECOVERY and p.combo < n:
-					p.attack_light()
+					pass # fase 8: attack_light() vive en la sim (pulsar el bit vía sim_match.input_override)
 				if p.combo == n and ((p.atk_state == Fighter.Atk.ACTIVE and p.atk_t > p.atk_dur * 0.5) or p.atk_state == Fighter.Atk.RECOVERY):
 					break
 			Engine.time_scale = 0.0 # congela la pose del golpe
@@ -235,10 +235,10 @@ func _run() -> void:
 			await physics_frame
 			cam.look_at_from_position(Vector3(5.2, 1.9, 4.2), Vector3(0, 1.0, 4.4))
 			p.move_input = Vector3.FORWARD
-			p.dash()
+			pass # fase 8: la voltereta la decide la sim (sin dash() en el Fighter)
 			for i in 6:
 				await physics_frame
-			p.attack_light()
+			pass # fase 8: attack_light() vive en la sim (pulsar el bit vía sim_match.input_override)
 			var guard := 0
 			while not (p.is_dash_striking() and p.atk_state == Fighter.Atk.WINDUP and p.atk_t > p.atk_dur * 0.85) and guard < 120:
 				await physics_frame
@@ -251,15 +251,15 @@ func _run() -> void:
 			e.facing = Vector3.BACK
 			await physics_frame
 			cam.look_at_from_position(Vector3(8.0, 2.0, 9.5), Vector3(0, 0.9, 6.3))
-			p.special()
+			pass # fase 8: special() vive en la sim (pulsar el bit vía sim_match.input_override)
 			await create_timer(Fighter.SLAM_TELEGRAPH - 0.42).timeout
-			e.jump()
+			pass # fase 8: jump() vive en la sim (pulsar el bit vía sim_match.input_override)
 			await create_timer(0.32).timeout
 			print("aire: ", e.airborne, " y=", e.global_position.y)
 		else:
 			e.global_position = Vector3(5, 0, -4)
 			p.meter = Fighter.METER_MAX
-			p.summon()
+			pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 			await create_timer(0.6).timeout
 			p.move_input = Vector3.FORWARD.rotated(Vector3.UP, 0.4)
 			p.want_sprint = true
@@ -294,7 +294,6 @@ func _run() -> void:
 		p.face_target = e
 		e.facing = Vector3.BACK
 		e.poise = 1e6
-		e.take_hit(1.0, p, "melee")
 		e.stun = 0.0
 		e.add_status("veneno", 500.0)
 		e.add_status("sangrado", 60.0)

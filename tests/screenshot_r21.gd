@@ -25,10 +25,10 @@ func _run() -> void:
 	arena.enemy.global_position = p.global_position + p.facing * 6.0
 	p.meter = Fighter.METER_MAX
 	await create_timer(0.2).timeout
-	p.cast_spell()
+	pass # fase 8: cast_spell() vive en la sim (pulsar el bit vía sim_match.input_override)
 	await create_timer(0.55).timeout
 	root.get_viewport().get_texture().get_image().save_png(args[0])
-	p.summon()
+	pass # fase 8: summon() vive en la sim (pulsar el bit vía sim_match.input_override)
 	await create_timer(1.5).timeout
 	root.get_viewport().get_texture().get_image().save_png(args[1])
 	print("saved")
