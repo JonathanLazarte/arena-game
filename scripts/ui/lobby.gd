@@ -434,6 +434,8 @@ func _build_ui() -> void:
 	sheet.attributes_requested.connect(open_attributes)
 	sheet.changed.connect(func() -> void: _refresh_all())
 	close_button = UIKit.close_x(root_ui, Vector2(850 + 410 - 50, 82), "CloseX", func() -> void: set_tab(""))
+	panel.resized.connect(_place_close)
+	sheet.resized.connect(_place_close)
 	_build_modal()
 	attr_screen = AttrScreen.new()
 	attr_screen.visible = false
@@ -705,7 +707,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 	right_panel.visible = tab != "" and tab != "Personaje"
 	sheet.visible = tab == "Personaje"
 	close_button.visible = tab != ""
-	close_button.position = Vector2(262 + 1000 - 50, 82) if tab == "Personaje" else Vector2(850 + 410 - 50, 82)
+	_place_close()
 
 	name_label.visible = tab != "Personaje"
 	role_label.visible = tab != "Personaje"
@@ -1149,6 +1151,8 @@ func _build_settings() -> void:
 	list_box.move_child(ct, 0) # Controles arriba, a la vista
 	list_box.move_child(brow, 1)
 	var hand_help := UIKit.label("Mano izquierda: toque breve = parry · mantener = escudo (si está equipado).", 14, UIKit.MUTED)
+	hand_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART # no ensancha el panel (la ✕ queda en la esquina)
+	hand_help.custom_minimum_size = Vector2(370, 0)
 	list_box.add_child(hand_help)
 	list_box.move_child(hand_help, 2)
 	# Ronda 25: cámara
@@ -1214,3 +1218,13 @@ func _build_boss() -> void:
 			detail.text = BossAbilities.codex(id))
 		list_box.add_child(b)
 	detail.text = "[b]Habilidades de jefe[/b]\nCuestan aguante, maná (Energía) o vida (nunca te dejan a 0). Recarga global de 1,4 s entre habilidades.\n\n" + BossAbilities.codex(String(eq[0]))
+
+## La ✕ sigue la esquina superior derecha del panel visible aunque su contenido lo ensanche.
+func _place_close() -> void:
+	if close_button == null:
+		return
+	var pnl: Control = sheet if tab == "Personaje" else right_panel
+	if pnl == null:
+		return
+	var r := pnl.get_global_rect()
+	close_button.global_position = Vector2(r.position.x + r.size.x - 50, r.position.y + 6)
