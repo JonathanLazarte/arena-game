@@ -127,17 +127,20 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 	model.rotation.y = PI # KayKit mira a +Z; el juego usa -Z como frente
 	model.scale = Vector3.ONE * SCALE
 	add_child(model)
-	body_mat = StandardMaterial3D.new()
-	body_mat.albedo_texture = load(cdef.texture_path)
-	accent_mat = body_mat.duplicate() as StandardMaterial3D
-	set_tint(c, false)
+	var has_tex := cdef.texture_path != "" and ResourceLoader.exists(cdef.texture_path)
+	if has_tex:
+		body_mat = StandardMaterial3D.new()
+		body_mat.albedo_texture = load(cdef.texture_path)
+		accent_mat = body_mat.duplicate() as StandardMaterial3D
+		set_tint(c, false)
 	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
 	var own_shield := cdef.shield_mesh != ""
 	for mi in AnimUtil.meshes(model):
 		var n := String(mi.name)
-		if not n.begins_with(cdef.body_prefix) or n.contains("Shield"):
+		if cdef.body_prefix != "" and not n.begins_with(cdef.body_prefix) or n.contains("Shield"):
 			mi.visible = false
-		mi.material_override = accent_mat if n.ends_with("Cape") else body_mat
+		if has_tex:
+			mi.material_override = accent_mat if n.ends_with("Cape") else body_mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	if melee_w.procedural == "lanza":
 		sword = _make_lance(sk)
@@ -150,13 +153,15 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 		offhand_weapon_mesh = _weapon_mesh(sk, offhand_def.mesh_source, offhand_mesh_name, true)
 	if own_shield:
 		shield = _weapon_mesh(sk, cdef.shield_source, cdef.shield_mesh)
-		shield.material_override = accent_mat
+		if accent_mat:
+			shield.material_override = accent_mat
 	else:
 		# Escudo invisible de relleno (así el resto del código no tiene casos nulos)
 		shield = MeshInstance3D.new()
 		shield.name = "NoShield"
 		sk.add_child(shield)
-	sword.material_override = body_mat if sword.material_override == null else sword.material_override
+	if body_mat:
+		sword.material_override = body_mat if sword.material_override == null else sword.material_override
 	glow_mat = StandardMaterial3D.new()
 	glow_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	glow_mat.albedo_color = Color.BLACK
@@ -167,7 +172,7 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 	# Arco: arma propia enganchada a la mano izquierda con BoneAttachment3D
 	var att := BoneAttachment3D.new()
 	att.name = "bow_slot"
-	att.bone_name = "handslot.l"
+	att.bone_name = _hand_bone(sk, true)
 	sk.add_child(att)
 	bow = MeshUtil.box(att, Vector3(0.1, 1.8, 0.14), Vector3.ZERO, Color(0.5, 0.3, 0.12))
 	MeshUtil.box(bow, Vector3(0.02, 1.7, 0.02), Vector3(0, 0, 0.25), Color(0.9, 0.9, 0.85)) # cuerda
@@ -182,6 +187,8 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 	riding.name = "RidingPose"
 	sk.add_child(riding)
 	ap = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if ap == null and sk != null:
+		ap = _create_fallback_ap(sk)
 	AnimUtil.set_loops(ap, ["Idle", "Walking_A", "Walking_Backwards", "Running_A", "Running_Strafe_Left",
 		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose", "Jump_Idle"])
 	author_dash_strike(ap, melee_w.anim_light[1 % melee_w.anim_light.size()])
@@ -214,6 +221,62 @@ func _apply_mixamo(melee_w: WeaponDef) -> void:
 			_loco_clips[k] = MX + String(MX_LOCO[k])
 var _loco_clips: Dictionary = {}
 
+const RETARGET_BONE_MAP := {
+	"hips": "Hip", "spine": "Spine", "chest": "Chest", "neck": "Neck", "head": "Head",
+	"upperarm.l": "UpperArmL", "lowerarm.l": "LoweArmL", "wrist.l": "HandL", "hand.l": "HandL", "handslot.l": "HandL",
+	"upperarm.r": "UpperArmR", "lowerarm.r": "LoweArmR", "wrist.r": "HandR", "hand.r": "HandR", "handslot.r": "HandR",
+	"upperleg.l": "ThighL", "lowerleg.l": "ShinL", "foot.l": "FootL",
+	"upperleg.r": "ThighR", "lowerleg.r": "ShinR", "foot.r": "FootR"
+}
+
+static func _hand_bone(sk: Skeleton3D, left: bool) -> String:
+	if sk == null:
+		return "handslot.l" if left else "handslot.r"
+	var candidates := ["handslot.l", "HandL", "hand.l", "wrist.l", "Wrist.L", "Fingers2L"] if left else ["handslot.r", "HandR", "hand.r", "wrist.r", "Wrist.R", "Fingers2R"]
+	for b in candidates:
+		if sk.find_bone(b) != -1:
+			return b
+	return candidates[0]
+
+func _create_fallback_ap(sk: Skeleton3D) -> AnimationPlayer:
+	var fallback_ap := AnimationPlayer.new()
+	fallback_ap.name = "AnimationPlayer"
+	sk.add_child(fallback_ap)
+	fallback_ap.root_node = NodePath("..")
+	var base_scene := load("res://assets/models/Knight.glb") as PackedScene
+	var base_inst := base_scene.instantiate()
+	var base_ap := base_inst.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	var lib := AnimationLibrary.new()
+	if base_ap:
+		for anim_name in base_ap.get_animation_list():
+			var src_anim := base_ap.get_animation(anim_name)
+			var dst_anim := Animation.new()
+			dst_anim.length = src_anim.length
+			dst_anim.loop_mode = src_anim.loop_mode
+			for tr_idx in src_anim.get_track_count():
+				var path := String(src_anim.track_get_path(tr_idx))
+				var ty := src_anim.track_get_type(tr_idx)
+				var parts := path.split(":")
+				if parts.size() == 2:
+					var src_bone := parts[1]
+					var mapped: String = RETARGET_BONE_MAP.get(src_bone, "")
+					if mapped == "" and sk.find_bone(src_bone) != -1:
+						mapped = src_bone
+					if mapped != "" and sk.find_bone(mapped) != -1:
+						var new_tr := dst_anim.add_track(ty)
+						dst_anim.track_set_path(new_tr, NodePath(":" + mapped))
+						for k in src_anim.track_get_key_count(tr_idx):
+							var t := src_anim.track_get_key_time(tr_idx, k)
+							var v = src_anim.track_get_key_value(tr_idx, k)
+							match ty:
+								Animation.TYPE_ROTATION_3D: dst_anim.rotation_track_insert_key(new_tr, t, v)
+								Animation.TYPE_POSITION_3D: dst_anim.position_track_insert_key(new_tr, t, v)
+								Animation.TYPE_SCALE_3D: dst_anim.scale_track_insert_key(new_tr, t, v)
+			lib.add_animation(anim_name, dst_anim)
+	fallback_ap.add_animation_library(&"", lib)
+	base_inst.queue_free()
+	return fallback_ap
+
 ## Malla de arma: la del propio modelo si existe, o copiada de otro .glb KayKit
 ## (mismo hueso handslot y misma transformación local).
 func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String, force_left: bool = false) -> MeshInstance3D:
@@ -225,9 +288,11 @@ func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String, force_left:
 		return own
 	var src := (load(source) as PackedScene).instantiate() as Node3D
 	var smi := src.find_child(mesh_name, true, false) as MeshInstance3D
-	var bone := "handslot.l" if force_left or mesh_name.contains("Offhand") or mesh_name.contains("Shield") else "handslot.r"
+	var bone := _hand_bone(sk, force_left or mesh_name.contains("Offhand") or mesh_name.contains("Shield"))
 	if not force_left and smi and smi.get_parent() is BoneAttachment3D:
-		bone = (smi.get_parent() as BoneAttachment3D).bone_name
+		var candidate: String = (smi.get_parent() as BoneAttachment3D).bone_name
+		if sk.find_bone(candidate) != -1:
+			bone = candidate
 	var att := BoneAttachment3D.new()
 	att.name = mesh_name + "_slot"
 	att.bone_name = bone
@@ -252,7 +317,7 @@ func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String, force_left:
 func _make_lance(sk: Skeleton3D) -> MeshInstance3D:
 	var att := BoneAttachment3D.new()
 	att.name = "lance_slot"
-	att.bone_name = "handslot.r"
+	att.bone_name = _hand_bone(sk, false)
 	sk.add_child(att)
 	var shaft := MeshUtil.box(att, Vector3(0.07, 2.6, 0.07), Vector3(0, 0.7, 0), Color(0.45, 0.3, 0.15))
 	shaft.name = "Lanza"
@@ -465,8 +530,17 @@ func _build_tree() -> void:
 	act.add_transition("Start", "none", AnimationNodeStateMachineTransition.new())
 	root.add_node("act", act)
 	mix = AnimationNodeBlend2.new()
+	var sk := model.find_child("Skeleton3D", true, false) as Skeleton3D
+	var sk_p := "Rig/Skeleton3D:"
+	if sk != null and not model.has_node("Rig/Skeleton3D"):
+		sk_p = String(model.get_path_to(sk)) + ":"
 	for b: String in UPPER:
-		mix.set_filter_path(NodePath("Rig/Skeleton3D:" + b), true)
+		if sk != null and sk.find_bone(b) != -1:
+			mix.set_filter_path(NodePath(sk_p + b), true)
+		elif RETARGET_BONE_MAP.has(b) and sk != null and sk.find_bone(RETARGET_BONE_MAP[b]) != -1:
+			mix.set_filter_path(NodePath(sk_p + RETARGET_BONE_MAP[b]), true)
+		else:
+			mix.set_filter_path(NodePath(sk_p + b), true)
 	root.add_node("mix", mix)
 	root.connect_node("mix", 0, "base")
 	root.connect_node("mix", 1, "act")

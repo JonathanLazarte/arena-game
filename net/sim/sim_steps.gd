@@ -296,8 +296,47 @@ static func alt_window(s: PackedInt64Array, P: Array, i: int) -> bool:
 	if (s[o + FightSim.AB_FL] & SimAbilities.FL_READY) != 0:
 		return false
 	var t := s[o + FightSim.AB_T] - 1
+	var dur := int(step.get("total", step.get("dur", 60)))
 	var b: Dictionary = br
-	return t >= int(b["from"]) - int(b.get("buffer", 0)) and t < int(b["to"])
+	var win_end := maxi(int(b.get("to", 0)), dur)
+	return t >= 0 and t < win_end
+
+static func combo_info(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
+	var o := i * FightSim.F_FIELDS
+	var ab := SimAbilities._ab(s, P, i)
+	if int(ab.get("graph", 0)) == 0:
+		return {"can_combo": false, "active": false, "progress": 0.0, "queued": false, "label": ""}
+	var step := _gstep(ab, s[o + FightSim.AB_FIRED])
+	var br: Variant = step.get("branch", null)
+	var cancel: Variant = step.get("cancel", null)
+	var blab := ""
+	var has_combo := false
+	if br is Dictionary:
+		has_combo = true
+		blab = String(br.get("label", ""))
+	elif cancel is Dictionary and int(cancel.get("trigger", 0)) == 1:
+		has_combo = true
+	if not has_combo:
+		return {"can_combo": false, "active": false, "progress": 0.0, "queued": false, "label": ""}
+	var dur := maxf(float(step.get("total", step.get("dur", 60))), 1.0)
+	var t := s[o + FightSim.AB_T] - 1
+	var active := t >= 0 and t < int(dur)
+	var steps_arr: Array = ab.get("steps", [])
+	var fired: int = s[o + FightSim.AB_FIRED]
+	var total_st: int = maxi(steps_arr.size(), 1)
+	var fl := s[o + FightSim.AB_FL]
+	var queued := (fl & (SimAbilities.FL_QUEUED | SimAbilities.FL_VARIANT)) != 0
+	var step_count: int = fired + (1 if queued else 0)
+	var prog := 1.0 - float(step_count) / float(total_st)
+	if prog <= 0.05:
+		prog = 1.0 / float(total_st)
+	return {
+		"can_combo": true,
+		"active": active,
+		"progress": prog,
+		"queued": queued,
+		"label": blab
+	}
 
 static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 	var o := i * FightSim.F_FIELDS
@@ -311,22 +350,28 @@ static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 		if cancel is Dictionary and int(cancel.get("trigger", 0)) == 1 and not alt:
 			return _latch_bits(s, o, step, false)
 		return false
+	var b: Dictionary = br
+	if alt and int(b.get("alt", -1)) < 0 and String(b.get("label", "")) == "":
+		return false
 	if (s[o + FightSim.AB_FL] & SimAbilities.FL_READY) != 0:
 		return true
 	var t := s[o + FightSim.AB_T] - 1
-	var b: Dictionary = br
-	if t < int(b["from"]) - int(b.get("buffer", 0)) or t >= int(b["to"]):
+	var dur := int(step.get("total", step.get("dur", 60)))
+	var win_end := maxi(int(b.get("to", 0)), dur)
+	if t < 0 or t >= win_end:
 		return false
 	if alt:
-		s[o + FightSim.AB_FL] |= SimAbilities.FL_VARIANT
+		s[o + FightSim.AB_FL] = (s[o + FightSim.AB_FL] & ~SimAbilities.FL_QUEUED) | SimAbilities.FL_VARIANT
 	else:
-		s[o + FightSim.AB_FL] |= SimAbilities.FL_QUEUED
+		s[o + FightSim.AB_FL] = (s[o + FightSim.AB_FL] & ~SimAbilities.FL_VARIANT) | SimAbilities.FL_QUEUED
 	return true
 
 static func _latch_bits(s: PackedInt64Array, o: int, step: Dictionary, _alt: bool) -> bool:
 	var cancel: Dictionary = step["cancel"]
 	var t := s[o + FightSim.AB_T] - 1
-	if t < int(cancel["from"]) or t >= int(cancel["to"]):
+	var dur := int(step.get("total", step.get("dur", 60)))
+	var win_end := maxi(int(cancel.get("to", 0)), dur)
+	if t < 0 or t >= win_end:
 		return false
 	if (s[o + FightSim.AB_FL] & SimAbilities.FL_READY) != 0:
 		return true

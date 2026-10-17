@@ -73,8 +73,11 @@ enum {
 	# contadores de eventos de fase 4
 	AB_STARTS, AB_HITS, AB_INTR, GRABS, SPELLS, SUMMONS, EK_SPECIALS, EK_HITS, SHIELD_ABSORB, DISMOUNTS,
 	ARTS, PET_HITS, PET_KILLS, MDASH_HITS, JUMPS,
-	F_FIELDS
+	# Cooldowns individuales por habilidad de jefe (hasta 64 ranuras)
+	BCD_BASE
 }
+const BCD_MAX := 64
+const F_FIELDS := BCD_BASE + BCD_MAX
 const P_BASE := 2 * F_FIELDS
 enum { G_FRAME, G_FREEZE, G_RNG, G_HITSTOP_ON, G_WINS0, G_WINS1, G_ROUND, G_END_T, G_FIELDS }
 ## G_END_T: ticks desde que cayó un luchador en esta ronda (0 = ronda en curso). FightEngine reinicia la ronda.
@@ -497,9 +500,7 @@ static func _request_attack(s: PackedInt64Array, P: Array, i: int, heavy: bool) 
 		s[o + FVY] = mini(s[o + FVY], JUMP_ATK_VY)
 		return true
 	if s[o + ATK_STATE] != Atk.NONE:
-		var a: Dictionary = _atk(P, i, s)
-		var in_window: bool = s[o + ATK_STATE] != Atk.RECOVERY or a["window"] < 0 or s[o + ATK_IDX] >= 3 or s[o + ATK_T] <= a["window"]
-		if not heavy and s[o + ATK_IDX] < 3 and s[o + COMBO] < P[i]["max_combo"] and in_window and (s[o + ATK_STATE] != Atk.WINDUP or s[o + ATK_T] * 2 > s[o + ATK_DUR]):
+		if not heavy and s[o + ATK_IDX] < 3 and s[o + COMBO] < P[i]["max_combo"]:
 			s[o + BUFFERED] = 1
 		return false
 	if s[o + BLOCKING] != 0 or s[o + ST] <= 0:

@@ -2,7 +2,8 @@ class_name Catalog
 ## Listas explícitas de definiciones (en builds exportados no se puede listar res:// con fiabilidad).
 
 const CHARACTERS := ["res://resources/characters/caballero.tres", "res://resources/characters/arquero.tres",
-	"res://resources/characters/berserker.tres", "res://resources/characters/paladin.tres", "res://resources/characters/asesino.tres"]
+	"res://resources/characters/berserker.tres", "res://resources/characters/paladin.tres", "res://resources/characters/asesino.tres",
+	"res://resources/characters/anime_girl.tres"]
 const WEAPONS := ["res://resources/weapons/espada_escudo.tres", "res://resources/weapons/espada_larga.tres",
 	"res://resources/weapons/hacha_2m.tres", "res://resources/weapons/dagas.tres", "res://resources/weapons/lanza.tres",
 	"res://resources/weapons/arco.tres", "res://resources/weapons/ballesta.tres"]

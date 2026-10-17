@@ -1,0 +1,266 @@
+{
+  "version": 1,
+  "tick_rate": 60,
+  "abilities": [
+    {
+      "id": "golpe_fisura",
+      "name": "Golpe de Fisura",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "aerial",
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 40,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 840,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "saltar",
+          "windup_ticks": 30,
+          "active_ticks": 1,
+          "recovery_ticks": 0,
+          "telegraph": {
+            "id": "tg_fisura_brasa",
+            "style": "body_pose",
+            "color": "#E2572B",
+            "sound": "sfx_tele_fisura",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Se encoge y la espada brilla al rojo antes de saltar."
+          },
+          "tracking": {
+            "deg_per_sec": 300,
+            "lock_at_tick": 20,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 14,
+            "to_tick": 31,
+            "height_m": 3.2,
+            "speed_mps": 11,
+            "max_distance_m": 7,
+            "target_mode": "lock_point",
+            "stop_at_m": 1.5
+          },
+          "next": {
+            "default": "martillazo"
+          },
+          "events": [
+            {
+              "id": "ev_salto",
+              "tick": 14,
+              "vfx": "vfx_dust_ring",
+              "sfx": "sfx_leap"
+            }
+          ]
+        },
+        {
+          "id": "martillazo",
+          "windup_ticks": 14,
+          "active_ticks": 4,
+          "recovery_ticks": 40,
+          "telegraph": {
+            "id": "tg_fisura_impacto",
+            "style": "ground_ring",
+            "color": "#E2572B",
+            "sound": "sfx_tele_fisura_impacto",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.0
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 14
+            },
+            "at_tick": 0,
+            "text": "Anillo rojo bajo el objetivo: el impacto."
+          },
+          "tracking": {
+            "deg_per_sec": 0,
+            "lock_at_tick": 0,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "slam",
+            "from_tick": 0,
+            "to_tick": 14,
+            "target_mode": "lock_point",
+            "max_distance_m": 3
+          },
+          "hitboxes": [
+            {
+              "id": "hb_martillazo",
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.0
+              },
+              "anchor": "self",
+              "ground_only": true,
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 28,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 34
+            }
+          ],
+          "spawns": [
+            {
+              "id": "sp_fisura_1",
+              "type": "ground_mark",
+              "at_tick": 14,
+              "anchor": "self",
+              "offset": {
+                "forward_m": 4.25,
+                "right_m": 0.0
+              },
+              "count": 1,
+              "spread_deg": 0,
+              "shape": {
+                "type": "line",
+                "length_m": 2.5,
+                "width_m": 1.8
+              },
+              "warn_ticks": 90,
+              "damage": 22,
+              "stun_power": 22,
+              "knockback_mps": 5,
+              "blockable": true
+            },
+            {
+              "id": "sp_fisura_2",
+              "type": "ground_mark",
+              "at_tick": 14,
+              "anchor": "self",
+              "offset": {
+                "forward_m": 6.75,
+                "right_m": 0.0
+              },
+              "count": 1,
+              "spread_deg": 0,
+              "shape": {
+                "type": "line",
+                "length_m": 2.5,
+                "width_m": 1.8
+              },
+              "warn_ticks": 110,
+              "damage": 22,
+              "stun_power": 22,
+              "knockback_mps": 5,
+              "blockable": true
+            },
+            {
+              "id": "sp_fisura_3",
+              "type": "ground_mark",
+              "at_tick": 14,
+              "anchor": "self",
+              "offset": {
+                "forward_m": 9.25,
+                "right_m": 0.0
+              },
+              "count": 1,
+              "spread_deg": 0,
+              "shape": {
+                "type": "line",
+                "length_m": 2.5,
+                "width_m": 1.8
+              },
+              "warn_ticks": 130,
+              "damage": 22,
+              "stun_power": 22,
+              "knockback_mps": 5,
+              "blockable": true
+            },
+            {
+              "id": "sp_fisura_4",
+              "type": "ground_mark",
+              "at_tick": 14,
+              "anchor": "self",
+              "offset": {
+                "forward_m": 11.75,
+                "right_m": 0.0
+              },
+              "count": 1,
+              "spread_deg": 0,
+              "shape": {
+                "type": "line",
+                "length_m": 2.5,
+                "width_m": 1.8
+              },
+              "warn_ticks": 150,
+              "damage": 22,
+              "stun_power": 22,
+              "knockback_mps": 5,
+              "blockable": true
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_impacto",
+              "tick": 14,
+              "vfx": "vfx_crack_ring",
+              "sfx": "sfx_slam",
+              "camera_shake": 2
+            },
+            {
+              "id": "ev_fisura",
+              "tick": 14,
+              "vfx": "vfx_fissure_line",
+              "sfx": "sfx_fissure_run"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 9.0,
+        "weight": 12,
+        "use_when": [
+          "target_far",
+          "target_in_range"
+        ]
+      },
+      "hint": {
+        "dodge": "jump",
+        "direction": "side",
+        "text": "Saltá el martillazo. Después salí de la línea roja antes de que cada tramo estalle."
+      }
+    }
+  ],
+  "presets": [
+    {
+      "id": "prueba_fisura",
+      "name": "Prueba de Fisura",
+      "abilities": [
+        "golpe_fisura"
+      ],
+      "notes": "Preset de un solo elemento para probar el golpe."
+    }
+  ]
+}

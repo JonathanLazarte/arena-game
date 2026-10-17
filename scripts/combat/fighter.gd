@@ -1203,6 +1203,10 @@ var ab_from: Vector3 = Vector3.ZERO
 var ab_fired: int = 0 ## tajos lanzados / golpes dados (lo escribe SimView)
 var ab_alt_open: bool = false ## ventana del remate alternativo, según la sim
 var ab_alt_label: String = ""
+var ab_combo_can: bool = false ## ¿este ataque/paso se puede seguir con un combo o variación?
+var ab_combo_active: bool = false ## ¿la ventana de pulsación está activa ahora mismo?
+var ab_combo_prog: float = 0.0 ## 1.0 -> 0.0 tiempo restante en la ventana de combo
+var buffered: bool = false ## ataque ligero encolado en el búfer
 var ab_marker: Node3D
 var ab_aoe: Node3D
 var ab_bubble: MeshInstance3D

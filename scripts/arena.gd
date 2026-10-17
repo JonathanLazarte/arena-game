@@ -664,7 +664,7 @@ func _update_round_label() -> void:
 	hud.round_label.text = "Ronda %d   %d - %d" % [round_num, wins[0], wins[1]]
 
 func _on_fighter_died(f: Fighter) -> void:
-	if state != "fight":
+	if state != "fight" or AdminMode.enabled:
 		return
 	if online:
 		return # online: rondas y victoria las decide la sim (estado confirmado)

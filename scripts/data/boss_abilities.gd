@@ -4,6 +4,7 @@ class_name BossAbilities
 ## Consulta primero BossAbilitiesExt y luego las 6 base.
 
 const MAX_EQUIPPED := 3
+const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
 const DEFAULT := ["estocada"]
 const ORDER := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso", "salto_caida"]
 const EXT_ORDER := [
@@ -67,7 +68,10 @@ const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfag
 	"aliento_rayo": "Fulgor", "aliento_escarcha": "Escarcha", "chorro_lava": "Lava",
 	"grito_guerra": "Grito", "guardia_reflejo": "Reflejo",
 	"trazos_hoja": "Trazos", "danza_garza": "Garza", "caida_hoja": "Clavada",
-	"floracion_escarlata": "Floración"}
+	"floracion_escarlata": "Floración",
+	"martillo_alba": "Alba", "lanza_veredicto": "Veredicto", "triptico_sagrado": "Tríptico",
+	"danza_espirales": "Espirales", "estocada_penetrante": "Penetrante", "floracion_purpurea": "Purpúrea",
+	"pisoton_telurico": "Telúrico", "presa_del_coloso": "Coloso", "hendedura_cataclismica": "Hendedura"}
 const BASE_COLORS := {"estocada": Color(1.0, 0.3, 0.12), "carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(1.0, 0.82, 0.3),
 	"escudo_mana": Color(0.3, 1.0, 1.0), "combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}
 
@@ -84,14 +88,16 @@ static func color_of(id: String) -> Color:
 	return d.get("color", Color(0.9, 0.85, 0.7)) if not d.is_empty() else Color(0.9, 0.85, 0.7)
 
 static func all_ids() -> Array:
-	return ORDER + EXT_ORDER + HojaCatalog.ids()
+	return ORDER + EXT_ORDER + HojaCatalog.ids() + EldenCatalog.ids()
 
 static func has(id: String) -> bool:
-	return DEFS.has(id) or BossAbilitiesExt.DEFS.has(id) or HojaCatalog.has(id)
+	return DEFS.has(id) or BossAbilitiesExt.DEFS.has(id) or HojaCatalog.has(id) or EldenCatalog.has(id)
 
 static func def(id: String) -> Dictionary:
 	if HojaCatalog.has(id):
 		return HojaCatalog.view_def(id)
+	if EldenCatalog.has(id):
+		return EldenCatalog.view_def(id)
 	if BossAbilitiesExt.DEFS.has(id):
 		return BossAbilitiesExt.DEFS[id]
 	return DEFS.get(id, {})
@@ -115,6 +121,8 @@ static func cost_text(id: String) -> String:
 static func codex(id: String) -> String:
 	if HojaCatalog.has(id):
 		return HojaCatalog.codex(id)
+	if EldenCatalog.has(id):
+		return EldenCatalog.codex(id)
 	var d := def(id)
 	if d.is_empty():
 		return ""

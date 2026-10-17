@@ -1,0 +1,337 @@
+{
+  "version": 1,
+  "tick_rate": 60,
+  "abilities": [
+    {
+      "id": "pisoton_telurico",
+      "name": "Pisotón Telúrico",
+      "icon": "generic",
+      "category": "melee",
+      "tags": ["delayed", "aoe"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 30, "mana": 0, "health": 0 },
+      "cooldown_ticks": 480,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl2", "knockdown", "parry"],
+      "interrupt_priority": 0,
+      "on_interrupt": { "recovery_ticks": 16, "cancel_spawns": true, "cooldown": "full", "refund_pct": 0 },
+      "steps": [
+        {
+          "id": "pisoton",
+          "windup_ticks": 24,
+          "active_ticks": 4,
+          "recovery_ticks": 24,
+          "telegraph": {
+            "id": "tg_telurico_pisoton",
+            "style": "body_pose",
+            "color": "#D4A373",
+            "sound": "sfx_tele_earth_stomp",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Alza el talón con un crujido de piedras antes de pisar con fuerza."
+          },
+          "tracking": { "deg_per_sec": 180, "lock_at_tick": 18, "post_lock_deg_per_sec": 0 },
+          "hitboxes": [
+            {
+              "id": "hb_pisoton_cuerpo",
+              "shape": { "type": "circle", "radius_m": 2.2 },
+              "ground_only": true,
+              "from_tick": 0, "to_tick": 4,
+              "damage_per_hit": 16,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_heavy",
+              "blockable": true, "parryable": false,
+              "stun_power": 24
+            }
+          ],
+          "spawns": [
+            {
+              "id": "sp_onda_pisoton",
+              "type": "ground_wave",
+              "at_tick": 24,
+              "anchor": "self",
+              "damage": 14,
+              "speed_mps": 12,
+              "range_m": 9.0,
+              "width_m": 1.4,
+              "warn_ticks": 20,
+              "ring": true,
+              "knockback_mps": 6
+            }
+          ],
+          "branch": {
+            "window_from_tick": 20,
+            "window_to_tick": 50,
+            "time_base": "step",
+            "only_on": "any",
+            "buffer_ticks": 6,
+            "commit": "window_end",
+            "options": [
+              { "input": "skill", "step": "hachazo_partidor" },
+              { "input": "alt", "step": "rugido_guerra", "hud_icon": "generic", "label": "Rugido", "extra_cost": { "stamina": 12 } }
+            ],
+            "default_if_no_input": "end"
+          },
+          "next": { "default": null }
+        },
+        {
+          "id": "hachazo_partidor",
+          "windup_ticks": 34,
+          "active_ticks": 6,
+          "recovery_ticks": 44,
+          "extra_cost": { "stamina": 8 },
+          "telegraph": {
+            "id": "tg_telurico_hachazo",
+            "style": "weapon_glow",
+            "color": "#CCD5AE",
+            "sound": "sfx_tele_axe_slam",
+            "ground_marker": { "shape": { "type": "line", "length_m": 4.5, "width_m": 1.6 }, "anchor": "self", "fill_ticks": 34 },
+            "at_tick": 0,
+            "text": "Baja el hacha a dos manos descargando todo el peso de su cuerpo."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 40, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
+          "tracking": { "deg_per_sec": 120, "lock_at_tick": 22, "post_lock_deg_per_sec": 0 },
+          "hitboxes": [
+            {
+              "id": "hb_hacha_partir",
+              "shape": { "type": "line", "length_m": 4.5, "width_m": 1.6 },
+              "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 34,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_heavy",
+              "blockable": true, "parryable": true,
+              "stun_power": 46, "stun_scaling": "physical",
+              "on_hit": { "knockback": { "speed_mps": 7, "duration_ticks": 8 } }
+            }
+          ],
+          "next": { "default": null }
+        },
+        {
+          "id": "rugido_guerra",
+          "windup_ticks": 16,
+          "active_ticks": 6,
+          "recovery_ticks": 40,
+          "telegraph": {
+            "id": "tg_telurico_rugido",
+            "style": "body_pose",
+            "color": "#E29578",
+            "sound": "sfx_tele_roar_shock",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Rugido salvaje que desata una onda de choque omnidireccional."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 22, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
+          "hitboxes": [
+            {
+              "id": "hb_rugido_empuje",
+              "shape": { "type": "circle", "radius_m": 3.8 },
+              "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 18,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_heavy",
+              "blockable": true, "parryable": false,
+              "stun_power": 34,
+              "on_hit": { "knockback": { "speed_mps": 10, "duration_ticks": 10 } }
+            }
+          ],
+          "next": { "default": null }
+        }
+      ],
+      "ai": {
+        "range_min": 1.5,
+        "range_max": 5.5,
+        "weight": 12,
+        "use_when": ["target_in_range"],
+        "branch_weights": { "hachazo_partidor": 60, "rugido_guerra": 40 }
+      },
+      "hint": {
+        "dodge": "jump",
+        "text": "Saltá cuando baje el pie para esquivar la onda telúrica; luego rodá si prepara el hachazo."
+      }
+    },
+    {
+      "id": "presa_del_coloso",
+      "name": "Presa del Coloso",
+      "icon": "generic",
+      "category": "grab",
+      "tags": ["unblockable"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 32, "mana": 0, "health": 0 },
+      "cooldown_ticks": 540,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl2", "knockdown"],
+      "steps": [
+        {
+          "id": "carrera_presa",
+          "windup_ticks": 36,
+          "active_ticks": 8,
+          "recovery_ticks": 6,
+          "telegraph": {
+            "id": "tg_coloso_carrera",
+            "style": "body_pose",
+            "color": "#B07D62",
+            "sound": "sfx_tele_grab_rush",
+            "ground_marker": { "shape": { "type": "box", "length_m": 5.0, "width_m": 1.8 }, "anchor": "self", "fill_ticks": 36 },
+            "at_tick": 0,
+            "text": "Abre los brazos de par en par y avanza decidido para atrapar al rival."
+          },
+          "tracking": { "deg_per_sec": 200, "lock_at_tick": 28, "post_lock_deg_per_sec": 0 },
+          "movement": { "type": "dash", "from_tick": 24, "to_tick": 44, "speed_mps": 12, "max_distance_m": 4.8, "target_mode": "facing", "stop_at_m": 0.8 },
+          "hitboxes": [
+            {
+              "id": "hb_presa_enganche",
+              "shape": { "type": "box", "length_m": 2.2, "width_m": 1.8 },
+              "from_tick": 0, "to_tick": 8,
+              "hits": 1,
+              "damage_per_hit": 6,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_light",
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 0,
+              "stun_scaling": "none",
+              "on_hit": {
+                "force": {
+                  "type": "pull",
+                  "strength_mps": 12,
+                  "duration_ticks": 18,
+                  "max_distance_m": 3.2,
+                  "breakable_by": ["roll"]
+                }
+              }
+            }
+          ],
+          "next": { "default": "estrellamiento", "on_whiff": "fallo_presa" }
+        },
+        {
+          "id": "estrellamiento",
+          "windup_ticks": 30,
+          "active_ticks": 4,
+          "recovery_ticks": 46,
+          "telegraph": {
+            "id": "tg_coloso_estrellamiento",
+            "style": "body_pose",
+            "color": "#8C5840",
+            "sound": "sfx_tele_grab_slam",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Alza al rival y lo estrella de espaldas contra la piedra."
+          },
+          "armor": { "type": "hyper", "from_tick": 0, "to_tick": 34, "poise_bonus_pct": 200, "dmg_reduction_pct": 0 },
+          "hitboxes": [
+            {
+              "id": "hb_estrellar",
+              "shape": { "type": "circle", "radius_m": 2.5 },
+              "from_tick": 0, "to_tick": 4,
+              "damage_per_hit": 36,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_heavy",
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 55,
+              "on_hit": { "knockdown": true }
+            }
+          ],
+          "next": { "default": null }
+        },
+        {
+          "id": "fallo_presa",
+          "windup_ticks": 1,
+          "active_ticks": 1,
+          "recovery_ticks": 44,
+          "next": { "default": null }
+        }
+      ],
+      "ai": { "range_min": 2.0, "range_max": 6.0, "weight": 9, "use_when": ["target_in_range", "target_blocking"] },
+      "hint": { "dodge": "roll_late", "direction": "side", "text": "Imbloqueable: rodá hacia un costado cuando sus brazos estén por cerrarse." }
+    },
+    {
+      "id": "hendedura_cataclismica",
+      "name": "Hendedura Cataclísmica",
+      "icon": "generic",
+      "category": "melee",
+      "tags": ["unblockable", "delayed", "aoe"],
+      "unlock": { "phase": 2 },
+      "cost": { "stamina": 38, "mana": 15, "health": 0 },
+      "cooldown_ticks": 750,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["knockdown"],
+      "steps": [
+        {
+          "id": "desgarro",
+          "windup_ticks": 32,
+          "active_ticks": 6,
+          "recovery_ticks": 14,
+          "telegraph": {
+            "id": "tg_cataclismo_desgarro",
+            "style": "weapon_glow",
+            "color": "#A25A38",
+            "sound": "sfx_tele_earth_rip",
+            "ground_marker": { "shape": { "type": "line", "length_m": 7.0, "width_m": 2.0 }, "anchor": "self", "fill_ticks": 32 },
+            "at_tick": 0,
+            "text": "Hunde el hacha profundamente en la tierra abriendo una fisura."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 38, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
+          "tracking": { "deg_per_sec": 180, "lock_at_tick": 24, "post_lock_deg_per_sec": 0 },
+          "hitboxes": [
+            {
+              "id": "hb_desgarro_linea",
+              "shape": { "type": "line", "length_m": 7.0, "width_m": 2.0 },
+              "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 22,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_heavy",
+              "blockable": true, "parryable": false,
+              "stun_power": 30
+            }
+          ],
+          "next": { "default": "erupcion_rocas" }
+        },
+        {
+          "id": "erupcion_rocas",
+          "windup_ticks": 36,
+          "active_ticks": 8,
+          "recovery_ticks": 52,
+          "telegraph": {
+            "id": "tg_cataclismo_erupcion",
+            "style": "ground_line",
+            "color": "#BC6C25",
+            "sound": "sfx_tele_earth_erupt",
+            "ground_marker": { "shape": { "type": "line", "length_m": 8.5, "width_m": 2.4 }, "anchor": "self", "fill_ticks": 36 },
+            "at_tick": 0,
+            "text": "Arranca el hacha levantando columnas de roca y tierra ardiente."
+          },
+          "armor": { "type": "hyper", "from_tick": 0, "to_tick": 44, "poise_bonus_pct": 200, "dmg_reduction_pct": 20 },
+          "hitboxes": [
+            {
+              "id": "hb_erupcion_colosal",
+              "shape": { "type": "line", "length_m": 8.5, "width_m": 2.4 },
+              "from_tick": 0, "to_tick": 8,
+              "damage_per_hit": 38,
+              "damage_type": "physical",
+              "damage_scaling": "weapon_heavy",
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 55,
+              "on_hit": { "knockdown": true }
+            }
+          ],
+          "next": { "default": null }
+        }
+      ],
+      "ai": { "range_min": 2.5, "range_max": 8.0, "weight": 14, "use_when": ["self_phase2", "target_in_range"] },
+      "hint": { "dodge": "roll_late", "direction": "side", "text": "Salí inmediatamente de la línea de la fisura antes de la erupción de rocas." }
+    }
+  ],
+  "presets": [
+    {
+      "id": "senor_telurico",
+      "name": "Señor Telúrico",
+      "abilities": ["pisoton_telurico", "presa_del_coloso", "hendedura_cataclismica"],
+      "notes": "Arquetipo inspirado en Godfrey: pisotón telúrico saltables con branch, agarre imbloqueable y erupción en Fase II."
+    }
+  ]
+}

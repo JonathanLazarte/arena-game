@@ -1,0 +1,1573 @@
+{
+  "version": 1,
+  "tick_rate": 60,
+  "abilities": [
+    {
+      "id": "cadena_mandobles",
+      "name": "Cadena de Mandobles",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 28,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 300,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "tajo_1",
+          "windup_ticks": 14,
+          "active_ticks": 4,
+          "recovery_ticks": 3,
+          "telegraph": {
+            "id": "tg_mandobles_acero",
+            "style": "weapon_flash",
+            "color": "#9FB8D8",
+            "sound": "sfx_tele_mandobles",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Destello de acero y la espada cruzada al costado."
+          },
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 6,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 8,
+            "to_tick": 21,
+            "speed_mps": 8,
+            "max_distance_m": 1.8,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_m1",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 120
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 15,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 14
+            }
+          ],
+          "next": {
+            "default": "tajo_2"
+          },
+          "events": [
+            {
+              "id": "ev_m1",
+              "tick": 14,
+              "vfx": "vfx_trail_steel",
+              "sfx": "sfx_swing_fast"
+            }
+          ]
+        },
+        {
+          "id": "tajo_2",
+          "windup_ticks": 8,
+          "active_ticks": 4,
+          "recovery_ticks": 3,
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 2,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 4,
+            "to_tick": 15,
+            "speed_mps": 7,
+            "max_distance_m": 1.5,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_m2",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 140
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 15,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 14
+            }
+          ],
+          "next": {
+            "default": "tajo_3"
+          },
+          "events": [
+            {
+              "id": "ev_m2",
+              "tick": 8,
+              "vfx": "vfx_trail_steel",
+              "sfx": "sfx_swing_fast"
+            }
+          ]
+        },
+        {
+          "id": "tajo_3",
+          "windup_ticks": 10,
+          "active_ticks": 4,
+          "recovery_ticks": 26,
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 4,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 6,
+            "to_tick": 14,
+            "speed_mps": 6,
+            "max_distance_m": 1.0,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_m3",
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.0,
+                "angle_deg": 160
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 22,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 22
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_m3",
+              "tick": 10,
+              "vfx": "vfx_trail_steel",
+              "sfx": "sfx_swing_heavy"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 1.0,
+        "range_max": 4.0,
+        "weight": 16,
+        "use_when": [
+          "target_in_range",
+          "opener"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Tres tajos seguidos: bloqueá los dos primeros y rodá o bloqueá el tercero, que pega más fuerte."
+      }
+    },
+    {
+      "id": "embestida_perforante",
+      "name": "Embestida Perforante",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "tracking"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 30,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 420,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "estocada_1",
+          "windup_ticks": 24,
+          "active_ticks": 3,
+          "recovery_ticks": 4,
+          "telegraph": {
+            "id": "tg_perforante_azul",
+            "style": "ground_line",
+            "color": "#5AA9E6",
+            "sound": "sfx_tele_perforante",
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 6.0,
+                "width_m": 1.4
+              },
+              "anchor": "self",
+              "fill_ticks": 24
+            },
+            "at_tick": 0,
+            "text": "Se agacha con la punta al frente y una línea azul en el suelo."
+          },
+          "tracking": {
+            "deg_per_sec": 260,
+            "lock_at_tick": 14,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 14,
+            "to_tick": 31,
+            "speed_mps": 20,
+            "max_distance_m": 6.0,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_e1",
+              "shape": {
+                "type": "line",
+                "length_m": 1.8,
+                "width_m": 1.4
+              },
+              "from_tick": 0,
+              "to_tick": 3,
+              "hits": 1,
+              "damage_per_hit": 24,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 24
+            }
+          ],
+          "next": {
+            "default": "estocada_2",
+            "on_blocked": "retirada"
+          },
+          "events": [
+            {
+              "id": "ev_e1",
+              "tick": 14,
+              "vfx": "vfx_dash_blue",
+              "sfx": "sfx_dash_blade"
+            }
+          ]
+        },
+        {
+          "id": "estocada_2",
+          "windup_ticks": 6,
+          "active_ticks": 3,
+          "recovery_ticks": 42,
+          "tracking": {
+            "deg_per_sec": 0,
+            "lock_at_tick": 0,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 2,
+            "to_tick": 9,
+            "speed_mps": 10,
+            "max_distance_m": 1.4,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_e2",
+              "shape": {
+                "type": "line",
+                "length_m": 1.8,
+                "width_m": 1.2
+              },
+              "from_tick": 0,
+              "to_tick": 3,
+              "hits": 1,
+              "damage_per_hit": 20,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 22
+            }
+          ],
+          "next": {
+            "default": null
+          }
+        },
+        {
+          "id": "retirada",
+          "windup_ticks": 1,
+          "active_ticks": 1,
+          "recovery_ticks": 24,
+          "movement": {
+            "type": "retreat",
+            "from_tick": 0,
+            "to_tick": 10,
+            "speed_mps": 8,
+            "max_distance_m": 2.5,
+            "target_mode": "away_from_target"
+          },
+          "next": {
+            "default": null
+          }
+        }
+      ],
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 8.0,
+        "weight": 14,
+        "use_when": [
+          "target_in_range",
+          "target_far"
+        ]
+      },
+      "hint": {
+        "dodge": "sidestep",
+        "direction": "side",
+        "text": "Línea azul en el suelo: apartate al costado. Si bloqueás la primera, él retrocede y se abre."
+      }
+    },
+    {
+      "id": "carga_abisal",
+      "name": "Carga Abisal",
+      "icon": "generic",
+      "category": "magic",
+      "tags": [
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 2
+      },
+      "cost": {
+        "stamina": 0,
+        "mana": 0,
+        "health": 12
+      },
+      "cooldown_ticks": 1500,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl1",
+        "stun_lvl2",
+        "knockdown"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "cargar_estallido",
+          "windup_ticks": 72,
+          "active_ticks": 4,
+          "recovery_ticks": 48,
+          "telegraph": {
+            "id": "tg_abisal_violeta",
+            "style": "aura",
+            "color": "#3B2F8F",
+            "sound": "sfx_tele_abisal",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 7.0
+              },
+              "anchor": "self",
+              "fill_ticks": 72
+            },
+            "at_tick": 0,
+            "text": "Se arrodilla y una niebla oscura se junta alrededor de la espada."
+          },
+          "hitboxes": [
+            {
+              "id": "hb_estallido",
+              "shape": {
+                "type": "circle",
+                "radius_m": 7.0
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 34,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 50,
+              "damage_type": "magico",
+              "damage_scaling": "magic",
+              "stun_scaling": "magic",
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 9,
+                  "duration_ticks": 12
+                }
+              }
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_junta",
+              "tick": 0,
+              "vfx": "vfx_dark_gather",
+              "sfx": "sfx_dark_charge"
+            },
+            {
+              "id": "ev_estalla",
+              "tick": 72,
+              "vfx": "vfx_dark_burst",
+              "sfx": "sfx_dark_burst",
+              "camera_shake": 3
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 0.0,
+        "range_max": 7.0,
+        "weight": 14,
+        "use_when": [
+          "self_phase2",
+          "target_close"
+        ]
+      },
+      "hint": {
+        "dodge": "distance",
+        "direction": "back",
+        "text": "Alejate del círculo oscuro o cortale la carga con daño a distancia antes de que estalle."
+      }
+    },
+    {
+      "id": "tajo_deslizante",
+      "name": "Tajo Deslizante",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "tracking"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 26,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 300,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "deslizar",
+          "windup_ticks": 20,
+          "active_ticks": 1,
+          "recovery_ticks": 0,
+          "telegraph": {
+            "id": "tg_deslizante_turquesa",
+            "style": "weapon_glow",
+            "color": "#6FD6C4",
+            "sound": "sfx_tele_deslizante",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Se inclina y la espada roza el suelo antes de deslizarse."
+          },
+          "tracking": {
+            "deg_per_sec": 220,
+            "lock_at_tick": 10,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 8,
+            "to_tick": 21,
+            "speed_mps": 12,
+            "max_distance_m": 3.5,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "branch": {
+            "window_from_tick": 8,
+            "window_to_tick": 21,
+            "time_base": "step",
+            "only_on": "any",
+            "buffer_ticks": 6,
+            "commit": "window_end",
+            "options": [
+              {
+                "input": "skill",
+                "step": "corte_horizontal"
+              },
+              {
+                "input": "alt",
+                "step": "corte_descendente",
+                "hud_icon": "generic",
+                "label": "Descendente"
+              }
+            ],
+            "default_if_no_input": "corte_horizontal"
+          },
+          "next": {
+            "default": "corte_horizontal"
+          }
+        },
+        {
+          "id": "corte_horizontal",
+          "windup_ticks": 14,
+          "active_ticks": 4,
+          "recovery_ticks": 36,
+          "telegraph": {
+            "id": "tg_deslizante_horizontal",
+            "style": "ground_cone",
+            "color": "#6FD6C4",
+            "sound": "sfx_tele_deslizante_h",
+            "ground_marker": {
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.2,
+                "angle_deg": 150
+              },
+              "anchor": "self",
+              "fill_ticks": 14
+            },
+            "at_tick": 0,
+            "text": "Cono turquesa frente a él: tajo horizontal."
+          },
+          "tracking": {
+            "deg_per_sec": 160,
+            "lock_at_tick": 6,
+            "post_lock_deg_per_sec": 0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_h",
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.2,
+                "angle_deg": 150
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 26,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 28
+            }
+          ],
+          "next": {
+            "default": null
+          }
+        },
+        {
+          "id": "corte_descendente",
+          "windup_ticks": 18,
+          "active_ticks": 4,
+          "recovery_ticks": 40,
+          "telegraph": {
+            "id": "tg_deslizante_descendente",
+            "style": "ground_line",
+            "color": "#6FD6C4",
+            "sound": "sfx_tele_deslizante_d",
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 3.4,
+                "width_m": 1.2
+              },
+              "anchor": "self",
+              "fill_ticks": 18
+            },
+            "at_tick": 0,
+            "text": "Línea turquesa frente a él: tajo hacia abajo."
+          },
+          "tracking": {
+            "deg_per_sec": 160,
+            "lock_at_tick": 10,
+            "post_lock_deg_per_sec": 0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_d",
+              "shape": {
+                "type": "line",
+                "length_m": 3.0,
+                "width_m": 1.2
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 30,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 32
+            }
+          ],
+          "next": {
+            "default": null
+          }
+        }
+      ],
+      "ai": {
+        "range_min": 2.0,
+        "range_max": 6.0,
+        "weight": 14,
+        "use_when": [
+          "target_in_range"
+        ],
+        "branch_weights": {
+          "corte_horizontal": 60,
+          "corte_descendente": 40
+        }
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Cono = tajo horizontal (rodá o bloqueá); línea = tajo descendente (apartate al costado)."
+      }
+    },
+    {
+      "id": "giros_dobles",
+      "name": "Giros Dobles",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 34,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 480,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "giro_a",
+          "windup_ticks": 22,
+          "active_ticks": 5,
+          "recovery_ticks": 3,
+          "telegraph": {
+            "id": "tg_giros_naranja",
+            "style": "weapon_glow",
+            "color": "#F5A65B",
+            "sound": "sfx_tele_giros",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Alza la espada sobre la cabeza y empieza a girar."
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 30,
+            "poise_bonus_pct": 60,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 12,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 14,
+            "to_tick": 30,
+            "speed_mps": 7,
+            "max_distance_m": 1.8,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_ga",
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.0,
+                "angle_deg": 360
+              },
+              "from_tick": 0,
+              "to_tick": 5,
+              "hits": 1,
+              "damage_per_hit": 18,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 18
+            }
+          ],
+          "next": {
+            "default": "giro_b"
+          },
+          "events": [
+            {
+              "id": "ev_ga",
+              "tick": 22,
+              "vfx": "vfx_spin_orange",
+              "sfx": "sfx_swing_spin"
+            }
+          ]
+        },
+        {
+          "id": "giro_b",
+          "windup_ticks": 6,
+          "active_ticks": 5,
+          "recovery_ticks": 42,
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 11,
+            "poise_bonus_pct": 60,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 0,
+            "lock_at_tick": 0,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 2,
+            "to_tick": 11,
+            "speed_mps": 6,
+            "max_distance_m": 1.0,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_gb",
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.2,
+                "angle_deg": 360
+              },
+              "from_tick": 0,
+              "to_tick": 5,
+              "hits": 1,
+              "damage_per_hit": 22,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 26
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_gb",
+              "tick": 6,
+              "vfx": "vfx_spin_orange",
+              "sfx": "sfx_swing_spin"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 0.0,
+        "range_max": 3.5,
+        "weight": 12,
+        "use_when": [
+          "target_close",
+          "target_in_range"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_through",
+        "direction": "any",
+        "text": "Giro de 360°: rodá a través o bloqueá. No sirve apartarse a un costado."
+      }
+    },
+    {
+      "id": "triple_clavada",
+      "name": "Triple Clavada",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "multi_hit",
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 2
+      },
+      "cost": {
+        "stamina": 36,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 600,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "clavada_1",
+          "windup_ticks": 22,
+          "active_ticks": 3,
+          "recovery_ticks": 2,
+          "telegraph": {
+            "id": "tg_clavada_roja",
+            "style": "ground_ring",
+            "color": "#C44D58",
+            "sound": "sfx_tele_clavada3",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.0
+              },
+              "anchor": "self",
+              "fill_ticks": 22
+            },
+            "at_tick": 0,
+            "text": "Levanta la espada con las dos manos; círculo rojo en el suelo."
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 27,
+            "poise_bonus_pct": 40,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 12,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 10,
+            "to_tick": 22,
+            "speed_mps": 8,
+            "max_distance_m": 2.0,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_c1",
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.0
+              },
+              "from_tick": 0,
+              "to_tick": 3,
+              "hits": 1,
+              "damage_per_hit": 18,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 20,
+              "ground_only": true
+            }
+          ],
+          "next": {
+            "default": "clavada_2"
+          },
+          "events": [
+            {
+              "id": "ev_c1",
+              "tick": 22,
+              "vfx": "vfx_crack_ring",
+              "sfx": "sfx_slam",
+              "camera_shake": 1
+            }
+          ]
+        },
+        {
+          "id": "clavada_2",
+          "windup_ticks": 16,
+          "active_ticks": 3,
+          "recovery_ticks": 2,
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 21,
+            "poise_bonus_pct": 40,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 160,
+            "lock_at_tick": 6,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 6,
+            "to_tick": 16,
+            "speed_mps": 8,
+            "max_distance_m": 1.6,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_c2",
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.4
+              },
+              "from_tick": 0,
+              "to_tick": 3,
+              "hits": 1,
+              "damage_per_hit": 20,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 22,
+              "ground_only": true
+            }
+          ],
+          "next": {
+            "default": "clavada_3"
+          },
+          "events": [
+            {
+              "id": "ev_c2",
+              "tick": 16,
+              "vfx": "vfx_crack_ring",
+              "sfx": "sfx_slam",
+              "camera_shake": 1
+            }
+          ]
+        },
+        {
+          "id": "clavada_3",
+          "windup_ticks": 18,
+          "active_ticks": 4,
+          "recovery_ticks": 42,
+          "telegraph": {
+            "id": "tg_clavada_final",
+            "style": "ground_ring",
+            "color": "#C44D58",
+            "sound": "sfx_tele_clavada3_final",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.8
+              },
+              "anchor": "self",
+              "fill_ticks": 18
+            },
+            "at_tick": 0,
+            "text": "Círculo rojo más grande: el último golpe."
+          },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 22,
+            "poise_bonus_pct": 40,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 160,
+            "lock_at_tick": 8,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 8,
+            "to_tick": 18,
+            "speed_mps": 8,
+            "max_distance_m": 1.6,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_c3",
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.8
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 26,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 40,
+              "ground_only": true,
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 6,
+                  "duration_ticks": 8
+                }
+              }
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_c3",
+              "tick": 18,
+              "vfx": "vfx_crack_ring",
+              "sfx": "sfx_slam",
+              "camera_shake": 2
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 1.0,
+        "range_max": 4.5,
+        "weight": 12,
+        "use_when": [
+          "target_in_range",
+          "target_recovering"
+        ]
+      },
+      "hint": {
+        "dodge": "jump",
+        "direction": "any",
+        "text": "Los tres golpes son al suelo: saltá cada uno, o rodá lejos del círculo."
+      }
+    },
+    {
+      "id": "salto_estocada",
+      "name": "Salto Estocada",
+      "icon": "generic",
+      "category": "melee",
+      "tags": [
+        "aerial"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 28,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 420,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "impulso",
+          "windup_ticks": 30,
+          "active_ticks": 1,
+          "recovery_ticks": 0,
+          "telegraph": {
+            "id": "tg_salto_verde",
+            "style": "body_pose",
+            "color": "#A3C86D",
+            "sound": "sfx_tele_salto_est",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Se encoge y la espada apunta al cielo."
+          },
+          "tracking": {
+            "deg_per_sec": 300,
+            "lock_at_tick": 20,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 16,
+            "to_tick": 31,
+            "height_m": 3.4,
+            "speed_mps": 11,
+            "max_distance_m": 7,
+            "target_mode": "lock_point",
+            "stop_at_m": 1.0
+          },
+          "next": {
+            "default": "clavar"
+          },
+          "events": [
+            {
+              "id": "ev_imp",
+              "tick": 16,
+              "vfx": "vfx_dust_ring",
+              "sfx": "sfx_leap"
+            }
+          ]
+        },
+        {
+          "id": "clavar",
+          "windup_ticks": 12,
+          "active_ticks": 4,
+          "recovery_ticks": 48,
+          "telegraph": {
+            "id": "tg_salto_clavar",
+            "style": "ground_ring",
+            "color": "#A3C86D",
+            "sound": "sfx_tele_salto_clavar",
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 2.6
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 12
+            },
+            "at_tick": 0,
+            "text": "Círculo verde bajo el objetivo."
+          },
+          "tracking": {
+            "deg_per_sec": 0,
+            "lock_at_tick": 0,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "slam",
+            "from_tick": 0,
+            "to_tick": 12,
+            "target_mode": "lock_point",
+            "max_distance_m": 3.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_clavar",
+              "shape": {
+                "type": "circle",
+                "radius_m": 2.6
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 30,
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 36,
+              "anchor": "self",
+              "ground_only": true,
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 6,
+                  "duration_ticks": 8
+                }
+              }
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_clavar",
+              "tick": 12,
+              "vfx": "vfx_crack_ring",
+              "sfx": "sfx_slam",
+              "camera_shake": 2
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 8.0,
+        "weight": 12,
+        "use_when": [
+          "target_far",
+          "target_in_range"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Apartate del círculo verde cuando caiga. Después de la clavada queda expuesto."
+      }
+    },
+    {
+      "id": "voltereta_cuchilla",
+      "name": "Volteretas Cortantes",
+      "icon": "generic",
+      "category": "movement",
+      "tags": [
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 30,
+        "mana": 0,
+        "health": 0
+      },
+      "cooldown_ticks": 360,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "retroceso_1",
+          "windup_ticks": 16,
+          "active_ticks": 1,
+          "recovery_ticks": 0,
+          "telegraph": {
+            "id": "tg_voltereta_lila",
+            "style": "body_pose",
+            "color": "#D9A5F5",
+            "sound": "sfx_tele_voltereta",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Se agacha de lado, listo para saltar hacia atrás."
+          },
+          "movement": {
+            "type": "retreat",
+            "from_tick": 4,
+            "to_tick": 17,
+            "speed_mps": 10,
+            "max_distance_m": 3.0,
+            "target_mode": "away_from_target"
+          },
+          "next": {
+            "default": "tajo_regreso_1"
+          }
+        },
+        {
+          "id": "tajo_regreso_1",
+          "windup_ticks": 10,
+          "active_ticks": 4,
+          "recovery_ticks": 2,
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 2,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 0,
+            "to_tick": 16,
+            "height_m": 1.6,
+            "speed_mps": 14,
+            "max_distance_m": 4.5,
+            "target_mode": "lock_point",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_v1",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 130
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 16,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 16
+            }
+          ],
+          "next": {
+            "default": "retroceso_2"
+          },
+          "events": [
+            {
+              "id": "ev_v1",
+              "tick": 10,
+              "vfx": "vfx_trail_lilac",
+              "sfx": "sfx_swing_fast"
+            }
+          ]
+        },
+        {
+          "id": "retroceso_2",
+          "windup_ticks": 12,
+          "active_ticks": 1,
+          "recovery_ticks": 0,
+          "movement": {
+            "type": "retreat",
+            "from_tick": 2,
+            "to_tick": 13,
+            "speed_mps": 10,
+            "max_distance_m": 2.5,
+            "target_mode": "away_from_target"
+          },
+          "next": {
+            "default": "tajo_regreso_2"
+          }
+        },
+        {
+          "id": "tajo_regreso_2",
+          "windup_ticks": 10,
+          "active_ticks": 4,
+          "recovery_ticks": 40,
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 2,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 0,
+            "to_tick": 16,
+            "height_m": 1.6,
+            "speed_mps": 14,
+            "max_distance_m": 4.5,
+            "target_mode": "lock_point",
+            "stop_at_m": 1.0
+          },
+          "hitboxes": [
+            {
+              "id": "hb_v2",
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 130
+              },
+              "from_tick": 0,
+              "to_tick": 4,
+              "hits": 1,
+              "damage_per_hit": 20,
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 22
+            }
+          ],
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_v2",
+              "tick": 10,
+              "vfx": "vfx_trail_lilac",
+              "sfx": "sfx_swing_fast"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 1.5,
+        "range_max": 5.0,
+        "weight": 10,
+        "use_when": [
+          "target_in_range",
+          "target_blocking"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Dos saltos hacia atrás y regreso con tajo. Esperá a que vuelva y rodá después del segundo."
+      }
+    },
+    {
+      "id": "potenciar_filo",
+      "name": "Filo Potenciado",
+      "icon": "generic",
+      "category": "buff",
+      "tags": [],
+      "unlock": {
+        "phase": 2
+      },
+      "cost": {
+        "stamina": 0,
+        "mana": 18,
+        "health": 0
+      },
+      "cooldown_ticks": 900,
+      "uses_global_cd": true,
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl1",
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
+      "on_interrupt": {
+        "recovery_ticks": 12,
+        "cancel_spawns": true,
+        "cooldown": "full"
+      },
+      "steps": [
+        {
+          "id": "potenciar",
+          "windup_ticks": 40,
+          "active_ticks": 1,
+          "recovery_ticks": 30,
+          "telegraph": {
+            "id": "tg_potenciar_dorado",
+            "style": "aura",
+            "color": "#FFD166",
+            "sound": "sfx_tele_potenciar",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "La espada se envuelve en un aura dorada mientras él se queda quieto."
+          },
+          "next": {
+            "default": null
+          },
+          "events": [
+            {
+              "id": "ev_aura",
+              "tick": 40,
+              "vfx": "vfx_aura_gold",
+              "sfx": "sfx_buff_up"
+            }
+          ]
+        }
+      ],
+      "ai": {
+        "range_min": 0.0,
+        "range_max": 14.0,
+        "weight": 6,
+        "use_when": [
+          "opener",
+          "target_far"
+        ]
+      },
+      "hint": {
+        "dodge": "distance",
+        "direction": "any",
+        "text": "Se queda quieto potenciándose: es el momento de golpearlo y cortarle el bufo."
+      },
+      "buff": {
+        "duration_ticks": 480,
+        "damage_pct": 15,
+        "speed_pct": 0,
+        "poise_bonus_pct": 0,
+        "shield_hp": 0
+      }
+    }
+  ],
+  "presets": [
+    {
+      "id": "caballero_umbral",
+      "name": "Caballero Umbral",
+      "abilities": [
+        "cadena_mandobles",
+        "embestida_perforante",
+        "carga_abisal"
+      ],
+      "notes": "Perfil base: presión de tajos y carrera; la carga abisal se desbloquea en Fase II."
+    },
+    {
+      "id": "caballero_umbral_furia",
+      "name": "Caballero Umbral (furia)",
+      "abilities": [
+        "tajo_deslizante",
+        "giros_dobles",
+        "triple_clavada"
+      ],
+      "notes": "Perfil agresivo de corto alcance; la triple clavada se desbloquea en Fase II."
+    },
+    {
+      "id": "caballero_umbral_agil",
+      "name": "Caballero Umbral (ágil)",
+      "abilities": [
+        "salto_estocada",
+        "voltereta_cuchilla",
+        "potenciar_filo"
+      ],
+      "notes": "Perfil de movilidad; el bufo se desbloquea en Fase II."
+    }
+  ]
+}

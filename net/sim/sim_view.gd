@@ -83,6 +83,7 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.land_t = s[o + S.LAND_T] / hz
 	f.velocity.y = s[o + S.FVY] / 1000000.0 * hz
 	f.combo = s[o + S.COMBO]
+	f.buffered = s[o + S.BUFFERED] != 0
 	f.cur_hit = f.combo_hit_for(f.combo) if f.atk_state != Fighter.Atk.NONE and s[o + S.ATK_IDX] < 3 else null
 	f.charge_t = s[o + S.CHARGE_T] / hz
 	f.roll_t = s[o + S.ROLL_T] / hz if s[o + S.ROLL_T] >= 0 else -1.0
@@ -116,10 +117,19 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.ab_combo_variant = (abfl & SimAbilities.FL_VARIANT) != 0
 	f.ab_alt_open = false
 	f.ab_alt_label = ""
+	f.ab_combo_can = false
+	f.ab_combo_active = false
+	f.ab_combo_prog = 0.0
+	f.ab_combo_queued = false
 	if not params.is_empty() and abk >= 0:
 		var pi := o / S.F_FIELDS
 		f.ab_alt_open = SimAbilities.alt_window(s, params, pi)
 		f.ab_alt_label = SimAbilities.alt_label(s, params, pi)
+		var cinfo: Dictionary = SimAbilities.combo_info(s, params, pi)
+		f.ab_combo_can = bool(cinfo.get("can_combo", false))
+		f.ab_combo_active = bool(cinfo.get("active", false))
+		f.ab_combo_prog = float(cinfo.get("progress", 0.0))
+		f.ab_combo_queued = bool(cinfo.get("queued", false))
 	f.stance_broken_t = s[o + S.STANCE_BROKEN_T] / hz
 	f.guard_counter_t = s[o + S.GC_T] / hz
 	f.invuln = s[o + S.INVULN] / hz

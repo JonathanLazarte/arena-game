@@ -109,16 +109,49 @@ func _ready() -> void:
 	_touch_button("Jefe", "boss", Vector2(840, 300), 38, Color(1.0, 0.3, 0.15))
 	_touch_button("Estocada", "boss_variation", Vector2(840, 235), 32, Color(1.0, 0.58, 0.2))
 	# Ronda 32: flecha para cambiar de habilidad de jefe (botón normal: se ve en PC y en Android)
+	boss_prev_btn = Button.new()
+	boss_prev_btn.name = "BossPrev"
+	boss_prev_btn.text = "◀"
+	boss_prev_btn.tooltip_text = "Habilidad anterior de jefe"
+	boss_prev_btn.focus_mode = Control.FOCUS_NONE
+	boss_prev_btn.custom_minimum_size = Vector2(40, 40)
+	boss_prev_btn.position = Vector2(794, 280)
+	boss_prev_btn.add_theme_font_size_override("font_size", 18)
+	boss_prev_btn.pressed.connect(_on_boss_prev)
+	add_child(boss_prev_btn)
+
 	boss_next_btn = Button.new()
 	boss_next_btn.name = "BossNext"
 	boss_next_btn.text = "▶"
 	boss_next_btn.tooltip_text = "Siguiente habilidad de jefe (N)"
 	boss_next_btn.focus_mode = Control.FOCUS_NONE
-	boss_next_btn.custom_minimum_size = Vector2(44, 44)
-	boss_next_btn.position = Vector2(884, 278)
-	boss_next_btn.add_theme_font_size_override("font_size", 22)
+	boss_next_btn.custom_minimum_size = Vector2(40, 40)
+	boss_next_btn.position = Vector2(886, 280)
+	boss_next_btn.add_theme_font_size_override("font_size", 18)
 	boss_next_btn.pressed.connect(_on_boss_next)
 	add_child(boss_next_btn)
+
+	boss_list_btn = Button.new()
+	boss_list_btn.name = "BossList"
+	boss_list_btn.text = "☰"
+	boss_list_btn.tooltip_text = "Catálogo de habilidades (Admin)"
+	boss_list_btn.focus_mode = Control.FOCUS_NONE
+	boss_list_btn.custom_minimum_size = Vector2(32, 32)
+	boss_list_btn.position = Vector2(886, 238)
+	boss_list_btn.add_theme_font_size_override("font_size", 16)
+	boss_list_btn.pressed.connect(toggle_ability_picker)
+	add_child(boss_list_btn)
+
+	admin_toggle_btn = Button.new()
+	admin_toggle_btn.name = "AdminToggle"
+	admin_toggle_btn.text = "⚙ Admin: OFF"
+	admin_toggle_btn.tooltip_text = "Modo Admin [F1]: Vida/Aguante/Maná infinitos, rival inmortal, 58 habilidades"
+	admin_toggle_btn.focus_mode = Control.FOCUS_NONE
+	admin_toggle_btn.custom_minimum_size = Vector2(130, 32)
+	admin_toggle_btn.position = Vector2(575, 82)
+	admin_toggle_btn.add_theme_font_size_override("font_size", 13)
+	admin_toggle_btn.pressed.connect(_on_admin_toggle)
+	add_child(admin_toggle_btn)
 	# fase 9: icono de la habilidad seleccionada dentro del botón «Jefe» (sin glifos de fuente)
 	var btb := btns["boss"] as TouchScreenButton
 	boss_icon = BossIcon.make("", 30.0)
@@ -209,7 +242,12 @@ func set_touch_visible(v: bool) -> void:
 
 var btns: Dictionary = {} ## ronda 21: acción -> TouchScreenButton
 var btn_labels: Dictionary = {}
+var btn_circles: Dictionary = {}
+var boss_prev_btn: Button
 var boss_next_btn: Button
+var boss_list_btn: Button
+var admin_toggle_btn: Button
+var ability_picker_panel: Control
 var boss_icon: BossIcon
 var rematch_btn: Button
 
@@ -220,6 +258,99 @@ func set_rematch(text: String, enabled: bool) -> void:
 		rematch_btn.disabled = not enabled
 var sim_match: SimMatch ## fase 9: ▶ pulsa IN_BOSS_NEXT en la sim (offline y online)
 var enemy_boss_strip: HBoxContainer ## habilidades del rival (la 3.ª del campeón aparece en la Fase II)
+
+func _on_boss_prev() -> void:
+	if sim_match:
+		sim_match.cycle_boss_prev()
+	elif _player:
+		var ids := _player.avail_boss_ids()
+		if ids.size() > 1:
+			_player.boss_sel = (_player.boss_sel - 1 + ids.size()) % ids.size()
+
+func _on_admin_toggle() -> void:
+	AdminMode.toggle()
+	_update_admin_ui()
+
+func _update_admin_ui() -> void:
+	if admin_toggle_btn:
+		admin_toggle_btn.text = "⚙ Admin: ON" if AdminMode.enabled else "⚙ Admin: OFF"
+		admin_toggle_btn.modulate = Color(1.0, 0.85, 0.2) if AdminMode.enabled else Color(1, 1, 1, 0.65)
+	if boss_list_btn:
+		boss_list_btn.visible = not (_player and _player.mounted) and (AdminMode.enabled or (_player != null and _player.avail_boss_ids().size() > 3))
+	show_message("MODO ADMIN: ACTIVADO (Vida/Aguante/Maná infinitos · Rival inmortal · 58 habilidades)" if AdminMode.enabled else "MODO ADMIN: DESACTIVADO", 2.2)
+
+func toggle_ability_picker() -> void:
+	if ability_picker_panel == null:
+		_build_ability_picker()
+	ability_picker_panel.visible = not ability_picker_panel.visible
+
+func _build_ability_picker() -> void:
+	if ability_picker_panel != null:
+		return
+	ability_picker_panel = Control.new()
+	ability_picker_panel.name = "AbilityPicker"
+	ability_picker_panel.visible = false
+	ability_picker_panel.size = Vector2(1280, 720)
+	ability_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	root_control().add_child(ability_picker_panel)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.size = Vector2(1280, 720)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ability_picker_panel.add_child(dim)
+
+	var p := UIKit.panel()
+	p.position = Vector2(200, 60)
+	p.custom_minimum_size = Vector2(880, 600)
+	ability_picker_panel.add_child(p)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	p.add_child(vb)
+
+	var top := HBoxContainer.new()
+	var tlabel := UIKit.title("CATÁLOGO DE HABILIDADES DE JEFE (MODO ADMIN)", 20, UIKit.YELLOW)
+	tlabel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(tlabel)
+	var close_btn := UIKit.button("Cerrar ✕", 16)
+	close_btn.custom_minimum_size = Vector2(100, 36)
+	close_btn.pressed.connect(func() -> void: ability_picker_panel.visible = false)
+	top.add_child(close_btn)
+	vb.add_child(top)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(860, 520)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vb.add_child(scroll)
+
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 6)
+	scroll.add_child(grid)
+
+	var all_ids: Array = BossAbilities.all_ids()
+	for idx in all_ids.size():
+		var ab_id: String = String(all_ids[idx])
+		var d: Dictionary = BossAbilities.def(ab_id)
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(275, 44)
+		b.text = "        %s" % String(d.get("name", ab_id))
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_size_override("font_size", 13)
+		var ic := BossIcon.make(ab_id, 22.0)
+		ic.position = Vector2(16, 22)
+		b.add_child(ic)
+		b.pressed.connect(func() -> void:
+			if sim_match:
+				sim_match.select_boss_ability(idx)
+			elif _player:
+				_player.boss_sel = idx
+			show_message("Habilidad: %s" % String(d.get("name", ab_id)), 1.2)
+			ability_picker_panel.visible = false
+		)
+		grid.add_child(b)
 
 ## Fase 9: cambiar de habilidad es un flanco de entrada de la sim (antes, offline, se cambiaba en el
 ## Fighter y SimView lo devolvía al valor de la sim en el tick siguiente: el botón «parpadeaba»).
@@ -254,6 +385,7 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 	vis.r = r
 	vis.c = c
 	tb.add_child(vis)
+	btn_circles[action] = vis
 	var l := Label.new()
 	l.text = text
 	l.size = Vector2(r * 2, 30)
@@ -271,9 +403,30 @@ func _touch_button(text: String, action: String, center: Vector2, r: float, c: C
 class _Circle extends Node2D:
 	var r: float = 40.0
 	var c: Color = Color.WHITE
+	var combo_can: bool = false
+	var combo_active: bool = false
+	var combo_prog: float = 0.0
+	var combo_queued: bool = false
+	var cooldown_active: bool = false
 	func _draw() -> void:
 		draw_circle(Vector2.ZERO, r, Color(c, 0.35))
-		draw_arc(Vector2.ZERO, r, 0, TAU, 40, Color(c, 0.8), 3.0)
+		var border_color := Color(c, 0.8)
+		if combo_can:
+			border_color = Color(1.0, 0.85, 0.22, 0.95)
+		elif cooldown_active:
+			border_color = Color(0.4, 0.4, 0.45, 0.7)
+		draw_arc(Vector2.ZERO, r, 0, TAU, 48, border_color, 3.0)
+		if cooldown_active:
+			draw_circle(Vector2.ZERO, r - 1.0, Color(0.0, 0.0, 0.0, 0.45))
+		if combo_can:
+			if combo_active:
+				var arc_col := Color(0.2, 1.0, 0.45) if combo_queued else Color(1.0, 0.85, 0.15)
+				var arc_len := maxf(TAU * combo_prog, 0.03)
+				draw_arc(Vector2.ZERO, r + 3.0, -PI * 0.5, -PI * 0.5 + arc_len, 48, arc_col, 5.0)
+			elif combo_queued:
+				draw_arc(Vector2.ZERO, r + 3.0, 0, TAU, 48, Color(0.2, 1.0, 0.5, 0.95), 4.0)
+			else:
+				draw_arc(Vector2.ZERO, r + 2.0, 0, TAU, 40, Color(1.0, 0.82, 0.2, 0.35), 2.0)
 
 ## Ronda 20: barras de acumulación de estados (HUD propio, del rival y sobre el rival).
 var status_p: Dictionary = {}
@@ -458,20 +611,64 @@ func _update_contextual_buttons() -> void:
 	(btns["swap_weapon"] as TouchScreenButton).visible = tv and _player.secondary != null
 	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
 	var alt := btns["boss_variation"] as TouchScreenButton
-	alt.visible = tv and not _player.mounted and _player.ab_alt_open
-	var alt_lab := _player.ab_alt_label if _player.ab_alt_label != "" else "Estocada"
+	var alt_open: bool = _player.ab_alt_open and _player.ab_alt_label != ""
+	alt.visible = tv and not _player.mounted and alt_open
+	var alt_lab := _player.ab_alt_label if _player.ab_alt_label != "" else "Variación"
 	if alt.visible and _changed(btn_labels["boss_variation"], alt_lab):
 		(btn_labels["boss_variation"] as Label).text = alt_lab
 	if boss_next_btn:
-		boss_next_btn.visible = not _player.mounted and _player.avail_boss_ids().size() > 1
-	# Ronda 31: sin recarga; habilidad seleccionada y su coste
+		boss_next_btn.visible = not _player.mounted and (_player.avail_boss_ids().size() > 1 or AdminMode.enabled)
+	if boss_prev_btn:
+		boss_prev_btn.visible = not _player.mounted and (_player.avail_boss_ids().size() > 1 or AdminMode.enabled)
+	if boss_list_btn:
+		boss_list_btn.visible = not _player.mounted and (AdminMode.enabled or _player.avail_boss_ids().size() > 3)
+
+	var boss_c: _Circle = btn_circles.get("boss")
+	if boss_c:
+		boss_c.combo_can = _player.ab_combo_can
+		boss_c.combo_active = _player.ab_combo_active
+		boss_c.combo_prog = _player.ab_combo_prog
+		boss_c.combo_queued = _player.ab_combo_queued and not _player.ab_combo_variant
+		boss_c.queue_redraw()
+
+	var alt_c: _Circle = btn_circles.get("boss_variation")
+	if alt_c:
+		alt_c.combo_can = alt.visible
+		alt_c.combo_active = _player.ab_combo_active
+		alt_c.combo_prog = 1.0
+		alt_c.combo_queued = _player.ab_combo_variant
+		alt_c.queue_redraw()
+
+	var sword_c: _Circle = btn_circles.get("attack_sword")
+	if sword_c:
+		sword_c.combo_can = false
+		sword_c.combo_active = false
+		sword_c.combo_prog = 0.0
+		sword_c.combo_queued = false
+		sword_c.queue_redraw()
+
+	# Habilidad de jefe seleccionada, coste y tiempo de recarga
 	var bid := _player.selected_boss()
-	(btns["boss"] as TouchScreenButton).modulate = Color.WHITE if bid != "" and _player.boss_cost_ok(bid) else Color(1, 1, 1, 0.45)
-	if _changed(btn_labels["boss"], bid):
-		(btn_labels["boss"] as Label).text = BossAbilities.short_name(bid) if bid != "" else "Jefe"
-		if boss_icon:
-			boss_icon.id = bid
-			boss_icon.visible = bid != ""
+	var cd_left: float = _player.boss_cd if not AdminMode.enabled else 0.0
+	var on_cd: bool = cd_left > 0.05
+	var can_afford: bool = bid != "" and _player.boss_cost_ok(bid)
+	var boss_btn := btns["boss"] as TouchScreenButton
+	var boss_lbl := btn_labels["boss"] as Label
+	if boss_c:
+		boss_c.cooldown_active = on_cd
+		boss_c.queue_redraw()
+	if on_cd:
+		boss_btn.modulate = Color(0.65, 0.65, 0.7, 0.55)
+		boss_lbl.text = "%.1fs" % cd_left
+	elif not can_afford:
+		boss_btn.modulate = Color(1, 1, 1, 0.45)
+		boss_lbl.text = BossAbilities.short_name(bid) if bid != "" else "Jefe"
+	else:
+		boss_btn.modulate = Color.WHITE
+		boss_lbl.text = BossAbilities.short_name(bid) if bid != "" else "Jefe"
+	if boss_icon and _changed(boss_icon, bid):
+		boss_icon.id = bid
+		boss_icon.visible = bid != ""
 	_update_enemy_strip()
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
@@ -761,12 +958,25 @@ func _build_pause_menu() -> void:
 		CameraRig.invert_y = on
 		if au: au.save_settings())
 	pause_settings.add_child(inv)
+	var admin_chk := CheckBox.new()
+	admin_chk.name = "PauseAdminToggle"
+	admin_chk.text = "Modo Admin (F1: Infinito / Rival Inmortal / 58 Habilidades)"
+	admin_chk.button_pressed = AdminMode.enabled
+	admin_chk.toggled.connect(func(on: bool) -> void:
+		AdminMode.enabled = on
+		_update_admin_ui())
+	pause_settings.add_child(admin_chk)
 	menu_button = UIKit.button("≡", 22)
 	menu_button.name = "MenuButton"
 	menu_button.position = Vector2(1280 - 56, 100)
 	menu_button.custom_minimum_size = Vector2(44, 44)
 	menu_button.pressed.connect(toggle_pause)
 	root_control().add_child(menu_button)
+
+func _unhandled_input(ev: InputEvent) -> void:
+	if ev.is_pressed() and not ev.is_echo() and ev is InputEventKey:
+		if (ev as InputEventKey).keycode == KEY_F1:
+			_on_admin_toggle()
 
 func is_pause_open() -> bool:
 	return pause_menu != null and pause_menu.visible

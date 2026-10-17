@@ -55,6 +55,9 @@ func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> v
 	view = SimView.new(a, b, parent)
 	view.params = params
 	view.smooth = net != null
+	AdminMode.on_toggled = func(on: bool) -> void: set_admin_mode(on)
+	if AdminMode.enabled:
+		_apply_admin_rules()
 
 signal rematch_started
 ## Fase 9: revancha online acordada. Sesión nueva (mismos params, semilla nueva): efectos nuevos
@@ -101,6 +104,74 @@ func _physics_process(_d: float) -> void:
 	if running:
 		step_once()
 
+var _backup_boss_ids: Array = []
+
+func _apply_admin_rules() -> void:
+	if state.is_empty() or params.is_empty():
+		return
+	var po := local_slot * FightSim.F_FIELDS
+	var p_params: Dictionary = params[local_slot]
+	var p_max_hp := int(p_params.get("hp", 100000))
+	var p_max_st := int(p_params.get("st_max", 100000))
+	var p_max_mana := int(p_params.get("mana_max", 100000))
+	state[po + FightSim.HP] = p_max_hp
+	state[po + FightSim.ST] = p_max_st
+	state[po + FightSim.MANA] = p_max_mana
+	state[po + FightSim.EXH] = 0
+	state[po + FightSim.FLASKS] = 5
+	state[po + FightSim.METER] = 100000
+	state[po + FightSim.ALIVE] = 1
+	state[po + FightSim.BOSS_CD] = 0
+	for k in 64:
+		state[po + FightSim.BCD_BASE + k] = 0
+
+	var opp_slot := 1 - local_slot
+	var eo := opp_slot * FightSim.F_FIELDS
+	var e_params: Dictionary = params[opp_slot]
+	var e_max_hp := int(e_params.get("hp", 100000))
+	state[eo + FightSim.ALIVE] = 1
+	state[FightSim.P_BASE + FightSim.G_END_T] = 0
+	if state[eo + FightSim.HP] <= e_max_hp * 30 / 100 or state[eo + FightSim.HP] <= 1000:
+		state[eo + FightSim.HP] = e_max_hp
+
+	if fighters.size() > local_slot:
+		var f := fighters[local_slot]
+		var total_ids := BossAbilities.all_ids()
+		if f.boss_ids.size() < total_ids.size():
+			if _backup_boss_ids.is_empty():
+				_backup_boss_ids = f.boss_ids.duplicate()
+			f.boss_ids = total_ids.duplicate()
+			p_params["boss"] = SimAbilities.compile_all(f)
+			p_params["boss_n"] = total_ids.size()
+
+func set_admin_mode(enabled: bool) -> void:
+	if not enabled and not _backup_boss_ids.is_empty() and fighters.size() > local_slot:
+		var f := fighters[local_slot]
+		f.boss_ids = _backup_boss_ids.duplicate()
+		_backup_boss_ids.clear()
+		params[local_slot]["boss"] = SimAbilities.compile_all(f)
+		params[local_slot]["boss_n"] = f.boss_ids.size()
+		var po := local_slot * FightSim.F_FIELDS
+		state[po + FightSim.AB_SEL] = mini(int(state[po + FightSim.AB_SEL]), maxi(f.boss_ids.size() - 1, 0))
+
+func cycle_boss_prev() -> void:
+	if state.is_empty() or params.is_empty():
+		return
+	var po := local_slot * FightSim.F_FIELDS
+	var n: int = SimAbilities.boss_avail(state, params, local_slot)
+	if n > 1:
+		state[po + FightSim.AB_SEL] = (int(state[po + FightSim.AB_SEL]) - 1 + n) % n
+		state[po + FightSim.BOSS_CD] = state[po + FightSim.BCD_BASE + state[po + FightSim.AB_SEL]]
+
+func select_boss_ability(idx: int) -> void:
+	if state.is_empty() or params.is_empty():
+		return
+	var po := local_slot * FightSim.F_FIELDS
+	var n: int = SimAbilities.boss_avail(state, params, local_slot)
+	if n > 0:
+		state[po + FightSim.AB_SEL] = clampi(idx, 0, n - 1)
+		state[po + FightSim.BOSS_CD] = state[po + FightSim.BCD_BASE + state[po + FightSim.AB_SEL]]
+
 func step_once() -> void:
 	if net:
 		_net_step()
@@ -108,6 +179,8 @@ func step_once() -> void:
 	var a := _sample(0)
 	var b := _sample(1)
 	engine.step(state, a, b)
+	if AdminMode.enabled:
+		_apply_admin_rules()
 	tick_n += 1
 	view.apply(state)
 

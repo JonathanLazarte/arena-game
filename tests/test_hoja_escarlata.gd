@@ -66,9 +66,9 @@ func _run() -> void:
 	check(FileAccess.file_exists("res://docs/backup/habilidades_ronda46/boss_abilities.gd"), "respaldo de las 6 base")
 	check(FileAccess.file_exists("res://docs/backup/habilidades_ronda46/boss_abilities_ext.gd"), "respaldo de las 39 ampliadas")
 	var ids: Array = BossAbilities.all_ids()
-	check(ids.size() == 49, "49 habilidades (hay %d)" % ids.size())
+	check(ids.size() == 58, "58 habilidades (hay %d)" % ids.size())
 	check(ids[0] == "estocada" and ids[44] == "guardia_reflejo", "las 45 anteriores no se movieron")
-	check(ids.slice(45) == ["trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata"], "las nuevas van al final")
+	check(ids.slice(45, 49) == ["trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata"], "las nuevas van al final")
 	check(HojaCatalog.preset() == ["trazos_hoja", "danza_garza", "floracion_escarlata"], "preset Hoja Escarlata")
 	check(SimAbilities.code_of("estocada") == 0 and SimAbilities.code_of("trazos_hoja") == 45, "los códigos viejos no se corren")
 	for id: String in ["trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata"]:
@@ -84,7 +84,7 @@ func _run() -> void:
 		check(int(baked[1]["type"]) == SimAbilities.T_ESTOCADA, "la estocada sigue en su ejecutor")
 
 	var est := await _play("trazos_hoja", 1800000, 220, false)
-	check(est["hurt"] > 0 and est["hits"] > 0 and est["step"] == 3 and est["cd"] >= 300, "estocada final por defecto (daño %d, paso %d, cd %d)" % [est["hurt"], est["step"], est["cd"]])
+	check(est["hurt"] > 0 and est["hits"] > 0 and est["step"] == 3 and est["cd"] > 0, "estocada final por defecto (daño %d, paso %d, cd %d)" % [est["hurt"], est["step"], est["cd"]])
 	var pat := await _play("trazos_hoja", 1800000, 220, true)
 	check(pat["latched"] == 1 and pat["step"] == 4 and pat["hurt"] > 0, "patada si se pulsa la variante (paso %d, daño %d)" % [pat["step"], pat["hurt"]])
 

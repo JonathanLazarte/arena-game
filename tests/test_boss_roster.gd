@@ -77,7 +77,7 @@ func _play(id: String, gap: int, ticks: int, hit_back: bool) -> Dictionary:
 	return peak
 
 func _run() -> void:
-	check(BossAbilities.all_ids().size() == 49, "49 habilidades (hay %d)" % BossAbilities.all_ids().size())
+	check(BossAbilities.all_ids().size() == 58, "58 habilidades (hay %d)" % BossAbilities.all_ids().size())
 	check(NEW.size() == 26 and FAMILY.size() == 26, "lote de 26")
 	var seen := {}
 	for id: String in BossAbilities.all_ids():

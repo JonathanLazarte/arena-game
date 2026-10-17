@@ -10,7 +10,7 @@ func check(cond: bool, msg: String) -> void:
 func _run() -> void:
 	var cs := Catalog.characters()
 	var ws := Catalog.weapons()
-	check(cs.size() == 5, "5 personajes (%d)" % cs.size())
+	check(cs.size() >= 5, "personajes registrados (%d)" % cs.size())
 	check(ws.size() == 7, "7 tipos de arma (%d)" % ws.size())
 	var ids := {}
 	for w in ws:

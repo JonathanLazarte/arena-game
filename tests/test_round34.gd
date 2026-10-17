@@ -27,7 +27,7 @@ func _fresh(f: Fighter) -> void:
 
 func _run() -> void:
 	await process_frame
-	check(BossAbilities.all_ids().size() == 49, "49 habilidades (45 anteriores + 4 del catálogo)")
+	check(BossAbilities.all_ids().size() == 58, "58 habilidades (45 anteriores + 4 Hoja + 9 Elden)")
 	for id: String in BossAbilitiesExt.ids():
 		check(BossAbilities.has(id) and BossAbilities.codex(id).length() > 30, "códice y definición disponibles para %s" % id)
 	change_scene_to_file("res://scenes/arena.tscn")

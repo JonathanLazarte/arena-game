@@ -14,9 +14,12 @@ const INT_DOWN := 4
 const INT_PARRY := 8
 const BLEED_BUILD := 25000 ## por debajo del umbral: no estalla en un solo golpe
 const CD_MASK := 65535
+const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
 
 static func compile(f: Fighter, id: String) -> Dictionary:
 	var a := HojaCatalog.ability(id)
+	if a.is_empty() and EldenCatalog.has(id):
+		a = EldenCatalog.ability(id)
 	if a.is_empty():
 		return {}
 	var w := f.melee()
@@ -39,6 +42,23 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 		steps.append(compiled)
 		if int(compiled["bra"]) >= 0:
 			balt = int(weights.get(int(compiled["bra"]), balt))
+	var n_st := steps.size()
+	var depth_map := {}
+	depth_map[0] = 0
+	for idx in n_st:
+		var d: int = depth_map.get(idx, 0)
+		var st_c: Dictionary = steps[idx]
+		var targets := [int(st_c["nxt"]), int(st_c["brs"]), int(st_c["bra"]), int(st_c["brd"])]
+		for tg: int in targets:
+			if tg >= 0 and tg < n_st and tg != idx:
+				depth_map[tg] = maxi(depth_map.get(tg, 0), d + 1)
+	var max_d := 0
+	for d_val: int in depth_map.values():
+		max_d = maxi(max_d, d_val)
+	var total_chain := max_d + 1
+	for idx in n_st:
+		steps[idx]["chain_idx"] = depth_map.get(idx, 0)
+		steps[idx]["total_chain"] = total_chain
 	return {
 		"code": SimAbilities.code_of(id), "id": id, "type": SimAbilities.T_CATALOG,
 		"cost_type": int(ct[0]), "cost": int(ct[1]),
@@ -222,7 +242,13 @@ static func _alive(s: PackedInt64Array, o: int) -> bool:
 
 static func _step_of(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
 	var o := i * FightSim.F_FIELDS
-	var ab: Dictionary = P[i]["boss"][s[o + FightSim.AB_SLOT]]
+	if i >= P.size():
+		return {}
+	var boss: Array = P[i].get("boss", [])
+	var slot: int = s[o + FightSim.AB_SLOT]
+	if slot < 0 or slot >= boss.size():
+		return {}
+	var ab: Dictionary = boss[slot]
 	var steps: Array = ab.get("steps", [])
 	var si: int = s[o + FightSim.AB_FIRED]
 	if si < 0 or si >= steps.size():
@@ -303,7 +329,8 @@ static func alt_window(s: PackedInt64Array, P: Array, i: int) -> bool:
 	if step.is_empty() or int(step.get("br0", -1)) < 0 or String(step.get("blab", "")) == "":
 		return false
 	var t := _t(s, o)
-	return t >= int(step["br0"]) - int(step.get("brbuf", 0)) and t < int(step["br1"])
+	var win_end := maxi(int(step.get("br1", 0)), int(step.get("dur", 60)))
+	return t >= 0 and t < win_end
 
 static func alt_label(s: PackedInt64Array, P: Array, i: int) -> String:
 	var o := i * FightSim.F_FIELDS
@@ -311,15 +338,46 @@ static func alt_label(s: PackedInt64Array, P: Array, i: int) -> String:
 		return ""
 	return String(_step_of(s, P, i).get("blab", ""))
 
+static func combo_info(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
+	var o := i * FightSim.F_FIELDS
+	if not _alive(s, o):
+		return {"can_combo": false, "active": false, "progress": 0.0, "queued": false, "label": ""}
+	var step := _step_of(s, P, i)
+	if step.is_empty() or int(step.get("br0", -1)) < 0:
+		return {"can_combo": false, "active": false, "progress": 0.0, "queued": false, "label": ""}
+	var dur := maxf(float(maxi(int(step.get("br1", 0)), int(step.get("dur", 60)))), 1.0)
+	var t := _t(s, o)
+	var active := t >= 0 and t < int(dur)
+	var total_ch: int = int(step.get("total_chain", 1))
+	var c_idx: int = int(step.get("chain_idx", 0))
+	var fl := s[o + FightSim.AB_FL]
+	var queued := (fl & (SimAbilities.FL_QUEUED | SimAbilities.FL_VARIANT)) != 0
+	var step_count: int = c_idx + (1 if queued else 0)
+	var prog: float = 1.0
+	if total_ch > 1:
+		prog = 1.0 - float(step_count) / float(total_ch)
+		if prog <= 0.05:
+			prog = 1.0 / float(total_ch)
+	return {
+		"can_combo": true,
+		"active": active,
+		"progress": prog,
+		"queued": queued,
+		"label": String(step.get("blab", ""))
+	}
+
 static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 	var o := i * FightSim.F_FIELDS
 	if not _alive(s, o):
 		return false
 	var step := _step_of(s, P, i)
-	if step.is_empty() or int(step["br0"]) < 0:
+	if step.is_empty() or int(step.get("br0", -1)) < 0:
+		return false
+	if alt and String(step.get("blab", "")) == "":
 		return false
 	var t := _t(s, o)
-	if t < int(step["br0"]) - int(step["brbuf"]) or t >= int(step["br1"]):
+	var win_end := maxi(int(step.get("br1", 0)), int(step.get("dur", 60)))
+	if t < 0 or t >= win_end:
 		return false
 	if alt:
 		s[o + FightSim.AB_FL] = (s[o + FightSim.AB_FL] & ~SimAbilities.FL_QUEUED) | SimAbilities.FL_VARIANT

@@ -38,7 +38,10 @@ const GLYPHS := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso
 	"lluvia_lanzas", "flecha_grave", "lluvia_sangre", "columnas_rayo",
 	"saeta_oscura", "orbe_lunar", "aliento_rayo", "aliento_escarcha", "chorro_lava",
 	"grito_guerra", "guardia_reflejo",
-	"trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata"]
+	"trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata",
+	"martillo_alba", "lanza_veredicto", "triptico_sagrado",
+	"danza_espirales", "estocada_penetrante", "floracion_purpurea",
+	"pisoton_telurico", "presa_del_coloso", "hendedura_cataclismica"]
 
 func _draw() -> void:
 	var s := minf(size.x, size.y)
@@ -264,6 +267,45 @@ func _glyph_extra(ability_id: String, P: Callable, s: float, c: Color, w: float)
 				draw_line(origin, origin + Vector2(cos(a3), sin(a3)) * s * 0.3, c, w * 0.8, true)
 			draw_circle(P.call(0.5, 0.5), s * 0.08, c)
 			draw_arc(P.call(0.5, 0.5), s * 0.18, 0.0, TAU, 14, Color(c, 0.65), w * 0.6, true)
+		"martillo_alba":
+			draw_line(P.call(0.5, 0.36), P.call(0.5, 0.78), c, w * 1.2, true)
+			draw_rect(Rect2(P.call(0.32, 0.22), Vector2(0.36, 0.16) * s), c, true)
+			draw_arc(P.call(0.5, 0.3), s * 0.22, -PI * 0.8, -PI * 0.2, 10, Color(c, 0.8), w * 0.8, true)
+		"lanza_veredicto":
+			draw_line(P.call(0.24, 0.76), P.call(0.72, 0.28), c, w * 1.3, true)
+			draw_colored_polygon(PackedVector2Array([P.call(0.68, 0.2), P.call(0.82, 0.18), P.call(0.8, 0.32)]), c)
+			draw_circle(P.call(0.5, 0.5), s * 0.05, Color(1, 1, 1, 0.9))
+		"triptico_sagrado":
+			draw_arc(P.call(0.5, 0.65), s * 0.14, PI, TAU, 10, c, w, true)
+			draw_arc(P.call(0.5, 0.65), s * 0.26, PI, TAU, 14, Color(c, 0.8), w, true)
+			draw_arc(P.call(0.5, 0.65), s * 0.38, PI, TAU, 18, Color(c, 0.6), w, true)
+		"danza_espirales":
+			draw_arc(P.call(0.5, 0.5), s * 0.28, -2.2, 0.2, 14, c, w * 1.3, true)
+			draw_arc(P.call(0.5, 0.5), s * 0.28, 0.9, 3.3, 14, Color(c, 0.8), w * 1.3, true)
+			draw_circle(P.call(0.5, 0.5), s * 0.06, c)
+		"estocada_penetrante":
+			draw_line(P.call(0.18, 0.5), P.call(0.8, 0.5), c, w * 1.2, true)
+			draw_colored_polygon(PackedVector2Array([P.call(0.76, 0.42), P.call(0.88, 0.5), P.call(0.76, 0.58)]), c)
+			draw_line(P.call(0.3, 0.36), P.call(0.3, 0.64), c, w, true)
+		"floracion_purpurea":
+			for k in 8:
+				var af := TAU * k / 8.0
+				draw_line(P.call(0.5, 0.5), P.call(0.5, 0.5) + Vector2(cos(af), sin(af)) * s * 0.28, c, w * 0.8, true)
+			draw_circle(P.call(0.5, 0.5), s * 0.08, c)
+			draw_arc(P.call(0.5, 0.5), s * 0.2, 0.0, TAU, 16, Color(c, 0.7), w * 0.6, true)
+		"pisoton_telurico":
+			draw_polyline(PackedVector2Array([P.call(0.38, 0.25), P.call(0.48, 0.55), P.call(0.65, 0.55)]), c, w * 1.3, true)
+			draw_line(P.call(0.2, 0.7), P.call(0.8, 0.7), c, w, true)
+			draw_arc(P.call(0.5, 0.7), s * 0.2, PI, TAU, 12, Color(c, 0.7), w * 0.7, true)
+		"presa_del_coloso":
+			draw_arc(P.call(0.38, 0.5), s * 0.22, -1.2, 1.2, 12, c, w * 1.3, true)
+			draw_arc(P.call(0.62, 0.5), s * 0.22, PI - 1.2, PI + 1.2, 12, c, w * 1.3, true)
+			draw_line(P.call(0.38, 0.5), P.call(0.22, 0.5), c, w, true)
+			draw_line(P.call(0.62, 0.5), P.call(0.78, 0.5), c, w, true)
+		"hendedura_cataclismica":
+			draw_polyline(PackedVector2Array([P.call(0.5, 0.18), P.call(0.44, 0.35), P.call(0.54, 0.52), P.call(0.46, 0.68), P.call(0.5, 0.82)]), c, w * 1.4, true)
+			draw_colored_polygon(PackedVector2Array([P.call(0.3, 0.78), P.call(0.4, 0.5), P.call(0.46, 0.78)]), Color(c, 0.8))
+			draw_colored_polygon(PackedVector2Array([P.call(0.54, 0.78), P.call(0.62, 0.44), P.call(0.72, 0.78)]), Color(c, 0.8))
 		_:
 			return false
 	return true
