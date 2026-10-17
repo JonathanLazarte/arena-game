@@ -645,7 +645,8 @@ func _avoid_aoe(mp: Vector3) -> bool:
 func _try_specials(dist: float, dir: Vector3) -> void:
 	if randf_() > minf(profile.special_chance * float(champion_style.get("special", 1.0)), 0.9):
 		return
-	if int(_P[me].get("slam", 0)) != 0 and g(S.ART_CD) <= 0 and not mounted() and dist < int(_P[me].get("slam_r", 0)) / 1.0e6 - 1.0 and stamina() > 35.0:
+	var art: Dictionary = _P[me].get("art", {})
+	if int(art.get("type", 0)) == 3 and g(S.ART_CD) <= 0 and not mounted() and dist < int(art["r"]) / 1.0e6 - 1.0 and stamina() > 35.0 and g(S.MANA) >= int(art["cost"]):
 		tap(S.IN_ART)
 		return
 	var ek: Dictionary = _P[me].get("ek", {})
@@ -672,7 +673,7 @@ func _try_magic(dist: float, dir: Vector3) -> bool:
 			tap(S.IN_SPELL)
 			return true
 	var art: Dictionary = _P[me].get("art", {})
-	if not art.is_empty() and randf_() < sc and g(S.ART_CD) <= 0 and g(S.MANA) >= int(art["cost"]) and can_act() and idle_atk():
+	if not art.is_empty() and int(art["type"]) != 3 and randf_() < sc and g(S.ART_CD) <= 0 and g(S.MANA) >= int(art["cost"]) and can_act() and idle_atk():
 		var ok := false
 		match int(art["type"]):
 			1: ok = dist > reach_of(me) + 0.8 and dist < 9.0 and facing().dot(dir) > 0.55

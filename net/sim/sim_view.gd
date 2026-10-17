@@ -112,6 +112,12 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.guard_counter_t = s[o + S.GC_T] / hz
 	f.invuln = s[o + S.INVULN] / hz
 	f.art_cd = s[o + S.ART_CD] / hz
+	if f.has_special():
+		f.special_cd = s[o + S.ART_CD] / hz
+		var spt := s[o + S.ART_T] / hz
+		if spt > 0.0 and f.special_t <= 0.0 and f._kv:
+			f._kv.event("slam")
+		f.special_t = spt
 	f.spell_idx = s[o + S.SP_SEL]
 	for k in mini(f.spells.size(), 4):
 		f.spell_cd[String(f.spells[k])] = s[o + S.SCD0 + k] / hz

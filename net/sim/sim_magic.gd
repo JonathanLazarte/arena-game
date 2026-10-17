@@ -69,7 +69,12 @@ static func bake(f: Fighter, p: Dictionary) -> void:
 	# arte del arma (Fighter.special sin habilidad propia → use_weapon_art)
 	var art := WeaponArts.art(f.weapon_art_id)
 	p["art"] = {}
-	if not art.is_empty() and not f.has_special() and WeaponArts.compatible(f.melee()):
+	if f.has_special() and f.character.special_id == "golpe_sismico":
+		# fase 8: golpe sísmico del personaje (Fighter.special): marca de suelo con aviso 0,7 s
+		p["art"] = {"type": 3, "cost": SimParams.milli(Fighter.SLAM_ENERGY), "cd": tk_down(Fighter.SLAM_COOLDOWN),
+			"st": SimParams.milli(Fighter.COST_SLAM * float(f.tfx["stamina_cost"])), "t": tk_down(Fighter.SLAM_TELEGRAPH),
+			"r": SimParams.um(Fighter.SLAM_RADIUS), "raw": SimParams.milli(Fighter.SLAM_DAMAGE * f.damage_mult())}
+	elif not art.is_empty() and not f.has_special() and WeaponArts.compatible(f.melee()):
 		var st_k := float(f.tfx["stamina_cost"])
 		var ai := {"type": 1 if f.weapon_art_id == "estocada_impulsada" else 2, "cost": SimParams.milli(float(art["cost"])),
 			"cd": tk_down(float(art["cooldown"])), "k": SimParams.pm(float(art["mult"]))}
@@ -365,7 +370,7 @@ static func art(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var a: Dictionary = P[i].get("art", {})
 	if a.is_empty() or s[o + FightSim.MOUNTED] != 0 or s[o + FightSim.AIR] != 0 or not FightSim._can_act(s, o) or s[o + FightSim.EXH] > 0 or s[o + FightSim.BACKSTEP_T] > 0:
 		return false
-	if s[o + FightSim.ART_CD] > 0 or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
+	if s[o + FightSim.ART_CD] > 0 or s[o + FightSim.ROLL_T] >= 0 or (s[o + FightSim.LOADOUT] != FightSim.Load.SWORD and int(a["type"]) != 3):
 		return false
 	if s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.PARRY_STATE] != FightSim.Parry.NONE or s[o + FightSim.SWAP_T] > 0 or s[o + FightSim.ST] <= 0:
 		return false

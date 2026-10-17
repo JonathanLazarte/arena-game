@@ -81,5 +81,17 @@ func _run() -> void:
 	var o := FightSim.F_FIELDS
 	check(s[o + FightSim.PH2] == 1 and SimAbilities.boss_avail(s, P, 1) == 3, "Fase II al 50 %: desbloquea la tercera habilidad")
 	check(s[o + FightSim.RAGE_T] >= 500 and s[o + FightSim.INVULN] > 0 and s[o + FightSim.METER] == FightSim.METER_MAX, "Fase II: furia, invulnerabilidad y medidor lleno")
+	# --- golpe sísmico del personaje (arte tipo 3) ---
+	P = SimParams.defaults()
+	P[0]["art"] = {"type": 3, "cost": 30000, "cd": 480, "st": 25000, "t": 42, "r": 5000000, "raw": 22000}
+	P[0]["mana_max"] = 100000
+	eng = FightEngine.new(P, 1, true)
+	s = eng.initial()
+	s[FightSim.F_FIELDS + FightSim.X] = s[FightSim.X] + 3000000
+	eng.step(s, FightSim.IN_ART, 0)
+	check(s[FightSim.ART_T] > 0 and s[FightSim.ART_CD] > 0, "golpe sísmico: empieza (marca con aviso)")
+	for t in 50:
+		eng.step(s, 0, 0)
+	check(s[FightSim.F_FIELDS + FightSim.HP] < 100000, "golpe sísmico: daña al rival dentro del radio (%d)" % s[FightSim.F_FIELDS + FightSim.HP])
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
