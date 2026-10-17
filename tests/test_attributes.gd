@@ -124,12 +124,11 @@ func _run() -> void:
 	gs.character_id = "caballero"
 	gs.weapon_id = "espada_escudo"
 	gs.eikon_id = "fenix"
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var ar: Arena = current_scene
-	ar.ai.enabled = false
+	ar.sim_ai.enabled = false
 	ar.controller.set_physics_process(false)
 	ar.time_left = 1.0e9
 	var p := ar.player

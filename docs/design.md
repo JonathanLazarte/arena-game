@@ -83,7 +83,16 @@ Compromisos que se mantienen: atacando 30 % de velocidad, bloqueando 45 %, agota
 Antes (sincronización del proyecto del usuario): 36 / 30 / 46 m/s², carrera exponencial 0,14 / 0,28 s, giro 800 °/s, velocidad girando a 920 °/s y suavizado 0,08 s → ~0,25 s para arrancar, ~0,45 s para correr y hasta 1,3 m de deslizamiento al frenar corriendo.
 
 ## Salto
-8 m/s, gravedad 20 m/s² (×1,8 durante el picado): 0,8 s en el aire, 1,67 m. Coste 12 de aguante. Sin control en el aire (trayectoria fijada al despegar) y sin giro. Atacar en el aire = picado (golpea al aterrizar si aún está en la anticipación). Recuperación al caer 0,18 s. Evita los golpes de área a ras de suelo (altura > 0,35 m). Montado: brinco de lobo/grifo (salto de la montura × 0,85); en el fénix no se salta. Online: entrada IN_JUMP (protocolo 6).
+8 m/s, gravedad 20 m/s² (×1,8 durante el picado): 0,8 s en el aire, 1,67 m. Coste 12 de aguante. Sin control en el aire (trayectoria fijada al despegar) y sin giro. Atacar en el aire = picado (golpea al aterrizar si aún está en la anticipación). Recuperación al caer 0,18 s. Evita los golpes de área a ras de suelo (altura > 0,35 m). Montado: brinco de lobo/grifo (salto de la montura × 0,85); en el fénix no se salta. Entrada IN_JUMP.
+
+## Frasco
+1 carga por ronda (H / botón «Frasco»): 1,1 s bebiendo (sin atacar ni bloquear, 25 % de velocidad), cura el 35 % de la vida máxima al terminar. No se bebe montado, en el aire ni atacando.
+
+## Duelo de Campeones: Fase II
+Al bajar del 50 % de vida: desbloquea su tercera habilidad de jefe, furia 9 s, invulnerable 0,85 s y, según el campeón, medidor de eikon lleno (invoca). La IA presiona más (habilidades ×2,5, especiales ×1,5).
+
+## IA del rival
+Lee el estado de la partida y pulsa botones como un jugador. Fases: rodear, comprometerse (1–N golpes, a veces retrasa el primero), retirarse, descansar (poco aguante) y respiros periódicos. Perfiles fácil/normal/difícil (`resources/ai/*.tres`): reacción, esquiva, parry, castigo, uso de habilidades.
 
 ## Pendiente
 - Erika: falta el FBX de Mixamo.

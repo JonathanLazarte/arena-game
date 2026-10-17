@@ -128,12 +128,11 @@ func _run() -> void:
 	gs.char_xp["caballero"] = 99999
 	gs.from_lobby = true
 	gs.random_rival = true
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	var rl := Smithing.rival_level(gs.char_level())
 	check(arena.enemy.weapon.upgrade_level == rl and rl > 0, "el rival lleva el arma a +%d (nivel %d)" % [rl, gs.char_level()])
 	check(arena.player.weapon.infusion == "gelido" and arena.player.weapon.upgrade_level == 1, "el jugador entra con su arma mejorada")

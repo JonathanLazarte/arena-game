@@ -7,7 +7,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene as Arena
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.player.dismount(false)
 	arena.enemy.dismount(false)
 	await create_timer(0.3).timeout

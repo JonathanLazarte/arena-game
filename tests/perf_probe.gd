@@ -23,7 +23,6 @@ func _run() -> void:
 	Engine.max_fps = 0
 	Engine.physics_ticks_per_second = 60
 	Engine.max_physics_steps_per_frame = 1
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame; await process_frame
 	var arena: Arena = current_scene

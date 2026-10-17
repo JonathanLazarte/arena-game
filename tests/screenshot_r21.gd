@@ -15,12 +15,11 @@ func _run() -> void:
 	gs.spells = ["chispa", "aliento_helado"]
 	gs.from_lobby = true
 	gs.random_rival = false
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	await create_timer(3.3).timeout
 	var p := arena.player
 	arena.enemy.global_position = p.global_position + p.facing * 6.0

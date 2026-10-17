@@ -11,55 +11,55 @@ Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (
 |---|---|
 | `project.godot`, `export_presets.cfg` | Proyecto y presets (Android, Windows, Linux) |
 | `scenes/` | `arena.tscn`, lobby, etc. |
-| `scripts/arena.gd` | Arena (muro circular, pilares), rondas, cámara, hit-stop, modo online |
-| `scripts/combat/` | `fighter.gd` (~3000 líneas) + componentes `fighter_combat.gd`, `fighter_mount.gd`, `fighter_magic.gd`, `fighter_boss_ext.gd`, `boss_abilities_ext.gd`; `mount.gd`, `eikon.gd`, `projectile.gd`, `ground_aoe.gd`, `ground_wave.gd`, `status_fx.gd` |
-| `scripts/ai/` | `ai_controller.gd` (IA por fases), `ai_difficulty.gd` |
+| `scripts/arena.gd` | Arena (muro circular, pilares), rondas, cámara; crea SimMatch (offline con SimAI, online con NetMatch) |
+| `scripts/combat/` | **Solo vista + datos**: `fighter.gd` (~1300 líneas: estadísticas que hornea SimParams, modelo/animación/sonido; SimView escribe su estado), `fighter_magic.gd` (consultas de hechizos), `boss_abilities_ext.gd` (datos), `mount.gd`/`eikon.gd` (títeres que coloca SimWorld), `projectile.gd`/`ground_aoe.gd` (solo constantes de arena), `status_fx.gd` |
+| `scripts/ai/` | `ai_difficulty.gd` (perfiles; la IA es `net/sim/sim_ai.gd`) |
 | `scripts/data/` | Datos: `stun_rules.gd`, `boss_abilities.gd`, `attributes.gd`, defs de armas/monturas/eikons |
 | `scripts/ui/` | `hud.gd`, `touch_stick.gd`, `lobby.gd`, `first_run.gd`, ficha, árbol de habilidades, tienda… |
-| `scripts/core/` | `command_processor.gd`, `player_command.gd` (controladores internos) |
 | `scripts/game_state.gd` | Progresión, guardado, `DEBUG_GRANT` |
 | `net/` | Prototipo rollback (`rb_sim/rb_session/rb_engine/rb_harness`) |
-| `net/sim/` | Sim determinista online (ver §3) |
+| `net/sim/` | **La jugabilidad entera** (offline y online, ver §3); `sim_ai.gd` IA; `sim_world.gd` vista de eikons/marcas/proyectiles |
 | `net/online/` | Transporte, lobby online, overlay, regiones, loadout |
 | `server/` | Relay Node 20 + TypeScript (`src/relay.ts`, `src/index.ts`, `test/`, `Dockerfile`, `deploy/` compose, `fly.toml`) |
 | `tests/` | Tests headless `test_*.gd`, bench, capturas |
 | `tools/` | `build_mixamo_libs.gd`, `retarget_kaykit.gd` |
 | `assets/` | Modelos, audio, **animaciones Mixamo** (`assets/animations/mixamo/*.fbx`, `lib_*.res`) |
 
-## 2. Arquitectura offline
-- **Fighter** (`CharacterBody3D`): estado de movimiento/combate en floats y timers por `delta`; `move_and_slide`. Delegá en componentes: **FighterCombat** (combos, fuerte/carga, bloqueo, parry, aturdimiento en 3 niveles, postura, críticos), **FighterMount** (montar/desmontar, embestida montada, alcance/daño montado), **FighterMagic** (maná, hechizos, eikons/invocaciones, escudo de maná), **fighter_boss_ext** (19 habilidades de jefe: estocada + 18; máx. 3 equipadas, B usa / N cambia; recarga global 1,4 s; telegrafía ×1,12 en móvil).
-- Animación sigue al estado (nunca al revés); golpes = ventanas de tiempo + distancia/ángulo (sin Area3D) → por eso se pudo portar a una sim por ticks.
-- **IA** (`ai_controller.gd`): rodea, se compromete, se retira/descansa; rueda estocada y ráfaga, huye de la carga, esquiva el salto_caida. Usa `randf` (no determinista; online no hay IA).
-- **HUD/lobby**: `hud.gd` + `touch_stick.gd` (multitáctil; botones Atacar, Parry/Escudo, Rodar, Correr, Saltar, Jefe/▶, magia, eikon, montura…). `lobby.gd` → personajes, armas, equipo; botón `ONLINE` abre `OnlinePanel`.
+## 2. Arquitectura (fase 8: offline = online)
+- **Una sola fuente de verdad: `net/sim`.** Toda partida corre en `SimMatch` sobre `FightSim`: offline con las dos entradas locales (jugador = `SimMatch.sample_device`, rival = `SimAI`), online con `NetMatch`/`RbSession` (rollback). Mismas reglas, mismo código.
+- **Fighter / Eikon / Mount = vista.** `SimView` vuelca el estado en los `Fighter` (`sim_driven`), `SimWorld` coloca eikons y monturas títere, marcas de suelo, ondas y proyectiles. La animación sigue al estado (`KnightVisual`), nunca al revés. Los `Fighter` siguen existiendo porque `SimParams.bake` lee de ellos las estadísticas (personaje, arma, atributos, armadura, amuletos).
+- **IA** (`net/sim/sim_ai.gd`): cada tick lee el estado y devuelve bits de entrada (como un mando). Fases CIRCLE/COMMIT/RETREAT/REST/BREATHE, perfiles `AIDifficulty`, estilo de campeón. Memoria propia + xorshift sembrado por partida (determinista dada la misma secuencia). Decide con float: no es netcode (online no hay IA).
+- **Arena**: rondas, reloj de 90 s, premios y presentación (sacudida, cinemática de crítico, aura de Fase II) a partir de eventos de la sim (`_on_sim_event`). La Fase II del campeón es una regla de la sim (`P.ph2`, `P.boss_n`).
+- **HUD/lobby**: `hud.gd` + `touch_stick.gd` (botones → acciones de Input → bits). `PlayerController` solo conserva ayudas de HUD/cámara (objetivo, forma del stick, menú, ajuste del búfer).
 
 ## 3. Arquitectura online
 - **Modelo**: rollback P2P estilo GGPO. Solo viajan inputs. Sim pura de enteros a **60 Hz**; jamás lee delta, reloj, `Engine.time_scale` ni física del árbol.
 - **`net/sim/fight_sim.gd`**: estado = un `PackedInt64Array` (2 luchadores × N campos + globales: frame, freeze de hit-stop, RNG xorshift, rondas `G_WINS0/1`, `G_ROUND`, `G_END_T` + pools: proyectiles 12, hazards 16). `SIZE` se calcula al final de las constantes de layout. Unidades: posición µm, velocidad µm/tick, HP/aguante en milésimas, multiplicadores ‰, timers en ticks, rumbo 0..255. Checksum FNV-1a. Save/load = `duplicate()`.
-- **Bits de entrada**: 0–4 rumbo (32), 5 move, 6 medio stick, 7 atacar, 8 bloquear, 9 parry, 10 rodar, 11 correr, 12 swap, 13 fijar, 14 IN_BOSS, 15 IN_BOSS_NEXT, 16 IN_SPELL, 17 IN_SPELL_NEXT, 18 IN_EIKON, 19 IN_MOUNT, 20 IN_ART, 21 IN_BOSS_VAR, 22 IN_JUMP. Flancos derivados en la sim (`prev_input` en estado).
+- **Bits de entrada**: 0–4 rumbo (32), 5 move, 6 medio stick, 7 atacar, 8 bloquear, 9 parry, 10 rodar, 11 correr, 12 swap, 13 fijar, 14 IN_BOSS, 15 IN_BOSS_NEXT, 16 IN_SPELL, 17 IN_SPELL_NEXT, 18 IN_EIKON, 19 IN_MOUNT, 20 IN_ART, 21 IN_BOSS_VAR, 22 IN_JUMP, 23 IN_FLASK. Flancos derivados en la sim (`prev_input` en estado).
 - **`fx_math.gd`**: trig por tabla, sqrt/atan2 enteros. **`sim_abilities.gd`**, **`sim_magic.gd`**: jefe, magia, eikons, montura.
 - **`SimParams.bake(a, b)`**: se calcula una vez por partida desde los dos `Fighter` reales (personaje, arma, atributos, armadura, amuletos, loadout). Pre-resuelve daño/tablas de defensa por par atacante→defensor; duraciones vía `tk()` (replica la acumulación float offline). `params_checksum()` se intercambia: si difiere → `params_mismatch`. Lenience de parry online según delay inicial (`lenience_for_delay`).
 - **`RbSession`** (`net/rb_session.gd`): input delay (1–4, adaptativo en partida con histéresis), predicción (repite último input), ventana 8 ticks, resim, stall, checksums confirmados, `reset_to(estado, f)` con épocas (reconexión). `fight_engine.gd` = adaptador RbEngine.
 - **`SimView`** (`sim_view.gd`): estado → nodos `Fighter` (`sim_driven = true`), suavizado visual de correcciones; nunca realimenta la sim. **`SimMatch`**: bucle local (muestrea dispositivo, teclado+táctil, camera-relative → mundo) y stepping online.
 - **Eventos rollback-safe** (`sim_events.gd` + `sim_fx.gd`): eventos con tick; online se retienen 2 ticks (`hold_ticks`) y se cancelan si la resim no los regenera; acciones propias instantáneas.
 - **`NetLink`** (`net/online/net_link.gd`): UDP crudo (`PacketPeerUDP`, IPv4). Relay (sala por código, partida rápida, ping por región, token de reconexión), NAT punch P/Q y fallback por relay, **LAN** en `0.0.0.0:47801/udp` con broadcast "Buscar". **`NetMatch`**: handshake (`hi`+loadout → ping/pong → `start` delay/seed → `go`), fase LOAD (`ka`/`rdy`, 30 s), paquete `in`, sync de ventaja, desync → `user://net/desync_*.json`, replays `user://net/replay_*.json` verificables (incluye resyncs), reconexión con snapshot deflate en trozos de 900 B.
-- **Protocolo = 6.** Al cambiar el layout del estado, bits de entrada, params o mensajes, subí en **todos** estos lugares:
-  1. `net/online/net_link.gd` → `const GAME_PROTO := 6` (`NetMatch.PROTO` lo hereda).
-  2. `server/src/index.ts` → default `num(env.GAME_PROTO, 6)` (y la env `GAME_PROTO` del relay desplegado).
-  3. `server/test/relay.test.ts` → `{ v: 6 }` en los envíos.
-  4. `tests/test_net_reconnect.gd` (check `== 6`) y revisar `tests/test_net_relay5.gd`, `tests/net_client.gd`.
-  5. Docs: `server/DEPLOY.md`, `docs/netcode.md`, `docs/design.md` (sección de salto menciona protocolo 6).
+- **Protocolo = 7** (fase 8: FLASK_T/FLASKS/PH2 en el estado, IN_FLASK). Al cambiar el layout del estado, bits de entrada, params o mensajes, subí en **todos** estos lugares:
+  1. `net/online/net_link.gd` → `const GAME_PROTO := 7` (`NetMatch.PROTO` lo hereda).
+  2. `server/src/index.ts` → default `num(env.GAME_PROTO, 7)` (y la env `GAME_PROTO` del relay desplegado).
+  3. `server/test/relay.test.ts` → `{ v: 7 }` (y `proto`/`need` del test de versión) en los envíos.
+  4. `tests/test_net_reconnect.gd` (check `== 7`) y revisar `tests/test_net_relay5.gd`, `tests/net_client.gd`.
+  5. Docs: `server/DEPLOY.md`, `docs/netcode.md`, `docs/design.md` .
 - **Relay** (`server/`): Node/TS, UDP 47800, HTTP 8080 `/healthz` y `/metrics`. Salas (código 5 chars), cola rápida, tokens 96 bits, gracia 20 s → 'F' abandono, rate limits, baneos, paquete máx. 1200 B, check de versión.
 
 ## 4. LA REGLA CLAVE
-**Todo cambio de jugabilidad se hace DOS veces: en el código offline (Fighter y componentes) Y en `net/sim` (FightSim/SimAbilities/SimMagic/SimParams), con un escenario de paridad en `tests/test_net_parity.gd`.** Si no, online desincroniza o se comporta distinto que offline. Además: si cambia el layout de estado o los bits → subir protocolo (§3). Nada de floats, `randf`, nodos ni reloj dentro de la sim. Correr también `test_fight_sim`, `test_net_rollback`, `test_net_abilities`, `test_net_online`.
+**La jugabilidad vive SOLO en `net/sim`** (FightSim / SimAbilities / SimMagic / SimParams, y la IA en SimAI). Nada de reglas en `Fighter`, `Eikon`, `Mount` ni en la arena: esos nodos solo dibujan y suenan. Una regla nueva = cambio en la sim + prueba en `test_fight_sim` / `test_sim_rules` / `test_net_abilities` (y en `test_sim_ai` si la IA debe usarla) + lo que haga falta en `SimView`/`SimWorld` para verla. Si cambia el layout de estado, los bits o los params → subir protocolo (§3). Dentro de la sim: nada de floats, `randf`, nodos ni reloj. Correr también `test_net_rollback` y `test_net_online`.
 
 ## 5. Tests headless
 ```bash
 cd ~/arena-game            # o donde esté el repo
 godot --headless --path . --import                      # primera vez / tras agregar assets
-godot --headless --path . -s res://tests/test_combat.gd
-godot --headless --path . -s res://tests/test_net_parity.gd
-godot --headless --path . -s res://tests/test_ai.gd -- 1   # semilla opcional
+godot --headless --path . -s res://tests/test_fight_sim.gd
+godot --headless --path . -s res://tests/test_sim_rules.gd
+godot --headless --path . -s res://tests/test_sim_ai.gd
 # todos:
 for t in tests/test_*.gd; do echo "== $t"; godot --headless --path . -s "res://$t" 2>&1 | tail -3; done
 # bench rollback:

@@ -43,7 +43,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var ar: Arena = current_scene as Arena
-	ar.ai.set_physics_process(false); ar.controller.enabled = false
+	ar.controller.enabled = false
 	ar.controller.set_physics_process(false)
 	ar.time_left = 1.0e9
 	var f := ar.player

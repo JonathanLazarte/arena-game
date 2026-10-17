@@ -5,7 +5,6 @@ func _initialize() -> void:
 	_run()
 
 func _run() -> void:
-	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame

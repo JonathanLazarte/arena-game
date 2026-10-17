@@ -33,12 +33,11 @@ func _run() -> void:
 	check(BossAbilities.all_ids().size() == 19, "19 habilidades de jefe registradas (6 base + 13 extendidas)")
 	for id: String in BossAbilitiesExt.ids():
 		check(BossAbilities.has(id) and BossAbilities.codex(id).length() > 30, "códice y definición disponibles para %s" % id)
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1e9
 	await create_timer(3.3).timeout
 	var p := arena.player

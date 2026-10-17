@@ -49,7 +49,7 @@ func _run() -> void:
 	var p := arena.player
 	check(p.character.id == "berserker" and p.weapon.id == "hacha_2m", "el jugador lleva berserker + hacha")
 	check(is_equal_approx(p.max_health, 120.0), "vida del berserker (%.0f)" % p.max_health)
-	check(p.eikon.id == "grifo" and not p.mounted and arena.ai.profile.resource_path.ends_with("normal.tres"), "eikon (montura) y dificultad del lobby; empieza a pie")
+	check(p.eikon.id == "grifo" and not p.mounted and arena.ai_profile.resource_path.ends_with("normal.tres"), "eikon (montura) y dificultad del lobby; empieza a pie")
 	check(arena.enemy.character != null and arena.enemy.character.allows(arena.enemy.weapon.id) and not arena.enemy.weapon.ranged, "rival con equipamiento aleatorio coherente (%s, %s)" % [arena.enemy.character.id, arena.enemy.weapon.id])
 	var lb := arena.hud.end_panel.find_child("LobbyButton", true, false) as Button
 	check(lb != null and lb.text == "Volver al lobby", "panel final con botón Volver al lobby")

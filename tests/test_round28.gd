@@ -50,12 +50,11 @@ func _run() -> void:
 		check(ok, "%s + %s: clips Mixamo donde tocan, el resto KayKit" % pair)
 		kv.queue_free()
 	# En combate: carga de jefe, rotura de postura y hechizo usan sus estados
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1e9
 	await create_timer(3.3).timeout
 	var p := arena.player

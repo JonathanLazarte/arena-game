@@ -78,13 +78,12 @@ func _run() -> void:
 	await process_frame
 	var au := root.get_node("Audio")
 	au.settings_path = "user://test_r25_ajustes.cfg"
-	Arena.start_mounted = true
 	Arena.hitstop_enabled = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1.0e9
 	await create_timer(3.2).timeout
 	var p := arena.player
@@ -231,11 +230,11 @@ func _run() -> void:
 	await until(func() -> bool: return p.boss_phase == Fighter.Boss.NONE, 3.0)
 	# --- 4. IA: esquiva y usa la Estocada de jefe ---
 	e.set_boss_abilities(["estocada"]) # ronda 31: el rival lleva 3 al azar
-	arena.ai.profile = (load("res://resources/ai/hard.tres") as AIDifficulty).duplicate()
-	arena.ai.profile.boss_dodge_chance = 1.0
-	arena.ai.profile.boss_use_chance = 0.0
-	arena.ai.profile.breather_chance = 0.0
-	arena.ai.enabled = true
+	arena.ai_profile = (load("res://resources/ai/hard.tres") as AIDifficulty).duplicate()
+	arena.ai_profile.boss_dodge_chance = 1.0
+	arena.ai_profile.boss_use_chance = 0.0
+	arena.ai_profile.breather_chance = 0.0
+	arena.sim_ai.enabled = true
 	if e.mounted:
 		e.dismount(false)
 	if is_instance_valid(e.owned_mount) and e.owned_mount.is_free():
@@ -250,7 +249,7 @@ func _run() -> void:
 	await until(func() -> bool: return p.boss_phase == Fighter.Boss.RECOVER, 3.0)
 	check(arena.ai.boss_dodges == 1 and e.health == hp, "la IA esquiva la estocada con buen tiempo (difícil)")
 	await until(func() -> bool: return p.boss_phase == Fighter.Boss.NONE, 3.0)
-	arena.ai.profile.boss_use_chance = 1.0
+	arena.ai_profile.boss_use_chance = 1.0
 	if e.mounted:
 		e.dismount(false)
 	e.owned_mount = null # sin montura: que no vuelva a montar
@@ -269,7 +268,7 @@ func _run() -> void:
 	if e.boss_uses == 0:
 		print("dbg can=%s mounted=%s lo=%d face=%.2f dist=%.1f act=%s" % [e.can_boss(), e.mounted, e.loadout, e.facing.dot(MeshUtil.flat(p.global_position-e.global_position).normalized()), e.global_position.distance_to(p.global_position), e._can_act()])
 	check(e.boss_uses > 0 and arena.ai.boss_used > 0, "la IA usa la Estocada de jefe a media distancia")
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	await until(func() -> bool: return e.boss_phase == Fighter.Boss.NONE, 4.0)
 	# --- 5. Paso de ataque + magnetismo ---
 	p.health = p.max_health
@@ -323,5 +322,4 @@ func _run() -> void:
 	check(to_e.length() < 3.0, "magnetismo: el paso se curva hacia el objetivo cercano (%.2f m)" % to_e.length())
 	print("\n%s (%d fallos)" % ["OK" if fails == 0 else "FALLÓ", fails])
 	Arena.hitstop_enabled = true
-	Arena.start_mounted = false
 	quit(1 if fails > 0 else 0)

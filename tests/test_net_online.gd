@@ -155,7 +155,7 @@ func _test_arena(me_slot: int, port: int) -> void:
 	await process_frame
 	var ar: Arena = current_scene as Arena
 	check(ar.online == mine and ar.sim_match != null and ar.sim_match.net == mine and ar.sim_match.local_slot == me_slot, "arena online (hueco %d): SimMatch en red, jugador local = nodo player" % me_slot)
-	check(not ar.controller.enabled and not ar.ai.is_physics_processing(), "arena online (hueco %d): sin IA ni controlador offline" % me_slot)
+	check(not ar.controller.enabled, "arena online (hueco %d): sin IA ni controlador offline" % me_slot)
 	bot.start_play(ar.sim_match.params, ar.sim_match.engine.spawn)
 	var rng := RandomNumberGenerator.new(); rng.seed = 9
 	var cur := 0

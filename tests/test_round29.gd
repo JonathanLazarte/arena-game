@@ -32,13 +32,12 @@ func _run() -> void:
 		var want: String = "mx/light_idle" if pair[1] != "espada_escudo" else "mx/sns_idle"
 		check(kv.idle_clip == want and String(kv.states["light0"]).begins_with("mx/"), "%s + %s: Mixamo (idle %s, ligero %s)" % [pair[0], pair[1], kv.idle_clip, kv.states["light0"]])
 		kv.queue_free()
-	Arena.start_mounted = false
 	gs.from_lobby = true
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1e9
 	await create_timer(3.3).timeout
 	var p := arena.player

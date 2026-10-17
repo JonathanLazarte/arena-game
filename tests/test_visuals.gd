@@ -17,12 +17,11 @@ func wait(s: float) -> void:
 
 func _run() -> void:
 	seed(6)
-	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene as Arena
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.controller.enabled = false
 	arena.controller.set_physics_process(false)
 	arena.controller.set_process(false)

@@ -215,3 +215,13 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 - Ataque montado bloqueado: block_cost_m (coste calculado con el daño × mounted_damage_mult).
 - Movimiento: steer (rumbos/tick a los que gira la velocidad), sprint_up/sprint_down (‰/tick); valores en docs/design.md.
 - Relay: sin respuesta en relay_timeout_ms (5 s) → FAILED "relay_unreachable"; DNS fallido → "relay_dns:host". El panel lo explica y sugiere LAN o server/DEPLOY.md.
+
+## 16. Fase 8: offline sobre la sim (protocolo 7)
+- Offline y online usan el mismo bucle: `SimMatch` + `FightEngine` + `FightSim`. Offline: `FightEngine.new(params, 1, true)` sin rondas internas (la arena reinicia la ronda con `SimMatch.reset_round()`), entrada del jugador por `sample_device`, del rival por `SimAI.think(state, params)` en `input_override[1]`.
+- `SimAI` vive fuera del estado (no se re-simula): memoria propia y xorshift sembrado con `randi()` al crear la partida. Misma secuencia de estados → mismas entradas (`test_sim_ai`).
+- Estado nuevo: `FLASK_T`, `FLASKS` (frasco: 1 carga por ronda, 1,1 s, cura 35 %, 25 % de velocidad, sin actuar) y `PH2` (Fase II del campeón). Entrada nueva `IN_FLASK` 1<<23 (acción «flask»). → protocolo 7.
+- Params nuevos: `flasks`, `flask_t`, `flask_heal_pm`; offline además `boss_n` (habilidades disponibles antes de la Fase II), `ph2` {hp_pm, rage, invuln, summon} y `buffer` (ventana del búfer del jugador, Ajustes → Controles). `art` tipo 3 = golpe sísmico del personaje (marca de suelo con aviso).
+- Paso atrás + ataque: la estocada sale al terminar el paso (`ROLL_ATK_BUF` reutilizado).
+- Eventos nuevos (`SimEvents`): `flask`, `phase2`. La arena traduce `crit` a la cinemática de ejecución y `phase2` al aura/mensaje del campeón.
+- Vista: `SimWorld` (eikons y monturas títere, marcas, ondas, proyectiles no-flecha) y `SimView` (medidor, maná, recargas, habilidad en curso, frasco). Sin realimentación hacia la sim.
+- `test_net_parity` se retiró: ya no hay reglas offline con las que comparar.

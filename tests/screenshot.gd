@@ -17,7 +17,7 @@ func _run() -> void:
 	await create_timer(1.2).timeout
 	await create_timer(0.6).timeout
 	arena.enemy.global_position = arena.player.global_position + arena.player.facing * 3.2
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.enemy.attack_heavy() # telegrafía: hoja alzada y brillante
 	await create_timer(0.5).timeout
 	var path := "/workspace/out/arena-shot.png"

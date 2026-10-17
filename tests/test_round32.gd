@@ -33,13 +33,12 @@ func _run() -> void:
 	check(float(h[1][0]) - float(h[0][0]) >= 2.8 and h.size() == 3 and float(h[2][0]) - float(h[1][0]) > float(h[1][0]) - float(h[0][0]), "combo falso lento (~3 s entre golpes) con la pausa falsa más larga al final")
 	var rd := BossAbilities.def("rafaga")
 	check(float(rd["interval"]) >= 0.8 and float(rd["home_deg"]) <= 90.0, "ráfaga: intervalos amplios, área ancha, persigue toda su vida")
-	Arena.start_mounted = false
 	gs.from_lobby = true
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1e9
 	await create_timer(3.3).timeout
 	var p := arena.player
@@ -105,15 +104,15 @@ func _run() -> void:
 	p.global_position = Vector3(0, 0, 6)
 	e.global_position = Vector3(0, 0, -6)
 	eh = e.health
-	arena.ai.enabled = true
-	arena.ai.profile.boss_dodge_chance = 1.0
+	arena.sim_ai.enabled = true
+	arena.ai_profile.boss_dodge_chance = 1.0
 	var r0: int = arena.ai.slash_rolls
 	p.energy = p.energy_max
 	p.boss_cd = 0.0
 	check(p.boss_skill("rafaga"), "ráfaga contra la IA")
 	await create_timer(3.5).timeout
 	check(arena.ai.slash_rolls - r0 >= 2, "la IA rueda cada tajo (%d volteretas)" % (arena.ai.slash_rolls - r0))
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	# --- Salto sin marca ---
 	p.set_boss_abilities(["salto_caida", "rafaga", "combo_falso"])
 	_fresh(p)
@@ -134,7 +133,7 @@ func _run() -> void:
 	await create_timer(1.5).timeout
 	_fresh(p)
 	_fresh(e)
-	arena.ai.enabled = true
+	arena.sim_ai.enabled = true
 	p.global_position = Vector3(0, 0, 6)
 	e.global_position = Vector3(0, 0, -4)
 	var jd: int = arena.ai.jump_dodges
@@ -143,7 +142,7 @@ func _run() -> void:
 	check(p.boss_skill("salto_caida"), "salto contra la IA")
 	await create_timer(2.4).timeout
 	check(arena.ai.jump_dodges > jd or e.health == ehh, "la IA reacciona al verle bajar (rueda o se aparta)")
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	await create_timer(1.0).timeout
 	# --- Arco: mantener no dispara hasta soltar; brillo de carga ---
 	_fresh(p)

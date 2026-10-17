@@ -19,13 +19,12 @@ func setup_pair(cp: String, wp: String, ce: String = "caballero", we: String = "
 	var gs := root.get_node("GameState")
 	gs.from_lobby = false
 	gs.random_rival = false
-	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	arena = current_scene as Arena
 	arena.time_left = 1.0e9
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.controller.set_physics_process(false)
 	arena.controller.set_process(false)
 	var p := arena.player

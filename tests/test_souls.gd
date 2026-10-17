@@ -36,7 +36,6 @@ func place(p: Fighter, e: Fighter, d: float) -> void:
 	await physics_frame
 
 func _run() -> void:
-	Arena.start_mounted = true # combate montado clásico (ronda 14: por defecto se empieza a pie)
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -46,7 +45,7 @@ func _run() -> void:
 	seed(4)
 	var p := arena.player
 	var e := arena.enemy
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	e.knockoff_chance_dash = 0.0 # derribos aleatorios fuera de la prueba de fuerte
 	e.knockoff_chance_heavy = 0.0
 	p.knockoff_chance_dash = 0.0
@@ -264,8 +263,8 @@ func _run() -> void:
 	await wait(0.3)
 	# --- 9. La IA lee ataques: esquiva y castiga; se compromete con los suyos ---
 	await wait(0.5)
-	arena.ai.enabled = true
-	arena.ai.profile = load("res://resources/ai/normal.tres") # capacidades de lectura: perfil normal
+	arena.sim_ai.enabled = true
+	arena.ai_profile = load("res://resources/ai/normal.tres") # capacidades de lectura: perfil normal
 	var e_attacked_recovery := false
 	for i in 14:
 		p.health = p.max_health

@@ -101,12 +101,11 @@ func _run() -> void:
 	gs.weapon_up[gs.weapon_id] = 6
 	# --- 4. Menú sin pausa, en arena ---
 	gs.from_lobby = true
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1e9
 	await create_timer(3.3).timeout
 	var p := arena.player

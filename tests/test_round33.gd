@@ -45,13 +45,12 @@ func _run() -> void:
 	gs.save_path = "user://test_round33.cfg"
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(gs.save_path))
 	gs.reset_defaults()
-	Arena.start_mounted = false
 	gs.from_lobby = true
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.time_left = 1e9
 	await create_timer(3.3).timeout
 	var p := arena.player

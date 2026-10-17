@@ -114,12 +114,11 @@ func _run() -> void:
 	# --- Arena: música de combate y efectos ---
 	gs.from_lobby = true
 	gs.random_rival = false
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.controller.set_physics_process(false)
 	arena.time_left = 1.0e9
 	check(au.current_music in ["combate1", "combate2"], "fundido a música de combate (%s)" % au.current_music)

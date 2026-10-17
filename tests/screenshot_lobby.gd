@@ -29,7 +29,7 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 		var ar: Arena = current_scene
-		ar.ai.enabled = false
+		ar.sim_ai.enabled = false
 		ar.player.dismount()
 		ar.enemy.dismount()
 		ar.enemy.global_position = ar.player.global_position + ar.player.facing * 3.0
@@ -45,14 +45,13 @@ func _run() -> void:
 		gs.character_id = "arquero"
 		gs.weapon_id = "ballesta" if mode == "fire_xbow" else "arco"
 		gs.eikon_id = "lobo"
-		Arena.start_mounted = false
 		gs.from_lobby = true
 		gs.random_rival = false
 		change_scene_to_file("res://scenes/arena.tscn")
 		await process_frame
 		await process_frame
 		var ar: Arena = current_scene
-		ar.ai.enabled = false
+		ar.sim_ai.enabled = false
 		ar.controller.set_physics_process(false)
 		ar.time_left = 76.0
 		var p := ar.player
@@ -109,7 +108,7 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 		var ar: Arena = current_scene
-		ar.ai.enabled = false
+		ar.sim_ai.enabled = false
 		ar.time_left = 76.0
 		var p := ar.player
 		var e := ar.enemy
@@ -186,7 +185,7 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 		var ar: Arena = current_scene
-		ar.ai.enabled = false
+		ar.sim_ai.enabled = false
 		ar.controller.set_physics_process(false)
 		ar.time_left = 76.0
 		var p := ar.player
@@ -218,7 +217,7 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 		var ar: Arena = current_scene
-		ar.ai.enabled = false
+		ar.sim_ai.enabled = false
 		ar.controller.set_physics_process(false)
 		ar.time_left = 76.0
 		var p := ar.player
@@ -277,14 +276,13 @@ func _run() -> void:
 		gs.choose_first_character("asesino")
 		gs.weapon_id = "dagas"
 		gs.eikon_id = "lobo"
-		Arena.start_mounted = false
 		gs.from_lobby = true
 		gs.random_rival = false
 		change_scene_to_file("res://scenes/arena.tscn")
 		await process_frame
 		await process_frame
 		var ar: Arena = current_scene
-		ar.ai.enabled = false
+		ar.sim_ai.enabled = false
 		ar.controller.set_physics_process(false)
 		ar.time_left = 71.0
 		await create_timer(3.2).timeout
@@ -317,7 +315,7 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 		var a: Arena = current_scene
-		a.ai.enabled = false
+		a.sim_ai.enabled = false
 		a.player.hits_landed = 14
 		a.player.parries_landed = 2
 		a.wins = [1, 2]

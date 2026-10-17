@@ -1,5 +1,5 @@
 extends SceneTree
-## Fase 1: partida local a dos jugadores en la arena sobre FightSim (Arena.sim_mode), con entradas guionizadas.
+## Fase 1: partida local a dos jugadores en la arena sobre FightSim, con entradas guionizadas.
 ## godot --headless --path . -s res://tests/test_net_sim_match.gd
 var fails := 0
 func check(c: bool, m: String) -> void:
@@ -10,7 +10,7 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
-	check(Arena.sim_mode == true, "fase 8: la sim es el camino por defecto (offline también)")
+	check(not ClassDB.class_exists("AIController"), "fase 8: la sim es el único camino (offline también)")
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -18,7 +18,7 @@ func _run() -> void:
 	a.time_left = 1.0e9
 	var m := a.sim_match
 	check(m != null and a.player.sim_driven and a.enemy.sim_driven, "modo sim: SimMatch creado y ambos Fighter en modo vista")
-	check(not a.controller.enabled and not a.ai.is_physics_processing(), "modo sim: IA y PlayerController desactivados")
+	check(not a.controller.enabled, "modo sim: IA y PlayerController desactivados")
 	check(a.sim_ai != null and m.input_override[1].is_valid(), "offline: el rival lo maneja SimAI con bits de entrada")
 	check(m.params_hash == SimParams.params_checksum(SimParams.bake(a.player, a.enemy)), "params_checksum calculado al empezar")
 	var z0 := a.player.global_position.z

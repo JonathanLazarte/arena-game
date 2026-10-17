@@ -42,12 +42,11 @@ func _run() -> void:
 	gs.character_id = "asesino"
 	gs.weapon_id = "dagas"
 	gs.eikon_id = "lobo"
-	Arena.start_mounted = false
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
 	var arena: Arena = current_scene
-	arena.ai.enabled = false
+	arena.sim_ai.enabled = false
 	arena.controller.set_physics_process(false)
 	arena.time_left = 1.0e9
 	await create_timer(3.2).timeout # intro de la ronda

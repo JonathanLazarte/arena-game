@@ -54,7 +54,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var a: Arena = current_scene
-	a.ai.enabled = false
+	a.sim_ai.enabled = false
 	var p := a.player
 	check(is_equal_approx(p.stamina_max, 115.0) and is_equal_approx(p.parry_window, Fighter.PARRY_WINDOW + 0.06), "habilidades: estamina 115 y ventana de parry 0,36 s")
 	var e := a.enemy
