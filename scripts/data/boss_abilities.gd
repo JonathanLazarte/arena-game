@@ -65,7 +65,9 @@ const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfag
 	"lluvia_lanzas": "Lluvia", "flecha_grave": "Flecha", "lluvia_sangre": "Sangre",
 	"columnas_rayo": "Columnas", "saeta_oscura": "Saeta", "orbe_lunar": "Orbe",
 	"aliento_rayo": "Fulgor", "aliento_escarcha": "Escarcha", "chorro_lava": "Lava",
-	"grito_guerra": "Grito", "guardia_reflejo": "Reflejo"}
+	"grito_guerra": "Grito", "guardia_reflejo": "Reflejo",
+	"trazos_hoja": "Trazos", "danza_garza": "Garza", "caida_hoja": "Clavada",
+	"floracion_escarlata": "Floración"}
 const BASE_COLORS := {"estocada": Color(1.0, 0.3, 0.12), "carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(1.0, 0.82, 0.3),
 	"escudo_mana": Color(0.3, 1.0, 1.0), "combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}
 
@@ -82,12 +84,14 @@ static func color_of(id: String) -> Color:
 	return d.get("color", Color(0.9, 0.85, 0.7)) if not d.is_empty() else Color(0.9, 0.85, 0.7)
 
 static func all_ids() -> Array:
-	return ORDER + EXT_ORDER
+	return ORDER + EXT_ORDER + HojaCatalog.ids()
 
 static func has(id: String) -> bool:
-	return DEFS.has(id) or BossAbilitiesExt.DEFS.has(id)
+	return DEFS.has(id) or BossAbilitiesExt.DEFS.has(id) or HojaCatalog.has(id)
 
 static func def(id: String) -> Dictionary:
+	if HojaCatalog.has(id):
+		return HojaCatalog.view_def(id)
 	if BossAbilitiesExt.DEFS.has(id):
 		return BossAbilitiesExt.DEFS[id]
 	return DEFS.get(id, {})
@@ -109,6 +113,8 @@ static func cost_text(id: String) -> String:
 	return "%d %s" % [int(d.get("cost", 0)), COST_NAMES.get(String(d.get("cost_type", "")), "")]
 
 static func codex(id: String) -> String:
+	if HojaCatalog.has(id):
+		return HojaCatalog.codex(id)
 	var d := def(id)
 	if d.is_empty():
 		return ""

@@ -1,0 +1,1 @@
+# Godot no debe registrar estas copias: tienen el mismo class_name que los scripts vivos.

@@ -13,7 +13,7 @@ extends RefCounted
 ## Factor de aviso online (Fighter.telegraph_k): fijo para los dos pares (PC y móvil juegan igual).
 const TELE_ONLINE := 1.12
 const GLOBAL_CD := 85 # tk(Fighter.BOSS_GLOBAL_CD = 1,4 s)
-enum { T_ESTOCADA, T_CARGA, T_RAFAGA, T_ESCUDO, T_COMBO, T_SALTO, T_TIMELINE = 10, T_WAVE, T_RAIN, T_BREATH, T_RAGE, T_COUNTER }
+enum { T_ESTOCADA, T_CARGA, T_RAFAGA, T_ESCUDO, T_COMBO, T_SALTO, T_TIMELINE = 10, T_WAVE, T_RAIN, T_BREATH, T_RAGE, T_COUNTER, T_CATALOG = 16 }
 ## AB_FL: bits de la habilidad en curso
 const FL_LANDED := 1
 const FL_COUNTERED := 2
@@ -26,6 +26,7 @@ const FL_VARIANT := 128 ## combo: remate en estocada (Fighter.ab_combo_variant)
 const FL_LOCKED := 256
 const FL_FLICK0 := 512
 const FL_FLICK1 := 1024
+const FL_CATALOG := 2048 ## habilidad del catálogo por pasos (SimCatalog)
 const ELEM_FUEGO := 5
 
 static func ids() -> Array:
@@ -57,6 +58,8 @@ static func compile_all(f: Fighter) -> Array:
 	return out
 
 static func compile(f: Fighter, id: String) -> Dictionary:
+	if HojaCatalog.has(id):
+		return SimCatalog.compile(f, id)
 	var d := BossAbilities.def(id)
 	if d.is_empty():
 		return {}
@@ -389,6 +392,8 @@ static func hazards(s: PackedInt64Array, P: Array) -> void:
 				continue
 			var res := FightSim._take_hit(s, P, owner, 5, s[q + FightSim.HZ_RAW], 0, s[q + FightSim.HZ_FORCE], 2000, 1000, 0, -1, [], s[q + FightSim.HZ_UNBL] != 0)
 			if res == 1:
+				if s[q + FightSim.HZ_KIND] != 0:
+					SimCatalog.on_zone_hit(s, P, owner)
 				var kv: int = s[q + FightSim.HZ_KNOCK]
 				if l > 100000:
 					s[b + FightSim.KX] = dx * kv / l
@@ -476,6 +481,10 @@ static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
 		return false
 	if int(ab["type"]) != T_ESCUDO and s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
 		return false
+	if int(ab.get("phase", 1)) >= 2:
+		var ph: Dictionary = P[i].get("ph2", {})
+		if not ph.is_empty() and s[o + FightSim.PH2] == 0:
+			return false
 	if s[o + FightSim.BOSS_CD] > 0 and not (int(ab["type"]) == T_RAFAGA and s[o + FightSim.AB_LAST] == int(ab["code"])):
 		return false
 	return _cost_ok(s, i, ab)
@@ -485,6 +494,10 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var boss: Array = P[i].get("boss", [])
 	if boss.is_empty():
 		return false
+	if s[o + FightSim.AB_SLOT] >= 0 and s[o + FightSim.AB_SLOT] < boss.size():
+		var cur: Dictionary = boss[s[o + FightSim.AB_SLOT]]
+		if int(cur.get("type", -1)) == T_CATALOG:
+			return SimCatalog.latch(s, P, i, false)
 	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
 	var ab: Dictionary = boss[slot]
 	if int(ab["type"]) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
@@ -510,6 +523,8 @@ static func variation(s: PackedInt64Array, P: Array, i: int) -> bool:
 	if s[o + FightSim.AB_SLOT] < 0:
 		return false
 	var ab := _ab(s, P, i)
+	if int(ab.get("type", -1)) == T_CATALOG:
+		return SimCatalog.latch(s, P, i, true)
 	if int(ab["type"]) != T_COMBO or s[o + FightSim.AB_FIRED] != (ab["hits"] as Array).size() - 1 or (s[o + FightSim.AB_FL] & FL_QUEUED) != 0:
 		return false
 	if not _cost_ok(s, i, ab):
@@ -548,14 +563,24 @@ static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 	var b := FightSim._opp(i)
 	s[o + FightSim.AB_X] = s[b + FightSim.X] if s[b + FightSim.ALIVE] != 0 else s[o + FightSim.X] + FxMath.COS[dir] * 6000000 / FxMath.ONE
 	s[o + FightSim.AB_Z] = s[b + FightSim.Z] if s[b + FightSim.ALIVE] != 0 else s[o + FightSim.Z] + FxMath.SIN[dir] * 6000000 / FxMath.ONE
-	if int(ab["type"]) == T_CARGA:
+	if int(ab["type"]) == T_CATALOG:
+		s[o + FightSim.AB_FL] = FL_CATALOG
+		s[o + FightSim.AB_FIRED] = int(ab.get("entry", 0))
+		s[o + FightSim.AB_WAIT] = int(ab["cd"]) | (int(ab["imask"]) << 16)
+	elif int(ab["type"]) == T_CARGA:
 		s[o + FightSim.AB_HZ] = spawn_hz(s, i, 1, s[o + FightSim.X], s[o + FightSim.Z], ab["warn"], ab["r"], raw_live(s, P, i, ab["raw"]), ab["force"], 150000, 0)
 
 ## Fin de la habilidad (Fighter._end_ability): recarga global; si se corta, su carga no estalla.
 static func end_ability(s: PackedInt64Array, o: int, interrupted: bool) -> void:
 	if s[o + FightSim.AB_SLOT] < 0:
 		return
+	var fl: int = s[o + FightSim.AB_FL]
+	var own_cd: int = s[o + FightSim.AB_WAIT] & SimCatalog.CD_MASK
 	s[o + FightSim.BOSS_CD] = GLOBAL_CD
+	if (fl & FL_CATALOG) != 0:
+		s[o + FightSim.BOSS_CD] = maxi(GLOBAL_CD, own_cd)
+		if interrupted:
+			SimCatalog.cancel_zones(s, o / FightSim.F_FIELDS)
 	if interrupted:
 		s[o + FightSim.AB_INTR] += 1
 		var hz: int = s[o + FightSim.AB_HZ]
@@ -583,6 +608,8 @@ static func _end_combo(s: PackedInt64Array, P: Array, i: int, penalize: bool) ->
 static func resist_pm(s: PackedInt64Array, P: Array, i: int) -> int:
 	var o := i * FightSim.F_FIELDS
 	var ab := _ab(s, P, i)
+	if int(ab.get("type", -1)) == T_CATALOG:
+		return SimCatalog.resist_now(s, P, i)
 	if int(ab["type"]) == T_COMBO:
 		var n: int = (ab["hits"] as Array).size()
 		var fin: int = ab["var_w"] if (s[o + FightSim.AB_FL] & FL_VARIANT) != 0 else ab["final"]
@@ -658,6 +685,8 @@ static func update(s: PackedInt64Array, P: Array, i: int) -> void:
 			var done: bool = s[o + FightSim.AB_T] >= int(ab["ws"]) + int(ab["rec_hit"]) if (s[o + FightSim.AB_FL] & FL_COUNTERED) != 0 else s[o + FightSim.AB_T] >= int(ab["end_miss"])
 			if done:
 				end_ability(s, o, false)
+		T_CATALOG:
+			SimCatalog.tick(s, P, i, ab)
 	# inmunidad (Fighter.ab_immune): escudo tras su anticipación, o en el aire (salto / combo)
 	if s[o + FightSim.AB_SLOT] >= 0:
 		var t := int(_ab(s, P, i)["type"])

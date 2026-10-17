@@ -120,6 +120,9 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 		if typ == A.T_TIMELINE and f._kv:
 			f._kv.flash_sword_trail(Color(1.0, 0.22, 0.12) if id == "presa_verdugo" else ab_color(id))
 			trails[i] += 1
+		elif typ == A.T_CATALOG and f._kv:
+			f._kv.flash_sword_trail(ab_color(id))
+			trails[i] += 1
 		elif typ == A.T_BREATH:
 			_burst(f, i, ab_color(id))
 			_cone_t[i] = 20

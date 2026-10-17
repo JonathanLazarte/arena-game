@@ -276,6 +276,7 @@ func _emit() -> int:
 	return v
 
 func _decide() -> void:
+	_catalog_alt()
 	var mp := pos(_o)
 	var op := pos(_q)
 	var to := op - mp
@@ -749,7 +750,32 @@ func _boss_situ(ab: Dictionary, dist: float, fd: float) -> bool:
 		SimAbilities.T_BREATH: return dist > 2.0 and dist < 8.0 and fd > 0.4
 		SimAbilities.T_RAGE: return g(S.RAGE_T) <= 0 and health() > 40.0
 		SimAbilities.T_COUNTER: return dist < 3.8 and og(S.ATK_STATE) == S.Atk.WINDUP
+		SimAbilities.T_CATALOG:
+			if int(ab.get("phase", 1)) >= 2:
+				var ph: Dictionary = _P[me].get("ph2", {})
+				if not ph.is_empty() and g(S.PH2) == 0:
+					return false
+			var dmin := float(int(ab.get("rmin", 0))) / 1000000.0
+			var dmax := float(int(ab.get("rmax", 0))) / 1000000.0
+			return dist >= dmin and dist <= dmax
 	return false
+
+## En el primer tick de la ventana, a veces elige el remate alternativo (patada).
+func _catalog_alt() -> void:
+	var ab := ab_cur(_o, me)
+	if int(ab.get("type", -1)) != SimAbilities.T_CATALOG:
+		return
+	var steps: Array = ab.get("steps", [])
+	var si := g(S.AB_FIRED)
+	if si < 0 or si >= steps.size():
+		return
+	var step: Dictionary = steps[si]
+	if int(step.get("br0", -1)) < 0:
+		return
+	if g(S.AB_T) - 1 != int(step["br0"]):
+		return
+	if ri(100) < int(ab.get("balt", 0)):
+		tap(S.IN_BOSS_VAR)
 
 ## Tajo de ráfaga que me persigue a punto de llegar: voltereta lateral.
 func _roll_slash(mp: Vector3) -> bool:

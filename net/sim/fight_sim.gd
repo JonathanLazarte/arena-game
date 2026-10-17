@@ -617,6 +617,9 @@ static func _apply_stun(s: PackedInt64Array, o: int, t: int) -> void:
 	if s[o + STUN_IMM] > 0 or s[o + AB_IMM] != 0:
 		return
 	if s[o + AB_SLOT] >= 0:
+		var catalog := (s[o + AB_FL] & SimAbilities.FL_CATALOG) != 0
+		if catalog and not SimCatalog.stun_interrupts(s, o, t):
+			return
 		SimAbilities.end_ability(s, o, true)
 	if s[o + CAST_T] > 0:
 		s[o + CAST_T] = 0
@@ -645,6 +648,8 @@ static func _add_stun_force(s: PackedInt64Array, P: Array, i: int, force: int) -
 	if force <= 0 or s[o + ALIVE] == 0 or s[o + STUN_IMM] > 0 or s[o + INVULN] > 0 or s[o + AB_IMM] != 0:
 		return 0
 	if s[o + BS_PH] == 1 or s[o + BS_PH] == 2:
+		return 0
+	if SimCatalog.skip_stun(s, P, i):
 		return 0
 	if s[o + STUN_WIN] <= 0:
 		s[o + STUN_ACC] = 0
@@ -782,7 +787,7 @@ const COUNTER_EIKON_K_PM := 1200 # StunRules.EIKON_K
 ## del eikon del atacante). st: acumulación de estado propia (milésimas) o [] = la del arma/eikon.
 ## unbl: marca de suelo imbloqueable. force < 0 = fuerza por defecto del tipo.
 ## Devuelve 0 nada, 1 golpe, 2 bloqueo, 3 parry (o contragolpe de postura), 4 esquiva.
-static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int, elem: int = -1, st: Array = [], unbl: bool = false) -> int:
+static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int, elem: int = -1, st: Array = [], unbl: bool = false, parryable: bool = true) -> int:
 	var d := 1 - att
 	var a := att * F_FIELDS
 	var b := d * F_FIELDS
@@ -799,7 +804,8 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var frontal := _in_front(s, b, a)
 	if kind != 5 and SimAbilities.counter_trigger(s, P, d, att):
 		return 3
-	if s[b + PARRY_STATE] == Parry.ACTIVE and frontal and (kind <= 1 or kind == 6):
+	if parryable and s[b + PARRY_STATE] == Parry.ACTIVE and frontal and (kind <= 1 or kind == 6):
+		SimCatalog.on_parry(s, att)
 		if kind == 0:
 			_apply_stun(s, a, P[d]["parry_stagger"])
 			s[a + RIPOSTE_T] = P[d]["parry_stagger"]
@@ -812,6 +818,7 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 			s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], HITSTOP_PARRY)
 		return 3
 	var mult := 1000
+	var ipm := SimCatalog.incoming_pm(s, P, d)
 	if s[b + PARRY_STATE] == Parry.RECOVERY:
 		mult = PARRY_EXPOSED_PM
 	if s[b + BLOCKING] != 0 and frontal and kind != 2 and kind != 3 and not unbl:
@@ -820,14 +827,14 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 			_spend(s, P, d, P[att]["arrow_block_cost"])
 			_hit_status(s, P, att, kind, BLOCK_STATUS_PM)
 		elif kind == 4 or kind == 5:
-			_damage(s, a, b, raw * mult / 1000 * maxi(EIKON_BLOCK_PM, EXH_BLOCK_PM if s[b + EXH] > 0 else 0) / 1000)
+			_damage(s, a, b, raw * mult / 1000 * maxi(EIKON_BLOCK_PM, EXH_BLOCK_PM if s[b + EXH] > 0 else 0) / 1000 * ipm / 1000)
 			_hit_status_ext(s, P, att, kind, st, BLOCK_STATUS_PM)
 			_spend(s, P, d, P[d].get("eikon_block_cost", 30000))
 			_meter(s, P, d, 3000)
 		else:
 			s[b + GC_T] = GC_WINDOW
 			var chip: int = EXH_BLOCK_PM if s[b + EXH] > 0 else P[d]["chip_pm"]
-			_damage(s, a, b, raw * mult / 1000 * chip / 1000)
+			_damage(s, a, b, raw * mult / 1000 * chip / 1000 * ipm / 1000)
 			_hit_status_ext(s, P, att, kind, st, BLOCK_STATUS_PM)
 			_spend(s, P, d, block_cost)
 			_meter(s, P, d, 3000)
@@ -864,6 +871,7 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 		amount = amount * GETUP_DMG_PM / 1000
 	if s[b + SKIN_T] > 0:
 		amount = amount * (1000 - int(P[d].get("skin_red_pm", 0))) / 1000
+	amount = amount * ipm / 1000
 	_damage(s, a, b, amount)
 	_meter(s, P, d, 5000)
 	_hit_status_ext(s, P, att, kind, st, 1000)
@@ -1407,6 +1415,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var tvx := 0
 	var tvz := 0
 	var locked := (inp & IN_LOCK) != 0 and s[b + ALIVE] != 0
+	var catalog_face := s[o + AB_SLOT] >= 0 and (s[o + AB_FL] & SimAbilities.FL_CATALOG) != 0
 	# fase 9: con el arco tensado (o al pulsar) y apuntado de ratón, se encara al punto de mira y se
 	# desplaza como fijado (strafe), en lugar de hacia el rival o la dirección de marcha
 	var aim_on := (inp & IN_AIM) != 0 and s[o + LOADOUT] == Load.BOW and s[o + ALIVE] != 0 and (s[o + SHOT_STATE] == Shot.DRAW or (inp & IN_ATK) != 0)
@@ -1419,7 +1428,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		turn = 0 if turning_locked else p.get("m_turn", turn)
 	if s[o + RAGE_T] > 0:
 		spd = spd * 1150 / 1000
-	if locked or aim_on:
+	if not catalog_face and (locked or aim_on):
 		s[o + FACE] = FxMath.turn_toward(s[o + FACE], aim_heading(inp) if aim_on else _dir_to_opp(s, i), turn * 18 / 10)
 		if amount_pm > 0:
 			var fdot: int = (FxMath.COS[mdir] * FxMath.COS[s[o + FACE]] + FxMath.SIN[mdir] * FxMath.SIN[s[o + FACE]]) / FxMath.ONE # ×4096

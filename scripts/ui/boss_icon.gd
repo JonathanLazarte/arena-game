@@ -37,7 +37,8 @@ const GLYPHS := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso
 	"garra_suelo", "vendaval_hacha", "anillo_fuego", "pisoton",
 	"lluvia_lanzas", "flecha_grave", "lluvia_sangre", "columnas_rayo",
 	"saeta_oscura", "orbe_lunar", "aliento_rayo", "aliento_escarcha", "chorro_lava",
-	"grito_guerra", "guardia_reflejo"]
+	"grito_guerra", "guardia_reflejo",
+	"trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata"]
 
 func _draw() -> void:
 	var s := minf(size.x, size.y)
@@ -244,6 +245,25 @@ func _glyph_extra(ability_id: String, P: Callable, s: float, c: Color, w: float)
 			draw_polyline(PackedVector2Array([P.call(0.32, 0.24), P.call(0.68, 0.24), P.call(0.68, 0.55), P.call(0.5, 0.8), P.call(0.32, 0.55), P.call(0.32, 0.24)]), c, w, true)
 			draw_line(P.call(0.4, 0.42), P.call(0.6, 0.42), c, w * 0.8, true)
 			draw_line(P.call(0.5, 0.34), P.call(0.5, 0.52), c, w * 0.8, true)
+		"trazos_hoja":
+			draw_line(P.call(0.18, 0.62), P.call(0.42, 0.38), c, w, true)
+			draw_line(P.call(0.34, 0.7), P.call(0.58, 0.32), c, w, true)
+			draw_line(P.call(0.5, 0.74), P.call(0.86, 0.28), c, w * 1.3, true)
+		"danza_garza":
+			draw_arc(P.call(0.4, 0.62), s * 0.22, -2.4, -0.4, 12, c, w, true)
+			draw_arc(P.call(0.58, 0.48), s * 0.2, -2.2, -0.2, 12, Color(c, 0.7), w * 0.8, true)
+			draw_line(P.call(0.5, 0.22), P.call(0.5, 0.4), c, w, true)
+		"caida_hoja":
+			draw_line(P.call(0.5, 0.16), P.call(0.5, 0.62), c, w * 1.3, true)
+			draw_colored_polygon(PackedVector2Array([P.call(0.4, 0.52), P.call(0.6, 0.52), P.call(0.5, 0.72)]), c)
+			draw_arc(P.call(0.5, 0.78), s * 0.16, 0.2, PI - 0.2, 10, c, w * 0.8, true)
+		"floracion_escarlata":
+			for k in 6:
+				var a3 := TAU * k / 6.0 - 0.4
+				var origin: Vector2 = P.call(0.5, 0.5)
+				draw_line(origin, origin + Vector2(cos(a3), sin(a3)) * s * 0.3, c, w * 0.8, true)
+			draw_circle(P.call(0.5, 0.5), s * 0.08, c)
+			draw_arc(P.call(0.5, 0.5), s * 0.18, 0.0, TAU, 14, Color(c, 0.65), w * 0.6, true)
 		_:
 			return false
 	return true

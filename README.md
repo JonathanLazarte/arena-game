@@ -784,6 +784,10 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - El área de Flor Umbral y Picado de Alas sale aunque el cuerpo no conecte (`slam_always`). Lluvia de Lanzas, Columnas de Rayo y Lanza Celeste dibujan columna. Saeta Oscura y Orbe Lunar persiguen como la Ráfaga y se pueden repetir al terminar.
 - La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.
 
+## Ronda 48 — Hoja Escarlata
+- Las 45 habilidades de jefe quedan como estaban (copia en `docs/backup/habilidades_ronda46/`). No se pasaron al esquema nuevo.
+- Entran cuatro del catálogo, horneadas con el cargador del esquema: Trazos de Hoja, Danza de la Garza, Caída de la Hoja y Floración Escarlata. Pasos, ramas (estocada o patada), saltos y la flor de fase II. La recarga propia comparte el contador global. El protocolo sigue en 8. Prueba: `tests/test_hoja_escarlata.gd`.
+
 ## Ronda 47 — Fénix y fin de ronda
 - Al morir con un eikon activo la partida se cortaba: `dismiss_eikon` llamaba a `Mount.expire`, que no existía, y no llegaba a anunciar la ronda. Ahora la montura se retira y la ronda sigue.
 - En el fénix el jinete se sienta en el lomo (el vuelo ya no se aplica dos veces y la cadera sigue la silla). El lobo y el grifo siguen a 1,3 m. Prueba: `tests/test_mount_seat.gd`.

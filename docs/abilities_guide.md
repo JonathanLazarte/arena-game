@@ -1084,6 +1084,21 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 11. **IA**: decide en float con lógica específica por id; no hay bloque `ai` en los datos.
 12. **Presets**: hoy siempre son 3 ids por campeón y la 3.ª se bloquea por ranura (`boss_n`), no por habilidad.
 
+### 13.5 Hoja Escarlata (ronda 48)
+
+Las 45 no se migraron (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. El protocolo sigue en 8.
+
+Adaptaciones de estas cuatro respecto del esquema:
+
+- Un solo `BOSS_CD`: al terminar, `max(GLOBAL_CD, cooldown)`. La global de la sim es 85 ticks (`tk(1,4)`); el esquema usa 84.
+- La zona de Floración son anillos sucesivos (marcas de suelo), no un charco. El sangrado suma a la acumulación que ya existe.
+- `self_invuln` en modo `stun_immune` no usa `AB_IMM` (eso contaría el golpe como esquivado): no aturde y el daño entra × `dmg_taken_pct`.
+- Hiperarmadura: no acumula robustez. Superarmadura: suma robustez con la fórmula que ya existe.
+- Quien no tiene regla de Fase II puede usar una habilidad de `unlock.phase` 2. El campeón no, hasta que entra en Fase II.
+- El daño mágico entra por la columna de golpe físico. No hay una columna de elemento.
+- `on_interrupt.recovery_ticks` no se suma: el castigo es el aturdimiento o el parry que ya aplica la sim.
+- `IN_BOSS_VAR` (bit 21) es el `alt` de la rama. No hay bit para `alt2`.
+
 ---
 
 ## 14. Checklist de diseño (justicia y legibilidad online, 50–150 ms)
