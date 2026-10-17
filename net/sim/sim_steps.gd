@@ -1,8 +1,8 @@
 class_name SimSteps
 extends RefCounted
-## Motor de pasos. Con SimParams.ab_engine == 1, las de IDS se envuelven: el programa
-## numérico sigue siendo el del camino viejo y el catálogo aporta la máscara y los eventos.
-## Apagado, no se usa.
+## Motor de pasos. Las de IDS siempre se envuelven: el programa numérico lo compila
+## SimAbilities desde catalog.json → source, y este archivo lo ejecuta. El catálogo
+## horneado aporta la máscara y los eventos. No hay camino sin envolver.
 ##
 ## Reloj: update() ya sumó 1 a AB_T. t_step = AB_T - 1. Los ticks del JSON están en t_step
 ## (0 = primer tick). El camino viejo compara contra AB_T: un umbral H del viejo es el tick
@@ -351,7 +351,7 @@ static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 			return _latch_bits(s, o, step, false)
 		return false
 	var b: Dictionary = br
-	if alt and int(b.get("alt", -1)) < 0 and String(b.get("label", "")) == "":
+	if alt and not _has_alt(b):
 		return false
 	if (s[o + FightSim.AB_FL] & SimAbilities.FL_READY) != 0:
 		return true
@@ -365,6 +365,14 @@ static func latch(s: PackedInt64Array, P: Array, i: int, alt: bool) -> bool:
 	else:
 		s[o + FightSim.AB_FL] = (s[o + FightSim.AB_FL] & ~SimAbilities.FL_VARIANT) | SimAbilities.FL_QUEUED
 	return true
+
+static func _has_alt(b: Dictionary) -> bool:
+	if int(b.get("alt", -1)) >= 0 or String(b.get("label", "")) != "":
+		return true
+	for op: Variant in b.get("opts", []):
+		if op is Array and int((op as Array)[0]) == 1:
+			return true
+	return false
 
 static func _latch_bits(s: PackedInt64Array, o: int, step: Dictionary, _alt: bool) -> bool:
 	var cancel: Dictionary = step["cancel"]

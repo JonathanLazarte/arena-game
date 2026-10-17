@@ -784,10 +784,10 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - El área de Flor Umbral y Picado de Alas sale aunque el cuerpo no conecte (`slam_always`). Lluvia de Lanzas, Columnas de Rayo y Lanza Celeste dibujan columna. Saeta Oscura y Orbe Lunar persiguen como la Ráfaga y se pueden repetir al terminar.
 - La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.
 
-## Motor de pasos (protocolo 10, etapa 2)
-- Detrás del flag `ab_engine` (apagado por defecto, entra en `params_checksum`) `SimSteps` envuelve el programa viejo de las 45 habilidades. El catálogo aporta `interruptible_by` y los eventos. El grafo (`next`, `cancel_into`, `branch`) está en el motor y todavía no ejecuta estas habilidades: el programa numérico sigue siendo el de antes.
-- En reposo los checksums coinciden con el camino viejo. `interruptible_by` vacío no corta con aturdimiento: solo se esquiva. La recarga sigue siendo la global de 85 ticks. La estocada conserva la inmunidad total de la carga y la embestida (pendiente de balance). Prueba: `tests/test_step_engine.gd`.
-- El protocolo es 10. El 9 metió el flag en los params. El 10 hace del bit 21 el `alt` de la ventana que dice la sim; el botón del HUD sale de ese estado. El layout del estado no cambia.
+## Motor de pasos (protocolo 11, etapa 3)
+- `SimSteps` ejecuta las 45 habilidades. No hay camino sin envolver. `ab_engine` entra en `params_checksum` y por defecto es 1; ya no elige el camino. El catálogo aporta `interruptible_by`, los eventos y `source` (los números que compila la sim). El grafo (`next`, `cancel_into`, `branch`) está en el motor y todavía no ejecuta estas habilidades.
+- `interruptible_by` vacío no corta con aturdimiento: solo se esquiva. La recarga sigue siendo la global de 85 ticks. La estocada conserva la inmunidad total de la carga y la embestida (pendiente de balance). `BossAbilities` lee el catálogo. Prueba: `tests/test_step_engine.gd`.
+- El protocolo es 11. El 9 metió el flag en los params. El 10 hace del bit 21 el `alt` de la ventana que dice la sim; el botón del HUD sale de ese estado. El 11 enciende el motor. El layout del estado no cambia.
 
 ## Ronda 48 — Hoja Escarlata
 - Las 45 habilidades de jefe quedan como estaban (copia en `docs/backup/habilidades_ronda46/`). No se pasaron al esquema nuevo.

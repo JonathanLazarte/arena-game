@@ -1,6 +1,6 @@
 extends SceneTree
-## Etapa 1: con ab_engine apagado y encendido, las habilidades migradas dejan el mismo
-## estado tick a tick. También save/load, rollback de eventos y el grafo (rama, cancel, next).
+## Etapa 3: las 45 salen siempre por SimSteps. El flag sigue en los params pero ya no
+## elige el camino. También save/load, rollback de eventos y el grafo (rama, cancel, next).
 ## godot --headless --path . -s res://tests/test_step_engine.gd
 
 var fails := 0
@@ -100,8 +100,8 @@ func _run() -> void:
 		var p1: Array = await _bake([id], ["estocada"], 1)
 		var c0: Dictionary = p0[0]["boss"][0]
 		var c1: Dictionary = p1[0]["boss"][0]
-		check(int(c0["type"]) != SimAbilities.T_STEPS and int(c1["type"]) == SimAbilities.T_STEPS and int(c1.get("family", -1)) == int(c0["type"]),
-			"%s: familia %d en el motor" % [id, int(c0["type"])])
+		check(int(c0["type"]) == SimAbilities.T_STEPS and int(c1["type"]) == SimAbilities.T_STEPS and int(c0.get("family", -1)) == int(c1.get("family", -2)),
+			"%s: familia %d en el motor" % [id, int(c0.get("family", -1))])
 		var same_force := true
 		if c0.has("force") or c1.has("force"):
 			same_force = int(c0.get("force", -1)) == int(c1.get("force", -2))
@@ -128,7 +128,7 @@ func _run() -> void:
 	_same(duo0, duo1, 5000000, 240, "both", "los dos usan el motor")
 	# la habilidad de cerca hace algo (si no, el checksum idéntico no prueba nada)
 	var probe: Dictionary = _roll(off0, 2200000, 220, "idle")
-	check(int(probe["s"][FightSim.AB_HITS]) > 0, "el tajo de cerca conecta en el camino viejo (golpes %d)" % int(probe["s"][FightSim.AB_HITS]))
+	check(int(probe["s"][FightSim.AB_HITS]) > 0, "el tajo de cerca conecta (golpes %d)" % int(probe["s"][FightSim.AB_HITS]))
 	# save / load a mitad del tajo
 	var mid_off: Dictionary = _roll(off0, 2200000, 50, "idle")
 	var mid_on: Dictionary = _roll(on0, 2200000, 50, "idle")
@@ -179,7 +179,7 @@ func _run() -> void:
 	await _combo_alt()
 	await _interrupts()
 	await _graph()
-	SimParams.ab_engine = 0
+	SimParams.ab_engine = 1
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
 
@@ -201,7 +201,7 @@ func _combo_alt() -> void:
 	sb[FightSim.AB_T] = 1
 	check(SimAbilities.alt_window(sa, off, 0) and SimAbilities.alt_label(sa, off, 0) == "Estocada", "la pausa falsa abre la ventana de estocada")
 	check(SimAbilities.variation(sa, off, 0) and SimAbilities.variation(sb, on, 0), "el bit alt elige el remate en los dos caminos")
-	check(not SimAbilities.alt_window(sa, off, 0), "elegido el remate, la ventana se cierra")
+	check((sa[FightSim.AB_FL] & SimAbilities.FL_VARIANT) != 0 and SimAbilities.alt_label(sa, off, 0) == "Estocada", "elegida la estocada, el botón sigue hasta el remate")
 	var same := true
 	for _t in 40:
 		ea.step(sa, FightSim.IN_LOCK, FightSim.IN_LOCK)
@@ -228,7 +228,7 @@ func _interrupts() -> void:
 	FightSim._apply_stun(sv, 0, FightSim.T_STAGGER, viejo)
 	FightSim._apply_stun(st, 0, FightSim.T_STAGGER, tajo)
 	FightSim._apply_stun(sp, 0, FightSim.T_STAGGER, piso)
-	check(sv[FightSim.AB_SLOT] < 0, "camino viejo: el tambaleo corta el tajo")
+	check(sv[FightSim.AB_SLOT] == 0 and sv[FightSim.STUN] == 0, "sin camino viejo: el tambaleo no corta el tajo")
 	check(st[FightSim.AB_SLOT] == 0 and st[FightSim.STUN] == 0, "tajo (lista vacía): el tambaleo no lo corta")
 	check(sp[FightSim.AB_SLOT] < 0 and sp[FightSim.STUN] == FightSim.T_STAGGER, "pisotón: el tambaleo sí lo corta")
 
@@ -283,7 +283,7 @@ func _graph() -> void:
 	var alt: Array = await _trace(ab, {25: FightSim.IN_BOSS_VAR}, 4000000)
 	check(_saw(alt, 2) and not _saw(alt, 1), "rama: alt sigue al paso alternativo")
 	var both: Array = await _trace(ab, {25: FightSim.IN_BOSS | FightSim.IN_BOSS_VAR}, 4000000)
-	check(_saw(both, 1) and not _saw(both, 2), "rama: en el mismo tick gana la opción que está primero")
+	check(_saw(both, 2) and not _saw(both, 1), "rama: en el mismo tick el alt se lee después y gana")
 	var early: Array = await _trace(ab, {25: FightSim.IN_BOSS, 30: FightSim.IN_BOSS_VAR}, 4000000)
 	check(_saw(early, 1) and not _saw(early, 2), "rama: la primera pulsación gana")
 	var buf: Array = await _trace(ab, {19: FightSim.IN_BOSS_VAR}, 4000000)
@@ -293,7 +293,7 @@ func _graph() -> void:
 		"opts": [[1, 2], [0, 1]],
 	}, null)
 	var tie: Array = await _trace(_gability([alt_first, idle, idle]), {25: FightSim.IN_BOSS | FightSim.IN_BOSS_VAR}, 4000000)
-	check(_saw(tie, 2) and not _saw(tie, 1), "rama: si alt está primero en las opciones, gana el empate")
+	check(_saw(tie, 2) and not _saw(tie, 1), "rama: el orden de las opciones no le gana al alt")
 	var cancel_step := _gstep(40, 30, 0, tail, null, {"from": 10, "to": 20, "trigger": 0, "only": 0, "step": 1})
 	var canceled: Array = await _trace(_gability([cancel_step, idle]), {}, 4000000)
 	check(_saw(canceled, 1), "cancel_into automático salta al paso siguiente")

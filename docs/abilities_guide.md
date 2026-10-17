@@ -982,11 +982,13 @@ junto al de la habilidad solo entre los ticks 32 y 66 del segundo golpe (según 
 
 ### 13.1 Dónde vive hoy
 
-- **Datos**: `scripts/data/boss_abilities.gd` (`BossAbilities.DEFS`, 6 base) y `scripts/combat/boss_abilities_ext.gd`
-  (`BossAbilitiesExt.DEFS`, 39 ampliadas: 13 del lote 1 + 26 del lote 2, ronda 46). Diccionarios GDScript con **tiempos en segundos (float)**.
-- **Compilación a enteros**: `SimAbilities.compile()` (`net/sim/sim_abilities.gd`), llamada desde `SimParams.bake`
-  (`p["boss"]`) con `SimParams.tk()`, que reproduce la acumulación float del offline (p. ej. 0,4 s = 25 ticks, no 24).
-- **Ejecución**: `SimAbilities.update()` por tipo; daño y aturdimiento en `FightSim._take_hit` / `_add_stun_force`.
+- **Datos**: `data/abilities/catalog.json`. Cada una de las 45 tiene el paso del esquema y un objeto `source`
+  con los tiempos en segundos que compila la sim. `BossAbilities` solo lee ese archivo (nombres, costes, códice, HUD).
+  Hoja Escarlata y Elden siguen en sus catálogos. La copia vieja de las 45 está en `docs/backup/habilidades_ronda46/`.
+- **Compilación a enteros**: `SimAbilities.compile()` lee `source` y `SimSteps.wrap` pone el tipo en pasos.
+  `SimParams.bake` arma `p["boss"]` con `SimParams.tk()` (0,4 s = 25 ticks, no 24).
+- **Ejecución**: `SimAbilities.update()` solo despacha `T_STEPS` (`SimSteps.tick`) y `T_CATALOG` (`SimCatalog`).
+  El daño y el aturdimiento siguen en `FightSim._take_hit` / `_add_stun_force`.
 - **Presets**: `scripts/data/champion_catalog.gd`, campo `boss` (3 ids por campeón: Vael, Lyra, Gorath, Nysera, Draven).
 - **IA**: `net/sim/sim_ai.gd` (lógica por id/tipo, en float, solo offline).
 - **Eventos**: `SimEvents` (contadores `AB_STARTS`, `AB_HITS`, `AB_INTR`… → claves `frame:kind:player`) + `SimFx`;
@@ -1067,7 +1069,8 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 9. **Ondas:** `knockback_mps` por defecto 6.
 10. **Remate alternativo.** El bit 21 (`IN_BOSS_VAR`, acción `boss_variation`, tecla `M`) es el `alt` de la
     ventana abierta: la pausa falsa (remate en estocada), una rama de Hoja y, si el motor de pasos trae `branch`,
-    esa rama. `alt2` no tiene bit (el 31 no se envía). El protocolo es 10 por ese significado. El botón del HUD
+    esa rama. `alt2` no tiene bit (el 31 no se envía). El protocolo es 11. El 10 fijó ese significado del bit 21;
+    el 11 deja el motor encendido y no hay camino sin envolver. El botón del HUD
     se muestra solo mientras `SimAbilities.alt_window` es verdad; `SimView` vuelca ese flag y la etiqueta
     (`Estocada`, o el `label` de la opción). La vista no decide la ventana.
 11. **Desfases de la tabla de las 6 base** (`docs/design.md`): la tabla dice Ráfaga 30 maná / 3 tajos y el código
@@ -1077,11 +1080,11 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
-Las 45 están en `data/abilities/catalog.json` y siguen definidas en `BossAbilities` (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las 45 de `SimSteps.IDS` las envuelve `SimSteps` si `ab_engine` es 1: el programa numérico es el viejo y el catálogo aporta `interruptible_by` y los eventos. Por defecto el flag es 0. El protocolo es 10: el 9 metió `ab_engine` en los params y el 10 generaliza el bit 21 como `alt`.
+Las 45 están en `data/abilities/catalog.json`. `BossAbilities` las lee de ahí. `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las 45 de `SimSteps.IDS` salen siempre por `SimSteps`: `source` alimenta el programa numérico y el horneado aporta `interruptible_by` y los eventos. `ab_engine` queda en los params y por defecto es 1; ya no elige el camino. El protocolo es 11: el 9 metió `ab_engine` en los params, el 10 generaliza el bit 21 como `alt` y el 11 enciende el motor.
 
 Adaptaciones respecto del esquema:
 
-- La recarga del motor de pasos es la global de 85 ticks (`tk(1,4)`). El `cooldown` propio no se usa en la etapa 2; más adelante será `max(global, propia)`. Hoja (`FL_CATALOG`) sí hace `max(GLOBAL_CD, cooldown)`. El esquema anota 84.
+- La recarga del motor de pasos es la global de 85 ticks (`tk(1,4)`). El `cooldown` propio no se usa; más adelante será `max(global, propia)`. Hoja (`FL_CATALOG`) sí hace `max(GLOBAL_CD, cooldown)`. El esquema anota 84.
 - La zona de Floración son anillos sucesivos (marcas de suelo), no un charco. El sangrado suma a la acumulación que ya existe.
 - `self_invuln` en modo `stun_immune` no usa `AB_IMM` (eso contaría el golpe como esquivado): no aturde y el daño entra × `dmg_taken_pct`.
 - Hiperarmadura: no acumula robustez. Superarmadura: suma robustez con la fórmula que ya existe.
@@ -1167,8 +1170,7 @@ Antes de aceptar lo que devuelva: pasalo por el validador (§17), la checklist (
 
 ## 17. Cómo validar un catálogo
 
-Cargador, validador y horneado: `net/sim/ability_catalog.gd` (`AbilityCatalog`). Las 45 anteriores no pasan por aquí.
-Hoja Escarlata sí: `SimCatalog` ejecuta ese horneado (§13.5). El motor de pasos, con `ab_engine` en 1, envuelve el programa viejo de las habilidades en `SimSteps.IDS`. El horneado del catálogo documenta la máscara y los eventos; todavía no es el programa numérico.
+Cargador, validador y horneado: `net/sim/ability_catalog.gd` (`AbilityCatalog`). El campo `source` de las 45 se acepta y no entra al horneado. Hoja Escarlata sí ejecuta el horneado en `SimCatalog` (§13.5). El motor de pasos ejecuta el programa que `SimAbilities.compile` arma desde `source`. El horneado aporta la máscara y los eventos.
 
 ```bash
 godot --headless --path . --script res://tools/validate_abilities.gd -- data/abilities/catalog.example.json

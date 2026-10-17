@@ -461,7 +461,9 @@ static func _names(c: Ctx, path: String, texts: Array) -> void:
 
 static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Dictionary:
 	_unknown(c, a, p, ["id", "name", "icon", "category", "tags", "unlock", "cost", "cooldown_ticks", "uses_global_cd",
-		"usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint"])
+		"usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source"])
+	if a.has("source") and not (a["source"] is Dictionary):
+		c.err(_p(p, "source"), "SCHEMA", "source debe ser un objeto")
 	var id := _str(c, a, "id", p, true)
 	var re := RegEx.new()
 	re.compile("^[a-z][a-z0-9_]{2,31}$")

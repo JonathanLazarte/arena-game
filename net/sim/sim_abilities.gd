@@ -274,7 +274,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 	return _finish(c, id)
 
 static func _finish(c: Dictionary, id: String) -> Dictionary:
-	if c.is_empty() or SimParams.ab_engine == 0 or not SimSteps.handles(id):
+	if c.is_empty() or not SimSteps.handles(id):
 		return c
 	return SimSteps.wrap(c, id)
 
@@ -766,36 +766,12 @@ static func update(s: PackedInt64Array, P: Array, i: int) -> void:
 		end_ability(s, o, true)
 		return
 	match int(ab.get("type", -1)):
-		T_CARGA:
-			if s[o + FightSim.AB_T] >= int(ab["end"]):
-				end_ability(s, o, false)
-		T_RAFAGA: _rafaga(s, P, i, ab)
-		T_ESCUDO:
-			if s[o + FightSim.AB_T] >= int(ab["w"]):
-				s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 3)
-			if s[o + FightSim.AB_T] >= int(ab["end"]):
-				s[o + FightSim.INVULN] = 0
-				end_ability(s, o, false)
-		T_COMBO: _combo(s, P, i, ab)
-		T_SALTO: _salto(s, P, i, ab)
-		T_TIMELINE: _timeline(s, P, i, ab)
-		T_WAVE: _wave(s, P, i, ab)
-		T_RAIN: _rain(s, P, i, ab)
-		T_BREATH: _breath(s, P, i, ab)
-		T_RAGE:
-			if s[o + FightSim.AB_FIRED] == 0 and s[o + FightSim.AB_T] >= int(ab["w"]):
-				s[o + FightSim.AB_FIRED] = 1
-				s[o + FightSim.RAGE_T] = ab["dur"]
-			if s[o + FightSim.AB_T] >= int(ab["end"]):
-				end_ability(s, o, false)
-		T_COUNTER:
-			var done: bool = s[o + FightSim.AB_T] >= int(ab["ws"]) + int(ab["rec_hit"]) if (s[o + FightSim.AB_FL] & FL_COUNTERED) != 0 else s[o + FightSim.AB_T] >= int(ab["end_miss"])
-			if done:
-				end_ability(s, o, false)
 		T_CATALOG:
 			SimCatalog.tick(s, P, i, ab)
 		T_STEPS:
 			SimSteps.tick(s, P, i, ab)
+		_:
+			end_ability(s, o, true)
 	# inmunidad (Fighter.ab_immune): escudo tras su anticipación, o en el aire (salto / combo)
 	if s[o + FightSim.AB_SLOT] >= 0:
 		var cur_ab := _ab(s, P, i)

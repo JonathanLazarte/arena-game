@@ -92,7 +92,7 @@ func _run() -> void:
 		await process_frame
 		var P := SimParams.bake(A, B)
 		var ab: Dictionary = P[0]["boss"][0]
-		check(int(ab["type"]) == int(FAMILY[id]) and String(ab["id"]) == id, "%s compila como %d" % [id, FAMILY[id]])
+		check(int(ab["type"]) == SimAbilities.T_STEPS and int(ab.get("family", -1)) == int(FAMILY[id]) and String(ab["id"]) == id, "%s compila como pasos, familia %d" % [id, FAMILY[id]])
 		check(float(BossAbilities.def(id).get("recovery", BossAbilities.def(id).get("recovery_miss", 0.4))) >= 0.3, "%s tiene recuperación" % id)
 		A.queue_free(); B.queue_free()
 	var est: Dictionary = await _play("estocada_negra", 2200000, 220, false)

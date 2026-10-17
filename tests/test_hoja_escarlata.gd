@@ -81,7 +81,7 @@ func _run() -> void:
 	if baked.size() >= 1:
 		check(int(baked[0]["type"]) == SimAbilities.T_CATALOG, "Trazos compila como catálogo")
 	if baked.size() >= 2:
-		check(int(baked[1]["type"]) == SimAbilities.T_ESTOCADA, "la estocada sigue en su ejecutor")
+		check(int(baked[1]["type"]) == SimAbilities.T_STEPS and int(baked[1].get("family", -1)) == SimAbilities.T_ESTOCADA, "la estocada sale por el motor de pasos")
 
 	var est := await _play("trazos_hoja", 1800000, 220, false)
 	check(est["hurt"] > 0 and est["hits"] > 0 and est["step"] == 3 and est["cd"] > 0, "estocada final por defecto (daño %d, paso %d, cd %d)" % [est["hurt"], est["step"], est["cd"]])

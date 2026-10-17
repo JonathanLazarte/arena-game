@@ -1,7 +1,7 @@
 class_name BossAbilities
-## Ronda 31/34: habilidades de jefe. Máx. 3 equipadas por personaje (pestaña «Jefe»). Sin tiempos de
-## recarga: cada una cuesta aguante, maná (Energía) o vida (no se puede usar si te dejaría a 0).
-## Consulta primero BossAbilitiesExt y luego las 6 base.
+## Fachada de las habilidades de jefe. Máx. 3 equipadas por personaje (pestaña «Jefe»).
+## Nombres, costes, códice y números de compilación salen de data/abilities/catalog.json
+## (`source`). Hoja Escarlata y Elden siguen en sus catálogos.
 
 const MAX_EQUIPPED := 3
 const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
@@ -20,37 +20,10 @@ const EXT_ORDER := [
 	"grito_guerra", "guardia_reflejo",
 ]
 const COST_NAMES := {"stamina": "aguante", "mana": "maná", "health": "vida"}
+const CATALOG_PATH := "res://data/abilities/catalog.json"
 
-const DEFS := {
-	"estocada": {"name": "Estocada de jefe", "cost_type": "stamina", "cost": 30.0, "unblockable": true, "home_time": 0.15, "dmg": 1.6, "force": 60.0, "resist": 99.0, "magic": false,
-		"windup": 1.6, "dist": 12.0, "speed": 30.0, "reach": 1.8, "home_deg": 140.0, "range": 12.0,
-		"desc": "Carga 1,6 s siguiendo al objetivo (invulnerable) y sale disparada 12 m; solo corrige la dirección en los primeros 0,15 s de la embestida. Imbloqueable: rueda justo antes del impacto o apártate cuando ya salió.",
-		"tele": "Hoja roja que se enciende y sonido que sube."},
-	"carga_area": {"name": "Carga en área", "cost_type": "mana", "cost": 35.0, "dmg": 1.4, "force": 45.0, "resist": 4.0, "magic": true,
-		"windup": 2.2, "radius": 7.5, "recovery": 0.6, "range": 3.5,
-		"desc": "Inmóvil, acumula energía 2,2 s con robustez x5 y estalla en un amplio radio de 7,5 m. Huye o córtala; no te quedes pegando.",
-		"tele": "Anillo azul en el suelo que se llena; pose de grito."},
-	"rafaga": {"name": "Ráfaga espectral", "cost_type": "mana", "cost": 10.0, "dmg": 0.55, "force": 14.0, "resist": 0.5, "magic": true, "light": true,
-		"windup": 0.36, "count": 1, "speed": 20.0, "life": 2.5, "home_deg": 60.0, "home_pitch_deg": 24.0, "home_time": 2.5, "radius": 0.8, "recovery": 0.5, "range": 20.0,
-		"desc": "Cada pulsación emite un tajo espectral dorado y consume 10 de maná. Puedes volver a pulsar al terminar la animación, sin recarga adicional. Persigue girando hasta 60°/s en horizontal y 24°/s en vertical a 20 m/s. Si te rebasa, sigue de largo.",
-		"tele": "La hoja se vuelve dorada; cada orden libera un tajo en media luna."},
-	"escudo_mana": {"name": "Escudo de maná", "cost_type": "mana", "cost": 25.0, "dmg": 0.0, "force": 0.0, "resist": 99.0, "magic": true,
-		"windup": 0.1, "active": 1.5, "range": 0.0,
-		"desc": "1,5 s de invulnerabilidad TOTAL (daño y aturdimiento). Te mueves despacio y no atacas.",
-		"tele": "Burbuja cian alrededor del personaje."},
-	"combo_falso": {"name": "Combo de la pausa falsa", "cost_type": "stamina", "cost": 38.0, "dmg": 1.0, "force": 0.0, "resist": 0.3, "magic": false, "light": true,
-		"hits": [[0.55, 0.75, 34.0], [0.55, 0.8, 36.0], [0.55, 0.9, 40.0], [1.65, 1.35, 48.0]], "stage_windup": 0.55, "variant_windup": 0.5, "final_stage_time": 1.65, "chain_window": 1.15, "recovery": 0.75, "reach": 2.4, "strike_radius": 4.0, "variation_reach": 6.5, "range": 9.0,
-		"lunge_speed": 12.0, "lunge_time": 0.42, "lunge_dist": 5.0, "lunge_stop_dist": 2.2, "turn_deg": 360.0,
-		"final_leap_time": 0.9, "final_leap_height": 3.2, "final_rise_time": 0.34, "final_apex_hold": 0.22,
-		"final_fall_time": 0.34, "final_retreat_speed": 1.8,
-		"slam_radius": 4.5, "slam_warn": 0.25, "slam_mult": 0.7, "slam_force": 48.0,
-		"desc": "Pulsa la habilidad para encadenar cada uno de tres tajos de barrido que persiguen al objetivo. Tras el tercero, vuelve a pulsar para saltar y caer con un remate de área, o elige Estocada para cambiar el remate. El primer impacto tambalea; cada golpe consume parte del coste total.",
-		"tele": "Hoja dorada; tras el tercer golpe puedes elegir remate. El salto falso pausa brevemente en el aire."},
-	"salto_caida": {"name": "Salto con caída", "cost_type": "health", "cost": 15.0, "dmg": 1.5, "force": 50.0, "resist": 99.0, "magic": false,
-		"rise": 0.55, "lock": 1.25, "land": 1.65, "radius": 3.5, "height": 6.0, "recovery": 0.7, "range": 14.0,
-		"desc": "Salta muy alto siguiendo al objetivo hasta 0,4 s antes de caer; entonces fija el punto y cae con golpe en área. Sin marca en el suelo: mira al rival en el aire y muévete o rueda cuando empiece a bajar.",
-		"tele": "El rival se eleva y queda suspendido; empieza a bajar = muévete."},
-}
+static var _source: Dictionary = {}
+static var _loaded := false
 
 ## Fase 9: nombre corto para botones/HUD y color propio de cada habilidad (icono BossIcon).
 const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfaga", "escudo_mana": "Escudo",
@@ -91,16 +64,56 @@ static func all_ids() -> Array:
 	return ORDER + EXT_ORDER + HojaCatalog.ids() + EldenCatalog.ids()
 
 static func has(id: String) -> bool:
-	return DEFS.has(id) or BossAbilitiesExt.DEFS.has(id) or HojaCatalog.has(id) or EldenCatalog.has(id)
+	_ensure()
+	return _source.has(id) or HojaCatalog.has(id) or EldenCatalog.has(id)
 
+## Definición de compilación (tiempos en segundos). Sale de catalog.json → source.
+## Hoja y Elden siguen en sus catálogos.
 static func def(id: String) -> Dictionary:
 	if HojaCatalog.has(id):
 		return HojaCatalog.view_def(id)
 	if EldenCatalog.has(id):
 		return EldenCatalog.view_def(id)
-	if BossAbilitiesExt.DEFS.has(id):
-		return BossAbilitiesExt.DEFS[id]
-	return DEFS.get(id, {})
+	_ensure()
+	return _source.get(id, {})
+
+static func _ensure() -> void:
+	if _loaded:
+		return
+	_loaded = true
+	var f := FileAccess.open(CATALOG_PATH, FileAccess.READ)
+	if f == null:
+		push_error("BossAbilities: no se pudo leer %s" % CATALOG_PATH)
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if not (parsed is Dictionary):
+		push_error("BossAbilities: catálogo ilegible")
+		return
+	for a: Variant in (parsed as Dictionary).get("abilities", []):
+		if not (a is Dictionary):
+			continue
+		var id := String((a as Dictionary).get("id", ""))
+		var src: Variant = (a as Dictionary).get("source", null)
+		if id != "" and src is Dictionary:
+			_source[id] = _restore(src)
+
+static func _restore(v: Variant) -> Variant:
+	if v is Dictionary:
+		var d: Dictionary = v
+		if d.size() == 1 and d.has("__color") and d["__color"] is Array:
+			var c: Array = d["__color"]
+			return Color(float(c[0]), float(c[1]), float(c[2]), float(c[3]) if c.size() > 3 else 1.0)
+		var out := {}
+		for k: Variant in d.keys():
+			out[k] = _restore(d[k])
+		return out
+	if v is Array:
+		var arr: Array = []
+		for x: Variant in v:
+			arr.append(_restore(x))
+		return arr
+	return v
 
 ## Ronda 33: imbloqueable = el escudo no la para (daño tipo «jefe»).
 static func is_unblockable(id: String) -> bool:

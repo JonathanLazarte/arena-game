@@ -15,9 +15,10 @@ const A_JUMP := 5 ## fase 7: picado desde el salto
 ## Subtipos físicos para la tabla de defensa: 0 = sin subtipo (flechas), 1..4 = PhysTypes.
 const SUBS := ["", "estandar", "cortante", "contundente", "perforante"]
 const DEF_TAB_MAX := 400 ## daño bruto máximo tabulado (por unidad)
-## 0 = las 45 siguen en SimAbilities. 1 = las del catálogo de pasos (SimSteps) salen por el motor nuevo.
-## Entra en params_checksum. Apagado por defecto: la partida de siempre no cambia de camino.
-static var ab_engine := 0
+## Entra en params_checksum. Por defecto 1: las 45 salen por SimSteps.
+## El valor ya no elige el camino (el camino sin envolver no existe). Queda en los params
+## para que un cliente viejo no coincida en el checksum.
+static var ab_engine := 1
 
 static func sub_code(sub: String) -> int:
 	return maxi(SUBS.find(sub), 0)

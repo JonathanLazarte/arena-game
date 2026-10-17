@@ -70,6 +70,7 @@ func _ability(id: String) -> Dictionary:
 	var cd := int(round(float(d.get("cd", 8.0)) * 60.0))
 	return {
 		"id": id,
+		"source": _plain(d),
 		"name": String(d.get("name", id)),
 		"icon": "boss:%s" % id,
 		"category": cat,
@@ -248,3 +249,19 @@ func _r3(v: float) -> float:
 func _hex(d: Dictionary) -> String:
 	var c: Color = d.get("color", Color(0.9, 0.8, 0.4))
 	return "#" + c.to_html(false)
+
+func _plain(v: Variant) -> Variant:
+	if v is Color:
+		var col := v as Color
+		return {"__color": [col.r, col.g, col.b, col.a]}
+	if v is Array:
+		var a: Array = []
+		for x: Variant in v:
+			a.append(_plain(x))
+		return a
+	if v is Dictionary:
+		var out := {}
+		for k: Variant in (v as Dictionary).keys():
+			out[str(k)] = _plain((v as Dictionary)[k])
+		return out
+	return v
