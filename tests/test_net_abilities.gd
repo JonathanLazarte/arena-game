@@ -49,5 +49,30 @@ func _run() -> void:
 			"%s vs %s, RTT %d: 0 desincronías (%d confirmados) %s" % [str(ids.slice(g, g + 3)), eks[k % eks.size()], rtt, r["common"], str(c)])
 		k += 1
 	check(tot["starts"] > 0 and tot["spells"] > 0 and tot["summons"] > 0, "se usaron habilidades, hechizos e invocaciones: %s" % str(tot))
+	# eventos de presentación: telegrafía de habilidad (con código), lanzamiento, invocación
+	var A2 := _fighter(["estocada"], spells.slice(0, 4), "fenix")
+	var B2 := _fighter([], [], "lobo")
+	await process_frame
+	var P2 := SimParams.bake(A2, B2)
+	P2[0]["meter0"] = 100000
+	A2.queue_free(); B2.queue_free()
+	var kinds := {}
+	var keys1: Array = []
+	for rep in 2:
+		var e := FightEngine.new(P2, 3, true); e.gap_um = 3000000
+		var st := e.initial()
+		for t in 400:
+			var a := FightSim.IN_LOCK
+			if t == 10: a |= FightSim.IN_BOSS
+			if t in [120, 160, 200]: a |= FightSim.IN_SPELL
+			if t == 250: a |= FightSim.IN_EIKON
+			var prev := st.duplicate()
+			e.step(st, a, FightSim.IN_LOCK)
+			for ev: Dictionary in SimEvents.diff(prev, st):
+				kinds[ev["kind"]] = ev.get("code", true)
+				if rep == 0: keys1.append(ev["key"])
+				elif rep == 1: keys1.erase(ev["key"])
+	check(kinds.has("ability") and kinds.has("cast") and kinds.has("summon"), "eventos fase 4: %s" % str(kinds))
+	check(keys1.is_empty(), "claves de evento deterministas (re-simulación idéntica)")
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)

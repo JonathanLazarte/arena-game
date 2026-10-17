@@ -215,7 +215,8 @@ var _loading_label: Label
 func _process_loading() -> void:
 	if not online.local_ready:
 		_warm_frames += 1
-		if _warm_frames >= WARM_FRAMES:
+		# eikons precargados y sombreadores compilados (_warm_eikons); tope de 8 s por si algo falla
+		if _warm_frames >= WARM_FRAMES and (warm_done or _warm_frames > 480):
 			online.local_ready = true
 	var waiting := online.waiting_peer()
 	if waiting and _loading_label == null:
@@ -236,6 +237,11 @@ func _on_sim_event(ev: Dictionary) -> void:
 			shake = maxf(shake, 0.18 if ev["kind"] == "hit" else 0.3)
 		"parry":
 			shake = maxf(shake, 0.12)
+		"ability":
+			if online and int(ev["player"]) != online.me:
+				hud.show_message("¡Habilidad del rival!", 0.8) # telegrafía (el aviso visual de la sim)
+		"grab", "eikon_special", "ability_hit":
+			shake = maxf(shake, 0.25)
 
 ## Ronda 26: pide en hilo los modelos de los eikons de ambos luchadores y, cuando llegan,
 ## calienta una instancia oculta (fuera de cámara, 2 fotogramas) para compilar sombreadores
