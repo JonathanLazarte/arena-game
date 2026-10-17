@@ -76,10 +76,22 @@ func _run() -> void:
 		["magia: chispa ígnea", 8.0, 120, [[2, 0, "spell", 0]], {"spells": [["chispa"], []]}],
 		["magia: aliento helado", 3.0, 120, [[2, 0, "spell", 0]], {"spells": [["aliento_helado"], []]}],
 		["magia: piel de piedra", 1.8, 120, [[2, 1, "spell", 0], [60, 0, "light", 0]], {"spells": [[], ["piel_de_piedra"]]}],
+		# ---- Fase 6: huecos online cerrados ----
+		["jefe: combo con remate en estocada (variante)", 2.5, 320, [[2, 0, "boss", 0], [50, 0, "boss", 0], [100, 0, "boss", 0], [150, 0, "boss_var", 0]], {"boss": [["combo_falso"], []]}],
+		["jefe: ráfaga vs blanco andando", 9.0, 160, [[0, 1, "move_on", 8], [2, 0, "boss", 0]], {"boss": [["rafaga"], []]}],
+		["arte: estocada impulsada", 4.0, 90, [[2, 0, "art", 0]], {"art": ["estocada_impulsada", ""]}],
+		["arte: torbellino", 2.0, 90, [[2, 0, "art", 0]], {"art": ["torbellino", ""]}],
+		["montado (lobo): embestida", 7.0, 120, [[2, 0, "summon", 0], [30, 0, "roll", 0]], {"eikon": ["lobo", ""], "meter": [100.0, 0.0]}],
+		["montado (lobo): ligero", 2.6, 120, [[2, 0, "summon", 0], [30, 0, "light", 0]], {"eikon": ["lobo", ""], "meter": [100.0, 0.0]}],
+		["montado (grifo): fuerte", 2.8, 160, [[2, 0, "summon", 0], [40, 0, "heavy", 0]], {"eikon": ["grifo", ""], "meter": [100.0, 0.0]}],
+		["montado (lobo): dash + ligero ligado", 6.0, 140, [[2, 0, "summon", 0], [30, 0, "light", 0], [32, 0, "roll", 0]], {"eikon": ["lobo", ""], "meter": [100.0, 0.0]}],
+		["montura sin jinete golpeada", 2.2, 200, [[2, 1, "summon", 0], [20, 1, "mount", 0], [40, 0, "light", 0], [80, 0, "light", 0], [120, 0, "light", 0]], {"eikon": ["", "lobo"], "meter": [0.0, 100.0], "sim_only": true}],
+		["golem compañero golpeado", 2.0, 160, [[2, 1, "summon", 0], [10, 0, "light", 0], [50, 0, "light", 0], [90, 0, "light", 0]], {"eikon": ["", "golem"], "meter": [0.0, 100.0]}],
 		["talismán: parry devuelve aguante", 1.8, 60, [[2, 0, "light", 0], [20, 1, "parry", 0]], {"trinkets": [[], ["eco_templado"]]}],
 	]
 	var all_params_ok := true
 	for sc in scen:
+		if OS.get_environment("PARITY_ONLY") != "" and not String(sc[0]).contains(OS.get_environment("PARITY_ONLY")): continue
 		var off := await _offline(world, sc)
 		var P: Array = off["params"]
 		for pp: Dictionary in P:
@@ -88,7 +100,11 @@ func _run() -> void:
 		var name: String = sc[0]
 		print("--- %s: offline %s | sim %s" % [name, str(off["r"]), str(sim)])
 		var r: Dictionary = off["r"]
-		for k in ["dmg0", "dmg1"]:
+		if sc.size() > 4 and sc[4].get("sim_only", false):
+			# offline la montura sin jinete además ataca con IA propia (no portado): solo se exige que reciba daño
+			check(float(sim["pet1"]) > 0.0, "%s: la montura sin jinete recibe daño online (%.2f)" % [name, sim["pet1"]])
+			continue
+		for k in ["dmg0", "dmg1", "pet1"]:
 			check(absf(float(r[k]) - float(sim[k])) <= 0.05 + 0.01 * float(r[k]), "%s: %s offline %.2f vs sim %.2f" % [name, k, r[k], sim[k]])
 		for k in ["lvl0", "lvl1", "parries", "dodges", "guard_breaks", "hits0", "hits1", "stance_breaks", "crits", "procs0", "procs1"]:
 			check(int(r[k]) == int(sim[k]), "%s: %s offline %d vs sim %d" % [name, k, r[k], sim[k]])
@@ -127,7 +143,7 @@ func _spam(n: int, every: int) -> Array:
 	return out
 
 func _empty_result() -> Dictionary:
-	return {"dmg0": 0.0, "dmg1": 0.0, "lvl0": 0, "lvl1": 0, "parries": 0, "dodges": 0, "guard_breaks": 0, "hits0": 0, "hits1": 0,
+	return {"pet1": 0.0, "dmg0": 0.0, "dmg1": 0.0, "lvl0": 0, "lvl1": 0, "parries": 0, "dodges": 0, "guard_breaks": 0, "hits0": 0, "hits1": 0,
 		"first_hit": -1, "stun0": 0, "stun1": 0, "stance_breaks": 0, "crits": 0, "procs0": 0, "procs1": 0, "log": []}
 
 func _dir_off(d32: int) -> Vector3:
@@ -159,8 +175,11 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 		f.telegraph_k = SimAbilities.TELE_ONLINE
 		if setup.has("boss"):
 			f.set_boss_abilities(setup["boss"][i])
-		if setup.has("spells"):
-			f.set_magic(setup["spells"][i], "")
+		f.fluid = true # como el jugador real (arena.gd)
+		if setup.has("spells") or setup.has("art"):
+			f.set_magic(setup.get("spells", [[], []])[i], String(setup.get("art", ["", ""])[i]))
+		if setup.has("eikon"):
+			f.eikon = load(Catalog.EIKONS[setup["eikon"][i]]) if String(setup["eikon"][i]) != "" else null
 		world.add_child(f)
 		f.secondary = w2
 		if setup.has("lead"):
@@ -176,6 +195,10 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 		if float(hp_set[i]) > 0.0:
 			fs[i].health = float(hp_set[i])
 	var params := SimParams.bake(fs[0], fs[1])
+	if setup.has("meter"):
+		for i in 2:
+			fs[i].meter = float(setup["meter"][i])
+			params[i]["meter0"] = int(round(float(setup["meter"][i]) * 1000.0))
 	await physics_frame
 	var r := _empty_result()
 	var hp0 := [fs[0].health, fs[1].health]
@@ -205,6 +228,10 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 				"swap": f.swap_loadout()
 				"boss": f.boss_skill(f.selected_boss())
 				"spell": f.cast_spell()
+				"boss_var": f.boss_variation()
+				"art": f.special()
+				"summon": f.summon()
+				"mount": f.toggle_mount()
 				"move_on": holds[int(e[1])]["move"] = int(e[3])
 				"move_off": holds[int(e[1])].erase("move")
 				"sprint_on": f.want_sprint = true
@@ -223,7 +250,14 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 			if h.has("shot") and t >= int(h["shot"]):
 				fs[i].want_shot_hold = false
 		var h1 := fs[1].health
+		var pe: Node3D = fs[1].active_eikon if is_instance_valid(fs[1].active_eikon) else null
+		var ph: float = float(pe.get("health")) if pe else 0.0
 		await physics_frame
+		if OS.get_environment("PARITY_DBG") != "" and t < 50:
+			for c in fs[0].get_parent().get_children():
+				if c is Projectile: print("O %d off=%.1f p(%.2f,%.2f,%.2f) t(%.2f,%.2f)" % [t, rad_to_deg(Vector2(c.direction.x, c.direction.z).angle_to(Vector2(fs[1].global_position.x - c.global_position.x, fs[1].global_position.z - c.global_position.z))), c.global_position.x, c.global_position.y, c.global_position.z, fs[1].global_position.x, fs[1].global_position.z])
+		if pe:
+			r["pet1"] += maxf(ph - (float(pe.get("health")) if is_instance_valid(pe) and bool(pe.get("alive")) else 0.0), 0.0) if (not is_instance_valid(pe) or bool(pe.get("alive")) or float(pe.get("health")) <= 0.0) else 0.0
 		for i in 2:
 			fs[i].move_input = Vector3.ZERO
 			if fs[i].stun > 0.0:
@@ -292,6 +326,10 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 			"swap": ins[i][t] |= S.IN_SWAP
 			"boss": ins[i][t] |= S.IN_BOSS
 			"spell": ins[i][t] |= S.IN_SPELL
+			"boss_var": ins[i][t] |= S.IN_BOSS_VAR
+			"art": ins[i][t] |= S.IN_ART
+			"summon": ins[i][t] |= S.IN_EIKON
+			"mount": ins[i][t] |= S.IN_MOUNT
 			"move_on":
 				var md: int = (int(e[3]) + (16 if i == 1 else 0)) & 31
 				for k in range(t, n): ins[i][k] = (ins[i][k] & ~S.IN_DIR_MASK) | S.IN_MOVE | md
@@ -306,7 +344,16 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 	var r := _empty_result()
 	for t in n:
 		var h1: int = s[F + S.HP]
+		var pt: int = s[F + S.EK_T]
+		var ph: int = s[F + S.EK_HP]
 		FightSim.step(s, P, ins[0][t], ins[1][t])
+		if OS.get_environment("PARITY_DBG") != "" and t < 50:
+			for j in S.PROJ_MAX:
+				var q: int = S.PROJ_BASE + j * S.PR_FIELDS
+				if s[q + S.PR_ON] > 0: print("S %d off=%.1f p(%.2f,%.2f,%.2f) t(%.2f,%.2f)" % [t, rad_to_deg(Vector2(s[q+S.PR_VX], s[q+S.PR_VZ]).angle_to(Vector2(s[F+S.X]-s[q+S.PR_X], s[F+S.Z]-s[q+S.PR_Z]))), s[q+S.PR_X]/1e6, s[q+S.PR_Y]/1e6, s[q+S.PR_Z]/1e6, s[F+S.X]/1e6, s[F+S.Z]/1e6])
+		if pt > 0 and s[F + S.MOUNTED] == 0:
+			if s[F + S.EK_T] > 0: r["pet1"] += maxf((ph - s[F + S.EK_HP]) / 1000.0, 0.0)
+			elif s[F + S.EK_HP] <= 0: r["pet1"] += ph / 1000.0
 		for i in 2:
 			if s[i * F + S.STUN] > 0:
 				r["stun%d" % i] += 1

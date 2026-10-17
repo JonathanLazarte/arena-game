@@ -183,17 +183,27 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 - Bits de entrada nuevos (flanco de pulsación en la sim): IN_BOSS 1<<14, IN_BOSS_NEXT 1<<15, IN_SPELL 1<<16, IN_SPELL_NEXT 1<<17, IN_EIKON 1<<18 (invocar / especial montado), IN_MOUNT 1<<19 (desmontar).
 - Habilidades de jefe (SimAbilities): las 19 (13 + ext + estocada) compiladas a ticks en params["boss"]. Telegrafía ×1,12 (TELE_ONLINE, fija en ambos pares). Cooldown global 85 ticks (1,4 s). Golpe tipo 3 «jefe»: imbloqueable, sin parada, perforante, postura ×3. Un coste de vida nunca baja de 1. Hazards: 16 plazas, tipo 1 = AoE en suelo, tipo 2 = onda.
 - Proyectiles: 12 plazas; kinds 0 flecha, 1 tajo de jefe, 2 hechizo, 3 eikon. Ráfaga: 20 m/s, giro 60°/s (rumbo en mili-unidades).
-- Magia y eikons (SimMagic): maná, medidor (máx. 100000 mili, +20/tick), escudo de maná 100%, hechizos proyectil/cono/buff, invocación, montura, especiales llamarada/colmillo/vendaval. Una montura sin jinete no ataca online. Las mascotas y monturas no reciben daño en la sim. El medidor empieza a 0 online.
+- Magia y eikons (SimMagic): maná, medidor (máx. 100000 mili, +20/tick), escudo de maná 100%, hechizos proyectil/cono/buff, invocación, montura, especiales llamarada/colmillo/vendaval. Una montura sin jinete no ataca online. El medidor empieza a 0 online.
 - Equipo (NetLoadout): ahora también eikon, hechizos (4), arte, sello y jefe (3). Los dos pares hacen bake → params_checksum.
 - Carga: start_play → fase LOAD. Cada par envía «ka» (latido) mientras calienta la escena y luego «rdy» cada 200 ms. PLAY empieza solo con ambos listos. Plazo de carga de 30 s («load_timeout»); el de juego sigue en 4 s. La arena muestra «Cargando rival...».
 - Eventos: ability (con code = AB_LAST), ability_hit, ability_interrupt, grab, cast, summon, eikon_special, eikon_hit, shield_absorb, dismount.
-- Simplificaciones: montado, la voltereta y el ataque usan los parámetros a pie; no hay variante combo-falso de la estocada ni artes de arma; la ráfaga contra un blanco en movimiento difiere del offline.
 
 ## 13. Fase 5: emparejamiento, reconexión, relay endurecido
 - Servidor: el relay Node/TS ampliado (no Nakama: sin BD ni cuentas; ver server/DEPLOY.md). Un relay por región (REGION).
-- Protocolo de juego 4 (NetLink.GAME_PROTO = NetMatch.PROTO). C/J/Q llevan "v"; si no coincide, E {err:"version", need}.
+- Protocolo de juego 5 desde la fase 6 (4 en la fase 5) (NetLink.GAME_PROTO = NetMatch.PROTO). C/J/Q llevan "v"; si no coincide, E {err:"version", need}.
 - Mensajes nuevos: 'Q' cola rápida → 'q' {pos} y luego 'M'; 'P'/'p' ping {t, region}; 'M' incluye token (24 hex) y region. 'B' {code, token} re-asocia una dirección nueva (re:1) y el otro recibe 'b' {peer}. 'F' {slot}: el rival lleva más de GRACE_MS (20 s) sin tráfico, victoria por abandono.
 - Límites: relay 200 pkt/s (ráfaga 400), control 10/s (ráfaga 20), 600 infracciones/min → bloqueo de 60 s, paquete máx. 1200 B, 5000 salas, cola de 10 s sin «K».
 - Salud: HTTP HEALTH_PORT (8080) con /healthz (JSON) y /metrics (Prometheus).
 - Cliente: tras TIMEOUT_MS (4 s) sin paquetes → reconnecting. La sim se congela, se envía 'B' por el relay cada 1 s y «rs» {ep} cada 0,5 s. Al volver, el anfitrión toma una instantánea del estado confirmado (deflate, trozos de 900 B, «snap» {ep, f, i, n, sz, b}) y ambos hacen RbSession.reset_to(estado, f) (época +1; «in»/«rdy» de otra época se descartan) y repiten LOAD/«rdy». Plazo local de 25 s («disconnected»); el relay decide antes con 'F'.
-- Repeticiones: tras una reconexión al invitado pueden faltarle entradas anteriores a f (la verificación de repetición puede fallar).
+- Repeticiones: replay_dict guarda "resync": [[f, estado]] por cada reinicio; verify_replay sustituye el estado en esos fotogramas, así la repetición del invitado verifica tras reconectar.
+
+## 14. Fase 6: huecos online cerrados (protocolo 5)
+- Entradas nuevas: IN_ART 1<<20 (arte de arma, acción special), IN_BOSS_VAR 1<<21 (variante, acción boss_variation). Flancos detectados en la sim.
+- Campos nuevos del luchador: MD_T, MD_HIT, MD_ATK, ART_CD, ART_T, ART_K, ATK_PET y contadores ARTS, PET_HITS, PET_KILLS, MDASH_HITS. Cambian SIZE → protocolo 5.
+- Montado: alcance m_reach_pm y daño m_dmg_pm de la montura; voltereta = embestida (m_dash_spd/t/if/cd, contacto 2,9 m, empuje 16 m/s, la mitad si bloquea, aturdimiento 15, medidor 6); kind 6 en _take_hit (parable, sin tambaleo al atacante). Sin parry montado. Ataque montado: lentitud 550 ‰, carga 300 ‰; un ataque en preparación durante la embestida golpea a partir del tick 7.
+- Mascotas/monturas: EK_HP recibe golpes cuerpo a cuerpo (si está en el arco), proyectiles y AoE; a 0 se retira. Las voladoras (fénix) ignoran las AoE.
+- Artes: estocada_impulsada (tipo 1) y torbellino (tipo 2); no disponibles si el personaje tiene especial propio (como offline).
+- Variante combo-falso: remate en estocada sin salto (parada a 1,4 m, distancia ×1,45, cono 65°, empuje ×1,2, fuerza +8), sin AoE de caída.
+- HUD táctil online: botones de jefe/magia/eikon/montura y los de ciclo (▶ envía pulsación+suelta de 0,12 s).
+- Paridad: el arnés pone fluid = true como el jugador real (arena.gd). Pendiente: la montura sin jinete no ataca online; el coste de bloqueo del ataque montado no se recalcula con m_dmg_pm.
+

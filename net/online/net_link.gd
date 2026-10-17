@@ -10,7 +10,7 @@ const PUNCH_MS := 2000
 const RETRY_MS := 300
 const KEEPALIVE_MS := 2000
 ## Protocolo de juego (versión): viaja en C/J/Q y el relay rechaza otros («version»).
-const GAME_PROTO := 4
+const GAME_PROTO := 5
 
 enum St { IDLE, CONNECTING, WAITING, PUNCHING, CONNECTED, FAILED, CLOSED }
 var state: St = St.IDLE
