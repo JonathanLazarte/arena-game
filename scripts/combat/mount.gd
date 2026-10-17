@@ -166,8 +166,11 @@ func set_rider(r: Fighter) -> void:
 		home = global_position
 		_wander_t = 1.0
 
+var puppet := false ## fase 8: la mueve la sim (SimWorld); sin lógica propia
 func _physics_process(delta: float) -> void:
 	_update_anim(delta)
+	if puppet:
+		return
 	special_cd = maxf(special_cd - delta, 0.0)
 	if life != INF and life > -1.0:
 		life -= delta

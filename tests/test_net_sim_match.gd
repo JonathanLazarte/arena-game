@@ -49,5 +49,13 @@ func _run() -> void:
 	# reinicio de ronda: vuelve a la aparición
 	a.start_round()
 	check(absf(m.state[FightSim.Z] / 1.0e6 - z0) < 0.01 and m.state[FightSim.HP] == m.params[0]["hp"], "start_round reinicia el estado de la sim")
+	# fase 8: la vista dibuja el eikon / montura de la sim (SimWorld)
+	m.state[FightSim.METER] = FightSim.METER_MAX
+	m.input_override[0] = func(t: int) -> int: return FightSim.IN_EIKON if t % 4 < 2 else 0
+	for i in 12:
+		await physics_frame
+	var ek_on: bool = m.state[FightSim.EK_T] > 0
+	check(not ek_on or is_instance_valid(a.player.active_eikon), "invocación de la sim dibujada (eikon %s, montado %s)" % [ek_on, a.player.mounted])
+	check(not ek_on or a.player.mounted == (m.state[FightSim.MOUNTED] != 0), "montado en la vista = montado en la sim")
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)

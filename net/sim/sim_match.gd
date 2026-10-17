@@ -52,6 +52,7 @@ func setup(a: Fighter, b: Fighter, parent: Node3D, online: NetMatch = null) -> v
 		if on_event.is_valid():
 			on_event.call(ev)
 	view = SimView.new(a, b, parent)
+	view.params = params
 	view.smooth = net != null
 
 static func spawn_of(a: Fighter, b: Fighter) -> Array[int]:

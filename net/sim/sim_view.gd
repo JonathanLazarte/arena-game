@@ -21,6 +21,10 @@ func _init(a: Fighter, b: Fighter, parent: Node3D = null) -> void:
 	arrow_parent = parent
 	for f in fighters:
 		f.sim_driven = true
+	if parent:
+		world = SimWorld.new(a, b, parent)
+var world: SimWorld ## eikons, monturas, marcas y proyectiles (fase 8)
+var params: Array = [] ## lo fija SimMatch (lecturas de la vista: recargas, habilidades)
 
 func apply(s: PackedInt64Array, corrected: bool = false) -> void:
 	for i in 2:
@@ -28,6 +32,8 @@ func apply(s: PackedInt64Array, corrected: bool = false) -> void:
 		if smooth:
 			_smooth(i, s, corrected)
 	_apply_arrows(s)
+	if world and not params.is_empty():
+		world.apply(s, params)
 
 func _smooth(i: int, s: PackedInt64Array, corrected: bool) -> void:
 	var o := i * S.F_FIELDS
@@ -92,6 +98,32 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.shot_state = s[o + S.SHOT_STATE]
 	f.crit_t = s[o + S.CRIT_T] / hz if s[o + S.CRIT_T] >= 0 else -1.0
 	f.flask_t = s[o + S.FLASK_T] / hz
+	f.cast_t = s[o + S.CAST_T] / hz
+	f.boss_phase = s[o + S.BS_PH]
+	f.boss_dir = Vector3(FxMath.COS[s[o + S.BS_DIR] & 255] / 4096.0, 0.0, FxMath.SIN[s[o + S.BS_DIR] & 255] / 4096.0)
+	f.boss_cd = s[o + S.BOSS_CD] / hz
+	f.boss_sel = s[o + S.AB_SEL]
+	f.ab_t = s[o + S.AB_T] / hz
+	f.ab_air = s[o + S.AB_AIR] != 0
+	f.ab_locked = (s[o + S.AB_FL] & SimAbilities.FL_LOCKED) != 0
+	var abk: int = s[o + S.AB_SLOT]
+	f.ab_id = String(f.boss_ids[abk]) if abk >= 0 and abk < f.boss_ids.size() else ""
+	f.stance_broken_t = s[o + S.STANCE_BROKEN_T] / hz
+	f.guard_counter_t = s[o + S.GC_T] / hz
+	f.invuln = s[o + S.INVULN] / hz
+	f.art_cd = s[o + S.ART_CD] / hz
+	f.spell_idx = s[o + S.SP_SEL]
+	for k in mini(f.spells.size(), 4):
+		f.spell_cd[String(f.spells[k])] = s[o + S.SCD0 + k] / hz
+	f.sprinting = s[o + S.SPRINT_PM] > 500
+	var en := s[o + S.MANA] / 1000.0
+	if not is_equal_approx(en, f.energy):
+		f.energy = en
+		f.energy_changed.emit(f.energy, f.energy_max)
+	var mt := s[o + S.METER] / 1000.0
+	if not is_equal_approx(mt, f.meter):
+		f.meter = mt
+		f.meter_changed.emit(f.meter)
 	f.flask_charges = s[o + S.FLASKS]
 	f.rage_t = s[o + S.RAGE_T] / hz
 
