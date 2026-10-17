@@ -82,6 +82,7 @@ func _run() -> void:
 	# 4) desconexión sin aviso
 	ms[0].link.udp.close(); ms[0].link.state = NetLink.St.CLOSED
 	ms[1].status = ""; ms[1].desync_frame = 1 << 40
+	ms[1].grace_ms = 1000 # fase 5: 4 s sin paquetes → reconexión; tras la gracia, desconexión
 	var t0 := Time.get_ticks_msec()
 	while ms[1].phase == NetMatch.Ph.PLAY and Time.get_ticks_msec() - t0 < 8000:
 		ms[1].play_step(0); OS.delay_msec(16)
