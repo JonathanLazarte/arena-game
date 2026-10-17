@@ -138,6 +138,7 @@ func _run() -> void:
 	CameraRig.invert_y = false
 	rig.pitch = CameraRig.PITCH_DEFAULT
 	# Movimiento relativo a la cámara después de orbitar
+	p.global_position = Vector3(0, 0.2, 8) # fase 7: lejos del muro (con aceleración ágil las pruebas anteriores lo dejan pegado al borde)
 	rig.orbit(Vector2(1.2, 0))
 	await create_timer(0.5).timeout
 	var exp_w := expected(arena, ["move_forward"])

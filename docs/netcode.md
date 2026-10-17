@@ -207,3 +207,11 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 - HUD táctil online: botones de jefe/magia/eikon/montura y los de ciclo (▶ envía pulsación+suelta de 0,12 s).
 - Paridad: el arnés pone fluid = true como el jugador real (arena.gd). Pendiente: la montura sin jinete no ataca online; el coste de bloqueo del ataque montado no se recalcula con m_dmg_pm.
 
+
+## 15. Fase 7: salto, montura compañera, movimiento ágil (protocolo 6)
+- IN_JUMP 1<<22 (acción «jump»: Espacio / botón táctil «Saltar»). Campos FY (µm), FVY (µm/tick), AIR, AIR_T, LAND_T y contador JUMPS → SIZE cambia → protocolo 6.
+- Salto: JUMP_V 133333 µm/tick, gravedad 5556 µm/tick² (×1,8 en el picado A_JUMP = 5), aterriza con AIR_T ≥ 5, FY < 0,02 m y FVY ≤ 0; LAND_T 11 ticks (no actúa, 40 % de velocidad). En el aire: sin control planar ni giro, sin voltereta/hechizo/arte/jefe/invocar montura. _grounded exige FY < 0,35 m. Proyectiles apuntan y golpean a HIT_CENTER_Y + FY. Montado: m_jump (0 en el fénix).
+- Montura sin jinete: ataca como Mount._companion_step (persigue a move_speed × 0,7, primer ataque a 0,8 s, mordisco o disparo).
+- Ataque montado bloqueado: block_cost_m (coste calculado con el daño × mounted_damage_mult).
+- Movimiento: steer (rumbos/tick a los que gira la velocidad), sprint_up/sprint_down (‰/tick); valores en docs/design.md.
+- Relay: sin respuesta en relay_timeout_ms (5 s) → FAILED "relay_unreachable"; DNS fallido → "relay_dns:host". El panel lo explica y sugiere LAN o server/DEPLOY.md.

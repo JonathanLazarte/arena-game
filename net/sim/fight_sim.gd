@@ -1401,7 +1401,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		s[o + ST] = mini(s[o + ST] + rg, p["st_max"])
 	# aceleración: a pie, la velocidad GIRA hacia la deseada (Fighter._steer_velocity) y ajusta su
 	# módulo; con giros de más de 150° o casi parado frena en línea recta (move_toward). En el aire no hay control.
-	if s[o + ROLL_T] < 0 and s[o + AIR] == 0:
+	if s[o + ROLL_T] < 0 and s[o + AIR] == 0 and not (s[o + MD_T] > 0 and s[o + MOUNTED] != 0):
 		var acc: int = p["acc"]
 		var cur := FxMath.length(s[o + VX], s[o + VZ])
 		var tl := FxMath.length(tvx, tvz)
@@ -1439,9 +1439,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		var dv: int = P[i].get("m_dash_spd", 500000)
 		vx = FxMath.COS[s[o + DASH_DIR]] * dv / FxMath.ONE
 		vz = FxMath.SIN[s[o + DASH_DIR]] * dv / FxMath.ONE
-		s[o + VX] = vx
-		s[o + VZ] = vz
-		_mount_dash_hit(s, P, i)
+		_mount_dash_hit(s, P, i) # (como Fighter: la velocidad de locomoción no cambia durante el dash)
 	elif a_idx == SimParams.A_DASH and (atk_st == Atk.WINDUP or atk_st == Atk.ACTIVE) and s[o + MOUNTED] == 0:
 		var lv: int = p["atk"][SimParams.A_DASH]["lunge"]
 		vx = FxMath.COS[s[o + DASH_DIR]] * lv / FxMath.ONE

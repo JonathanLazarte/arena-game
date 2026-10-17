@@ -68,5 +68,22 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 - Un punto de Destreza ≈ 40 % del daño que da un punto de Fuerza en «escala» (2 %/pt temprano), compensado por velocidad, voltereta e i-frames.
 - La ficha muestra la velocidad de ataque final.
 
+## Movimiento a pie (fase 7: respuesta de juego de acción)
+Mismos valores offline (Fighter, jugador con `fluid`) y online (SimParams → FightSim). Velocidad de andar 8,3 m/s × multiplicadores; correr ×1,3.
+| Parámetro | Valor | Efecto |
+|---|---|---|
+| FOOT_MOVE_ACCEL | 90 m/s² | 0 → andar en ~0,09 s |
+| FOOT_SPRINT_ACCEL | 75 m/s² | andar → correr ~0,06 s (lo limita la rampa); 0 → correr ~0,14 s |
+| FOOT_BRAKE_ACCEL | 120 m/s² | frena andando en ~0,07 s (0,29 m), corriendo ~0,09 s (≤0,5 m) |
+| SPRINT_RAMP_UP / DOWN | 0,06 s / 0,08 s | rampa lineal del multiplicador de carrera (online: 278 ‰ / 208 ‰ por tick) |
+| TURN_RATE_DEG | 1080 °/s | giro del cuerpo (online 13 rumbos/tick) |
+| STEER_TURN_MULT | 2,0 | la velocidad gira a 2160 °/s conservando el módulo: sin derrapes en curvas; >150° frena en línea recta |
+| INPUT_SMOOTH | 0,03 s / 90° | suavizado del stick (solo offline); voltereta, ataque y salto usan la dirección sin suavizar |
+Compromisos que se mantienen: atacando 30 % de velocidad, bloqueando 45 %, agotado 60 %, al caer de un salto 40 % durante 0,18 s.
+Antes (sincronización del proyecto del usuario): 36 / 30 / 46 m/s², carrera exponencial 0,14 / 0,28 s, giro 800 °/s, velocidad girando a 920 °/s y suavizado 0,08 s → ~0,25 s para arrancar, ~0,45 s para correr y hasta 1,3 m de deslizamiento al frenar corriendo.
+
+## Salto
+8 m/s, gravedad 20 m/s² (×1,8 durante el picado): 0,8 s en el aire, 1,67 m. Coste 12 de aguante. Sin control en el aire (trayectoria fijada al despegar) y sin giro. Atacar en el aire = picado (golpea al aterrizar si aún está en la anticipación). Recuperación al caer 0,18 s. Evita los golpes de área a ras de suelo (altura > 0,35 m). Montado: brinco de lobo/grifo (salto de la montura × 0,85); en el fénix no se salta. Online: entrada IN_JUMP (protocolo 6).
+
 ## Pendiente
 - Erika: falta el FBX de Mixamo.
