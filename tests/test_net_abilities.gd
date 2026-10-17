@@ -23,7 +23,7 @@ func _run() -> void:
 	check(ids.size() >= 13, "%d habilidades de jefe" % ids.size())
 	var eks := ["fenix", "lobo", "golem", "grifo"]
 	var spells := EikonSpells.DEFS.keys()
-	var tot := {"starts": 0, "spells": 0, "summons": 0, "grabs": 0, "hits": 0, "arts": 0, "pet_hits": 0, "mdash": 0}
+	var tot := {"starts": 0, "spells": 0, "summons": 0, "grabs": 0, "hits": 0, "arts": 0, "pet_hits": 0, "mdash": 0, "jumps": 0, "ek_hits": 0}
 	var k := 0
 	for g in range(0, ids.size(), 3):
 		var A := _fighter(ids.slice(g, g + 3), spells.slice(0, 4), eks[k % eks.size()], "estocada_impulsada" if k % 2 == 0 else "torbellino")
@@ -39,17 +39,17 @@ func _run() -> void:
 		h.engine_factory = func() -> RbEngine: var e := FightEngine.new(P, 9, true); e.gap_um = 3000000; return e
 		var r := h.run(1500)
 		var s: PackedInt64Array = r["state"]
-		var c := {"starts": 0, "spells": 0, "summons": 0, "grabs": 0, "hits": 0, "arts": 0, "pet_hits": 0, "mdash": 0}
+		var c := {"starts": 0, "spells": 0, "summons": 0, "grabs": 0, "hits": 0, "arts": 0, "pet_hits": 0, "mdash": 0, "jumps": 0, "ek_hits": 0}
 		for i in 2:
 			var o := i * FightSim.F_FIELDS
 			c["starts"] += s[o + FightSim.AB_STARTS]; c["spells"] += s[o + FightSim.SPELLS]
 			c["summons"] += s[o + FightSim.SUMMONS]; c["grabs"] += s[o + FightSim.GRABS]; c["hits"] += s[o + FightSim.AB_HITS]
-			c["arts"] += s[o + FightSim.ARTS]; c["pet_hits"] += s[o + FightSim.PET_HITS]; c["mdash"] += s[o + FightSim.MDASH_HITS]
+			c["arts"] += s[o + FightSim.ARTS]; c["pet_hits"] += s[o + FightSim.PET_HITS]; c["mdash"] += s[o + FightSim.MDASH_HITS]; c["jumps"] += s[o + FightSim.JUMPS]; c["ek_hits"] += s[o + FightSim.EK_HITS]
 		for key in c: tot[key] += c[key]
 		check(r["mismatches"] == 0 and r["final_equal"] and r["common"] > 1300,
 			"%s vs %s, RTT %d: 0 desincronías (%d confirmados) %s" % [str(ids.slice(g, g + 3)), eks[k % eks.size()], rtt, r["common"], str(c)])
 		k += 1
-	check(tot["starts"] > 0 and tot["spells"] > 0 and tot["summons"] > 0 and tot["arts"] > 0, "se usaron habilidades, hechizos e invocaciones: %s" % str(tot))
+	check(tot["starts"] > 0 and tot["spells"] > 0 and tot["summons"] > 0 and tot["arts"] > 0 and tot["jumps"] > 0, "se usaron habilidades, hechizos e invocaciones: %s" % str(tot))
 	# eventos de presentación: telegrafía de habilidad (con código), lanzamiento, invocación
 	var A2 := _fighter(["estocada"], spells.slice(0, 4), "fenix")
 	var B2 := _fighter([], [], "lobo")

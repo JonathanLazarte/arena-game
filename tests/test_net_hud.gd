@@ -15,7 +15,7 @@ func _run() -> void:
 	await process_frame
 	hud.online_mode = true
 	var want := {"boss": FightSim.IN_BOSS, "boss_variation": FightSim.IN_BOSS_VAR, "spell": FightSim.IN_SPELL,
-		"spell_next": FightSim.IN_SPELL_NEXT, "summon": FightSim.IN_EIKON, "special": FightSim.IN_ART, "mount": FightSim.IN_MOUNT}
+		"spell_next": FightSim.IN_SPELL_NEXT, "summon": FightSim.IN_EIKON, "special": FightSim.IN_ART, "mount": FightSim.IN_MOUNT, "jump": FightSim.IN_JUMP}
 	for a: String in want:
 		check(hud.btns.has(a) and (hud.btns[a] as TouchScreenButton).action == a, "botón táctil «%s» genera la acción" % a)
 		var v := SimMatch.extra_buttons_from(func(x: String) -> bool: return x == a)
