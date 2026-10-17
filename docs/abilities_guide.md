@@ -1078,7 +1078,7 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
-Las 45 están en `data/abilities/catalog.json` y siguen definidas en `BossAbilities` (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las de `SimSteps.IDS` (líneas de tiempo, ondas, lluvias y alientos) las envuelve `SimSteps` si `ab_engine` es 1: el programa numérico es el viejo y el catálogo aporta `interruptible_by` y los eventos. Por defecto el flag es 0. El protocolo es 9 porque ese flag entra en los params.
+Las 45 están en `data/abilities/catalog.json` y siguen definidas en `BossAbilities` (copia en `docs/backup/habilidades_ronda46/`). `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las de `SimSteps.IDS` (líneas de tiempo, ondas, lluvias, alientos y ráfagas) las envuelve `SimSteps` si `ab_engine` es 1: el programa numérico es el viejo y el catálogo aporta `interruptible_by` y los eventos. Por defecto el flag es 0. El protocolo es 9 porque ese flag entra en los params.
 
 Adaptaciones respecto del esquema:
 

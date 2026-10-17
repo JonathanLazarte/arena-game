@@ -785,7 +785,7 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.
 
 ## Motor de pasos (protocolo 9, etapa 2)
-- Detrás del flag `ab_engine` (apagado por defecto, entra en `params_checksum`) `SimSteps` envuelve el programa viejo de las habilidades en `SimSteps.IDS`: líneas de tiempo, ondas, lluvias y alientos. El catálogo aporta `interruptible_by` y los eventos. El grafo (`next`, `cancel_into`, `branch`) está en el motor y todavía no ejecuta estas habilidades.
+- Detrás del flag `ab_engine` (apagado por defecto, entra en `params_checksum`) `SimSteps` envuelve el programa viejo de las habilidades en `SimSteps.IDS`: líneas de tiempo, ondas, lluvias, alientos y ráfagas. El catálogo aporta `interruptible_by` y los eventos. El grafo (`next`, `cancel_into`, `branch`) está en el motor y todavía no ejecuta estas habilidades.
 - En reposo los checksums coinciden con el camino viejo. `interruptible_by` vacío no corta con aturdimiento: solo se esquiva. La recarga sigue siendo la global de 85 ticks. Prueba: `tests/test_step_engine.gd`.
 - El protocolo es 9 porque el flag es parte de los params. Los bits de entrada y el layout del estado no cambian.
 

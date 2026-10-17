@@ -37,6 +37,8 @@ func _inputs(t: int, kind: String) -> Array:
 		ia |= FightSim.IN_BOSS
 	if kind == "both" and t == 10:
 		ib |= FightSim.IN_BOSS
+	if kind == "chain" and t == 140:
+		ia |= FightSim.IN_BOSS
 	if kind == "trade" and t >= 12 and t % 18 < 5:
 		ib |= FightSim.IN_ATK
 	return [ia, ib]
@@ -105,6 +107,10 @@ func _run() -> void:
 			"%s: raw %d/%d end %d/%d" % [id, int(c0["raw"]), int(c1["raw"]), int(c0["end"]), int(c1["end"])])
 		_same(p0, p1, 2200000, 160, "idle", "%s de cerca" % id)
 		_same(p0, p1, 14000000, 140, "idle", "%s de lejos" % id)
+		if id in ["saeta_oscura", "orbe_lunar"]:
+			_same(p0, p1, 8000000, 220, "chain", "%s encadenada" % id)
+			var chained: Dictionary = _roll(p0, 8000000, 220, "chain")
+			check(int(chained["s"][FightSim.AB_STARTS]) >= 2, "%s: la segunda sale durante la recarga (%d)" % [id, int(chained["s"][FightSim.AB_STARTS])])
 	var duo0: Array = await _bake(["pisoton", "tajo_retardado"], ["flecha_grave", "estocada_negra"], 0)
 	var duo1: Array = await _bake(["pisoton", "tajo_retardado"], ["flecha_grave", "estocada_negra"], 1)
 	_same(duo0, duo1, 5000000, 240, "both", "los dos usan el motor")

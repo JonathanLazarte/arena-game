@@ -20,6 +20,7 @@ const IDS: Array[String] = [
 	"onda_rastrera", "embate_sismico", "garra_suelo", "vendaval_hacha", "anillo_fuego",
 	"rayos_trazadores", "lluvia_meteoros", "lanza_celeste", "lluvia_lanzas", "lluvia_sangre", "columnas_rayo",
 	"aliento_dragon", "aliento_rayo", "aliento_escarcha", "chorro_lava",
+	"saeta_oscura", "orbe_lunar",
 ]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1

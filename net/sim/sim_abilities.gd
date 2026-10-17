@@ -494,7 +494,7 @@ static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
 		var ph: Dictionary = P[i].get("ph2", {})
 		if not ph.is_empty() and s[o + FightSim.PH2] == 0:
 			return false
-	if s[o + FightSim.BOSS_CD] > 0 and not (int(ab["type"]) == T_RAFAGA and s[o + FightSim.AB_LAST] == int(ab["code"])):
+	if s[o + FightSim.BOSS_CD] > 0 and not (kind_of(ab) == T_RAFAGA and s[o + FightSim.AB_LAST] == int(ab["code"])):
 		return false
 	return _cost_ok(s, i, ab)
 
