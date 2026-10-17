@@ -72,6 +72,7 @@ cd server && npm ci && npm test && GODOT=$(which godot) npm run test:e2e
 - **Ronda 46:** el catálogo de jefe pasa a 45 habilidades (6 base + 39 extendidas). Las 26 nuevas reusan los ejecutores de la sim (línea de tiempo, onda, lluvia, aliento, ráfaga, furia, contragolpe). Protocolo sigue en **8**. Prueba nueva: `test_boss_roster.gd`. Verificadas en esta ronda: roster, UI de jefe, efectos, rollback de habilidades, IA y `test_round34`. La suite entera de 46 tests no se re-corrió.
 - **Ronda 47:** `Mount.expire` existe otra vez (sin ella, morir con un eikon activo cortaba la partida). El jinete del fénix sigue la silla; el vuelo no se aplica dos veces. Prueba: `test_mount_seat.gd`.
 - `test_net_events` no era flaky: exigía `> 20` eventos y la partida genera exactamente 20 a 50 ms; ahora el umbral (≥ 15) es una comprobación aparte. `test_round25` pasó en esta corrida (sigue siendo posicional).
+- **Catálogo de habilidades (JSON):** `net/sim/ability_catalog.gd` carga, valida (V01–V19) y hornea a enteros un catálogo según `docs/abilities_guide.md`; la sim aún no lo usa. CLI: `godot --headless --path . --script res://tools/validate_abilities.gd -- data/abilities/catalog.example.json` (sale 1 si hay errores). Prueba: `test_ability_catalog`. Suite completa 48/48 con relay local (2026-10-17). Siguiente paso: `docs/prompt_motor_habilidades.md`.
 - Los tests online/sim (`test_net_*`, `test_fight_sim`, `test_sim_*`) deben pasar al 100 %.
 
 ## 6. Exportar (solo Android y Linux; Jonathan no quiere otros)

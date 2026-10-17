@@ -27,6 +27,7 @@
 14. Checklist de diseño (justicia y legibilidad online)
 15. Errores comunes
 16. Cómo pedirle a un modelo una habilidad (plantilla)
+17. Cómo validar un catálogo
 
 ---
 
@@ -1154,4 +1155,29 @@ Números en la escala real (vida 80–130, fuerte de arma 18–40, robustez 30�
 sin nombres de otras franquicias. No inventes campos fuera del esquema.
 ```
 
-Antes de aceptar lo que devuelva: pasalo por la checklist (§14) y los errores comunes (§15).
+Antes de aceptar lo que devuelva: pasalo por el validador (§17), la checklist (§14) y los errores comunes (§15).
+
+---
+
+## 17. Cómo validar un catálogo
+
+Cargador, validador y horneado: `net/sim/ability_catalog.gd` (`AbilityCatalog`). La sim **todavía no lo usa**
+(no cambia ninguna habilidad actual ni los checksums); es la base del futuro motor genérico de pasos.
+
+```bash
+godot --headless --path . --script res://tools/validate_abilities.gd -- data/abilities/catalog.example.json
+# --strict: los avisos también fallan · --quiet: solo el resumen
+```
+- Imprime `ERROR [regla] ruta: mensaje` y `AVISO [regla] ruta: mensaje` (rutas tipo
+  `abilities[3].steps[1].hitboxes[0].shape.radius_m`) y un resumen con el hash del horneado.
+- Código de salida: `0` sin errores, `1` con errores (o avisos con `--strict`), `2` sin argumento.
+- Reglas: `V01`–`V19` (§11), `SCHEMA` (tipos, enums, obligatorios, rangos), `PARSE` (JSON/archivo).
+  Avisos: `ASSET` (icono/vfx/sfx inexistente → se usa el genérico), `UNKNOWN_FIELD`, `UNKNOWN_TAG`, `HINT`,
+  `FAIRNESS`, `V15`.
+- Desde código: `AbilityCatalog.load_file(ruta, opts)` / `load_text` / `load_data` →
+  `{ok, errors, warnings, baked, hash}`. `opts.known_vfx` / `opts.known_sfx` (listas) activan el chequeo de ids
+  de efectos. `baked` es de solo lectura, en enteros con las convenciones de `SimParams` (milésimas, µm, µm/tick,
+  ‰, ticks, rumbos 0..255, mili-rumbos/tick, coseno del medio arco ×4096); ids → índices, `-1` = fin.
+  `AbilityCatalog.checksum(baked)` = FNV-1a (mismo input → mismo hash).
+- Catálogo de ejemplo con las 5 habilidades de §12: `data/abilities/catalog.example.json` (valida sin avisos).
+- Pruebas: `tests/test_ability_catalog.gd`.
