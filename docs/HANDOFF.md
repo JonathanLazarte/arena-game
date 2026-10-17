@@ -1,6 +1,6 @@
 # HANDOFF — Arena de Eikons (para Grok Build)
 
-Proyecto de Jonathan: luchador de arena 1v1 en **Godot 4.7.2** (GDScript), offline contra IA y online P2P con rollback. Vas a seguir el desarrollo **en local, en su PC Fedora Linux**. Repo: `https://github.com/JonathanLazarte/arena-game` (rama `master`, base de este handoff: `3fb3bd4`).
+Proyecto de Jonathan: luchador de arena 1v1 en **Godot 4.7.2** (GDScript), offline contra IA y online P2P con rollback. Vas a seguir el desarrollo **en local, en su PC Fedora Linux**. Repo: `https://github.com/JonathanLazarte/arena-game` (rama `master`, base de este handoff: `3fb3bd4`; fase 8 completa en `6f4d0ab`+).
 
 Leé antes de tocar nada: `README.md` (historial por rondas), `docs/design.md` (reglas duraderas y números), `docs/netcode.md` (online, §9–§15), `docs/determinism_audit.md`, `server/README.md`, `server/DEPLOY.md`.
 
@@ -68,8 +68,8 @@ godot --headless --path . -s res://tests/bench_net_rollback.gd -- 2 8
 cd server && npm ci && npm test && GODOT=$(which godot) npm run test:e2e
 ```
 - **Fase 8**: las pruebas antiguas de jugabilidad del Fighter offline se portaron a la sim (`test_sim_rules`, `test_sim_ai`) o se retiraron; las secciones retiradas de los tests por rondas llevan el comentario `[fase 8] retirado` con el motivo. Los tests de datos/UI se ajustaron al diseño actual.
-- Línea base: toda la suite pasa salvo `test_ui_audio` (la ✕ de Ajustes no sigue el ancho del panel, UI) y los flaky de abajo. `test_net_relay5/matchmaking/reconnect` necesitan el relay local (`cd server && npm run test:e2e`).
-- **Flaky**: `test_net_events` (a veces 1 evento de diferencia predicho/confirmado bajo carga), `test_round25` (posicional).
+- **Línea base (2026-10-17, `6f4d0ab`, Godot 4.7.2 headless, 41 `test_*.gd`):** 40/41 pasan. Falla solo `test_ui_audio` (la ✕ de Ajustes no sigue el ancho del panel, UI). `test_net_relay5` y `test_net_matchmaking` fallan sin relay y pasan con el relay local levantado (`cd server && npm run build && PORT=47800 REGION=local npm start`); `test_net_reconnect` pasa sin él. Relay: `npm test` 9/9, `npm run test:e2e` 5/5.
+- `test_net_events` no era flaky: exigía `> 20` eventos y la partida genera exactamente 20 a 50 ms; ahora el umbral (≥ 15) es una comprobación aparte. `test_round25` pasó en esta corrida (sigue siendo posicional).
 - Los tests online/sim (`test_net_*`, `test_fight_sim`, `test_sim_*`) deben pasar al 100 %.
 
 ## 6. Exportar (solo Android y Linux; Jonathan no quiere otros)
@@ -96,6 +96,8 @@ Para instalar por sideload en el teléfono hay que **desactivar Play Protect** (
 
 **Linux:** `godot --headless --path . --export-release Linux ../out/linux/ArenaGame.x86_64` (o `--export-debug`) y `chmod +x`.
 
+**Última build (fase 8):** `/workspace/arena-game-build/arena-game-f8.apk` (debug, arm64-v8a + armeabi-v7a, firmada v2+v3 con la debug keystore; `apksigner verify` OK) y `/workspace/arena-game-build/arena-game-f8-linux.zip` (binario `arena-game-f8-linux.x86_64`, pck embebido, modo 755). `apksigner` necesita `JAVA_HOME` (JDK 17) en el PATH.
+
 **Firewall Fedora para LAN** (host de partida LAN):
 ```bash
 sudo firewall-cmd --add-port=47801/udp --permanent && sudo firewall-cmd --reload
@@ -121,7 +123,7 @@ Andar 8,3 m/s, correr ×1,3; aceleraciones, giro (13 rumbos/tick) y frenado en `
 ## 10. Huecos conocidos
 1. `NetLink` resuelve el DNS del relay **sincrónicamente** (`IP.resolve_hostname` en `net_link.gd` ~l.119 y ~l.181): congela la UI si el DNS tarda. Pasar a `IP.resolve_hostname_queue_item` + poll.
 2. Referencias a Elden Ring / Dark Souls en docs y comentarios (README rondas 9/25, `docs/design.md`, `docs/ELDEN_RING_REFERENCIA.md`, comentarios "estilo ER") → limpiar/renombrar.
-3. `test_ui_audio` (✕ de Ajustes) falla; `test_net_events` y `test_round25` flaky.
+3. `test_ui_audio` (✕ de Ajustes) falla; `test_round25` posiblemente flaky (posicional).
 6. Fase 8: el HUD del campeón muestra las 3 habilidades aunque la 3.ª se desbloquee en Fase II; offline no hay apuntado con ratón del arco (sigue facing/fijado); visuales de habilidades offline = primitivas de SimWorld.
 4. Relay sin desplegar; IPv4 solo.
 5. Pendiente de design: Erika sin FBX de Mixamo.
@@ -129,7 +131,7 @@ Andar 8,3 m/s, correr ×1,3; aceleraciones, giro (13 rumbos/tick) y frenado en `
 ## 11. Próximos pasos (prioridad)
 2. Desplegar el relay (Oracle São Paulo) y probar partida rápida Android↔Linux real; anotar IP/host en la config por defecto.
 3. DNS asíncrono en `NetLink`.
-4. Estabilizar `test_net_events`/`test_round25`; arreglar la ✕ de Ajustes; visuales completos de habilidades sobre eventos de la sim.
+4. Vigilar `test_round25`; arreglar la ✕ de Ajustes; visuales completos de habilidades sobre eventos de la sim.
 5. Limpiar referencias FromSoftware en docs/comentarios/nombres.
 6. Probar rendimiento de rollback en un Android medio (overlay F3/"Red": µs por paso).
 7. Checklist de release: `DEBUG_GRANT=false`, keystore de release, versión de app.
