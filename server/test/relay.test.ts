@@ -86,7 +86,7 @@ test("version check rejects other protocols", async () => {
   const a = client(); await a.bind();
   a.send(port, "C", { v: 3 });
   const e = await a.next();
-  assert.equal(String.fromCharCode(e[0]), "E"); assert.equal(body(e).err, "version"); assert.equal(body(e).need, 4);
+  assert.equal(String.fromCharCode(e[0]), "E"); assert.equal(body(e).err, "version"); assert.equal(body(e).need, 5);
   a.send(port, "Q"); assert.equal(body(await a.next()).err, "version");
   assert.equal(srv.stats.version_rejects, 2);
   a.close(); await srv.stop();
