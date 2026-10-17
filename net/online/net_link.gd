@@ -38,7 +38,16 @@ var _retry_at := 0
 var _punch_until := 0
 var _keep_at := 0
 var force_relay := false ## pruebas/diagnóstico: no intentar conexión directa
-var join_wait_ms := 0 ## unirse antes de que exista la sala: reintentar este tiempo
+var join_wait_ms := 0
+## Diagnóstico LAN (panel online)
+var bound_port := 0
+var hellos_sent := 0
+var hellos_recv := 0      ## anfitrión: saludos recibidos; invitado: respuestas recibidas
+var lan_timeout_ms := 8000
+var _lan_deadline := 0
+var found_hosts: Dictionary = {} ## búsqueda LAN: "ip" -> {name, ms}
+var host_name := ""
+const DISCOVER_MS := 500 ## unirse antes de que exista la sala: reintentar este tiempo
 var _join_deadline := 0
 
 static func now_ms() -> int:
@@ -76,8 +85,19 @@ func join_lan(ip: String, port: int = LAN_PORT) -> void:
 	mode = "lan_guest"; slot = 1; direct = true
 	peer_ip = addr; peer_port = port
 	_ctl = PackedByteArray([0x4C]) # 'L'
+	_lan_deadline = now_ms() + lan_timeout_ms
 	state = St.CONNECTING
 	_retry_at = 0
+
+## Busca anfitriones LAN por difusión (sin escribir IP). Rellena found_hosts al llegar respuestas.
+func discover_lan(port: int = LAN_PORT) -> void:
+	if not _open(0): return
+	udp.set_broadcast_enabled(true)
+	mode = "lan_search"
+	_disc_port = port
+	state = St.CONNECTING
+	_retry_at = 0
+var _disc_port := LAN_PORT
 
 func close() -> void:
 	if state == St.CONNECTED or state == St.WAITING or state == St.PUNCHING:
@@ -87,19 +107,36 @@ func close() -> void:
 	state = St.CLOSED
 
 ## Direcciones LAN de este equipo (para mostrar al anfitrión).
+## Primero las de wifi/LAN domésticas (192.168, 10.), luego 172.16-31; fuera puentes de
+## contenedores/VM típicos (172.17.x docker0, 192.168.122.x libvirt), que confunden al escribir la IP.
 static func lan_addresses() -> Array[String]:
 	var out: Array[String] = []
-	for a in IP.get_local_addresses():
-		if a.begins_with("192.168.") or a.begins_with("10.") or (a.begins_with("172.") and int(a.split(".")[1]) >= 16 and int(a.split(".")[1]) <= 31):
+	for pref in ["192.168.", "10.", "172."]:
+		for a in IP.get_local_addresses():
+			if not a.begins_with(pref) or a in out or a.contains(":"):
+				continue
+			if pref == "172.":
+				var o2 := int(a.split(".")[1])
+				if o2 < 16 or o2 > 31 or o2 == 17: continue
+			if a.begins_with("192.168.122."): continue
 			out.append(a)
 	return out
+
+## ¿Comparte /24 con alguna dirección local? (aviso de «otra red» en el panel)
+static func same_subnet(ip: String) -> bool:
+	var p := ip.rsplit(".", true, 1)[0] + "."
+	for a in IP.get_local_addresses():
+		if a.begins_with(p): return true
+	return false
 
 func _open(port: int) -> bool:
 	udp.close()
 	_rng.randomize()
-	var e := udp.bind(port, "0.0.0.0")
+	var e := udp.bind(port, "0.0.0.0") # todas las interfaces IPv4
 	if e != OK:
-		_fail("no se puede abrir el puerto UDP %d" % port); return false
+		_fail("port_busy:%d" % port); return false
+	bound_port = udp.get_local_port()
+	hellos_sent = 0; hellos_recv = 0
 	last_recv_ms = now_ms()
 	return true
 
@@ -162,6 +199,15 @@ func poll() -> void:
 		_retry_at = t + RETRY_MS
 		if mode == "lan_guest":
 			_raw(_ctl, peer_ip, peer_port, true)
+			hellos_sent += 1
+			if t >= _lan_deadline:
+				_fail("lan_timeout")
+				return
+		elif mode == "lan_search":
+			_retry_at = t + DISCOVER_MS
+			for bc in _broadcasts():
+				_raw(PackedByteArray([0x53]), bc, _disc_port, true) # 'S'
+			hellos_sent += 1
 		else:
 			_raw(_ctl, relay_ip, relay_port, true)
 	if state == St.PUNCHING:
@@ -173,6 +219,12 @@ func poll() -> void:
 	if mode == "relay" and relay_ip != "" and t >= _keep_at and (state == St.WAITING or state == St.CONNECTED or state == St.PUNCHING):
 		_keep_at = t + KEEPALIVE_MS
 		_raw(PackedByteArray([0x4B]), relay_ip, relay_port, true) # 'K'
+
+func _broadcasts() -> Array[String]:
+	var out: Array[String] = ["255.255.255.255"]
+	for a in lan_addresses():
+		out.append(a.rsplit(".", true, 1)[0] + ".255")
+	return out
 
 func _on_packet(b: PackedByteArray, ip: String, port: int) -> void:
 	if b.is_empty(): return
@@ -214,13 +266,27 @@ func _on_packet(b: PackedByteArray, ip: String, port: int) -> void:
 			if from_peer and not direct:
 				direct = true
 				if state == St.PUNCHING: state = St.CONNECTED
+		"S":
+			if mode == "lan_host" and state == St.WAITING:
+				var r := PackedByteArray([0x73]); r.append_array(host_name.to_utf8_buffer()) # 's' + nombre
+				_raw(r, ip, port, true)
+		"s":
+			if mode == "lan_search":
+				found_hosts[ip] = {"name": b.slice(1).get_string_from_utf8(), "ms": now_ms(), "port": port}
 		"L":
+			if mode == "lan_host":
+				hellos_recv += 1
 			if mode == "lan_host" and (state == St.WAITING or from_peer):
 				peer_ip = ip; peer_port = port
 				state = St.CONNECTED
 				last_recv_ms = now_ms()
 				_raw(PackedByteArray([0x6C]), ip, port, true) # 'l'
 		"l":
+			if mode == "lan_guest" and state == St.CONNECTING and port == peer_port and not from_peer:
+				# respuesta desde otra interfaz del anfitrión (varias IPs): adoptamos la dirección real
+				peer_ip = ip; from_peer = true
+			if mode == "lan_guest" and from_peer:
+				hellos_recv += 1
 			if mode == "lan_guest" and from_peer and state == St.CONNECTING:
 				state = St.CONNECTED
 				last_recv_ms = now_ms()

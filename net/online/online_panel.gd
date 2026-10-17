@@ -41,6 +41,7 @@ func _ready() -> void:
 	ip_edit = _edit(row2, "IP del anfitrión (192.168.x.x)")
 	ip_edit.custom_minimum_size.x = 220
 	_btn(row2, "LAN: unirse", join_lan)
+	_btn(row2, "Buscar", search_lan)
 	status_label = UIKit.label("", 17, UIKit.TEXT)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.custom_minimum_size = Vector2(560, 90)
@@ -102,15 +103,39 @@ func join_room() -> void:
 	status_label.text = "Buscando sala %s…" % code_edit.text.to_upper()
 
 func host_lan() -> void:
-	_new_link(); link.host_lan()
+	_new_link()
+	link.host_name = _my_name()
+	link.host_lan()
+	if link.state == NetLink.St.FAILED:
+		return
+	status_label.text = _host_text()
+
+func _my_name() -> String:
+	var gs := get_node_or_null("/root/GameState")
+	return String(gs.display_name_with_title()) if gs else "Anfitrión"
+
+func _host_text() -> String:
 	var ips := NetLink.lan_addresses()
-	status_label.text = "Esperando rival en la misma wifi. Tu IP: %s (puerto %d)" % [", ".join(ips) if not ips.is_empty() else "?", NetLink.LAN_PORT]
+	return "Esperando rival en la misma wifi. Tu IP: %s (UDP %d, escuchando en todas las interfaces 0.0.0.0)\nSaludos recibidos: %d. Si el rival no conecta: permite UDP %d en el cortafuegos de este equipo (Linux: sudo ufw allow %d/udp) y desactiva el «aislamiento de clientes» del router." % [
+		", ".join(ips) if not ips.is_empty() else "? (sin red local)", link.bound_port, link.hellos_recv, NetLink.LAN_PORT, NetLink.LAN_PORT]
+
+## Busca anfitriones en la wifi por difusión y rellena la IP sola.
+func search_lan() -> void:
+	_new_link(); link.discover_lan()
+	_search_until = Time.get_ticks_msec() + 3000
+	status_label.text = "Buscando partidas en la wifi…"
+var _search_until := 0
 
 func join_lan() -> void:
 	if ip_edit.text.strip_edges() == "":
 		status_label.text = "Escribe la IP que muestra el anfitrión."; return
-	_new_link(); link.join_lan(ip_edit.text.strip_edges())
-	status_label.text = "Conectando con %s…" % ip_edit.text
+	var ip := ip_edit.text.strip_edges()
+	_new_link(); link.join_lan(ip)
+	if link.state == NetLink.St.FAILED:
+		return
+	_lan_warn = "" if NetLink.same_subnet(ip) else "\nAviso: %s no está en tu misma red (tus IPs: %s)." % [ip, ", ".join(NetLink.lan_addresses())]
+	status_label.text = "Conectando con %s…%s" % [ip, _lan_warn]
+var _lan_warn := ""
 
 func cancel() -> void:
 	if link: link.close()
@@ -122,6 +147,20 @@ func _physics_process(_d: float) -> void:
 		return
 	if m == null:
 		link.poll()
+		if link.mode == "lan_search":
+			if not link.found_hosts.is_empty():
+				var ip: String = link.found_hosts.keys()[0]
+				ip_edit.text = ip
+				status_label.text = "Encontrada: %s (%s). Pulsa «LAN: unirse»." % [ip, link.found_hosts[ip]["name"]]
+				_save(); link.close(); link = null
+			elif Time.get_ticks_msec() > _search_until:
+				status_label.text = "No se encontró ninguna partida LAN. ¿El anfitrión pulsó «LAN: crear»? Algunas redes bloquean la difusión: escribe su IP a mano."
+				link.close(); link = null
+			return
+		if link.mode == "lan_host" and link.state == NetLink.St.WAITING:
+			status_label.text = _host_text()
+		elif link.mode == "lan_guest" and link.state == NetLink.St.CONNECTING:
+			status_label.text = "Conectando con %s:%d desde 0.0.0.0:%d… saludos enviados %d, respuestas %d%s" % [link.peer_ip, link.peer_port, link.bound_port, link.hellos_sent, link.hellos_recv, _lan_warn]
 		match link.state:
 			NetLink.St.WAITING:
 				if link.mode == "relay":
@@ -148,5 +187,9 @@ func _physics_process(_d: float) -> void:
 		link.close(); link = null; m = null
 
 func _err(e: String) -> String:
+	if e.begins_with("port_busy"):
+		return "el puerto UDP %s está ocupado (¿otra copia del juego abierta?)" % e.get_slice(":", 1)
+	if e == "lan_timeout" and link:
+		return "sin respuesta de %s:%d tras %d saludos. Comprueba: misma wifi (no la de invitados), la IP correcta (la que muestra el anfitrión), cortafuegos del anfitrión con UDP %d permitido (Linux: sudo ufw allow %d/udp; Windows: permitir el juego en redes privadas) y que el router no aísle clientes." % [link.peer_ip, link.peer_port, link.hellos_sent, NetLink.LAN_PORT, NetLink.LAN_PORT]
 	return {"no_room": "no existe esa sala", "room_full": "la sala está llena", "code_taken": "código en uso",
 		"version": "versión distinta del juego", "disconnected": "sin respuesta del rival"}.get(e, e)
