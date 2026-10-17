@@ -171,6 +171,7 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	# Fase 4: habilidades de jefe, magia, eikon y montura (cubiertos por params_checksum)
 	p["boss"] = SimAbilities.compile_all(f)
 	SimMagic.bake(f, p)
+	p["m_dash_bc"] = milli(o.blocked_hit_cost(Fighter.DASH_DAMAGE, f) * float(o.tfx["stamina_cost"]))
 	return p
 
 ## damage_mult sin la parte que depende del estado (furia con vida baja): la sim la aplica en vivo.

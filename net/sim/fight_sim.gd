@@ -21,6 +21,8 @@ const IN_SPELL := 1 << 16      # lanzar el hechizo seleccionado
 const IN_SPELL_NEXT := 1 << 17 # cambiar de hechizo
 const IN_EIKON := 1 << 18      # invocar eikon / especial del eikon montado
 const IN_MOUNT := 1 << 19      # desmontar del eikon montable
+const IN_ART := 1 << 20        # arte del arma (botón «Habilidad» sin habilidad propia)
+const IN_BOSS_VAR := 1 << 21   # variante: remate en estocada del combo de la pausa falsa
 
 static func make_input(dir32: int, move: bool, buttons: int) -> int:
 	return (dir32 & IN_DIR_MASK) | (IN_MOVE if move else 0) | buttons
@@ -49,8 +51,11 @@ enum {
 	# magia, eikon y montura (SimMagic)
 	CAST_T, CAST_SLOT, SP_SEL, SCD0, SCD1, SCD2, SCD3, SKIN_T, METER, EK_T, EK_X, EK_Z, EK_HP, EK_CD, EK_SPC,
 	MOUNTED, MSTANCE, MDASH_T,
+	# fase 6: dash montado (embestida), artes de arma, golpes a invocaciones
+	MD_T, MD_HIT, MD_ATK, ART_CD, ART_T, ART_K, ATK_PET,
 	# contadores de eventos de fase 4
 	AB_STARTS, AB_HITS, AB_INTR, GRABS, SPELLS, SUMMONS, EK_SPECIALS, EK_HITS, SHIELD_ABSORB, DISMOUNTS,
+	ARTS, PET_HITS, PET_KILLS, MDASH_HITS,
 	F_FIELDS
 }
 const P_BASE := 2 * F_FIELDS
@@ -79,6 +84,9 @@ const SEP_FOOT := 1600000     # µm (Fighter.SEPARATION_FOOT)
 const SEP_MOUNT := 3000000    # µm (Fighter.SEPARATION, montado)
 const KNOCK_DECAY := 11111    # µm/tick por tick (40 m/s²)
 const STAMINA_ATK_SLOW_PM := 300
+const MOUNTED_ATK_SLOW_PM := 550
+const MOUNTED_CHARGE_SLOW_PM := 300
+const DASH_STRIKE_MIN := 7 ## Fighter.DASH_STRIKE_MIN_TIME 0,12 s
 const HEAVY_HOLD := 24        # ticks (Fighter.HEAVY_HOLD 0,4 s)
 const BLOCK_HOLD := 0         # el bit de escudo ya es "mantener" (el control táctil decide toque/mantener)
 const BUFFER_WINDOW := 24     # ticks (PlayerController.BUFFER_WINDOW 0,4 s)
@@ -249,6 +257,10 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		SimMagic.eikon_button(s, P, i)
 	if pressed & IN_MOUNT:
 		SimMagic.dismount(s, P, i, false)
+	if pressed & IN_BOSS_VAR:
+		SimAbilities.variation(s, P, i)
+	if pressed & IN_ART:
+		SimMagic.art(s, P, i)
 	# búfer: envejece, caduca y reintenta la cabeza
 	for k in 4:
 		if s[o + Q0 + k] != 0:
@@ -285,7 +297,7 @@ static func _do(s: PackedInt64Array, P: Array, i: int, a: int, retry: bool) -> b
 	match a:
 		Act.LIGHT: return _request_attack(s, P, i, false) or s[o + BUFFERED] != 0
 		Act.HEAVY: return _request_attack(s, P, i, true)
-		Act.PARRY: return _parry(s, P, i)
+		Act.PARRY: return s[o + MOUNTED] == 0 and _parry(s, P, i)
 		Act.SHOOT: return _shoot(s, P, i)
 		Act.SWAP: return _swap(s, P, i)
 		Act.ROLL:
@@ -299,7 +311,7 @@ static func _opp(i: int) -> int:
 	return (1 - i) * F_FIELDS
 
 static func _can_act(s: PackedInt64Array, o: int) -> bool:
-	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0
+	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0 and s[o + ART_T] <= 0
 
 static func _spend(s: PackedInt64Array, P: Array, i: int, v: int) -> void:
 	var o := i * F_FIELDS
@@ -404,6 +416,8 @@ static func _start_attack(s: PackedInt64Array, P: Array, i: int, idx: int, chain
 		idx = clampi(s[o + COMBO] - 1, 0, 2)
 	s[o + ATK_IDX] = idx
 	s[o + ATK_GC] = 0
+	s[o + ART_K] = 0
+	s[o + ATK_PET] = 0
 	s[o + CHARGE_T] = 0
 	var a: Dictionary = P[i]["atk"][idx]
 	s[o + STEP_TOTAL] = a["step"]
@@ -458,12 +472,22 @@ static func _dash_now(s: PackedInt64Array, P: Array, i: int) -> bool:
 		s[o + STAGGER_T] = 0
 	if not _can_act(s, o) or s[o + DASH_CD] > 0 or s[o + ST] <= 0 or s[o + PARRY_STATE] != Parry.NONE or s[o + ROLL_T] >= 0:
 		return false
-	if s[o + ATK_STATE] != Atk.NONE:
+	if s[o + ATK_STATE] != Atk.NONE and not (s[o + MOUNTED] != 0 and s[o + ATK_STATE] == Atk.WINDUP):
 		if s[o + ATK_STATE] == Atk.RECOVERY and s[o + ATK_T] * 1000 >= s[o + ATK_DUR] * ROLL_CANCEL_PM:
 			_cancel_attack(s, o)
 		else:
 			return false
 	var inp: int = s[o + PREV_IN]
+	if s[o + MOUNTED] != 0:
+		# dash montado (Fighter.dash montado): embestida con i-frames; un ataque en anticipación sigue cargando
+		s[o + DASH_DIR] = ((inp & IN_DIR_MASK) * 8) & 255 if (inp & IN_MOVE) else s[o + FACE]
+		s[o + DASH_CD] = P[i].get("m_dash_cd", 90)
+		s[o + MD_T] = P[i].get("m_dash_t", 18)
+		s[o + INVULN] = P[i].get("m_dash_if", 12)
+		s[o + MD_HIT] = 0
+		s[o + MD_ATK] = 1 if s[o + ATK_STATE] == Atk.WINDUP else 0
+		_spend(s, P, i, P[i].get("m_dash_cost", 25000))
+		return true
 	if not (inp & IN_MOVE):
 		s[o + BACKSTEP_T] = P[i]["backstep_t"]
 		s[o + DASH_CD] = maxi(P[i]["dash_cd"], P[i]["backstep_t"])
@@ -677,7 +701,7 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var frontal := _in_front(s, b, a)
 	if kind != 5 and SimAbilities.counter_trigger(s, P, d, att):
 		return 3
-	if s[b + PARRY_STATE] == Parry.ACTIVE and frontal and kind <= 1:
+	if s[b + PARRY_STATE] == Parry.ACTIVE and frontal and (kind <= 1 or kind == 6):
 		if kind == 0:
 			_apply_stun(s, a, P[d]["parry_stagger"])
 			s[a + RIPOSTE_T] = P[d]["parry_stagger"]
@@ -697,7 +721,7 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 		if kind == 1:
 			_spend(s, P, d, P[att]["arrow_block_cost"])
 			_hit_status(s, P, att, kind, BLOCK_STATUS_PM)
-		elif kind >= 4:
+		elif kind == 4 or kind == 5:
 			_damage(s, a, b, raw * mult / 1000 * maxi(EIKON_BLOCK_PM, EXH_BLOCK_PM if s[b + EXH] > 0 else 0) / 1000)
 			_hit_status_ext(s, P, att, kind, st, BLOCK_STATUS_PM)
 			_spend(s, P, d, P[d].get("eikon_block_cost", 30000))
@@ -732,7 +756,7 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 		amount = _incoming(P, d, 0, amount)
 	else:
 		amount = _incoming(P, d, sub, amount)
-	if kind >= 4:
+	if kind == 4 or kind == 5:
 		amount = amount * (1000 - int(P[d].get("sagrado_pm", 0))) / 1000
 	if kind == 5:
 		amount = amount * int(P[d].get("aoe_pm", 1000)) / 1000
@@ -812,6 +836,12 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		s[o + SWAP_T] -= 1
 		if s[o + SWAP_T] <= 0:
 			s[o + LOADOUT] = Load.BOW if s[o + LOADOUT] == Load.SWORD else Load.SWORD
+	if s[o + MD_T] > 0:
+		s[o + MD_T] -= 1
+		if s[o + MD_T] <= 0 and s[o + ATK_STATE] != Atk.WINDUP:
+			s[o + MD_ATK] = 0
+	if s[o + ART_CD] > 0: s[o + ART_CD] -= 1
+	if s[o + ART_T] > 0: s[o + ART_T] -= 1
 	_update_attack(s, P, i, inp)
 	if s[o + RBUF] > 0:
 		s[o + RBUF] -= 1
@@ -876,6 +906,12 @@ static func _update_attack(s: PackedInt64Array, P: Array, i: int, inp: int) -> v
 	var a: Dictionary = _atk(P, i, s)
 	match s[o + ATK_STATE]:
 		Atk.WINDUP:
+			if s[o + MD_T] > 0 and s[o + MOUNTED] != 0:
+				s[o + MD_ATK] = 1
+				return
+			if s[o + MD_ATK] != 0 and s[o + ATK_T] >= DASH_STRIKE_MIN and s[o + ATK_T] < s[o + ATK_DUR]:
+				s[o + ATK_T] = s[o + ATK_DUR]
+			s[o + MD_ATK] = 1 if (s[o + MD_ATK] != 0 and s[o + ATK_T] < s[o + ATK_DUR]) else 0
 			if s[o + ATK_IDX] == SimParams.A_HEAVY and s[o + ATK_GC] == 0 and (inp & IN_ATK) and s[o + ATK_T] >= s[o + ATK_DUR] and s[o + CHARGE_T] < CHARGE_MAX and s[o + ST] > 0:
 				s[o + CHARGE_T] += 1
 				s[o + ATK_T] = s[o + ATK_DUR] - 1
@@ -909,13 +945,21 @@ static func _rec_dur(a: Dictionary, landed: bool, finisher: bool) -> int:
 static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> void:
 	var o := i * F_FIELDS
 	var b := _opp(i)
-	if s[o + ALIVE] == 0 or s[o + ATK_HIT] != 0 or s[b + ALIVE] == 0:
+	if s[o + ALIVE] == 0:
+		return
+	var reach: int = a["reach"]
+	if s[o + MOUNTED] != 0:
+		reach = reach * int(P[i].get("m_reach_pm", 1000)) / 1000
+	if s[o + ATK_PET] == 0 and SimMagic.pet_in_arc(s, P, i, reach, a["cos_arc"]):
+		s[o + ATK_PET] = 1
+		SimMagic.pet_hit(s, P, i, _strike_raw(s, P, i, a))
+	if s[o + ATK_HIT] != 0 or s[b + ALIVE] == 0:
 		return
 	# in_sword_arc: d - hr/2 <= alcance y dentro del semiarco
 	var dx: int = s[b + X] - s[o + X]
 	var dz: int = s[b + Z] - s[o + Z]
 	var l := FxMath.length(dx, dz)
-	if l - P[1 - i]["hit_radius"] / 2 > a["reach"]:
+	if l - P[1 - i]["hit_radius"] / 2 > reach:
 		return
 	if l >= 500000:
 		var f: int = s[o + FACE]
@@ -929,11 +973,7 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> voi
 	var force: int = a["force"]
 	if heavy:
 		force = force * (1000 + 500 * s[o + CHARGE_T] / CHARGE_MAX) / 1000
-	var raw: int = a["raw"] * ck / 1000
-	if P[i].get("furia_pm", 0) > 0 and s[o + HP] * 1000 < P[i]["hp"] * FURIA_HP_PM:
-		raw = raw * (1000 + P[i]["furia_pm"]) / 1000
-	if s[o + RAGE_T] > 0:
-		raw = raw * 1300 / 1000 # furia de fase
+	var raw := _strike_raw(s, P, i, a)
 	var res := _take_hit(s, P, i, 0, raw, a["sub"], force, a["pd_pm"] * ck / 1000 * gc_k / 1000, a["counter_pm"], a["block_cost"])
 	if res == 1 or res == 2 or res == 3:
 		s[o + ATK_LANDED] = 1
@@ -945,6 +985,56 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> voi
 		s[o + HITS] += 1
 		if (heavy or was_open) and s[P_BASE + G_HITSTOP_ON] != 0:
 			s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], HITSTOP_HEAVY)
+
+## Daño bruto del golpe en curso (carga, furia, furia de fase, arte del arma, montado).
+static func _strike_raw(s: PackedInt64Array, P: Array, i: int, a: Dictionary) -> int:
+	var o := i * F_FIELDS
+	var ck := 1000 + CHARGE_BONUS_PM * s[o + CHARGE_T] / CHARGE_MAX
+	var raw: int = a["raw"] * ck / 1000
+	if P[i].get("furia_pm", 0) > 0 and s[o + HP] * 1000 < P[i]["hp"] * FURIA_HP_PM:
+		raw = raw * (1000 + P[i]["furia_pm"]) / 1000
+	if s[o + RAGE_T] > 0:
+		raw = raw * 1300 / 1000 # furia de fase
+	if s[o + ART_K] > 0:
+		raw = raw * s[o + ART_K] / 1000
+	if s[o + MOUNTED] != 0:
+		raw = raw * int(P[i].get("m_dmg_pm", 1000)) / 1000
+	return raw
+
+## Embestida del dash montado (Fighter._check_dash_hit).
+static func _mount_dash_hit(s: PackedInt64Array, P: Array, i: int) -> void:
+	var o := i * F_FIELDS
+	var b := _opp(i)
+	if s[o + MD_HIT] != 0 or s[b + ALIVE] == 0:
+		return
+	var dx: int = s[b + X] - s[o + X]
+	var dz: int = s[b + Z] - s[o + Z]
+	var l := FxMath.length(dx, dz)
+	var dd: int = s[o + DASH_DIR]
+	var ahead: bool = l < 500000 or (dx * FxMath.COS[dd] + dz * FxMath.SIN[dd]) * 10 > 3 * FxMath.ONE * l
+	if not ahead:
+		return
+	if s[o + ATK_STATE] == Atk.WINDUP:
+		var a: Dictionary = _atk(P, i, s)
+		var reach: int = a["reach"] * int(P[i].get("m_reach_pm", 1000)) / 1000
+		if l < reach - 400000:
+			s[o + MD_HIT] = 1
+			s[o + MD_T] = 0
+			return
+	if l < 2900000:
+		s[o + MD_HIT] = 1
+		var res := _take_hit(s, P, i, 6, P[i].get("m_dash_raw", 6000), 0, 0, 2000, 1000, P[i].get("m_dash_bc", 20000))
+		if res == 1 or res == 2:
+			var kv: int = P[i].get("m_dash_knock", 266667) * (500 if res == 2 else 1000) / 1000
+			s[b + KX] = FxMath.COS[dd] * kv / FxMath.ONE
+			s[b + KZ] = FxMath.SIN[dd] * kv / FxMath.ONE
+			if res == 1:
+				_apply_stun(s, b, 15)
+				_meter(s, P, i, 6000)
+				s[o + MDASH_HITS] += 1
+				if s[b + MOUNTED] != 0:
+					SimMagic.mount_stance_hit(s, P, 1 - i, P[i].get("m_dash_raw", 6000) * 1500 / 1000)
+			s[o + MD_T] = mini(s[o + MD_T], 3)
 
 static func _update_shot(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var o := i * F_FIELDS
@@ -1143,6 +1233,10 @@ static func _projectiles(s: PackedInt64Array, P: Array) -> void:
 		var b := _opp(owner)
 		if s[b + ALIVE] == 0:
 			continue
+		if SimMagic.pet_proj(s, P, owner, s[q + PR_X], s[q + PR_Y], s[q + PR_Z], s[q + PR_R]):
+			SimMagic.pet_hit(s, P, owner, s[q + PR_RAW])
+			s[q + PR_ON] = 0
+			continue
 		var ex: int = s[q + PR_X] - s[b + X]
 		var ez: int = s[q + PR_Z] - s[b + Z]
 		var ey: int = s[q + PR_Y] - HIT_CENTER_Y
@@ -1182,7 +1276,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var b := _opp(i)
 	var moving := (inp & IN_MOVE) != 0
 	var ab_moving: bool = s[o + AB_SLOT] >= 0 and not SimAbilities.is_shield(s, P, i)
-	if s[o + ALIVE] == 0 or s[o + STUN] > 0 or s[o + CRIT_T] >= 0 or s[o + CAST_T] > 0 or s[o + BS_PH] != 0 or ab_moving:
+	if s[o + ALIVE] == 0 or s[o + STUN] > 0 or s[o + CRIT_T] >= 0 or s[o + CAST_T] > 0 or s[o + BS_PH] != 0 or ab_moving or s[o + ART_T] > 0:
 		moving = false
 	var want_block: bool = (inp & IN_BLOCK) != 0 # sin escudo el control local no envía IN_BLOCK
 	var wb: bool = want_block and s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + ROLL_T] < 0 and s[o + BACKSTEP_T] <= 0 and s[o + LOADOUT] == Load.SWORD and s[o + SWAP_T] <= 0 and s[o + ATK_STATE] == Atk.NONE and s[o + PARRY_STATE] == Parry.NONE
@@ -1233,7 +1327,9 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		_spend(s, P, i, p["drain_sprint"])
 	if wb: mul = mul * 450 / 1000
 	if s[o + EXH] > 0: mul = mul * 600 / 1000
-	if s[o + ATK_STATE] != Atk.NONE: mul = mul * STAMINA_ATK_SLOW_PM / 1000
+	if s[o + ATK_STATE] != Atk.NONE: mul = mul * (MOUNTED_ATK_SLOW_PM if s[o + MOUNTED] != 0 else STAMINA_ATK_SLOW_PM) / 1000
+	if s[o + MOUNTED] != 0 and s[o + ATK_IDX] == SimParams.A_HEAVY and s[o + CHARGE_T] > 0 and (inp & IN_ATK):
+		mul = mul * MOUNTED_CHARGE_SLOW_PM / 1000
 	if s[o + SHOT_STATE] == Shot.DRAW:
 		mul = 0
 		s[o + VX] = 0
@@ -1271,13 +1367,20 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var vz: int = s[o + VZ]
 	var a_idx: int = s[o + ATK_IDX]
 	var atk_st: int = s[o + ATK_STATE]
-	if a_idx == SimParams.A_DASH and (atk_st == Atk.WINDUP or atk_st == Atk.ACTIVE):
+	if s[o + MD_T] > 0 and s[o + MOUNTED] != 0:
+		var dv: int = P[i].get("m_dash_spd", 500000)
+		vx = FxMath.COS[s[o + DASH_DIR]] * dv / FxMath.ONE
+		vz = FxMath.SIN[s[o + DASH_DIR]] * dv / FxMath.ONE
+		s[o + VX] = vx
+		s[o + VZ] = vz
+		_mount_dash_hit(s, P, i)
+	elif a_idx == SimParams.A_DASH and (atk_st == Atk.WINDUP or atk_st == Atk.ACTIVE) and s[o + MOUNTED] == 0:
 		var lv: int = p["atk"][SimParams.A_DASH]["lunge"]
 		vx = FxMath.COS[s[o + DASH_DIR]] * lv / FxMath.ONE
 		vz = FxMath.SIN[s[o + DASH_DIR]] * lv / FxMath.ONE
 		s[o + VX] = vx / 2
 		s[o + VZ] = vz / 2
-	elif s[o + STEP_LEFT] > 0 and (atk_st == Atk.WINDUP or atk_st == Atk.ACTIVE) and a_idx != SimParams.A_DASH:
+	elif s[o + STEP_LEFT] > 0 and (atk_st == Atk.WINDUP or atk_st == Atk.ACTIVE) and a_idx != SimParams.A_DASH and s[o + MOUNTED] == 0:
 		var st_v := _step(s, P, i)
 		vx = st_v.x
 		vz = st_v.y

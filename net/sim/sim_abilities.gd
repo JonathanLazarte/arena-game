@@ -22,6 +22,7 @@ const FL_STAGGERED := 8
 const FL_QUEUED := 16
 const FL_READY := 32
 const FL_FINISHER := 64
+const FL_VARIANT := 128 ## combo: remate en estocada (Fighter.ab_combo_variant)
 const FL_LOCKED := 256
 const FL_FLICK0 := 512
 const FL_FLICK1 := 1024
@@ -138,6 +139,16 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["slam_warn"] = _tk(float(d.get("slam_warn", 0.25)))
 			c["slam_k"] = _ml(float(d.get("slam_mult", 0.7)))
 			c["slam_force"] = fphys.call(float(d.get("slam_force", 48.0)))
+			# variante (botón «Estocada» antes del último golpe): estocada larga sin salto ni AoE
+			var hl: Array = (d["hits"] as Array)[-1]
+			c["var_w"] = _tk(float(d["variant_windup"]))
+			c["var_lunge_t"] = _tk(float(d["variant_windup"]) - float(d["lunge_time"]))
+			c["var_stop"] = _um(1.4)
+			c["var_dist_v"] = _um(float(d["lunge_dist"]) * 1.45 / float(d["lunge_time"]) / 60.0)
+			c["var_reach"] = _um(float(d.get("variation_reach", 6.5)))
+			c["var_cos"] = SimParams.cos_q(65.0)
+			c["var_k"] = _ml(float(hl[1]) * 1.2)
+			c["var_force"] = fphys.call(float(hl[2]) + 8.0)
 			c["stagger"] = _tk(StunRules.STAGGER_T)
 			c["resist_final"] = 1000
 		"salto_caida":
@@ -361,6 +372,7 @@ static func hazards(s: PackedInt64Array, P: Array) -> void:
 			if s[q + FightSim.HZ_T] < s[q + FightSim.HZ_WARN]:
 				continue
 			s[q + FightSim.HZ_DONE] = 1
+			SimMagic.pet_aoe(s, P, owner, s[q + FightSim.HZ_X], s[q + FightSim.HZ_Z], s[q + FightSim.HZ_R], s[q + FightSim.HZ_RAW])
 			if s[b + FightSim.ALIVE] == 0:
 				continue
 			var dx: int = s[b + FightSim.X] - s[q + FightSim.HZ_X]
@@ -476,6 +488,21 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 	_start(s, P, i, slot)
 	return true
 
+## Fighter.boss_variation: con el combo esperando el último golpe, el remate será la estocada.
+static func variation(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	if s[o + FightSim.AB_SLOT] < 0:
+		return false
+	var ab := _ab(s, P, i)
+	if int(ab["type"]) != T_COMBO or s[o + FightSim.AB_FIRED] != (ab["hits"] as Array).size() - 1 or (s[o + FightSim.AB_FL] & FL_QUEUED) != 0:
+		return false
+	if not _cost_ok(s, i, ab):
+		_end_combo(s, P, i, true)
+		return true
+	_pay(s, P, i, ab)
+	s[o + FightSim.AB_FL] |= FL_QUEUED | FL_VARIANT
+	return true
+
 static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 	var o := i * FightSim.F_FIELDS
 	var ab: Dictionary = P[i]["boss"][slot]
@@ -542,7 +569,8 @@ static func resist_pm(s: PackedInt64Array, P: Array, i: int) -> int:
 	var ab := _ab(s, P, i)
 	if int(ab["type"]) == T_COMBO:
 		var n: int = (ab["hits"] as Array).size()
-		if s[o + FightSim.AB_FIRED] == n - 1 and s[o + FightSim.AB_T] < int(ab["final"]):
+		var fin: int = ab["var_w"] if (s[o + FightSim.AB_FL] & FL_VARIANT) != 0 else ab["final"]
+		if s[o + FightSim.AB_FIRED] == n - 1 and s[o + FightSim.AB_T] < fin:
 			return ab["resist_final"]
 	return ab["resist"]
 
@@ -873,8 +901,9 @@ static func _combo(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> voi
 		return
 	var t: int = s[o + FightSim.AB_T]
 	var final_hit: bool = s[o + FightSim.AB_FIRED] == n - 1
-	var strike: int = ab["final"] if final_hit else ab["stage"]
-	if final_hit and t >= int(ab["leap0"]) and t < strike:
+	var variant := final_hit and (s[o + FightSim.AB_FL] & FL_VARIANT) != 0
+	var strike: int = (ab["var_w"] if variant else ab["final"]) if final_hit else ab["stage"]
+	if final_hit and not variant and t >= int(ab["leap0"]) and t < strike:
 		s[o + FightSim.AB_AIR] = 1
 		if s[b + FightSim.ALIVE] != 0:
 			var ax: int = s[o + FightSim.X] - s[b + FightSim.X]
@@ -885,13 +914,25 @@ static func _combo(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> voi
 				s[o + FightSim.AB_VZ] = az * int(ab["retreat"]) / al
 	if s[b + FightSim.ALIVE] != 0 and FightSim._dist_to_opp(s, i) > 100000:
 		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
-		if not final_hit and t >= int(ab["lunge_t"]) and t < strike:
+		var lt: int = ab["var_lunge_t"] if variant else ab["lunge_t"]
+		if (not final_hit or variant) and t >= lt and t < strike:
 			var gap := FightSim._dist_to_opp(s, i)
-			if gap > int(ab["stop"]):
+			var stop: int = ab["var_stop"] if variant else ab["stop"]
+			if gap > stop:
 				var remaining: int = maxi(strike - t, 1)
-				var v: int = mini(int(ab["lunge_spd"]), mini(int(ab["lunge_dist_v"]), (gap - int(ab["stop"])) / remaining))
+				var v: int = mini(int(ab["lunge_spd"]), mini(int(ab["var_dist_v"] if variant else ab["lunge_dist_v"]), (gap - stop) / remaining))
 				s[o + FightSim.AB_VX] = FxMath.COS[s[o + FightSim.FACE]] * v / FxMath.ONE
 				s[o + FightSim.AB_VZ] = FxMath.SIN[s[o + FightSim.FACE]] * v / FxMath.ONE
+	if t >= strike and variant:
+		s[o + FightSim.AB_AIR] = 0
+		if s[b + FightSim.ALIVE] != 0 and _in_reach(s, P, i, ab["var_reach"], ab["var_cos"]):
+			var res2 := FightSim._take_hit(s, P, i, 3, raw_live(s, P, i, int(ab["raw"]) * int(ab["var_k"]) / 1000), 4, ab["var_force"], 2000, 1000, 0)
+			if res2 == 1 or res2 == 2:
+				s[o + FightSim.AB_HITS] += 1
+		s[o + FightSim.AB_FIRED] += 1
+		s[o + FightSim.AB_FL] |= FL_READY
+		s[o + FightSim.AB_WAIT] = 0
+		return
 	if t >= strike:
 		s[o + FightSim.AB_AIR] = 0
 		var h: Array = hits[s[o + FightSim.AB_FIRED]]

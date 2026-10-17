@@ -66,6 +66,28 @@ static func bake(f: Fighter, p: Dictionary) -> void:
 	# eikon
 	p["eikon_elem"] = _elem(String(EquipStats.EIKON_ELEMENT.get(f.eikon.id if f.eikon else "", "fisico")))
 	p["eikon_st"] = [0, 0, SimParams.milli(Fighter.LOBO_FROST)] if f.eikon and f.eikon.id == "lobo" else [0, 0, 0]
+	# arte del arma (Fighter.special sin habilidad propia → use_weapon_art)
+	var art := WeaponArts.art(f.weapon_art_id)
+	p["art"] = {}
+	if not art.is_empty() and not f.has_special() and WeaponArts.compatible(f.melee()):
+		var st_k := float(f.tfx["stamina_cost"])
+		var ai := {"type": 1 if f.weapon_art_id == "estocada_impulsada" else 2, "cost": SimParams.milli(float(art["cost"])),
+			"cd": tk_down(float(art["cooldown"])), "k": SimParams.pm(float(art["mult"]))}
+		if int(ai["type"]) == 1:
+			ai["st"] = SimParams.milli(f.melee().light_stamina * st_k)
+		else:
+			ai["st"] = SimParams.milli(f.melee().heavy_stamina * st_k)
+			ai["t"] = tk_down(0.3)
+			ai["r"] = SimParams.um(float(art["radius"]))
+			ai["raw"] = SimParams.milli(f.melee().light_damage * float(art["mult"]) * f.damage_mult())
+		p["art"] = ai
+	# montado (Fighter.stats() = montura; arma: alcance y daño a caballo)
+	var w := f.melee()
+	p["m_reach_pm"] = SimParams.pm(w.reach_mounted / maxf(w.reach_foot, 0.1))
+	p["m_dmg_pm"] = SimParams.pm(w.mounted_damage_mult)
+	p["m_dash_raw"] = SimParams.milli(Fighter.DASH_DAMAGE)
+	p["m_dash_knock"] = SimParams.um(Fighter.DASH_KNOCKBACK / 60.0)
+	p["m_dash_cost"] = SimParams.milli(Fighter.COST_DASH * float(f.tfx["stamina_cost"]))
 	if f.eikon == null:
 		p["ek"] = {}
 		return
@@ -81,6 +103,14 @@ static func bake(f: Fighter, p: Dictionary) -> void:
 		ek["hover"] = SimParams.um(m.hover)
 		p["m_speed"] = SimParams.um(m.speed * f.speed_mult() / 60.0)
 		p["m_turn"] = maxi(int(round(rad_to_deg(m.turn_speed) / 60.0 * 256.0 / 360.0)), 1)
+		p["m_dash_spd"] = SimParams.um(m.dash_speed / 60.0)
+		p["m_dash_t"] = tk_down(m.dash_duration)
+		p["m_dash_if"] = tk_down(m.dash_iframes)
+		p["m_dash_cd"] = tk_down(m.dash_cooldown)
+	# invocación golpeable (Eikon.take_hit / Mount.take_hit sin jinete): radio y altura
+	ek["hr"] = SimParams.um(1.2 if ed.rideable else 0.9 * ed.size)
+	ek["fly"] = 1 if (ed.flying and not ed.rideable) else 0
+	ek["cy"] = SimParams.um(2.5 if int(ek["fly"]) != 0 else 0.9 * ed.size)
 	p["ek"] = ek
 
 # ---------------- Hechizos ----------------
@@ -319,3 +349,87 @@ static func _eikon(s: PackedInt64Array, P: Array, i: int) -> void:
 				FightSim.spawn_proj(s, i, 3, s[o + FightSim.EK_X], s[o + FightSim.EK_Z], ek["y"], face, 366667, 150, 700000, ek["dmg"], -1, -1, 0, 0, 0, 0, true)
 			_:
 				SimAbilities.spawn_hz(s, i, 1, s[o + FightSim.EK_X], s[o + FightSim.EK_Z], 36, ek["range"], ek["dmg"], 40000, 100000, 0)
+
+# ---------------- Fase 6: artes de arma ----------------
+## FighterMagic.use_weapon_art: estocada impulsada (dash con x1,5) o torbellino (AoE a 0,3 s).
+static func art(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var a: Dictionary = P[i].get("art", {})
+	if a.is_empty() or s[o + FightSim.MOUNTED] != 0 or not FightSim._can_act(s, o) or s[o + FightSim.EXH] > 0 or s[o + FightSim.BACKSTEP_T] > 0:
+		return false
+	if s[o + FightSim.ART_CD] > 0 or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
+		return false
+	if s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.PARRY_STATE] != FightSim.Parry.NONE or s[o + FightSim.SWAP_T] > 0 or s[o + FightSim.ST] <= 0:
+		return false
+	if s[o + FightSim.MANA] < int(a["cost"]):
+		return false
+	s[o + FightSim.MANA] -= int(a["cost"])
+	s[o + FightSim.ART_CD] = a["cd"]
+	s[o + FightSim.ARTS] += 1
+	s[o + FightSim.BLOCKING] = 0
+	FightSim._spend(s, P, i, a["st"])
+	if int(a["type"]) == 1:
+		s[o + FightSim.DASH_DIR] = SimAbilities._tdir(s, i)
+		s[o + FightSim.FACE] = s[o + FightSim.DASH_DIR]
+		FightSim._start_attack(s, P, i, SimParams.A_DASH, false)
+		s[o + FightSim.ART_K] = a["k"]
+	else:
+		s[o + FightSim.ART_T] = a["t"]
+		SimAbilities.spawn_hz(s, i, 1, s[o + FightSim.X], s[o + FightSim.Z], a["t"], a["r"], a["raw"], 40000, 150000, 0)
+	return true
+
+# ---------------- Fase 6: invocaciones golpeables ----------------
+## ¿El eikon del rival (compañero o montura sin jinete) está activo y se puede golpear?
+static func pet_live(s: PackedInt64Array, P: Array, d: int) -> bool:
+	var o := d * FightSim.F_FIELDS
+	return s[o + FightSim.EK_T] > 0 and s[o + FightSim.MOUNTED] == 0 and not (P[d].get("ek", {}) as Dictionary).is_empty()
+
+static func pet_in_arc(s: PackedInt64Array, P: Array, att: int, reach: int, cos_arc: int) -> bool:
+	var d := 1 - att
+	if not pet_live(s, P, d):
+		return false
+	var o := att * FightSim.F_FIELDS
+	var q := d * FightSim.F_FIELDS
+	var dx: int = s[q + FightSim.EK_X] - s[o + FightSim.X]
+	var dz: int = s[q + FightSim.EK_Z] - s[o + FightSim.Z]
+	var l := FxMath.length(dx, dz)
+	if l - int(P[d]["ek"]["hr"]) / 2 > reach:
+		return false
+	if l < 500000:
+		return true
+	var f: int = s[o + FightSim.FACE]
+	return dx * FxMath.COS[f] + dz * FxMath.SIN[f] >= cos_arc * l
+
+## Eikon.take_hit: resta vida sin defensa; a 0 se retira (montura incluida).
+static func pet_hit(s: PackedInt64Array, P: Array, att: int, raw: int) -> void:
+	var d := 1 - att
+	var q := d * FightSim.F_FIELDS
+	if not pet_live(s, P, d):
+		return
+	s[q + FightSim.EK_HP] -= raw
+	s[att * FightSim.F_FIELDS + FightSim.PET_HITS] += 1
+	if s[q + FightSim.EK_HP] <= 0:
+		s[q + FightSim.EK_T] = 0
+		s[att * FightSim.F_FIELDS + FightSim.PET_KILLS] += 1
+
+## Proyectil contra el eikon del rival (esfera contra esfera).
+static func pet_proj(s: PackedInt64Array, P: Array, att: int, px: int, py: int, pz: int, pr: int) -> bool:
+	var d := 1 - att
+	if not pet_live(s, P, d):
+		return false
+	var q := d * FightSim.F_FIELDS
+	var ek: Dictionary = P[d]["ek"]
+	var ex: int = px - s[q + FightSim.EK_X]
+	var ez: int = pz - s[q + FightSim.EK_Z]
+	var ey: int = py - int(ek["cy"])
+	var r: int = pr + int(ek["hr"])
+	return ex * ex + ez * ez + ey * ey < r * r
+
+## Área en el suelo contra el eikon del rival (los voladores no la reciben).
+static func pet_aoe(s: PackedInt64Array, P: Array, att: int, x: int, z: int, r: int, raw: int) -> void:
+	var d := 1 - att
+	if not pet_live(s, P, d) or int(P[d]["ek"].get("fly", 0)) != 0:
+		return
+	var q := d * FightSim.F_FIELDS
+	if FxMath.length(s[q + FightSim.EK_X] - x, s[q + FightSim.EK_Z] - z) <= r:
+		pet_hit(s, P, att, raw)
