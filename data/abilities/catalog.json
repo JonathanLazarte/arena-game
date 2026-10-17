@@ -1,249 +1,4137 @@
 {
-  "version": 1,
-  "tick_rate": 60,
-  "abilities": [
-    {
-      "id": "tajo_retardado",
-      "name": "Tajo Retardado",
-      "icon": "boss:tajo_retardado",
-      "category": "melee",
-      "tags": ["unblockable", "delayed"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 24, "mana": 0, "health": 0 },
-      "cooldown_ticks": 360,
-      "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": [],
-      "entry_step": "golpe",
-      "ai": { "range_min": 0, "range_max": 3.2, "weight": 12, "use_when": ["target_in_range"] },
-      "hint": { "dodge": "roll_late", "direction": "side", "text": "No rueces al ver el amague: el golpe llega tarde." },
-      "steps": [
-        {
-          "id": "golpe",
-          "windup_ticks": 84,
-          "active_ticks": 1,
-          "recovery_ticks": 54,
-          "telegraph": {
-            "id": "tg_tajo_ambar",
-            "style": "weapon_glow",
-            "color": "#FFCC4D",
-            "sound": "sfx_tele_tajo",
-            "at_tick": 0,
-            "text": "Hoja ámbar alzada que parpadea en blanco a mitad antes del golpe tardío."
-          },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 139, "poise_bonus_pct": 80 },
-          "tracking": { "deg_per_sec": 220, "lock_at_tick": 80, "post_lock_deg_per_sec": 0 },
-          "movement": {
-            "type": "dash",
-            "from_tick": 68,
-            "to_tick": 86,
-            "speed_mps": 7,
-            "max_distance_m": 14,
-            "target_mode": "facing",
-            "stop_at_m": 1.65
-          },
-          "hitboxes": [
-            {
-              "id": "hb_tajo",
-              "shape": { "type": "arc", "radius_m": 3, "angle_deg": 110 },
-              "from_tick": 0,
-              "to_tick": 1,
-              "damage_per_hit": 1.5,
-              "damage_scaling": "weapon_heavy",
-              "blockable": false,
-              "parryable": false,
-              "stun_power": 40,
-              "stun_scaling": "physical"
-            }
-          ],
-          "spawns": [
-            {
-              "id": "sp_onda",
-              "type": "ground_mark",
-              "at_tick": 84,
-              "on": "hit",
-              "offset": { "forward_m": 1.2 },
-              "shape": { "type": "circle", "radius_m": 4.5 },
-              "warn_ticks": 21,
-              "damage": 0.975,
-              "stun_power": 40,
-              "knockback_mps": 9,
-              "blockable": true,
-              "mode": "track"
-            }
-          ],
-          "events": [
-            { "id": "ev_flick0", "tick": 33, "vfx": "vfx_flash_white", "sfx": "sfx_blade_ring" },
-            { "id": "ev_flick1", "tick": 57, "vfx": "vfx_flash_white", "sfx": "sfx_blade_ring" },
-            { "id": "ev_impacto", "tick": 84, "vfx": "vfx_slash", "sfx": "sfx_heavy" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "estocada_negra",
-      "name": "Estocada Negra",
-      "icon": "boss:estocada_negra",
-      "category": "melee",
-      "tags": ["unblockable"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 0, "mana": 28, "health": 0 },
-      "cooldown_ticks": 600,
-      "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": [],
-      "entry_step": "estocada",
-      "ai": { "range_min": 2, "range_max": 7.5, "weight": 12, "use_when": ["target_in_range"] },
-      "hint": { "dodge": "sidestep", "direction": "side", "text": "Rodá hacia el costado cuando la hoja ya está atrás." },
-      "steps": [
-        {
-          "id": "estocada",
-          "windup_ticks": 84,
-          "active_ticks": 1,
-          "recovery_ticks": 75,
-          "telegraph": {
-            "id": "tg_estocada_negra",
-            "style": "weapon_glow",
-            "color": "#6B0D14",
-            "sound": "sfx_tele_estocada_negra",
-            "at_tick": 0,
-            "text": "La hoja se vuelve negra y roja y retrocede antes de clavarse."
-          },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 160, "poise_bonus_pct": 80 },
-          "tracking": { "deg_per_sec": 140, "lock_at_tick": 80, "post_lock_deg_per_sec": 0 },
-          "movement": {
-            "type": "dash",
-            "from_tick": 68,
-            "to_tick": 86,
-            "speed_mps": 11,
-            "max_distance_m": 14,
-            "target_mode": "facing",
-            "stop_at_m": 2.31
-          },
-          "hitboxes": [
-            {
-              "id": "hb_estocada",
-              "shape": { "type": "arc", "radius_m": 4.2, "angle_deg": 64 },
-              "from_tick": 0,
-              "to_tick": 1,
-              "damage_per_hit": 1.55,
-              "damage_scaling": "weapon_heavy",
-              "blockable": false,
-              "parryable": false,
-              "stun_power": 52,
-              "stun_scaling": "physical"
-            }
-          ],
-          "events": [
-            { "id": "ev_impacto", "tick": 84, "vfx": "vfx_slash", "sfx": "sfx_heavy" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "pisoton",
-      "name": "Pisotón",
-      "icon": "boss:pisoton",
-      "category": "zone",
-      "tags": ["aoe"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 20, "mana": 0, "health": 0 },
-      "cooldown_ticks": 360,
-      "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl1", "stun_lvl2", "knockdown"],
-      "entry_step": "onda",
-      "ai": { "range_min": 3, "range_max": 12, "weight": 10, "use_when": ["target_in_range"] },
-      "hint": { "dodge": "jump", "direction": "any", "text": "Es una onda baja: saltala." },
-      "steps": [
-        {
-          "id": "onda",
-          "windup_ticks": 47,
-          "active_ticks": 1,
-          "recovery_ticks": 48,
-          "telegraph": {
-            "id": "tg_pisoton",
-            "style": "ground_ring",
-            "color": "#BD8542",
-            "sound": "sfx_tele_pisoton",
-            "at_tick": 0,
-            "text": "Levanta un pie con brillo ocre; al bajar, una onda baja y ancha sale al frente."
-          },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 96, "poise_bonus_pct": 80 },
-          "tracking": { "deg_per_sec": 240, "lock_at_tick": 47, "post_lock_deg_per_sec": 0 },
-          "spawns": [
-            {
-              "id": "sp_onda",
-              "type": "ground_wave",
-              "at_tick": 47,
-              "offset": { "forward_m": 1 },
-              "count": 1,
-              "spread_deg": 0,
-              "speed_mps": 10,
-              "range_m": 9,
-              "width_m": 4.2,
-              "warn_ticks": 27,
-              "damage": 0.85,
-              "stun_power": 55,
-              "blockable": true
-            }
-          ],
-          "events": [
-            { "id": "ev_onda", "tick": 47, "vfx": "vfx_crack", "sfx": "sfx_stomp" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "flecha_grave",
-      "name": "Flecha Grave",
-      "icon": "boss:flecha_grave",
-      "category": "ranged",
-      "tags": ["unblockable", "aoe"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 0, "mana": 24, "health": 0 },
-      "cooldown_ticks": 480,
-      "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": [],
-      "entry_step": "marca",
-      "ai": { "range_min": 4, "range_max": 16, "weight": 10, "use_when": ["target_in_range"] },
-      "hint": { "dodge": "roll_through", "direction": "side", "text": "En cuanto aparezca el círculo, rodá hacia afuera." },
-      "steps": [
-        {
-          "id": "marca",
-          "windup_ticks": 47,
-          "active_ticks": 1,
-          "recovery_ticks": 54,
-          "telegraph": {
-            "id": "tg_flecha_grave",
-            "style": "ground_ring",
-            "color": "#7A47B8",
-            "sound": "sfx_tele_flecha_grave",
-            "at_tick": 0,
-            "text": "Un círculo violeta grande se clava en el suelo bajo los pies y se llena despacio."
-          },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 102, "poise_bonus_pct": 30 },
-          "spawns": [
-            {
-              "id": "sp_marca",
-              "type": "ground_mark",
-              "at_tick": 47,
-              "shape": { "type": "circle", "radius_m": 2.6 },
-              "warn_ticks": 85,
-              "damage": 1.35,
-              "stun_power": 58,
-              "knockback_mps": 11,
-              "blockable": false,
-              "mode": "track",
-              "count": 1
-            }
-          ],
-          "events": [
-            { "id": "ev_marca", "tick": 47, "vfx": "vfx_mark", "sfx": "sfx_tele_flecha_grave" }
-          ]
-        }
-      ]
-    }
-  ]
+	"abilities": [
+		{
+			"ai": {
+				"range_max": 12.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 30.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Hoja roja que se enciende y sonido que sube."
+			},
+			"icon": "boss:estocada",
+			"id": "estocada",
+			"interruptible_by": [],
+			"name": "Estocada de jefe",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 67,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.6,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 1.8,
+								"type": "arc"
+							},
+							"stun_power": 20.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 54,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e6cc66",
+						"id": "tg_estocada",
+						"sound": "sfx_tele_estocada",
+						"style": "weapon_glow",
+						"text": "Hoja roja que se enciende y sonido que sube."
+					},
+					"windup_ticks": 67
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 3.5,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 35.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Anillo azul en el suelo que se llena; pose de grito."
+			},
+			"icon": "boss:carga_area",
+			"id": "carga_area",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Carga en área",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 400,
+						"to_tick": 184,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 36,
+					"spawns": [
+						{
+							"at_tick": 147,
+							"blockable": true,
+							"count": 1,
+							"damage": 1.4,
+							"id": "sp_marca",
+							"interval_ticks": 0,
+							"knockback_mps": 6.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 7.5,
+								"type": "circle"
+							},
+							"stun_power": 45.0,
+							"type": "ground_mark",
+							"warn_ticks": 30
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e6cc66",
+						"id": "tg_carga_area",
+						"sound": "sfx_tele_carga_area",
+						"style": "ground_ring",
+						"text": "Anillo azul en el suelo que se llena; pose de grito."
+					},
+					"windup_ticks": 147
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 20.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "magic",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 10.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "La hoja se vuelve dorada; cada orden libera un tajo en media luna."
+			},
+			"icon": "boss:rafaga",
+			"id": "rafaga",
+			"interruptible_by": [],
+			"name": "Ráfaga espectral",
+			"steps": [
+				{
+					"active_ticks": 60,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 50,
+						"to_tick": 115,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 31,
+					"spawns": [
+						{
+							"at_tick": 1,
+							"count": 1,
+							"hitbox": {
+								"blockable": true,
+								"damage_per_hit": 0.55,
+								"parryable": false,
+								"stun_power": 14.0
+							},
+							"homing_deg": 60.0,
+							"homing_ticks": 151,
+							"id": "sp_tiro",
+							"lifetime_ticks": 151,
+							"radius_m": 0.8,
+							"speed_mps": 20.0,
+							"type": "projectile"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e6cc66",
+						"id": "tg_rafaga",
+						"sound": "sfx_tele_rafaga",
+						"style": "weapon_glow",
+						"text": "La hoja se vuelve dorada; cada orden libera un tajo en media luna."
+					},
+					"windup_ticks": 24
+				}
+			],
+			"tags": [
+				"projectile"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 0.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "buff",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 25.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Burbuja cian alrededor del personaje."
+			},
+			"icon": "boss:escudo_mana",
+			"id": "escudo_mana",
+			"interruptible_by": [],
+			"name": "Escudo de maná",
+			"steps": [
+				{
+					"active_ticks": 91,
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e6cc66",
+						"id": "tg_escudo_mana",
+						"sound": "sfx_tele_escudo_mana",
+						"style": "weapon_glow",
+						"text": "Burbuja cian alrededor del personaje."
+					},
+					"windup_ticks": 6
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 9.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 38.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Hoja dorada; tras el tercer golpe puedes elegir remate. El salto falso pausa brevemente en el aire."
+			},
+			"icon": "boss:combo_falso",
+			"id": "combo_falso",
+			"interruptible_by": [
+				"parry",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Combo de la pausa falsa",
+			"steps": [
+				{
+					"active_ticks": 75,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 156,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 110,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": true,
+							"damage_per_hit": 0.75,
+							"damage_scaling": "weapon_light",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 2.4,
+								"type": "arc"
+							},
+							"stun_power": 34.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.8,
+							"damage_scaling": "weapon_light",
+							"from_tick": 0,
+							"id": "hb_1",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 2.4,
+								"type": "arc"
+							},
+							"stun_power": 36.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.9,
+							"damage_scaling": "weapon_light",
+							"from_tick": 0,
+							"id": "hb_2",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 2.4,
+								"type": "arc"
+							},
+							"stun_power": 40.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 1.35,
+							"damage_scaling": "weapon_light",
+							"from_tick": 74,
+							"id": "hb_3",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 2.4,
+								"type": "arc"
+							},
+							"stun_power": 48.0,
+							"stun_scaling": "physical",
+							"to_tick": 75
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 45,
+					"spawns": [
+						{
+							"at_tick": 110,
+							"blockable": true,
+							"damage": 0.7,
+							"id": "sp_slam",
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"offset": {
+								"forward_m": 1.2
+							},
+							"on": "hit",
+							"shape": {
+								"radius_m": 4.5,
+								"type": "circle"
+							},
+							"stun_power": 48.0,
+							"type": "ground_mark",
+							"warn_ticks": 16
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e6cc66",
+						"id": "tg_combo_falso",
+						"sound": "sfx_tele_combo_falso",
+						"style": "weapon_glow",
+						"text": "Hoja dorada; tras el tercer golpe puedes elegir remate. El salto falso pausa brevemente en el aire."
+					},
+					"windup_ticks": 36
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 14.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 15.0,
+				"mana": 0.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "El rival se eleva y queda suspendido; empieza a bajar = muévete."
+			},
+			"icon": "boss:salto_caida",
+			"id": "salto_caida",
+			"interruptible_by": [],
+			"name": "Salto con caída",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 18,
+					"spawns": [
+						{
+							"at_tick": 84,
+							"blockable": true,
+							"count": 1,
+							"damage": 1.5,
+							"id": "sp_marca",
+							"interval_ticks": 0,
+							"knockback_mps": 6.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 3.5,
+								"type": "circle"
+							},
+							"stun_power": 50.0,
+							"type": "ground_mark",
+							"warn_ticks": 30
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e6cc66",
+						"id": "tg_salto_caida",
+						"sound": "sfx_tele_salto_caida",
+						"style": "ground_ring",
+						"text": "El rival se eleva y queda suspendido; empieza a bajar = muévete."
+					},
+					"windup_ticks": 84
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 360,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 24.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Hoja ámbar alzada que parpadea en blanco a mitad (el amague) antes del golpe tardío."
+			},
+			"icon": "boss:tajo_retardado",
+			"id": "tajo_retardado",
+			"interruptible_by": [],
+			"name": "Tajo Retardado",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 80,
+						"to_tick": 139,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_flick0",
+							"sfx": "sfx_ring",
+							"tick": 33,
+							"vfx": "vfx_flash"
+						},
+						{
+							"id": "ev_flick1",
+							"sfx": "sfx_ring",
+							"tick": 57,
+							"vfx": "vfx_flash"
+						},
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 84,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.5,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 110.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 40.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 54,
+					"spawns": [
+						{
+							"at_tick": 84,
+							"blockable": true,
+							"damage": 0.975,
+							"id": "sp_slam",
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"offset": {
+								"forward_m": 1.2
+							},
+							"on": "hit",
+							"shape": {
+								"radius_m": 4.5,
+								"type": "circle"
+							},
+							"stun_power": 40.0,
+							"type": "ground_mark",
+							"warn_ticks": 21
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#ffcc4d",
+						"id": "tg_tajo_retardado",
+						"sound": "sfx_tele_tajo_retardado",
+						"style": "weapon_glow",
+						"text": "Hoja ámbar alzada que parpadea en blanco a mitad (el amague) antes del golpe tardío."
+					},
+					"tracking": {
+						"deg_per_sec": 220.0,
+						"lock_at_tick": 80,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 84
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "grab",
+			"cooldown_ticks": 540,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 28.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brazo extendido y brillo rojo sangre; avanza en línea recta para agarrar."
+			},
+			"icon": "boss:presa_verdugo",
+			"id": "presa_verdugo",
+			"interruptible_by": [],
+			"name": "Presa del Verdugo",
+			"steps": [
+				{
+					"active_ticks": 51,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 50,
+						"to_tick": 159,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 110,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 0.42,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 80.0,
+								"radius_m": 2.4,
+								"type": "arc"
+							},
+							"stun_power": 10.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 1.68,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 50,
+							"id": "hb_1",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 80.0,
+								"radius_m": 2.4,
+								"type": "arc"
+							},
+							"stun_power": 45.0,
+							"stun_scaling": "physical",
+							"to_tick": 51
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#d91a1a",
+						"id": "tg_presa_verdugo",
+						"sound": "sfx_tele_presa_verdugo",
+						"style": "weapon_glow",
+						"text": "Brazo extendido y brillo rojo sangre; avanza en línea recta para agarrar."
+					},
+					"tracking": {
+						"deg_per_sec": 300.0,
+						"lock_at_tick": 56,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 60
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 600,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 30.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo naranja y el cuerpo se tuerce hacia atrás antes del barrido circular."
+			},
+			"icon": "boss:giro_martillo",
+			"id": "giro_martillo",
+			"interruptible_by": [],
+			"name": "Giro Devastador",
+			"steps": [
+				{
+					"active_ticks": 31,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 150,
+						"to_tick": 158,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 97,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.3,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 360.0,
+								"radius_m": 3.6,
+								"type": "arc"
+							},
+							"stun_power": 35.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 1.56,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 30,
+							"id": "hb_1",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 360.0,
+								"radius_m": 3.6,
+								"type": "arc"
+							},
+							"stun_power": 35.0,
+							"stun_scaling": "physical",
+							"to_tick": 31
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 60,
+					"spawns": [
+						{
+							"at_tick": 97,
+							"blockable": true,
+							"damage": 0.975,
+							"id": "sp_slam",
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"offset": {
+								"forward_m": 1.2
+							},
+							"on": "hit",
+							"shape": {
+								"radius_m": 4.2,
+								"type": "circle"
+							},
+							"stun_power": 42.0,
+							"type": "ground_mark",
+							"warn_ticks": 13
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#ff801a",
+						"id": "tg_giro_martillo",
+						"sound": "sfx_tele_giro_martillo",
+						"style": "weapon_glow",
+						"text": "Brillo naranja y el cuerpo se tuerce hacia atrás antes del barrido circular."
+					},
+					"tracking": {
+						"deg_per_sec": 120.0,
+						"lock_at_tick": 63,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 67
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 840,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 40.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo rosa y pasos de puntillas; cada tajo deja un destello."
+			},
+			"icon": "boss:danza_cisne",
+			"id": "danza_cisne",
+			"interruptible_by": [
+				"parry",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Danza del Cisne",
+			"steps": [
+				{
+					"active_ticks": 128,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 70,
+						"to_tick": 253,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 174,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": true,
+							"damage_per_hit": 0.4,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 8.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.4,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 20,
+							"id": "hb_1",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 8.0,
+							"stun_scaling": "physical",
+							"to_tick": 21
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.4,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 40,
+							"id": "hb_2",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 8.0,
+							"stun_scaling": "physical",
+							"to_tick": 41
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.48,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 60,
+							"id": "hb_3",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 10.0,
+							"stun_scaling": "physical",
+							"to_tick": 61
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.48,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 87,
+							"id": "hb_4",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 10.0,
+							"stun_scaling": "physical",
+							"to_tick": 88
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.88,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 127,
+							"id": "hb_5",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 30.0,
+							"stun_scaling": "physical",
+							"to_tick": 128
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 78,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#f24d80",
+						"id": "tg_danza_cisne",
+						"sound": "sfx_tele_danza_cisne",
+						"style": "weapon_glow",
+						"text": "Brillo rosa y pasos de puntillas; cada tajo deja un destello."
+					},
+					"tracking": {
+						"deg_per_sec": 300.0,
+						"lock_at_tick": 43,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 47
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 600,
+			"cost": {
+				"health": 0.0,
+				"mana": 25.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Estallido violeta y desaparece; reaparece con otro estallido a tu espalda."
+			},
+			"icon": "boss:paso_espectral",
+			"id": "paso_espectral",
+			"interruptible_by": [],
+			"name": "Paso Espectral",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 60,
+						"to_tick": 125,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 70,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.4,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 35.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 54,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#b366ff",
+						"id": "tg_paso_espectral",
+						"sound": "sfx_tele_paso_espectral",
+						"style": "weapon_glow",
+						"text": "Estallido violeta y desaparece; reaparece con otro estallido a tu espalda."
+					},
+					"tracking": {
+						"deg_per_sec": 360.0,
+						"lock_at_tick": 66,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 70
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 16.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 420,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 24.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Golpe al suelo naranja; las ondas muestran su trayectoria antes de avanzar."
+			},
+			"icon": "boss:onda_rastrera",
+			"id": "onda_rastrera",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Onda Rastrera",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 40,
+						"to_tick": 96,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [
+						{
+							"at_tick": 47,
+							"blockable": true,
+							"count": 3,
+							"damage": 0.8,
+							"id": "sp_onda",
+							"knockback_mps": 6.0,
+							"offset": {
+								"forward_m": 1.0
+							},
+							"range_m": 16.0,
+							"ring": false,
+							"speed_mps": 15.0,
+							"spread_deg": 18.0,
+							"stun_power": 30.0,
+							"type": "ground_wave",
+							"warn_ticks": 31,
+							"width_m": 1.8
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#ff731a",
+						"id": "tg_onda_rastrera",
+						"sound": "sfx_tele_onda_rastrera",
+						"style": "ground_ring",
+						"text": "Golpe al suelo naranja; las ondas muestran su trayectoria antes de avanzar."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 47,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 47
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 660,
+			"cost": {
+				"health": 0.0,
+				"mana": 25.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo celeste; círculos azules siguen tu posición antes de cada rayo."
+			},
+			"icon": "boss:rayos_trazadores",
+			"id": "rayos_trazadores",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Rayos Trazadores",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 163,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 129,
+					"spawns": [
+						{
+							"at_tick": 33,
+							"blockable": true,
+							"count": 4,
+							"damage": 0.9,
+							"id": "sp_marca",
+							"interval_ticks": 33,
+							"knockback_mps": 6.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 2.0,
+								"type": "circle"
+							},
+							"stun_power": 30.0,
+							"type": "ground_mark",
+							"warn_ticks": 54
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#66ccff",
+						"id": "tg_rayos_trazadores",
+						"sound": "sfx_tele_rayos_trazadores",
+						"style": "ground_ring",
+						"text": "Brillo celeste; círculos azules siguen tu posición antes de cada rayo."
+					},
+					"windup_ticks": 33
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 1080,
+			"cost": {
+				"health": 0.0,
+				"mana": 35.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo carmesí y marcas rojas repartidas por la zona."
+			},
+			"icon": "boss:lluvia_meteoros",
+			"id": "lluvia_meteoros",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Lluvia de Meteoros",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 175,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 121,
+					"spawns": [
+						{
+							"at_tick": 53,
+							"blockable": true,
+							"count": 7,
+							"damage": 0.8,
+							"id": "sp_marca",
+							"interval_ticks": 14,
+							"knockback_mps": 7.0,
+							"mode": "scatter",
+							"scatter_radius_m": 7.5,
+							"shape": {
+								"radius_m": 2.4,
+								"type": "circle"
+							},
+							"stun_power": 25.0,
+							"type": "ground_mark",
+							"warn_ticks": 68
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#d91f40",
+						"id": "tg_lluvia_meteoros",
+						"sound": "sfx_tele_lluvia_meteoros",
+						"style": "ground_ring",
+						"text": "Brillo carmesí y marcas rojas repartidas por la zona."
+					},
+					"windup_ticks": 53
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 7.5,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "magic",
+			"cooldown_ticks": 840,
+			"cost": {
+				"health": 0.0,
+				"mana": 30.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo ígneo y cabeza echada atrás antes de soplar el cono de fuego."
+			},
+			"icon": "boss:aliento_dragon",
+			"id": "aliento_dragon",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Aliento de Dragón",
+			"steps": [
+				{
+					"active_ticks": 91,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 100,
+						"to_tick": 204,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 66,
+					"spawns": [
+						{
+							"angle_deg": 28.0,
+							"at_tick": 47,
+							"damage": 0.45,
+							"duration_ticks": 91,
+							"id": "sp_cono",
+							"length_m": 7.5,
+							"stun_power": 8.0,
+							"sweep_deg_per_sec": 70.0,
+							"tick_interval": 18,
+							"type": "beam"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#ff660d",
+						"id": "tg_aliento_dragon",
+						"sound": "sfx_tele_aliento_dragon",
+						"style": "weapon_glow",
+						"text": "Brillo ígneo y cabeza echada atrás antes de soplar el cono de fuego."
+					},
+					"windup_ticks": 47
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "buff",
+			"cooldown_ticks": 1800,
+			"cost": {
+				"health": 20.0,
+				"mana": 0.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Estallido rojo y aura roja persistente."
+			},
+			"icon": "boss:furia_fase",
+			"id": "furia_fase",
+			"interruptible_by": [],
+			"name": "Furia de Fase",
+			"steps": [
+				{
+					"active_ticks": 540,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 200,
+						"to_tick": 591,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 18,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#e61a1a",
+						"id": "tg_furia_fase",
+						"sound": "sfx_tele_furia_fase",
+						"style": "weapon_glow",
+						"text": "Estallido rojo y aura roja persistente."
+					},
+					"windup_ticks": 33
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "counter",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 22.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo azul acero y guardia quieta; no le ataques mientras brille."
+			},
+			"icon": "boss:postura_contra",
+			"id": "postura_contra",
+			"interruptible_by": [],
+			"name": "Postura de Contragolpe",
+			"steps": [
+				{
+					"active_ticks": 60,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 200,
+						"to_tick": 128,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#6699ff",
+						"id": "tg_postura_contra",
+						"sound": "sfx_tele_postura_contra",
+						"style": "weapon_glow",
+						"text": "Brillo azul acero y guardia quieta; no le ataques mientras brille."
+					},
+					"windup_ticks": 20
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 11.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 720,
+			"cost": {
+				"health": 18.0,
+				"mana": 0.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Brillo marrón y alza el arma con ambas manos; al caer, ocho grietas salen en anillo."
+			},
+			"icon": "boss:embate_sismico",
+			"id": "embate_sismico",
+			"interruptible_by": [
+				"knockdown"
+			],
+			"name": "Embate Sísmico",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 100,
+						"to_tick": 152,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 78,
+					"spawns": [
+						{
+							"at_tick": 73,
+							"blockable": true,
+							"count": 8,
+							"damage": 0.9,
+							"id": "sp_onda",
+							"knockback_mps": 6.0,
+							"offset": {
+								"forward_m": 1.0
+							},
+							"range_m": 11.0,
+							"ring": true,
+							"speed_mps": 11.0,
+							"spread_deg": 45.0,
+							"stun_power": 45.0,
+							"type": "ground_wave",
+							"warn_ticks": 34,
+							"width_m": 1.6
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#996633",
+						"id": "tg_embate_sismico",
+						"sound": "sfx_tele_embate_sismico",
+						"style": "ground_ring",
+						"text": "Brillo marrón y alza el arma con ambas manos; al caer, ocho grietas salen en anillo."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 73,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 73
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 720,
+			"cost": {
+				"health": 0.0,
+				"mana": 30.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Columna de luz blanca sobre ti que se estrecha; la lanza cae cuando desaparece."
+			},
+			"icon": "boss:lanza_celeste",
+			"id": "lanza_celeste",
+			"interruptible_by": [],
+			"name": "Lanza Celeste",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 50,
+						"to_tick": 125,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 84,
+					"spawns": [
+						{
+							"at_tick": 40,
+							"blockable": false,
+							"count": 1,
+							"damage": 1.6,
+							"id": "sp_marca",
+							"interval_ticks": 0,
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 1.6,
+								"type": "circle"
+							},
+							"stun_power": 70.0,
+							"type": "ground_mark",
+							"warn_ticks": 74
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#f2f2ff",
+						"id": "tg_lanza_celeste",
+						"sound": "sfx_tele_lanza_celeste",
+						"style": "ground_ring",
+						"text": "Columna de luz blanca sobre ti que se estrecha; la lanza cae cuando desaparece."
+					},
+					"windup_ticks": 40
+				}
+			],
+			"tags": [
+				"unblockable",
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 28.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Se agacha con un cuerno de luz ámbar y arranca en línea recta."
+			},
+			"icon": "boss:cuerno_embiste",
+			"id": "cuerno_embiste",
+			"interruptible_by": [],
+			"name": "Cuerno de Embiste",
+			"steps": [
+				{
+					"active_ticks": 28,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 110,
+						"to_tick": 161,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 97,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 0.712,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 96.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 26.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 1.188,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 27,
+							"id": "hb_1",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 96.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 44.0,
+							"stun_scaling": "physical",
+							"to_tick": 28
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 63,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#f2b840",
+						"id": "tg_cuerno_embiste",
+						"sound": "sfx_tele_cuerno_embiste",
+						"style": "weapon_glow",
+						"text": "Se agacha con un cuerno de luz ámbar y arranca en línea recta."
+					},
+					"tracking": {
+						"deg_per_sec": 160.0,
+						"lock_at_tick": 66,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 70
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 540,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 32.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Dos destellos cruzados y una pausa antes de la estocada final."
+			},
+			"icon": "boss:tajo_cruzado",
+			"id": "tajo_cruzado",
+			"interruptible_by": [
+				"parry",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Tajo Cruzado",
+			"steps": [
+				{
+					"active_ticks": 58,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 60,
+						"to_tick": 180,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 110,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": true,
+							"damage_per_hit": 0.7,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.1,
+								"type": "arc"
+							},
+							"stun_power": 16.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.7,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 20,
+							"id": "hb_1",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.1,
+								"type": "arc"
+							},
+							"stun_power": 16.0,
+							"stun_scaling": "physical",
+							"to_tick": 21
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 1.19,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 57,
+							"id": "hb_2",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 140.0,
+								"radius_m": 3.1,
+								"type": "arc"
+							},
+							"stun_power": 40.0,
+							"stun_scaling": "physical",
+							"to_tick": 58
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 69,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#f2e6b8",
+						"id": "tg_tajo_cruzado",
+						"sound": "sfx_tele_tajo_cruzado",
+						"style": "weapon_glow",
+						"text": "Dos destellos cruzados y una pausa antes de la estocada final."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 50,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 53
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 26.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Un arco carmesí queda en el aire y estalla un instante después."
+			},
+			"icon": "boss:zarpazo_sangre",
+			"id": "zarpazo_sangre",
+			"interruptible_by": [
+				"parry",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Zarpazo de Sangre",
+			"steps": [
+				{
+					"active_ticks": 41,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 40,
+						"to_tick": 148,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 90,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": true,
+							"damage_per_hit": 0.68,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 14.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 0.977,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 40,
+							"id": "hb_1",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 120.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 36.0,
+							"stun_scaling": "physical",
+							"to_tick": 41
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 57,
+					"spawns": [
+						{
+							"at_tick": 90,
+							"blockable": true,
+							"damage": 0.68,
+							"id": "sp_slam",
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"offset": {
+								"forward_m": 1.2
+							},
+							"on": "hit",
+							"shape": {
+								"radius_m": 3.2,
+								"type": "circle"
+							},
+							"stun_power": 32.0,
+							"type": "ground_mark",
+							"warn_ticks": 18
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#c70f1f",
+						"id": "tg_zarpazo_sangre",
+						"sound": "sfx_tele_zarpazo_sangre",
+						"style": "weapon_glow",
+						"text": "Un arco carmesí queda en el aire y estalla un instante después."
+					},
+					"tracking": {
+						"deg_per_sec": 200.0,
+						"lock_at_tick": 46,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 50
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 26.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "El cuerpo se tuerce y un arco bajo recorre casi todo el alrededor."
+			},
+			"icon": "boss:barrido_cola",
+			"id": "barrido_cola",
+			"interruptible_by": [
+				"parry",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Barrido de Cola",
+			"steps": [
+				{
+					"active_ticks": 41,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 90,
+						"to_tick": 187,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 117,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": true,
+							"damage_per_hit": 1.1,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 340.0,
+								"radius_m": 4.4,
+								"type": "arc"
+							},
+							"stun_power": 34.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": true,
+							"damage_per_hit": 1.21,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 40,
+							"id": "hb_1",
+							"parryable": true,
+							"shape": {
+								"angle_deg": 340.0,
+								"radius_m": 4.4,
+								"type": "arc"
+							},
+							"stun_power": 30.0,
+							"stun_scaling": "physical",
+							"to_tick": 41
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 69,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#8c6b47",
+						"id": "tg_barrido_cola",
+						"sound": "sfx_tele_barrido_cola",
+						"style": "weapon_glow",
+						"text": "El cuerpo se tuerce y un arco bajo recorre casi todo el alrededor."
+					},
+					"tracking": {
+						"deg_per_sec": 80.0,
+						"lock_at_tick": 73,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 77
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 420,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 24.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Una daga de luz sale primero; el brillo blanco del amague avisa el salto."
+			},
+			"icon": "boss:daga_sagrada",
+			"id": "daga_sagrada",
+			"interruptible_by": [],
+			"name": "Daga Sagrada",
+			"steps": [
+				{
+					"active_ticks": 59,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 70,
+						"to_tick": 155,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_flick0",
+							"sfx": "sfx_ring",
+							"tick": 30,
+							"vfx": "vfx_flash"
+						},
+						{
+							"id": "ev_flick1",
+							"sfx": "sfx_ring",
+							"tick": 57,
+							"vfx": "vfx_flash"
+						},
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 94,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 0.402,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 90.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 8.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 1.667,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 58,
+							"id": "hb_1",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 90.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 46.0,
+							"stun_scaling": "physical",
+							"to_tick": 59
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 60,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#f2db73",
+						"id": "tg_daga_sagrada",
+						"sound": "sfx_tele_daga_sagrada",
+						"style": "weapon_glow",
+						"text": "Una daga de luz sale primero; el brillo blanco del amague avisa el salto."
+					},
+					"tracking": {
+						"deg_per_sec": 260.0,
+						"lock_at_tick": 33,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 36
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 600,
+			"cost": {
+				"health": 0.0,
+				"mana": 28.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "La hoja se vuelve negra y roja y retrocede antes de clavarse."
+			},
+			"icon": "boss:estocada_negra",
+			"id": "estocada_negra",
+			"interruptible_by": [],
+			"name": "Estocada Negra",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 80,
+						"to_tick": 160,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 84,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.55,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 64.0,
+								"radius_m": 4.2,
+								"type": "arc"
+							},
+							"stun_power": 52.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 75,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#6b0d14",
+						"id": "tg_estocada_negra",
+						"sound": "sfx_tele_estocada_negra",
+						"style": "weapon_glow",
+						"text": "La hoja se vuelve negra y roja y retrocede antes de clavarse."
+					},
+					"tracking": {
+						"deg_per_sec": 140.0,
+						"lock_at_tick": 80,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 84
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 960,
+			"cost": {
+				"health": 16.0,
+				"mana": 0.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Se eleva envuelto en pétalos oscuros; el círculo del suelo es el lugar de la flor."
+			},
+			"icon": "boss:flor_umbral",
+			"id": "flor_umbral",
+			"interruptible_by": [],
+			"name": "Flor Umbral",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 120,
+						"to_tick": 202,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 114,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.2,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 160.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 38.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 87,
+					"spawns": [
+						{
+							"at_tick": 114,
+							"blockable": true,
+							"damage": 1.02,
+							"id": "sp_slam",
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"offset": {
+								"forward_m": 1.2
+							},
+							"on": "always",
+							"shape": {
+								"radius_m": 5.2,
+								"type": "circle"
+							},
+							"stun_power": 36.0,
+							"type": "ground_mark",
+							"warn_ticks": 28
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#d11f61",
+						"id": "tg_flor_umbral",
+						"sound": "sfx_tele_flor_umbral",
+						"style": "weapon_glow",
+						"text": "Se eleva envuelto en pétalos oscuros; el círculo del suelo es el lugar de la flor."
+					},
+					"tracking": {
+						"deg_per_sec": 200.0,
+						"lock_at_tick": 110,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 114
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "grab",
+			"cooldown_ticks": 600,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 26.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Abre las fauces con brillo cobre y avanza para morder."
+			},
+			"icon": "boss:presa_fauces",
+			"id": "presa_fauces",
+			"interruptible_by": [],
+			"name": "Presa de Fauces",
+			"steps": [
+				{
+					"active_ticks": 45,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 50,
+						"to_tick": 149,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 97,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 0.345,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 72.0,
+								"radius_m": 2.3,
+								"type": "arc"
+							},
+							"stun_power": 8.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 1.667,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 44,
+							"id": "hb_1",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 72.0,
+								"radius_m": 2.3,
+								"type": "arc"
+							},
+							"stun_power": 48.0,
+							"stun_scaling": "physical",
+							"to_tick": 45
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 51,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#b84724",
+						"id": "tg_presa_fauces",
+						"sound": "sfx_tele_presa_fauces",
+						"style": "weapon_glow",
+						"text": "Abre las fauces con brillo cobre y avanza para morder."
+					},
+					"tracking": {
+						"deg_per_sec": 220.0,
+						"lock_at_tick": 50,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 53
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 420,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 22.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Se enrosca en una rueda gris y sale disparado hacia vos."
+			},
+			"icon": "boss:giro_noble",
+			"id": "giro_noble",
+			"interruptible_by": [],
+			"name": "Rueda Noble",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 140,
+						"to_tick": 136,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 63,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.05,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 100.0,
+								"radius_m": 2.5,
+								"type": "arc"
+							},
+							"stun_power": 30.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 72,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#8c8c9e",
+						"id": "tg_giro_noble",
+						"sound": "sfx_tele_giro_noble",
+						"style": "weapon_glow",
+						"text": "Se enrosca en una rueda gris y sale disparado hacia vos."
+					},
+					"tracking": {
+						"deg_per_sec": 360.0,
+						"lock_at_tick": 60,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 63
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 840,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 42.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Se queda en puntas y el arma brilla en tres pulsos antes de cada ráfaga."
+			},
+			"icon": "boss:danza_triple",
+			"id": "danza_triple",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Danza Triple",
+			"steps": [
+				{
+					"active_ticks": 88,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 80,
+						"to_tick": 229,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 144,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 0.42,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 160.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 8.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 0.462,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 23,
+							"id": "hb_1",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 160.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 10.0,
+							"stun_scaling": "physical",
+							"to_tick": 24
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 0.462,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 47,
+							"id": "hb_2",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 160.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 10.0,
+							"stun_scaling": "physical",
+							"to_tick": 48
+						},
+						{
+							"blockable": false,
+							"damage_per_hit": 0.756,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 87,
+							"id": "hb_3",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 160.0,
+								"radius_m": 3.2,
+								"type": "arc"
+							},
+							"stun_power": 26.0,
+							"stun_scaling": "physical",
+							"to_tick": 88
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 84,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#ebb8d6",
+						"id": "tg_danza_triple",
+						"sound": "sfx_tele_danza_triple",
+						"style": "weapon_glow",
+						"text": "Se queda en puntas y el arma brilla en tres pulsos antes de cada ráfaga."
+					},
+					"tracking": {
+						"deg_per_sec": 320.0,
+						"lock_at_tick": 53,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 57
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "melee",
+			"cooldown_ticks": 660,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 30.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Un par de alas de luz se abren; al plegarse, cae en picado."
+			},
+			"icon": "boss:alas_picado",
+			"id": "alas_picado",
+			"interruptible_by": [],
+			"name": "Picado de Alas",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 130,
+						"to_tick": 160,
+						"type": "super"
+					},
+					"events": [
+						{
+							"id": "ev_golpe",
+							"sfx": "sfx_heavy",
+							"tick": 90,
+							"vfx": "vfx_slash"
+						}
+					],
+					"hitboxes": [
+						{
+							"blockable": false,
+							"damage_per_hit": 1.25,
+							"damage_scaling": "weapon_heavy",
+							"from_tick": 0,
+							"id": "hb_0",
+							"parryable": false,
+							"shape": {
+								"angle_deg": 110.0,
+								"radius_m": 3.0,
+								"type": "arc"
+							},
+							"stun_power": 46.0,
+							"stun_scaling": "physical",
+							"to_tick": 1
+						}
+					],
+					"id": "paso",
+					"recovery_ticks": 69,
+					"spawns": [
+						{
+							"at_tick": 90,
+							"blockable": true,
+							"damage": 0.875,
+							"id": "sp_slam",
+							"knockback_mps": 9.0,
+							"mode": "track",
+							"offset": {
+								"forward_m": 1.2
+							},
+							"on": "always",
+							"shape": {
+								"radius_m": 3.8,
+								"type": "circle"
+							},
+							"stun_power": 40.0,
+							"type": "ground_mark",
+							"warn_ticks": 18
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#d9ad52",
+						"id": "tg_alas_picado",
+						"sound": "sfx_tele_alas_picado",
+						"style": "weapon_glow",
+						"text": "Un par de alas de luz se abren; al plegarse, cae en picado."
+					},
+					"tracking": {
+						"deg_per_sec": 180.0,
+						"lock_at_tick": 87,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 90
+				}
+			],
+			"tags": [
+				"unblockable"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 15.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 420,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 24.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Clava la mano en el suelo; una grieta ancha avanza hacia vos."
+			},
+			"icon": "boss:garra_suelo",
+			"id": "garra_suelo",
+			"interruptible_by": [
+				"stun_lvl1",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Garra de Suelo",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 50,
+						"to_tick": 112,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 54,
+					"spawns": [
+						{
+							"at_tick": 57,
+							"blockable": true,
+							"count": 1,
+							"damage": 0.95,
+							"id": "sp_onda",
+							"knockback_mps": 6.0,
+							"offset": {
+								"forward_m": 1.0
+							},
+							"range_m": 15.0,
+							"ring": false,
+							"speed_mps": 13.0,
+							"spread_deg": 0.0,
+							"stun_power": 48.0,
+							"type": "ground_wave",
+							"warn_ticks": 34,
+							"width_m": 2.6
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#9e805c",
+						"id": "tg_garra_suelo",
+						"sound": "sfx_tele_garra_suelo",
+						"style": "ground_ring",
+						"text": "Clava la mano en el suelo; una grieta ancha avanza hacia vos."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 57,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 57
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 17.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 540,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 28.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "El hacha gira y suelta dos cortes de viento pálido."
+			},
+			"icon": "boss:vendaval_hacha",
+			"id": "vendaval_hacha",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Vendaval de Hacha",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 60,
+						"to_tick": 111,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 57,
+					"spawns": [
+						{
+							"at_tick": 53,
+							"blockable": true,
+							"count": 2,
+							"damage": 0.75,
+							"id": "sp_onda",
+							"knockback_mps": 6.0,
+							"offset": {
+								"forward_m": 1.0
+							},
+							"range_m": 17.0,
+							"ring": false,
+							"speed_mps": 17.0,
+							"spread_deg": 10.0,
+							"stun_power": 28.0,
+							"type": "ground_wave",
+							"warn_ticks": 27,
+							"width_m": 2.0
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#b3dbf2",
+						"id": "tg_vendaval_hacha",
+						"sound": "sfx_tele_vendaval_hacha",
+						"style": "ground_ring",
+						"text": "El hacha gira y suelta dos cortes de viento pálido."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 53,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 53
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 6.5,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 720,
+			"cost": {
+				"health": 0.0,
+				"mana": 30.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Un anillo violeta se enciende a sus pies y ocho llamaradas salen en todas direcciones."
+			},
+			"icon": "boss:anillo_fuego",
+			"id": "anillo_fuego",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Anillo de Fuego",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 40,
+						"to_tick": 131,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 63,
+					"spawns": [
+						{
+							"at_tick": 67,
+							"blockable": true,
+							"count": 8,
+							"damage": 0.7,
+							"id": "sp_onda",
+							"knockback_mps": 6.0,
+							"offset": {
+								"forward_m": 1.0
+							},
+							"range_m": 6.5,
+							"ring": true,
+							"speed_mps": 7.5,
+							"spread_deg": 45.0,
+							"stun_power": 22.0,
+							"type": "ground_wave",
+							"warn_ticks": 37,
+							"width_m": 1.3
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#8c38d9",
+						"id": "tg_anillo_fuego",
+						"sound": "sfx_tele_anillo_fuego",
+						"style": "ground_ring",
+						"text": "Un anillo violeta se enciende a sus pies y ocho llamaradas salen en todas direcciones."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 67,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 67
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 9.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 360,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 20.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Levanta un pie con brillo ocre; al bajar, una onda baja y ancha sale al frente."
+			},
+			"icon": "boss:pisoton",
+			"id": "pisoton",
+			"interruptible_by": [
+				"stun_lvl1",
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Pisotón",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 80,
+						"to_tick": 96,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [
+						{
+							"at_tick": 47,
+							"blockable": true,
+							"count": 1,
+							"damage": 0.85,
+							"id": "sp_onda",
+							"knockback_mps": 6.0,
+							"offset": {
+								"forward_m": 1.0
+							},
+							"range_m": 9.0,
+							"ring": false,
+							"speed_mps": 10.0,
+							"spread_deg": 0.0,
+							"stun_power": 55.0,
+							"type": "ground_wave",
+							"warn_ticks": 27,
+							"width_m": 4.2
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#bd8542",
+						"id": "tg_pisoton",
+						"sound": "sfx_tele_pisoton",
+						"style": "ground_ring",
+						"text": "Levanta un pie con brillo ocre; al bajar, una onda baja y ancha sale al frente."
+					},
+					"tracking": {
+						"deg_per_sec": 240.0,
+						"lock_at_tick": 47,
+						"post_lock_deg_per_sec": 0.0
+					},
+					"windup_ticks": 47
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 660,
+			"cost": {
+				"health": 0.0,
+				"mana": 28.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Cinco columnas doradas siguen tu posición, una detrás de otra."
+			},
+			"icon": "boss:lluvia_lanzas",
+			"id": "lluvia_lanzas",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Lluvia de Lanzas",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 174,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 140,
+					"spawns": [
+						{
+							"at_tick": 33,
+							"blockable": true,
+							"count": 5,
+							"damage": 0.8,
+							"id": "sp_marca",
+							"interval_ticks": 26,
+							"knockback_mps": 6.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 1.35,
+								"type": "circle"
+							},
+							"stun_power": 32.0,
+							"type": "ground_mark",
+							"warn_ticks": 51
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#f2e080",
+						"id": "tg_lluvia_lanzas",
+						"sound": "sfx_tele_lluvia_lanzas",
+						"style": "ground_ring",
+						"text": "Cinco columnas doradas siguen tu posición, una detrás de otra."
+					},
+					"windup_ticks": 33
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 480,
+			"cost": {
+				"health": 0.0,
+				"mana": 24.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Un círculo violeta grande se clava en el suelo bajo tus pies y se llena despacio."
+			},
+			"icon": "boss:flecha_grave",
+			"id": "flecha_grave",
+			"interruptible_by": [],
+			"name": "Flecha Grave",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 102,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 54,
+					"spawns": [
+						{
+							"at_tick": 47,
+							"blockable": false,
+							"count": 1,
+							"damage": 1.35,
+							"id": "sp_marca",
+							"interval_ticks": 0,
+							"knockback_mps": 11.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 2.6,
+								"type": "circle"
+							},
+							"stun_power": 58.0,
+							"type": "ground_mark",
+							"warn_ticks": 85
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#7a47b8",
+						"id": "tg_flecha_grave",
+						"sound": "sfx_tele_flecha_grave",
+						"style": "ground_ring",
+						"text": "Un círculo violeta grande se clava en el suelo bajo tus pies y se llena despacio."
+					},
+					"windup_ticks": 47
+				}
+			],
+			"tags": [
+				"unblockable",
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 720,
+			"cost": {
+				"health": 0.0,
+				"mana": 32.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Alza la mano y llueven gotas carmesí: varias marcas chicas alrededor tuyo."
+			},
+			"icon": "boss:lluvia_sangre",
+			"id": "lluvia_sangre",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Lluvia de Sangre",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 137,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 93,
+					"spawns": [
+						{
+							"at_tick": 43,
+							"blockable": true,
+							"count": 6,
+							"damage": 0.7,
+							"id": "sp_marca",
+							"interval_ticks": 10,
+							"knockback_mps": 4.0,
+							"mode": "scatter",
+							"scatter_radius_m": 5.0,
+							"shape": {
+								"radius_m": 1.7,
+								"type": "circle"
+							},
+							"stun_power": 20.0,
+							"type": "ground_mark",
+							"warn_ticks": 48
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#cc1424",
+						"id": "tg_lluvia_sangre",
+						"sound": "sfx_tele_lluvia_sangre",
+						"style": "ground_ring",
+						"text": "Alza la mano y llueven gotas carmesí: varias marcas chicas alrededor tuyo."
+					},
+					"windup_ticks": 43
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "zone",
+			"cooldown_ticks": 780,
+			"cost": {
+				"health": 0.0,
+				"mana": 34.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Tres columnas celestes caen donde estabas, con una pausa entre cada una."
+			},
+			"icon": "boss:columnas_rayo",
+			"id": "columnas_rayo",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Columnas de Rayo",
+			"steps": [
+				{
+					"active_ticks": 1,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 40,
+						"to_tick": 172,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 135,
+					"spawns": [
+						{
+							"at_tick": 36,
+							"blockable": true,
+							"count": 3,
+							"damage": 1.05,
+							"id": "sp_marca",
+							"interval_ticks": 42,
+							"knockback_mps": 8.0,
+							"mode": "track",
+							"scatter_radius_m": 0.0,
+							"shape": {
+								"radius_m": 2.1,
+								"type": "circle"
+							},
+							"stun_power": 40.0,
+							"type": "ground_mark",
+							"warn_ticks": 64
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#9eccff",
+						"id": "tg_columnas_rayo",
+						"sound": "sfx_tele_columnas_rayo",
+						"style": "ground_ring",
+						"text": "Tres columnas celestes caen donde estabas, con una pausa entre cada una."
+					},
+					"windup_ticks": 36
+				}
+			],
+			"tags": [
+				"aoe"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "ranged",
+			"cooldown_ticks": 360,
+			"cost": {
+				"health": 0.0,
+				"mana": 18.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "La hoja suelta un tajo negro y rojo que curva hacia vos."
+			},
+			"icon": "boss:saeta_oscura",
+			"id": "saeta_oscura",
+			"interruptible_by": [],
+			"name": "Saeta Oscura",
+			"steps": [
+				{
+					"active_ticks": 60,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 30,
+						"to_tick": 119,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 31,
+					"spawns": [
+						{
+							"at_tick": 1,
+							"count": 1,
+							"hitbox": {
+								"blockable": true,
+								"damage_per_hit": 0.9,
+								"parryable": false,
+								"stun_power": 34.0
+							},
+							"homing_deg": 48.0,
+							"homing_ticks": 97,
+							"id": "sp_tiro",
+							"lifetime_ticks": 133,
+							"radius_m": 0.85,
+							"speed_mps": 16.0,
+							"type": "projectile"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#8c141f",
+						"id": "tg_saeta_oscura",
+						"sound": "sfx_tele_saeta_oscura",
+						"style": "weapon_glow",
+						"text": "La hoja suelta un tajo negro y rojo que curva hacia vos."
+					},
+					"windup_ticks": 28
+				}
+			],
+			"tags": [
+				"projectile"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "magic",
+			"cooldown_ticks": 600,
+			"cost": {
+				"health": 0.0,
+				"mana": 30.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Un orbe pálido nace delante del arma y avanza girando muy poco."
+			},
+			"icon": "boss:orbe_lunar",
+			"id": "orbe_lunar",
+			"interruptible_by": [],
+			"name": "Orbe Lunar",
+			"steps": [
+				{
+					"active_ticks": 60,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 40,
+						"to_tick": 155,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [
+						{
+							"at_tick": 1,
+							"count": 1,
+							"hitbox": {
+								"blockable": true,
+								"damage_per_hit": 1.25,
+								"parryable": false,
+								"stun_power": 40.0
+							},
+							"homing_deg": 22.0,
+							"homing_ticks": 133,
+							"id": "sp_tiro",
+							"lifetime_ticks": 181,
+							"radius_m": 1.05,
+							"speed_mps": 11.0,
+							"type": "projectile"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#bfd1ff",
+						"id": "tg_orbe_lunar",
+						"sound": "sfx_tele_orbe_lunar",
+						"style": "weapon_glow",
+						"text": "Un orbe pálido nace delante del arma y avanza girando muy poco."
+					},
+					"windup_ticks": 47
+				}
+			],
+			"tags": [
+				"projectile"
+			],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 9.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "magic",
+			"cooldown_ticks": 780,
+			"cost": {
+				"health": 0.0,
+				"mana": 32.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Echa la cabeza atrás con chispas celestes y sopla un cono fino."
+			},
+			"icon": "boss:aliento_rayo",
+			"id": "aliento_rayo",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Aliento de Rayo",
+			"steps": [
+				{
+					"active_ticks": 72,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 80,
+						"to_tick": 191,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 69,
+					"spawns": [
+						{
+							"angle_deg": 18.0,
+							"at_tick": 50,
+							"damage": 0.4,
+							"duration_ticks": 72,
+							"id": "sp_cono",
+							"length_m": 9.0,
+							"stun_power": 10.0,
+							"sweep_deg_per_sec": 40.0,
+							"tick_interval": 16,
+							"type": "beam"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#8cc7ff",
+						"id": "tg_aliento_rayo",
+						"sound": "sfx_tele_aliento_rayo",
+						"style": "weapon_glow",
+						"text": "Echa la cabeza atrás con chispas celestes y sopla un cono fino."
+					},
+					"windup_ticks": 50
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 6.5,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "magic",
+			"cooldown_ticks": 720,
+			"cost": {
+				"health": 0.0,
+				"mana": 28.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Una niebla blanca le sale de la boca antes del soplido ancho."
+			},
+			"icon": "boss:aliento_escarcha",
+			"id": "aliento_escarcha",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Aliento de Escarcha",
+			"steps": [
+				{
+					"active_ticks": 78,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 70,
+						"to_tick": 178,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 60,
+					"spawns": [
+						{
+							"angle_deg": 42.0,
+							"at_tick": 40,
+							"damage": 0.38,
+							"duration_ticks": 78,
+							"id": "sp_cono",
+							"length_m": 6.5,
+							"stun_power": 8.0,
+							"sweep_deg_per_sec": 50.0,
+							"tick_interval": 18,
+							"type": "beam"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#b8e6ff",
+						"id": "tg_aliento_escarcha",
+						"sound": "sfx_tele_aliento_escarcha",
+						"style": "weapon_glow",
+						"text": "Una niebla blanca le sale de la boca antes del soplido ancho."
+					},
+					"windup_ticks": 40
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 5.5,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "magic",
+			"cooldown_ticks": 840,
+			"cost": {
+				"health": 0.0,
+				"mana": 34.0,
+				"stamina": 0.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "El suelo delante de él se pone naranja y luego brota un chorro bajo."
+			},
+			"icon": "boss:chorro_lava",
+			"id": "chorro_lava",
+			"interruptible_by": [
+				"stun_lvl2",
+				"knockdown"
+			],
+			"name": "Chorro de Lava",
+			"steps": [
+				{
+					"active_ticks": 97,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 100,
+						"to_tick": 222,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 72,
+					"spawns": [
+						{
+							"angle_deg": 36.0,
+							"at_tick": 53,
+							"damage": 0.5,
+							"duration_ticks": 97,
+							"id": "sp_cono",
+							"length_m": 5.5,
+							"stun_power": 12.0,
+							"sweep_deg_per_sec": 35.0,
+							"tick_interval": 17,
+							"type": "beam"
+						}
+					],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#ff6114",
+						"id": "tg_chorro_lava",
+						"sound": "sfx_tele_chorro_lava",
+						"style": "weapon_glow",
+						"text": "El suelo delante de él se pone naranja y luego brota un chorro bajo."
+					},
+					"windup_ticks": 53
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "buff",
+			"cooldown_ticks": 1320,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 26.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Alza los brazos y un aura naranja lo envuelve al rugir."
+			},
+			"icon": "boss:grito_guerra",
+			"id": "grito_guerra",
+			"interruptible_by": [],
+			"name": "Grito de Guerra",
+			"steps": [
+				{
+					"active_ticks": 331,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 150,
+						"to_tick": 392,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 25,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#eb8c29",
+						"id": "tg_grito_guerra",
+						"sound": "sfx_tele_grito_guerra",
+						"style": "weapon_glow",
+						"text": "Alza los brazos y un aura naranja lo envuelve al rugir."
+					},
+					"windup_ticks": 36
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		},
+		{
+			"ai": {
+				"range_max": 8.0,
+				"range_min": 0.0,
+				"use_when": [
+					"target_in_range"
+				],
+				"weight": 10
+			},
+			"category": "counter",
+			"cooldown_ticks": 540,
+			"cost": {
+				"health": 0.0,
+				"mana": 0.0,
+				"stamina": 20.0
+			},
+			"entry_step": "paso",
+			"hint": {
+				"text": "Se queda quieto con un filo plateado. Si le pegás mientras brilla, devuelve el golpe."
+			},
+			"icon": "boss:guardia_reflejo",
+			"id": "guardia_reflejo",
+			"interruptible_by": [],
+			"name": "Guardia Refleja",
+			"steps": [
+				{
+					"active_ticks": 60,
+					"armor": {
+						"from_tick": 0,
+						"poise_bonus_pct": 200,
+						"to_tick": 124,
+						"type": "super"
+					},
+					"events": [],
+					"hitboxes": [],
+					"id": "paso",
+					"recovery_ticks": 48,
+					"spawns": [],
+					"telegraph": {
+						"at_tick": 0,
+						"color": "#b8dbff",
+						"id": "tg_guardia_reflejo",
+						"sound": "sfx_tele_guardia_reflejo",
+						"style": "weapon_glow",
+						"text": "Se queda quieto con un filo plateado. Si le pegás mientras brilla, devuelve el golpe."
+					},
+					"windup_ticks": 16
+				}
+			],
+			"tags": [],
+			"unlock": {
+				"phase": 1
+			},
+			"usable_while": [
+				"ground"
+			],
+			"uses_global_cd": true
+		}
+	],
+	"tick_rate": 60,
+	"version": 1
 }

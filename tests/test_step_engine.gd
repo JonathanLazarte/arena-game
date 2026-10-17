@@ -86,7 +86,7 @@ func _same(off: Array, on: Array, gap: int, ticks: int, kind: String, label: Str
 
 func _run() -> void:
 	var cat := SimSteps.catalog()
-	check(cat.size() == 4, "el catálogo de la etapa tiene 4 habilidades (hay %d)" % cat.size())
+	check(cat.size() == SimSteps.IDS.size(), "el catálogo cargado cubre las migradas (%d)" % cat.size())
 	var off0: Array = await _bake(["tajo_retardado"], ["estocada"], 0)
 	var on0: Array = await _bake(["tajo_retardado"], ["estocada"], 1)
 	check(int(off0[0]["ab_engine"]) == 0 and int(on0[0]["ab_engine"]) == 1, "ab_engine 0 y 1 queda en los params")

@@ -14,7 +14,12 @@ extends RefCounted
 ## aún no tiene ese escalado: ver la pregunta al final de la etapa).
 
 const PATH := "res://data/abilities/catalog.json"
-const IDS: Array[String] = ["tajo_retardado", "estocada_negra", "pisoton", "flecha_grave"]
+const IDS: Array[String] = [
+	"tajo_retardado", "estocada_negra", "pisoton", "flecha_grave",
+	"presa_verdugo", "giro_martillo", "danza_cisne", "paso_espectral",
+	"cuerno_embiste", "tajo_cruzado", "zarpazo_sangre", "barrido_cola", "daga_sagrada", "flor_umbral",
+	"presa_fauces", "giro_noble", "danza_triple", "alas_picado",
+]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1
 const EXEC_RAIN := 2

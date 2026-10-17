@@ -183,7 +183,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["abort"] = 1 if d.get("abort_on_miss", false) else 0
 			c["miss_t"] = c["end"] - _tk(float(d.get("miss_extra", 0.5)) + float(d.get("recovery", 0.9)))
 			c["hit_if"] = 1 if d.get("hit_iframes", false) else 0
-			c["parry_cancel"] = 1 if id == "danza_cisne" or SimSteps.wants_parry(id) else 0
+			c["parry_cancel"] = 1 if SimSteps.wants_parry(id) else 0
 			c["vanish"] = _tk(float(d["vanish"]) * tk) if d.has("vanish") else -1
 			c["reappear"] = _tk(float(hits[0][0]) * tk - 0.2)
 			c["blink"] = _um(float(d.get("blink_dist", 2.4)))
