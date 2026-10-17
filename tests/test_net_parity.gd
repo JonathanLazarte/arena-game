@@ -35,6 +35,13 @@ func _run() -> void:
 		["flecha cargada", 10.0, 220, [[0, 0, "swap", 0], [40, 0, "shoot", 90]]],
 		["ataque en carrera", 6.0, 90, [[0, 0, "move_on", 0], [0, 0, "sprint_on", 0], [30, 0, "light", 0], [31, 0, "move_off", 0], [31, 0, "sprint_off", 0]]],
 		["crítico tras rotura de postura", 1.8, 520, _crit_script()],
+		["infusión sangrante", 1.8, 460, _spam(10, 44), {"inf": ["sangrante", ""]}],
+		["infusión venenosa (veneno en el tiempo)", 1.8, 1100, _spam(8, 44), {"inf": ["venenoso", ""]}],
+		["infusión gélida (+daño recibido)", 1.8, 700, _spam(14, 44), {"inf": ["gelido", ""]}],
+		["infusión ardiente vs armadura", 1.8, 300, _spam(5, 44), {"inf": ["ardiente", ""], "armor": true}],
+		["infusión sagrada", 1.8, 300, _spam(5, 44), {"inf": ["sagrada", ""], "armor": true}],
+		["bloqueo con sangrante (30 %)", 1.8, 520, [[0, 1, "block_on", 0]] + _spam(10, 48), {"inf": ["sangrante", ""]}],
+		["flecha venenosa", 10.0, 900, [[0, 0, "swap", 0], [40, 0, "shoot", 0], [140, 0, "shoot", 0], [240, 0, "shoot", 0], [340, 0, "shoot", 0], [440, 0, "shoot", 0]], {"w2": "arco", "w2inf": "venenoso"}],
 		["ballesta", 10.0, 200, [[0, 0, "swap", 0], [40, 0, "shoot", 0]], {"w2": "ballesta"}],
 		["ballesta cargada (abanico)", 10.0, 260, [[0, 0, "swap", 0], [40, 0, "shoot", 100]], {"w2": "ballesta"}],
 		["armadura: ligero + fuerte", 1.8, 220, [[2, 0, "light", 0], [120, 0, "heavy", 0]], {"armor": true}],
@@ -57,7 +64,7 @@ func _run() -> void:
 		var r: Dictionary = off["r"]
 		for k in ["dmg0", "dmg1"]:
 			check(absf(float(r[k]) - float(sim[k])) <= 0.05 + 0.01 * float(r[k]), "%s: %s offline %.2f vs sim %.2f" % [name, k, r[k], sim[k]])
-		for k in ["lvl0", "lvl1", "parries", "dodges", "guard_breaks", "hits0", "hits1", "stance_breaks", "crits"]:
+		for k in ["lvl0", "lvl1", "parries", "dodges", "guard_breaks", "hits0", "hits1", "stance_breaks", "crits", "procs0", "procs1"]:
 			check(int(r[k]) == int(sim[k]), "%s: %s offline %d vs sim %d" % [name, k, r[k], sim[k]])
 		for k in ["first_hit", "stun0", "stun1"]:
 			var tol := 1 if k == "first_hit" else 2
@@ -87,9 +94,15 @@ func _pressure_script() -> Array:
 		out.append([2 + k * 13, 0, "light", 0])
 	return out
 
+func _spam(n: int, every: int) -> Array:
+	var out := []
+	for k in n:
+		out.append([2 + k * every, 0, "light", 0])
+	return out
+
 func _empty_result() -> Dictionary:
 	return {"dmg0": 0.0, "dmg1": 0.0, "lvl0": 0, "lvl1": 0, "parries": 0, "dodges": 0, "guard_breaks": 0, "hits0": 0, "hits1": 0,
-		"first_hit": -1, "stun0": 0, "stun1": 0, "stance_breaks": 0, "crits": 0, "log": []}
+		"first_hit": -1, "stun0": 0, "stun1": 0, "stance_breaks": 0, "crits": 0, "procs0": 0, "procs1": 0, "log": []}
 
 func _dir_off(d32: int) -> Vector3:
 	var a := d32 / 32.0 * TAU
@@ -109,6 +122,10 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 		if String(chars[i]) != "":
 			f.set_loadout_defs(load("res://resources/characters/%s.tres" % chars[i]), f.weapon)
 		var w2: WeaponDef = load("res://resources/weapons/%s.tres" % setup["w2"]) if setup.has("w2") else Fighter.FALLBACK_BOW
+		if setup.has("w2inf") and i == 0:
+			w2 = Smithing.effective(w2, 0, String(setup["w2inf"]))
+		if setup.has("inf") and String(setup["inf"][i]) != "":
+			f.set_loadout_defs(f.character, Smithing.effective(f.weapon, 0, String(setup["inf"][i])))
 		if setup.get("armor", false):
 			f.set_equipment(5, EquipStats.rival_armor("caballero", 5), w2)
 		if setup.has("trinkets"):
@@ -195,6 +212,9 @@ func _offline(world: Node3D, sc: Array) -> Dictionary:
 	r["hits1"] = fs[1].hits_landed
 	r["stance_breaks"] = fs[0].stance_breaks + fs[1].stance_breaks
 	r["crits"] = fs[0].crits + fs[1].crits
+	for i in 2:
+		var pr: Dictionary = fs[i].status_fx.procs
+		r["procs%d" % i] = int(pr["sangrado"]) + int(pr["veneno"]) + int(pr["congelacion"])
 	for f in fs:
 		f.queue_free()
 	await physics_frame
@@ -264,6 +284,8 @@ func _sim(P: Array, sc: Array, hp_start: Array) -> Dictionary:
 	r["dmg0"] = float(hp_start[0]) - s[S.HP] / 1000.0
 	r["dmg1"] = float(hp_start[1]) - s[F + S.HP] / 1000.0
 	r["crits"] = s[S.CRITS] + s[F + S.CRITS]
+	for i in 2:
+		r["procs%d" % i] = s[i * F + S.PROC0] + s[i * F + S.PROC1] + s[i * F + S.PROC2]
 	r["lvl0"] = s[S.STAGGERS] + s[S.STUNS] * 10 + s[S.KNOCKDOWNS] * 100
 	r["lvl1"] = s[F + S.STAGGERS] + s[F + S.STUNS] * 10 + s[F + S.KNOCKDOWNS] * 100
 	r["parries"] = s[S.PARRIES] + s[F + S.PARRIES]

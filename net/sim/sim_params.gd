@@ -108,13 +108,25 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	# Defensa de ESTE luchador como defensor: tabla incoming(a)/a (ppm) por subtipo, a = 0..400
 	if not f.eq.is_empty():
 		var tabs: Array = []
-		for sb: String in SUBS:
+		for sb: String in SUBS + ELEMS:
 			var t := PackedInt32Array()
 			for a in DEF_TAB_MAX + 1:
 				var amt := maxf(float(a), 0.01)
-				t.append(int(round(EquipStats.incoming(amt, "fisico", f.eq, f.eq_ref, sb) / amt * 1000000.0)))
+				var v := EquipStats.incoming(amt, sb, f.eq, f.eq_ref) if sb in ELEMS else EquipStats.incoming(amt, "fisico", f.eq, f.eq_ref, sb)
+				t.append(int(round(v / amt * 1000000.0)))
 			tabs.append(t)
 		p["def_tab"] = tabs
+	# Infusiones (elemento) y estados que inflige / umbrales que recibe
+	p["elem_melee"] = _elem_code(f.melee())
+	p["elem_arrow"] = _elem_code(f.ranged())
+	p["st_melee"] = _status_arr(f.melee().status)
+	p["st_arrow"] = _status_arr(f.ranged().status)
+	var thr: Array[int] = []
+	for k: String in StatusFx.TYPES:
+		thr.append(milli(f.status_threshold(k)))
+	p["st_thr"] = thr
+	p["bleed_dmg"] = milli(f.max_health * StatusFx.BLEED_PCT + StatusFx.BLEED_FLAT)
+	p["frost_dmg"] = milli(f.max_health * StatusFx.FROST_PCT + StatusFx.FROST_FLAT)
 	# Pasivas y talismanes con efecto en tiempo de partida
 	p["furia_pm"] = pm(0.25 * f.passive_k()) if f.character.passive_id == "furia" else 0
 	p["heal_tick"] = milli(2.0 * f.passive_k() * float(f.ad["curacion"]) / HZ) if f.character.passive_id == "luz_sanadora" else 0
@@ -269,6 +281,20 @@ static func online_tuning(ps: Array, lenience: int) -> Array:
 		p["parry_window"] = int(p["parry_window"]) + lenience
 		p["parry_recovery"] = maxi(1, int(p["parry_recovery"]) - lenience)
 		p["net_lenience"] = lenience
+	return out
+
+const ELEMS := ["fuego", "magico", "sagrado"] ## códigos 5..7 tras SUBS en def_tab
+
+static func _elem_code(w: WeaponDef) -> int:
+	if w == null: return 0
+	var el := String(Smithing.INFUSIONS.get(String(w.infusion), {}).get("element", ""))
+	var i := ELEMS.find(el)
+	return 0 if i < 0 else SUBS.size() + i
+
+static func _status_arr(st: Dictionary) -> Array[int]:
+	var out: Array[int] = []
+	for k: String in StatusFx.TYPES:
+		out.append(milli(float(st.get(k, 0.0))))
 	return out
 
 static func params_checksum(ps: Array) -> int:

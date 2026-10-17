@@ -9,6 +9,7 @@ const COUNTERS := {
 	FightSim.DODGES: "dodge", FightSim.STAGGERS: "stagger", FightSim.STUNS: "stun",
 	FightSim.GUARD_BREAKS: "guard_break", FightSim.STANCE_BREAKS: "stance_break",
 	FightSim.CRITS: "crit", FightSim.SHOTS: "shot",
+	FightSim.PROC0: "bleed", FightSim.PROC1: "poison", FightSim.PROC2: "frost",
 }
 
 ## Devuelve [{key, frame, kind, player}] del tick prev -> cur.

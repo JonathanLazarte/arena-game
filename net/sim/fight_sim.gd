@@ -35,6 +35,7 @@ enum {
 	STANCE, STANCE_BROKEN_T, CRIT_T, CRIT_DONE, INVULN,
 	SHOT_STATE, SHOT_T, SHOT_DUR, HOLD_T, BOW_CD, SHOT_CHARGED,
 	PREV_IN, ATK_HOLD, HEAVY_FIRED, Q0, Q1, Q2, Q3, QA0, QA1, QA2, QA3, PREV_STUN, SPRINT_PM,
+	BU0, BU1, BU2, SN0, SN1, SN2, LK0, LK1, LK2, PROC0, PROC1, PROC2, POISON_T, POISON_E, FROST_T,
 	HITS, BLOCKS, PARRIES, DODGES, STAGGERS, STUNS, GUARD_BREAKS, STANCE_BREAKS, DMG_DEALT, CRITS, SHOTS,
 	F_FIELDS
 }
@@ -89,6 +90,16 @@ const FAN_COS := 4030         # cos(0,18 rad) ×4096 (abanico de la ballesta)
 const FAN_SIN := 733
 const HEAL_DELAY := 180       # 3 s sin golpes (pasiva de curación)
 const FURIA_HP_PM := 400
+# Estados (StatusFx): 0 sangrado, 1 veneno, 2 congelación. Acumulación en milésimas de punto.
+const ST_DECAY_DELAY := 90    # tk(1,5 s): sin acumular antes de que baje la barra
+const ST_DECAY_MILLI := 10000 # puntos/s ×1000, repartido exacto por ticks
+const ST_PROC_LOCK := 90
+const POISON_TICKS := 840     # 14 s
+const POISON_DPS_MILLI := 2000
+const FROST_TICKS := 720      # 12 s
+const FROST_TAKEN_PM := 1150
+const FROST_REGEN_PM := 600
+const BLOCK_STATUS_PM := 300
 
 static func initial(params: Array, seed_v: int = 1, hitstop: bool = true) -> PackedInt64Array:
 	var s := PackedInt64Array()
@@ -107,6 +118,7 @@ static func initial(params: Array, seed_v: int = 1, hitstop: bool = true) -> Pac
 		s[o + STANCE] = p["stance_max"]
 		s[o + SINCE_SPEND] = 1000
 		s[o + SINCE_HIT] = 1000
+		s[o + SN0] = 540; s[o + SN1] = 540; s[o + SN2] = 540
 	s[P_BASE + G_RNG] = (seed_v * 2654435761 + 1) & 0x7FFFFFFF
 	s[P_BASE + G_HITSTOP_ON] = 1 if hitstop else 0
 	return s
@@ -517,6 +529,52 @@ static func _incoming(P: Array, d: int, sub: int, amount: int) -> int:
 		r = t[i] + (t[i + 1] - t[i]) * (amount % 1000) / 1000
 	return amount * r / 1000000
 
+## Acumulación de estado en el defensor (Fighter.add_status). k: 0 sangrado, 1 veneno, 2 congelación.
+static func _add_status(s: PackedInt64Array, P: Array, att: int, k: int, amount: int) -> void:
+	var d := 1 - att
+	var b := d * F_FIELDS
+	if s[b + ALIVE] == 0 or amount <= 0 or s[b + LK0 + k] > 0:
+		return
+	s[b + BU0 + k] += amount
+	s[b + SN0 + k] = 0
+	if s[b + BU0 + k] < int(P[d].get("st_thr", [70000, 70000, 70000])[k]):
+		return
+	s[b + BU0 + k] = 0
+	s[b + LK0 + k] = ST_PROC_LOCK
+	s[b + PROC0 + k] += 1
+	match k:
+		0: _damage(s, att * F_FIELDS, b, P[d].get("bleed_dmg", 18000))
+		1: s[b + POISON_T] = POISON_TICKS; s[b + POISON_E] = 0
+		2:
+			s[b + FROST_T] = FROST_TICKS
+			_damage(s, att * F_FIELDS, b, P[d].get("frost_dmg", 12000))
+
+static func _hit_status(s: PackedInt64Array, P: Array, att: int, kind: int, pm_v: int) -> void:
+	if kind == 2:
+		return
+	var st: Array = P[att].get("st_arrow" if kind == 1 else "st_melee", [])
+	for k in st.size():
+		if int(st[k]) > 0:
+			_add_status(s, P, att, k, int(st[k]) * pm_v / 1000)
+
+## Avance de estados por tick (StatusFx.tick): decaimiento, bloqueos, veneno y congelación.
+static func _status_tick(s: PackedInt64Array, i: int) -> void:
+	var o := i * F_FIELDS
+	if s[o + ALIVE] == 0:
+		return
+	for k in 3:
+		s[o + SN0 + k] += 1
+		if s[o + LK0 + k] > 0: s[o + LK0 + k] -= 1
+		var n: int = s[o + SN0 + k] - ST_DECAY_DELAY - 1
+		if n >= 0 and s[o + BU0 + k] > 0:
+			s[o + BU0 + k] = maxi(0, s[o + BU0 + k] - ((ST_DECAY_MILLI * (n + 1)) / 60 - (ST_DECAY_MILLI * n) / 60))
+	if s[o + FROST_T] > 0: s[o + FROST_T] -= 1
+	if s[o + POISON_T] > 0:
+		s[o + POISON_T] -= 1
+		var e: int = s[o + POISON_E]
+		s[o + POISON_E] = e + 1
+		_damage(s, (1 - i) * F_FIELDS, o, (POISON_DPS_MILLI * (e + 1)) / 60 - (POISON_DPS_MILLI * e) / 60)
+
 static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: int, sub: int, force: int, pd_pm: int, counter_pm: int, block_cost: int) -> int:
 	var d := 1 - att
 	var a := att * F_FIELDS
@@ -548,10 +606,12 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 		s[b + BLOCKS] += 1
 		if kind == 1:
 			_spend(s, P, d, P[att]["arrow_block_cost"])
+			_hit_status(s, P, att, kind, BLOCK_STATUS_PM)
 		else:
 			s[b + GC_T] = GC_WINDOW
 			var chip: int = EXH_BLOCK_PM if s[b + EXH] > 0 else P[d]["chip_pm"]
 			_damage(s, a, b, raw * mult / 1000 * chip / 1000)
+			_hit_status(s, P, att, kind, BLOCK_STATUS_PM)
 			_spend(s, P, d, block_cost)
 		if s[b + ST] <= 0:
 			s[b + GUARD_BREAKS] += 1
@@ -564,10 +624,18 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var counter := kind != 2 and (s[b + ATK_STATE] == Atk.WINDUP or s[b + ATK_STATE] == Atk.ACTIVE)
 	if counter:
 		mult = mult * counter_pm / 1000
-	var amount := _incoming(P, d, sub, raw * mult / 1000)
+	var amount := raw * mult / 1000
+	var el: int = P[att].get("elem_arrow" if kind == 1 else "elem_melee", 0) if kind != 2 else 0
+	if el > 0:
+		amount = _incoming(P, d, sub, amount / 2) + _incoming(P, d, el, amount - amount / 2) # infusión: mitad física, mitad elemental
+	else:
+		amount = _incoming(P, d, sub, amount)
+	if s[b + FROST_T] > 0:
+		amount = amount * FROST_TAKEN_PM / 1000
 	if s[b + STUN_IMM] > 0 and s[b + KNOCKDOWNS] > 0:
 		amount = amount * GETUP_DMG_PM / 1000
 	_damage(s, a, b, amount)
+	_hit_status(s, P, att, kind, 1000)
 	s[b + SINCE_HIT] = 0
 	var pd := amount * pd_pm / 1000
 	if counter:
@@ -601,6 +669,7 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		s[o + STUN_WIN] -= 1
 		if s[o + STUN_WIN] <= 0:
 			_reset_stun(s, o)
+	_status_tick(s, i)
 	if p.get("heal_tick", 0) > 0 and s[o + ALIVE] != 0 and s[o + SINCE_HIT] > HEAL_DELAY and s[o + HP] < p["hp"]:
 		s[o + HP] = mini(s[o + HP] + p["heal_tick"], p["hp"])
 	if s[o + SWAP_T] > 0:
@@ -917,6 +986,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if s[o + SINCE_SPEND] >= p["regen_delay"] and s[o + ST] < p["st_max"]:
 		var rg: int = p["regen_idle"] if amount_pm < 300 else p["regen"]
 		if wb: rg = rg * BLOCK_REGEN_PM / 1000
+		if s[o + FROST_T] > 0: rg = rg * FROST_REGEN_PM / 1000
 		s[o + ST] = mini(s[o + ST] + rg, p["st_max"])
 	# aceleración (move_toward)
 	if s[o + ROLL_T] < 0:

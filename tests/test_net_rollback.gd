@@ -68,5 +68,20 @@ func _initialize() -> void:
 			var st: PackedInt64Array = rf["state"]
 			check(rf["mismatches"] == 0 and rf["final_equal"] and rf["common"] > 1700 and (st[FightSim.HP] < 100000 or st[FightSim.F_FIELDS + FightSim.HP] < 100000),
 				"FightSim RTT %d semilla %d: %d ticks confirmados, 0 desincronías (vida %d/%d, rollback medio %.1f)" % [rtt, sd, rf["common"], st[FightSim.HP], st[FightSim.F_FIELDS + FightSim.HP], rf["avg_rollback_len"]])
+	# 7) fase 4: infusiones elementales y estados (sangrado/veneno/congelación) bajo rollback
+	var PI := SimParams.defaults().duplicate(true)
+	PI[0]["st_melee"] = [60000, 60000, 60000]; PI[0]["elem_melee"] = 5
+	PI[1]["st_melee"] = [0, 75000, 75000]; PI[1]["elem_melee"] = 7
+	for rtt in [100, 200]:
+		var hi := RbHarness.new()
+		hi.rtt_ms = rtt; hi.jitter_ms = 15.0; hi.loss = 0.03; hi.seed_v = 4
+		hi.bot_mask = 0x3FFF & ~FightSim.IN_SWAP & ~FightSim.IN_BLOCK; hi.bot_or = FightSim.IN_LOCK; hi.bot_change = 0.15
+		hi.engine_factory = func() -> RbEngine: var e := FightEngine.new(PI, 9, true); e.gap_um = 2000000; return e
+		var ri := hi.run(1800)
+		var si: PackedInt64Array = ri["state"]
+		var procs := 0
+		for i in 2:
+			for k in 3: procs += si[i * FightSim.F_FIELDS + FightSim.PROC0 + k]
+		check(ri["mismatches"] == 0 and ri["final_equal"] and procs > 0, "estados + infusión RTT %d: 0 desincronías, %d estallidos de estado" % [rtt, procs])
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
