@@ -68,6 +68,7 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 	var ab := _ab_of(P, i, slot)
 	var id := String(ab.get("id", ""))
 	var typ := int(ab.get("type", -1))
+	var steps_timeline := typ == A.T_STEPS and int(ab.get("family", -1)) == A.T_TIMELINE
 	var fl: int = s[o + S.AB_FL]
 	var t: int = s[o + S.AB_T]
 	# activación nueva: otra ranura o el reloj vuelve atrás
@@ -88,7 +89,7 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 	elif s[o + S.ALIVE] != 0 and id != "":
 		key = id
 		col = ab_color(id)
-		if typ == A.T_TIMELINE and (fl & A.FL_FLICK0) != 0 and (fl & A.FL_FLICK1) == 0:
+		if (typ == A.T_TIMELINE or steps_timeline) and (fl & A.FL_FLICK0) != 0 and (fl & A.FL_FLICK1) == 0:
 			key = id + ":flick"
 			col = Color.WHITE
 	if key != _glow_key[i]:
@@ -117,7 +118,7 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 	# --- golpes de timeline: rastro de espada del color de la habilidad ---
 	var fired: int = s[o + S.AB_FIRED]
 	if slot >= 0 and fired > _fired[i]:
-		if typ == A.T_TIMELINE and f._kv:
+		if (typ == A.T_TIMELINE or steps_timeline) and f._kv:
 			f._kv.flash_sword_trail(Color(1.0, 0.22, 0.12) if id == "presa_verdugo" else ab_color(id))
 			trails[i] += 1
 		elif typ == A.T_CATALOG and f._kv:

@@ -13,7 +13,7 @@ extends RefCounted
 ## Factor de aviso online (Fighter.telegraph_k): fijo para los dos pares (PC y móvil juegan igual).
 const TELE_ONLINE := 1.12
 const GLOBAL_CD := 85 # tk(Fighter.BOSS_GLOBAL_CD = 1,4 s)
-enum { T_ESTOCADA, T_CARGA, T_RAFAGA, T_ESCUDO, T_COMBO, T_SALTO, T_TIMELINE = 10, T_WAVE, T_RAIN, T_BREATH, T_RAGE, T_COUNTER, T_CATALOG = 16 }
+enum { T_ESTOCADA, T_CARGA, T_RAFAGA, T_ESCUDO, T_COMBO, T_SALTO, T_TIMELINE = 10, T_WAVE, T_RAIN, T_BREATH, T_RAGE, T_COUNTER, T_CATALOG = 16, T_STEPS = 17 }
 ## AB_FL: bits de la habilidad en curso
 const FL_LANDED := 1
 const FL_COUNTERED := 2
@@ -60,6 +60,10 @@ static func compile_all(f: Fighter) -> Array:
 static func compile(f: Fighter, id: String) -> Dictionary:
 	if HojaCatalog.has(id):
 		return SimCatalog.compile(f, id)
+	if SimParams.ab_engine != 0 and SimSteps.handles(id):
+		var stepped := SimSteps.compile(f, id)
+		if not stepped.is_empty():
+			return stepped
 	var d := BossAbilities.def(id)
 	if d.is_empty():
 		return {}
@@ -498,6 +502,8 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 		var cur: Dictionary = boss[s[o + FightSim.AB_SLOT]]
 		if int(cur.get("type", -1)) == T_CATALOG:
 			return SimCatalog.latch(s, P, i, false)
+		if int(cur.get("type", -1)) == T_STEPS and SimSteps.latch(s, P, i, false):
+			return true
 	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
 	var ab: Dictionary = boss[slot]
 	if int(ab["type"]) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
@@ -525,6 +531,8 @@ static func variation(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var ab := _ab(s, P, i)
 	if int(ab.get("type", -1)) == T_CATALOG:
 		return SimCatalog.latch(s, P, i, true)
+	if int(ab.get("type", -1)) == T_STEPS and SimSteps.latch(s, P, i, true):
+		return true
 	if int(ab["type"]) != T_COMBO or s[o + FightSim.AB_FIRED] != (ab["hits"] as Array).size() - 1 or (s[o + FightSim.AB_FL] & FL_QUEUED) != 0:
 		return false
 	if not _cost_ok(s, i, ab):
@@ -610,6 +618,8 @@ static func resist_pm(s: PackedInt64Array, P: Array, i: int) -> int:
 	var ab := _ab(s, P, i)
 	if int(ab.get("type", -1)) == T_CATALOG:
 		return SimCatalog.resist_now(s, P, i)
+	if int(ab.get("type", -1)) == T_STEPS:
+		return SimSteps.resist_now(s, P, i)
 	if int(ab["type"]) == T_COMBO:
 		var n: int = (ab["hits"] as Array).size()
 		var fin: int = ab["var_w"] if (s[o + FightSim.AB_FL] & FL_VARIANT) != 0 else ab["final"]
@@ -687,6 +697,8 @@ static func update(s: PackedInt64Array, P: Array, i: int) -> void:
 				end_ability(s, o, false)
 		T_CATALOG:
 			SimCatalog.tick(s, P, i, ab)
+		T_STEPS:
+			SimSteps.tick(s, P, i, ab)
 	# inmunidad (Fighter.ab_immune): escudo tras su anticipación, o en el aire (salto / combo)
 	if s[o + FightSim.AB_SLOT] >= 0:
 		var t := int(_ab(s, P, i)["type"])

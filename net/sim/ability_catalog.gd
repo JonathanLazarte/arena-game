@@ -50,6 +50,7 @@ const TIME_BASES := ["step", "active"]
 const COMMITS := ["window_end", "immediate"]
 const INPUTS := ["skill", "alt", "alt2"]
 const EV_ON := ["always", "hit", "whiff"]
+const SPAWN_ON := ["always", "hit"]
 const NEXT_KEYS := ["default", "on_hit", "on_whiff", "on_blocked"]
 const HINT_DODGE := ["roll_early", "roll_late", "roll_through", "sidestep", "jump", "distance", "parry", "block"]
 const HINT_DIR := ["side", "back", "forward", "any"]
@@ -1008,9 +1009,11 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 		"spread": heading(_num(c, s, "spread_deg", p, false, 0.0, 0.0, 360.0))}
 	match SPAWNS[t]:
 		"ground_mark":
-			_unknown(c, s, p, common + ["shape", "warn_ticks", "damage", "stun_power", "knockback_mps", "blockable", "mode", "scatter_radius_m", "interval_ticks"])
+			_unknown(c, s, p, common + ["shape", "warn_ticks", "damage", "stun_power", "knockback_mps", "blockable", "mode", "scatter_radius_m", "interval_ticks", "on"])
 			out["shape"] = _shape(c, s, "shape", p, true)
-			out["warn"] = _int(c, s, "warn_ticks", p, true, 30, 30, 600)
+			out["warn"] = _int(c, s, "warn_ticks", p, true, 30, 0, 600)
+			if int(out["warn"]) < 30:
+				c.warn(_p(p, "warn_ticks"), "FAIRNESS", "aviso de marca < 30 ticks")
 			out["dmg"] = milli(_num(c, s, "damage", p, true, 0.0, 0.0, 500.0))
 			out["stun"] = milli(_num(c, s, "stun_power", p, false, 0.0, 0.0, 500.0))
 			out["knock"] = upt(_num(c, s, "knockback_mps", p, false, 0.0, 0.0, 12.0))
@@ -1018,8 +1021,9 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["mode"] = _enum(c, s, "mode", p, MARK_MODES, false, "track")
 			out["scatter_r"] = um(_num(c, s, "scatter_radius_m", p, false, 0.0, 0.0, 20.0))
 			out["interval"] = _int(c, s, "interval_ticks", p, false, 0, 0, 600)
+			out["on"] = _enum(c, s, "on", p, SPAWN_ON, false, "always")
 		"ground_wave":
-			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable"])
+			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable", "on"])
 			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 40.0))
 			out["range"] = um(_num(c, s, "range_m", p, true, 0.0, 0.1, 40.0))
 			out["width"] = um(_num(c, s, "width_m", p, true, 0.0, 0.1, 10.0))
@@ -1028,6 +1032,7 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["dmg"] = milli(_num(c, s, "damage", p, true, 0.0, 0.0, 500.0))
 			out["stun"] = milli(_num(c, s, "stun_power", p, false, 0.0, 0.0, 500.0))
 			out["blockable"] = 1 if _bool(c, s, "blockable", p, true) else 0
+			out["on"] = _enum(c, s, "on", p, SPAWN_ON, false, "always")
 		"projectile":
 			_unknown(c, s, p, common + ["speed_mps", "homing_deg", "homing_ticks", "lifetime_ticks", "radius_m", "pierce", "reflectable_by_parry", "hitbox"])
 			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 60.0))

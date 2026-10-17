@@ -56,7 +56,7 @@ func step(s: PackedInt64Array, a: int, b: int) -> void:
 	FightSim.step(s, params, a, b)
 	_round_reset(s)
 	if s[FightSim.P_BASE + FightSim.G_ROUND] == prev[FightSim.P_BASE + FightSim.G_ROUND]:
-		fx.feed(SimEvents.diff(prev, s))
+		fx.feed(SimEvents.diff(prev, s, params))
 func checksum(s: PackedInt64Array) -> int:
 	return FightSim.checksum(s)
 

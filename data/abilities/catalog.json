@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "tick_rate": 60,
+  "abilities": [
+    {
+      "id": "tajo_retardado",
+      "name": "Tajo Retardado",
+      "icon": "boss:tajo_retardado",
+      "category": "melee",
+      "tags": ["unblockable", "delayed"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 24, "mana": 0, "health": 0 },
+      "cooldown_ticks": 360,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl1", "stun_lvl2", "knockdown"],
+      "entry_step": "golpe",
+      "ai": { "range_min": 0, "range_max": 3.2, "weight": 12, "use_when": ["target_in_range"] },
+      "hint": { "dodge": "roll_late", "direction": "side", "text": "No rueces al ver el amague: el golpe llega tarde." },
+      "steps": [
+        {
+          "id": "golpe",
+          "windup_ticks": 84,
+          "active_ticks": 1,
+          "recovery_ticks": 54,
+          "telegraph": {
+            "id": "tg_tajo_ambar",
+            "style": "weapon_glow",
+            "color": "#FFCC4D",
+            "sound": "sfx_tele_tajo",
+            "at_tick": 0,
+            "text": "Hoja ámbar alzada que parpadea en blanco a mitad antes del golpe tardío."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 139, "poise_bonus_pct": 80 },
+          "tracking": { "deg_per_sec": 220, "lock_at_tick": 80, "post_lock_deg_per_sec": 0 },
+          "movement": {
+            "type": "dash",
+            "from_tick": 68,
+            "to_tick": 86,
+            "speed_mps": 7,
+            "max_distance_m": 14,
+            "target_mode": "facing",
+            "stop_at_m": 1.65
+          },
+          "hitboxes": [
+            {
+              "id": "hb_tajo",
+              "shape": { "type": "arc", "radius_m": 3, "angle_deg": 110 },
+              "from_tick": 0,
+              "to_tick": 1,
+              "damage_per_hit": 1.5,
+              "damage_scaling": "attacker",
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 40,
+              "stun_scaling": "physical"
+            }
+          ],
+          "spawns": [
+            {
+              "id": "sp_onda",
+              "type": "ground_mark",
+              "at_tick": 84,
+              "on": "hit",
+              "offset": { "forward_m": 1.2 },
+              "shape": { "type": "circle", "radius_m": 4.5 },
+              "warn_ticks": 21,
+              "damage": 0.975,
+              "stun_power": 40,
+              "knockback_mps": 9,
+              "blockable": true,
+              "mode": "track"
+            }
+          ],
+          "events": [
+            { "id": "ev_flick0", "tick": 33, "vfx": "vfx_flash_white", "sfx": "sfx_blade_ring" },
+            { "id": "ev_flick1", "tick": 57, "vfx": "vfx_flash_white", "sfx": "sfx_blade_ring" },
+            { "id": "ev_impacto", "tick": 84, "vfx": "vfx_slash", "sfx": "sfx_heavy" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "estocada_negra",
+      "name": "Estocada Negra",
+      "icon": "boss:estocada_negra",
+      "category": "melee",
+      "tags": ["unblockable"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 0, "mana": 28, "health": 0 },
+      "cooldown_ticks": 600,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl1", "stun_lvl2", "knockdown"],
+      "entry_step": "estocada",
+      "ai": { "range_min": 2, "range_max": 7.5, "weight": 12, "use_when": ["target_in_range"] },
+      "hint": { "dodge": "sidestep", "direction": "side", "text": "Rodá hacia el costado cuando la hoja ya está atrás." },
+      "steps": [
+        {
+          "id": "estocada",
+          "windup_ticks": 84,
+          "active_ticks": 1,
+          "recovery_ticks": 75,
+          "telegraph": {
+            "id": "tg_estocada_negra",
+            "style": "weapon_glow",
+            "color": "#6B0D14",
+            "sound": "sfx_tele_estocada_negra",
+            "at_tick": 0,
+            "text": "La hoja se vuelve negra y roja y retrocede antes de clavarse."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 160, "poise_bonus_pct": 80 },
+          "tracking": { "deg_per_sec": 140, "lock_at_tick": 80, "post_lock_deg_per_sec": 0 },
+          "movement": {
+            "type": "dash",
+            "from_tick": 68,
+            "to_tick": 86,
+            "speed_mps": 11,
+            "max_distance_m": 14,
+            "target_mode": "facing",
+            "stop_at_m": 2.31
+          },
+          "hitboxes": [
+            {
+              "id": "hb_estocada",
+              "shape": { "type": "arc", "radius_m": 4.2, "angle_deg": 64 },
+              "from_tick": 0,
+              "to_tick": 1,
+              "damage_per_hit": 1.55,
+              "damage_scaling": "magic",
+              "blockable": false,
+              "parryable": false,
+              "stun_power": 52,
+              "stun_scaling": "physical"
+            }
+          ],
+          "events": [
+            { "id": "ev_impacto", "tick": 84, "vfx": "vfx_slash", "sfx": "sfx_heavy" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pisoton",
+      "name": "Pisotón",
+      "icon": "boss:pisoton",
+      "category": "zone",
+      "tags": ["aoe"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 20, "mana": 0, "health": 0 },
+      "cooldown_ticks": 360,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl1", "stun_lvl2", "knockdown"],
+      "entry_step": "onda",
+      "ai": { "range_min": 3, "range_max": 12, "weight": 10, "use_when": ["target_in_range"] },
+      "hint": { "dodge": "jump", "direction": "any", "text": "Es una onda baja: saltala." },
+      "steps": [
+        {
+          "id": "onda",
+          "windup_ticks": 47,
+          "active_ticks": 1,
+          "recovery_ticks": 48,
+          "telegraph": {
+            "id": "tg_pisoton",
+            "style": "ground_ring",
+            "color": "#BD8542",
+            "sound": "sfx_tele_pisoton",
+            "at_tick": 0,
+            "text": "Levanta un pie con brillo ocre; al bajar, una onda baja y ancha sale al frente."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 96, "poise_bonus_pct": 80 },
+          "tracking": { "deg_per_sec": 240, "lock_at_tick": 47, "post_lock_deg_per_sec": 0 },
+          "spawns": [
+            {
+              "id": "sp_onda",
+              "type": "ground_wave",
+              "at_tick": 47,
+              "offset": { "forward_m": 1 },
+              "count": 1,
+              "spread_deg": 0,
+              "speed_mps": 10,
+              "range_m": 9,
+              "width_m": 4.2,
+              "warn_ticks": 27,
+              "damage": 0.85,
+              "stun_power": 55,
+              "blockable": true
+            }
+          ],
+          "events": [
+            { "id": "ev_onda", "tick": 47, "vfx": "vfx_crack", "sfx": "sfx_stomp" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flecha_grave",
+      "name": "Flecha Grave",
+      "icon": "boss:flecha_grave",
+      "category": "ranged",
+      "tags": ["unblockable", "aoe"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 0, "mana": 24, "health": 0 },
+      "cooldown_ticks": 480,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl1", "stun_lvl2", "knockdown"],
+      "entry_step": "marca",
+      "ai": { "range_min": 4, "range_max": 16, "weight": 10, "use_when": ["target_in_range"] },
+      "hint": { "dodge": "roll_through", "direction": "side", "text": "En cuanto aparezca el círculo, rodá hacia afuera." },
+      "steps": [
+        {
+          "id": "marca",
+          "windup_ticks": 47,
+          "active_ticks": 1,
+          "recovery_ticks": 54,
+          "telegraph": {
+            "id": "tg_flecha_grave",
+            "style": "ground_ring",
+            "color": "#7A47B8",
+            "sound": "sfx_tele_flecha_grave",
+            "at_tick": 0,
+            "text": "Un círculo violeta grande se clava en el suelo bajo los pies y se llena despacio."
+          },
+          "armor": { "type": "super", "from_tick": 0, "to_tick": 102, "poise_bonus_pct": 30 },
+          "spawns": [
+            {
+              "id": "sp_marca",
+              "type": "ground_mark",
+              "at_tick": 47,
+              "shape": { "type": "circle", "radius_m": 2.6 },
+              "warn_ticks": 85,
+              "damage": 1.35,
+              "stun_power": 58,
+              "knockback_mps": 11,
+              "blockable": false,
+              "mode": "track",
+              "count": 1
+            }
+          ],
+          "events": [
+            { "id": "ev_marca", "tick": 47, "vfx": "vfx_mark", "sfx": "sfx_tele_flecha_grave" }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -15,6 +15,9 @@ const A_JUMP := 5 ## fase 7: picado desde el salto
 ## Subtipos físicos para la tabla de defensa: 0 = sin subtipo (flechas), 1..4 = PhysTypes.
 const SUBS := ["", "estandar", "cortante", "contundente", "perforante"]
 const DEF_TAB_MAX := 400 ## daño bruto máximo tabulado (por unidad)
+## 0 = las 45 siguen en SimAbilities. 1 = las del catálogo de pasos (SimSteps) salen por el motor nuevo.
+## Entra en params_checksum. Apagado por defecto: la partida de siempre no cambia de camino.
+static var ab_engine := 0
 
 static func sub_code(sub: String) -> int:
 	return maxi(SUBS.find(sub), 0)
@@ -175,6 +178,7 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	p["arrow_block_cost"] = milli(Fighter.COST_BLOCKED_ARROW * float(o.tfx["stamina_cost"]))
 	p["counter_arrow_pm"] = pm(float(PhysTypes.COUNTER_DMG["estandar"]))
 	# Fase 4: habilidades de jefe, magia, eikon y montura (cubiertos por params_checksum)
+	p["ab_engine"] = ab_engine
 	p["boss"] = SimAbilities.compile_all(f)
 	# fase 8: frasco (Fighter.drink_flask)
 	p["flasks"] = 1
