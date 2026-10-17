@@ -611,7 +611,17 @@ static func _shoot(s: PackedInt64Array, P: Array, i: int) -> bool:
 	s[o + SHOT_DUR] = P[i]["bow_draw"]
 	return true
 
-static func _apply_stun(s: PackedInt64Array, o: int, t: int) -> void:
+static func _steps_ignores_stun(s: PackedInt64Array, P: Array, o: int, t: int) -> bool:
+	var i := o / F_FIELDS
+	if i < 0 or i >= P.size():
+		return false
+	var slot := s[o + AB_SLOT]
+	var boss: Array = P[i].get("boss", [])
+	if slot < 0 or slot >= boss.size():
+		return false
+	return SimSteps.ignores_stun(boss[slot], t)
+
+static func _apply_stun(s: PackedInt64Array, o: int, t: int, P: Array = []) -> void:
 	if s[o + BS_PH] == 1 or s[o + BS_PH] == 2:
 		return # la estocada de jefe no se interrumpe
 	if s[o + STUN_IMM] > 0 or s[o + AB_IMM] != 0:
@@ -619,6 +629,8 @@ static func _apply_stun(s: PackedInt64Array, o: int, t: int) -> void:
 	if s[o + AB_SLOT] >= 0:
 		var catalog := (s[o + AB_FL] & SimAbilities.FL_CATALOG) != 0
 		if catalog and not SimCatalog.stun_interrupts(s, o, t):
+			return
+		if not P.is_empty() and _steps_ignores_stun(s, P, o, t):
 			return
 		SimAbilities.end_ability(s, o, true)
 	if s[o + CAST_T] > 0:
@@ -669,22 +681,22 @@ static func _add_stun_force(s: PackedInt64Array, P: Array, i: int, force: int) -
 	match lv:
 		1:
 			s[o + STAGGERS] += 1
-			_apply_stun(s, o, T_STAGGER)
+			_apply_stun(s, o, T_STAGGER, P)
 			s[o + STAGGER_T] = T_STAGGER
 		2:
 			s[o + STUNS] += 1
 			s[o + STAGGER_T] = 0
-			_apply_stun(s, o, T_STUN)
+			_apply_stun(s, o, T_STUN, P)
 		3:
 			if s[o + MOUNTED] != 0:
 				s[o + STUNS] += 1
-				_apply_stun(s, o, T_STUN)
+				_apply_stun(s, o, T_STUN, P)
 				_reset_stun(s, o)
 				return lv
 			s[o + KNOCKDOWNS] += 1
 			s[o + STAGGER_T] = 0
 			s[o + BLOCKING] = 0
-			_apply_stun(s, o, T_DOWN + T_GETUP)
+			_apply_stun(s, o, T_DOWN + T_GETUP, P)
 			s[o + DOWN_T] = T_DOWN + T_GETUP
 			s[o + STUN_IMM] = T_DOWN + T_GETUP + IMMUNE_AFTER
 			_reset_stun(s, o)

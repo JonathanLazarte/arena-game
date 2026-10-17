@@ -5,7 +5,7 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 ## Principios de balance
 - Inspiración souls (curvas tipo Elden Ring, números propios): ganancias por tramos con rendimientos decrecientes (primeros ~25–30 puntos rinden, luego cae).
 - Todo ataque fuerte o de jefe se telegrafía; al soltarse solo se evita con voltereta en la ventana justa (no caminando).
-- Ningún recurso gratis: las habilidades de jefe no tienen recarga pero cuestan aguante, maná (= Energía) o vida.
+- Ningún recurso gratis: las habilidades de jefe cuestan aguante, maná (= Energía) o vida. Hay recarga global de 1,4 s (85 ticks en la sim). La recarga propia de cada habilidad no se usa todavía; más adelante será `max(global, propia)`.
 
 ## Aturdimiento (3 niveles acumulados)
 - Fuerza por golpe: `str_force(Fuerza) + fuerza del arma + fuerza del golpe` × `stun_dealt`. Mágico: `magia × 0,1 + fuerza asignada` (por impacto).
@@ -30,10 +30,15 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 - Cambio de habilidad: tecla N o botón ▶ del HUD (PC y táctil).
 
 ### Reglas comunes (Ronda 33)
-- Imbloqueable (`unblockable` en la definición; `BossAbilities.is_unblockable`): el escudo no la para. Lo son la Estocada y las marcadas en la tabla (Tajo Retardado, Presa del Verdugo, Giro Devastador, Paso Espectral, Lanza Celeste, Cuerno, Daga Sagrada, Estocada Negra, Flor Umbral, Presa de Fauces, Rueda Noble, Danza Triple, Picado de Alas y Flecha Grave). Danza del Cisne se bloquea y un parry la corta.
-- Estocada: sigue al objetivo toda la carga; en la embestida solo corrige la dirección los primeros 0,15 s, después va recta.
-- Recarga global de 1,4 s desde que acaba una habilidad de jefe (la Ráfaga puede encadenarse consigo misma). Recarga propia por habilidad (`cd`) opcional, desactivada por defecto (`Fighter.per_ability_cd_enabled`).
-- Cada habilidad tiene un aviso propio (texto `tele`/`tele_txt` y color de brillo distintos), coste de recurso, fuerza de aturdimiento y recuperación castigable (≥ 0,3 s). Un coste de vida nunca puede dejar la vida a 0.
+- Imbloqueable (`unblockable` en la definición; `BossAbilities.is_unblockable`): el escudo no la para y el parry tampoco (golpe tipo 3). Lo son la Estocada y las marcadas en la tabla (Tajo Retardado, Presa del Verdugo, Giro Devastador, Paso Espectral, Lanza Celeste, Cuerno, Daga Sagrada, Estocada Negra, Flor Umbral, Presa de Fauces, Rueda Noble, Danza Triple, Picado de Alas y Flecha Grave).
+- Estocada: sigue al objetivo toda la carga; en la embestida solo corrige la dirección los primeros 0,15 s, después va recta. Durante la carga y la embestida es inmunidad total, igual que hoy; queda pendiente de balance.
+- Recarga global de 1,4 s (85 ticks, `tk(1,4)`) desde que acaba una habilidad de jefe (la Ráfaga puede encadenarse consigo misma). La recarga propia no corre. Más adelante, `max(global, propia)`.
+- Cada habilidad tiene un aviso propio (texto `tele`/`tele_txt` y color de brillo distintos), coste de recurso, fuerza de aturdimiento y recuperación castigable (≥ 0,3 s). Un coste de vida se rechaza si dejaría la vida en 0; si se paga, se recorta a 1.
+- Interrupción (`interruptible_by`, en el motor nuevo): lista vacía = no se corta con tambaleo, aturdimiento ni derribo; solo se esquiva. Quien se corta lo declara, por ejemplo `["stun_lvl2", "knockdown", "parry"]`. La Danza del Cisne declara parry, aturdimiento fuerte y derribo (ya no hay un corte cableado por id una vez migrada).
+- Invulnerabilidad total (el golpe cuenta como esquiva): i-frames de la Danza, el Paso Espectral, la transición a Fase II y el escudo de maná. Son esquivas. El derribo no es invulnerable: inmune al aturdimiento y daño ×0,85.
+- Daño de estas habilidades: `damage_scaling` `weapon_heavy` o `weapon_light` (multiplicador del fuerte o del ligero). Si la habilidad es mágica, además × magia/100.
+- Onda: empuje de 6 m/s si el catálogo no dice otra cosa (`knockback_mps`).
+- Cuándo se puede usar: en el suelo, sin montar, sin frasco, sin estar agotado y con la espada (el escudo de maná también con arco). Vive en `SimAbilities.can_use`.
 - En móvil todos los avisos duran +12 % (`telegraph_k` = 1,12).
 - Aura dorada pulsante mientras hay invulnerabilidad, inmunidad al aturdimiento o súper-armadura (robustez extra ≥ +1,0).
 - Voltereta con búfer de 0,18 s: si se pulsa durante una acción, sale en cuanto el personaje queda libre.

@@ -29,6 +29,47 @@ static var _by_id: Dictionary = {}
 static func handles(id: String) -> bool:
 	return id in IDS
 
+## El programa numérico es el del camino viejo. Acá se cambia el tipo y se lee la máscara.
+static func wrap(c: Dictionary, id: String) -> Dictionary:
+	c["family"] = int(c["type"])
+	c["type"] = SimAbilities.T_STEPS
+	c["imask"] = _mask(id)
+	c["graph"] = 0
+	c["evs"] = _events_of(id)
+	return c
+
+static func _events_of(id: String) -> Array:
+	var out: Array = []
+	var a: Dictionary = catalog().get(id, {})
+	var steps: Array = a.get("steps", [])
+	for st: Dictionary in steps:
+		var evs: Array = st.get("events", [])
+		for ev: Dictionary in evs:
+			out.append({"id": String(ev.get("id", "")), "tick": int(ev.get("tick", 0)), "step": int(st.get("index", 0))})
+	return out
+
+static func _mask(id: String) -> int:
+	var a: Dictionary = catalog().get(id, {})
+	return int(a.get("interrupt_mask", 0))
+
+static func wants_parry(id: String) -> bool:
+	return (_mask(id) & (1 << 3)) != 0
+
+## true = este aturdimiento no corta la habilidad ni se le aplica mientras dura.
+static func ignores_stun(ab: Dictionary, dur: int) -> bool:
+	if int(ab.get("type", -1)) != SimAbilities.T_STEPS:
+		return false
+	var bit := -1
+	if dur == FightSim.T_STAGGER:
+		bit = 0
+	elif dur == FightSim.T_STUN:
+		bit = 1
+	elif dur == FightSim.T_DOWN + FightSim.T_GETUP:
+		bit = 2
+	else:
+		return false
+	return (int(ab.get("imask", 0)) & (1 << bit)) == 0
+
 static func catalog() -> Dictionary:
 	if _by_id.is_empty():
 		var res := AbilityCatalog.load_file(PATH)
@@ -272,12 +313,40 @@ static func tick(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 		_graph(s, P, i, ab)
 		return
 	var o := i * FightSim.F_FIELDS
-	var ts := s[o + FightSim.AB_T] - 1
-	_flick(s, o, ab, ts)
-	match int(ab.get("exec", EXEC_TIMELINE)):
-		EXEC_WAVE: _wave(s, P, i, ab, ts)
-		EXEC_RAIN: _rain(s, P, i, ab, ts)
-		_: _timeline(s, P, i, ab, ts)
+	match SimAbilities.kind_of(ab):
+		SimAbilities.T_TIMELINE:
+			SimAbilities._timeline(s, P, i, ab)
+		SimAbilities.T_WAVE:
+			SimAbilities._wave(s, P, i, ab)
+		SimAbilities.T_RAIN:
+			SimAbilities._rain(s, P, i, ab)
+		SimAbilities.T_BREATH:
+			SimAbilities._breath(s, P, i, ab)
+		SimAbilities.T_RAFAGA:
+			SimAbilities._rafaga(s, P, i, ab)
+		SimAbilities.T_SALTO:
+			SimAbilities._salto(s, P, i, ab)
+		SimAbilities.T_COMBO:
+			SimAbilities._combo(s, P, i, ab)
+		SimAbilities.T_CARGA:
+			if s[o + FightSim.AB_T] >= int(ab["end"]):
+				SimAbilities.end_ability(s, o, false)
+		SimAbilities.T_ESCUDO:
+			if s[o + FightSim.AB_T] >= int(ab["w"]):
+				s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 3)
+			if s[o + FightSim.AB_T] >= int(ab["end"]):
+				s[o + FightSim.INVULN] = 0
+				SimAbilities.end_ability(s, o, false)
+		SimAbilities.T_RAGE:
+			if s[o + FightSim.AB_FIRED] == 0 and s[o + FightSim.AB_T] >= int(ab["w"]):
+				s[o + FightSim.AB_FIRED] = 1
+				s[o + FightSim.RAGE_T] = ab["dur"]
+			if s[o + FightSim.AB_T] >= int(ab["end"]):
+				SimAbilities.end_ability(s, o, false)
+		SimAbilities.T_COUNTER:
+			var done: bool = s[o + FightSim.AB_T] >= int(ab["ws"]) + int(ab["rec_hit"]) if (s[o + FightSim.AB_FL] & SimAbilities.FL_COUNTERED) != 0 else s[o + FightSim.AB_T] >= int(ab["end_miss"])
+			if done:
+				SimAbilities.end_ability(s, o, false)
 
 static func _flick(s: PackedInt64Array, o: int, ab: Dictionary, ts: int) -> void:
 	for ev: Dictionary in ab.get("evs", []):

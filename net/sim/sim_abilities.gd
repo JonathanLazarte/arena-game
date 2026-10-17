@@ -60,10 +60,6 @@ static func compile_all(f: Fighter) -> Array:
 static func compile(f: Fighter, id: String) -> Dictionary:
 	if HojaCatalog.has(id):
 		return SimCatalog.compile(f, id)
-	if SimParams.ab_engine != 0 and SimSteps.handles(id):
-		var stepped := SimSteps.compile(f, id)
-		if not stepped.is_empty():
-			return stepped
 	var d := BossAbilities.def(id)
 	if d.is_empty():
 		return {}
@@ -159,7 +155,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["force"] = fphys.call(float(d["force"]))
 			c["end"] = _tk(float(d["land"]) + float(d["recovery"]))
 	if c["type"] >= 0:
-		return c
+		return _finish(c, id)
 	match String(d.get("type", "")):
 		"timeline":
 			c["type"] = T_TIMELINE
@@ -187,7 +183,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["abort"] = 1 if d.get("abort_on_miss", false) else 0
 			c["miss_t"] = c["end"] - _tk(float(d.get("miss_extra", 0.5)) + float(d.get("recovery", 0.9)))
 			c["hit_if"] = 1 if d.get("hit_iframes", false) else 0
-			c["parry_cancel"] = 1 if id == "danza_cisne" else 0
+			c["parry_cancel"] = 1 if id == "danza_cisne" or SimSteps.wants_parry(id) else 0
 			c["vanish"] = _tk(float(d["vanish"]) * tk) if d.has("vanish") else -1
 			c["reappear"] = _tk(float(hits[0][0]) * tk - 0.2)
 			c["blink"] = _um(float(d.get("blink_dist", 2.4)))
@@ -265,7 +261,12 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["c_force"] = fphys.call(float(d.get("cforce", 55.0)))
 		"rafaga":
 			_compile_rafaga(c, d, fmag, tk)
-	return c
+	return _finish(c, id)
+
+static func _finish(c: Dictionary, id: String) -> Dictionary:
+	if c.is_empty() or SimParams.ab_engine == 0 or not SimSteps.handles(id):
+		return c
+	return SimSteps.wrap(c, id)
 
 ## Tajo que persigue. scale 1 = ráfaga base (tiempos de escritorio); el resto alarga el aviso.
 static func _compile_rafaga(c: Dictionary, d: Dictionary, fmag: Callable, scale: float) -> void:
@@ -286,9 +287,13 @@ static func _compile_rafaga(c: Dictionary, d: Dictionary, fmag: Callable, scale:
 static func _ab(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
 	return P[i]["boss"][s[i * FightSim.F_FIELDS + FightSim.AB_SLOT]]
 
+## Tipo de ejecutor. El motor de pasos guarda el original en `family` y pone `type` = T_STEPS.
+static func kind_of(ab: Dictionary) -> int:
+	return int(ab.get("family", ab.get("type", -1)))
+
 static func is_shield(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var o := i * FightSim.F_FIELDS
-	return s[o + FightSim.AB_SLOT] >= 0 and int(_ab(s, P, i)["type"]) == T_ESCUDO
+	return s[o + FightSim.AB_SLOT] >= 0 and kind_of(_ab(s, P, i)) == T_ESCUDO
 
 ## Daño en vivo: furia con vida baja y furia de fase (+30 %).
 static func raw_live(s: PackedInt64Array, P: Array, i: int, raw: int) -> int:
@@ -483,7 +488,7 @@ static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
 		return false
 	if s[o + FightSim.SHOT_STATE] == FightSim.Shot.DRAW or s[o + FightSim.SHOT_STATE] == FightSim.Shot.RECOVER:
 		return false
-	if int(ab["type"]) != T_ESCUDO and s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
+	if kind_of(ab) != T_ESCUDO and s[o + FightSim.LOADOUT] != FightSim.Load.SWORD:
 		return false
 	if int(ab.get("phase", 1)) >= 2:
 		var ph: Dictionary = P[i].get("ph2", {})
@@ -506,7 +511,7 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 			return true
 	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
 	var ab: Dictionary = boss[slot]
-	if int(ab["type"]) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
+	if kind_of(ab) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
 		if (s[o + FightSim.AB_FL] & FL_QUEUED) != 0 or s[o + FightSim.AB_FIRED] >= (ab["hits"] as Array).size():
 			return false
 		if not _cost_ok(s, i, ab):
@@ -533,7 +538,7 @@ static func variation(s: PackedInt64Array, P: Array, i: int) -> bool:
 		return SimCatalog.latch(s, P, i, true)
 	if int(ab.get("type", -1)) == T_STEPS and SimSteps.latch(s, P, i, true):
 		return true
-	if int(ab["type"]) != T_COMBO or s[o + FightSim.AB_FIRED] != (ab["hits"] as Array).size() - 1 or (s[o + FightSim.AB_FL] & FL_QUEUED) != 0:
+	if kind_of(ab) != T_COMBO or s[o + FightSim.AB_FIRED] != (ab["hits"] as Array).size() - 1 or (s[o + FightSim.AB_FL] & FL_QUEUED) != 0:
 		return false
 	if not _cost_ok(s, i, ab):
 		_end_combo(s, P, i, true)
@@ -548,7 +553,7 @@ static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 	s[o + FightSim.BLOCKING] = 0
 	var dir := _tdir(s, i)
 	s[o + FightSim.FACE] = dir
-	if int(ab["type"]) == T_ESTOCADA:
+	if kind_of(ab) == T_ESTOCADA:
 		s[o + FightSim.BS_PH] = 1
 		s[o + FightSim.BS_T] = 0
 		s[o + FightSim.BS_TRAV] = 0
@@ -575,7 +580,7 @@ static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 		s[o + FightSim.AB_FL] = FL_CATALOG
 		s[o + FightSim.AB_FIRED] = int(ab.get("entry", 0))
 		s[o + FightSim.AB_WAIT] = int(ab["cd"]) | (int(ab["imask"]) << 16)
-	elif int(ab["type"]) == T_CARGA:
+	elif kind_of(ab) == T_CARGA:
 		s[o + FightSim.AB_HZ] = spawn_hz(s, i, 1, s[o + FightSim.X], s[o + FightSim.Z], ab["warn"], ab["r"], raw_live(s, P, i, ab["raw"]), ab["force"], 150000, 0)
 
 ## Fin de la habilidad (Fighter._end_ability): recarga global; si se corta, su carga no estalla.
@@ -620,7 +625,7 @@ static func resist_pm(s: PackedInt64Array, P: Array, i: int) -> int:
 		return SimCatalog.resist_now(s, P, i)
 	if int(ab.get("type", -1)) == T_STEPS:
 		return SimSteps.resist_now(s, P, i)
-	if int(ab["type"]) == T_COMBO:
+	if kind_of(ab) == T_COMBO:
 		var n: int = (ab["hits"] as Array).size()
 		var fin: int = ab["var_w"] if (s[o + FightSim.AB_FL] & FL_VARIANT) != 0 else ab["final"]
 		if s[o + FightSim.AB_FIRED] == n - 1 and s[o + FightSim.AB_T] < fin:
@@ -701,14 +706,14 @@ static func update(s: PackedInt64Array, P: Array, i: int) -> void:
 			SimSteps.tick(s, P, i, ab)
 	# inmunidad (Fighter.ab_immune): escudo tras su anticipación, o en el aire (salto / combo)
 	if s[o + FightSim.AB_SLOT] >= 0:
-		var t := int(_ab(s, P, i)["type"])
+		var t := kind_of(_ab(s, P, i))
 		s[o + FightSim.AB_IMM] = 1 if (t == T_ESCUDO and s[o + FightSim.AB_T] >= int(_ab(s, P, i)["w"])) or ((t == T_SALTO or t == T_COMBO) and s[o + FightSim.AB_AIR] != 0) else 0
 
 static func _estocada(s: PackedInt64Array, P: Array, i: int) -> void:
 	var o := i * FightSim.F_FIELDS
 	var ab: Dictionary = {}
 	for c: Dictionary in P[i].get("boss", []):
-		if int(c["type"]) == T_ESTOCADA:
+		if kind_of(c) == T_ESTOCADA:
 			ab = c
 	if ab.is_empty() or s[o + FightSim.ALIVE] == 0:
 		_end_boss(s, o)

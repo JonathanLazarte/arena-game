@@ -46,17 +46,20 @@
 - **Fase II del campeón** (al bajar del 50 % de vida): desbloquea la **3.ª habilidad** del campeón (además
   de furia, 0,85 s de invulnerabilidad y, según el campeón, medidor de eikon lleno).
 - **Costo de recurso** obligatorio: aguante (`stamina`), maná (`mana`, = Energía) o vida (`health`). Un costo
-  de vida **nunca** deja la vida en 0: se recorta para dejar como mínimo **1 de vida**.
-- **Recarga propia** por habilidad (`cooldown_ticks`) **más recarga global de 1,4 s (84 ticks)** que arranca
-  cuando termina cualquier habilidad de jefe (si `uses_global_cd` = true).
+  de vida **se rechaza** si `vida − costo ≤ 0`. Si se paga, se recorta para dejar como mínimo **1 de vida**.
+- **Recarga:** la sim usa solo la **global de 85 ticks** (`tk(1,4)`, 1,4 s). El `cooldown_ticks` del catálogo
+  no se aplica todavía. Más adelante la recarga será `max(global, propia)`. La ráfaga se encadena consigo
+  misma y saltea la global. El 84 del esquema objetivo no corre en la sim.
 - **Aturdimiento en 3 niveles acumulados** durante una ventana de **3 s (180 ticks)** desde el primer golpe:
   umbrales `acumulado / robustez` = **1,0 tambaleo** (21 ticks, se cancela rodando) · **1,6 aturdido**
   (54 ticks) · **2,4 derribo** (66 ticks en el suelo + 48 levantándose). Un golpe aporta como mucho
   **0,95 × robustez**: ningún golpe aturde solo.
-- **Derribo**: el derribado es **invulnerable hasta terminar de levantarse** (en el esquema objetivo; ver §13).
-  Después tiene 36 ticks más de inmunidad al aturdimiento.
-- **«Invulnerabilidad»** en este juego significa **inmunidad al aturdimiento + daño recibido levemente
-  reducido** (referencia: ×0,85), **salvo el escudo de maná**, que es invulnerabilidad **total (100 %)**.
+- **Derribo**: inmune al aturdimiento desde el derribo hasta levantarse + 36 ticks, y el daño entra ×0,85
+  (`GETUP_DMG_PM`). No es invulnerable.
+- **Inmunidad total** (el golpe cuenta como esquiva): i-frames de la Danza, el Paso Espectral, la transición
+  a Fase II y el escudo de maná. La carga y la embestida de la Estocada también, igual que hoy, y queda
+  **pendiente de balance**. En el resto, «invulnerable» del esquema (inmune al aturdimiento + daño ×0,85)
+  no reemplaza esas esquivas.
 - **Cada habilidad tiene un aviso (telegraph) propio y único**, con forma/color/sonido distinguibles.
 - **Flags de cancelación y parry** por habilidad y por caja de golpe (`interruptible_by`, `parryable`, …).
 
@@ -201,7 +204,7 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 | `cooldown_ticks` | int ≥ 0 | sí | — | recarga propia; arranca al **terminar** la habilidad (o al interrumpirse si `on_interrupt.cooldown` = `full`) |
 | `uses_global_cd` | bool | no | `true` | respeta y dispara la recarga global de 84 ticks |
 | `usable_while` | array<enum> | no | `["ground"]` | `ground` · `air` · `mounted` · `sprinting` · `blocking`. Fuera de esos estados la habilidad no arranca. Nunca: muerto, aturdido, bebiendo frasco, agotado |
-| `interruptible_by` | array<enum> | no | `["stun_lvl1","stun_lvl2","knockdown","parry"]` | `stun_lvl1` (tambaleo) · `stun_lvl2` (aturdido) · `knockdown` · `parry` · `guard_break` · `stance_break` · `grab`. Lista vacía = no se interrumpe (ver V18) |
+| `interruptible_by` | array<enum> | no | `[]` | `stun_lvl1` (tambaleo) · `stun_lvl2` (aturdido) · `knockdown` · `parry` · `guard_break` · `stance_break` · `grab`. **Lista vacía = no se corta** (solo se esquiva). Quien se corta lo declara, por ejemplo `["stun_lvl2","knockdown","parry"]` |
 | `interrupt_priority` | int | no | `0` | desempate determinista (§8.4) |
 | `on_interrupt.recovery_ticks` | int ≥ 0 | no | `0` | recuperación extra tras ser cortada (además del aturdimiento recibido) |
 | `on_interrupt.cancel_spawns` | bool | no | `true` | marcas/zonas que aún no estallaron desaparecen |
@@ -388,7 +391,7 @@ contradecir lo que la sim realmente hace. Lo único permitido es un `hint` **opc
 | `hit_interval_ticks` | int | `0` | ≥ 1 si `hits` > 1: separación mínima entre impactos |
 | `damage_per_hit` | number ≥ 0 | — | puntos de vida **antes** de defensas y armadura |
 | `damage_type` | enum | `"physical"` | `physical` · `fuego` · `magico` · `sagrado` · `rayo` · `hielo` (tablas de defensa existentes) |
-| `damage_scaling` | enum | `"attacker"` | `attacker` = × multiplicador de daño del atacante (atributos, furia) · `magic` = × poder mágico/100 · `none` |
+| `damage_scaling` | enum | `"attacker"` | `weapon_heavy` / `weapon_light` = `damage_per_hit` × el fuerte o el ligero del arma × el multiplicador de daño del atacante. Si la habilidad es mágica, además × magia/100. `attacker` = solo ese multiplicador · `magic` = × magia/100 · `none` = el número tal cual |
 | `blockable` | bool | `true` | false = imbloqueable (V07) |
 | `parryable` | bool | `true` | false = el parry no la corta. Imbloqueable ⇒ en general también `parryable: false` |
 | `stun_power` | number ≥ 0 | — | fuerza de aturdimiento de este impacto (escala §2.2) |
@@ -595,7 +598,7 @@ ocupen más de **6 proyectiles** u **8 peligros** a la vez.
 | Tipo | Campos propios | Notas |
 |---|---|---|
 | `ground_mark` (hoy «lluvia») | `shape`, `warn_ticks` (≥ 30), `damage`, `stun_power`, `knockback_mps`, `blockable`, `mode: track\|scatter`, `scatter_radius_m`, `interval_ticks` | `scatter` usa el RNG de la sim |
-| `ground_wave` (hoy «onda») | `speed_mps`, `range_m`, `width_m`, `warn_ticks`, `ring` (bool) | siempre `ground_only` (se salta) |
+| `ground_wave` (hoy «onda») | `speed_mps`, `range_m`, `width_m`, `warn_ticks`, `ring` (bool), `knockback_mps` | siempre `ground_only` (se salta). El empuje `knockback_mps` vale **6** si se omite |
 | `projectile` | `speed_mps`, `homing_deg` (°/s), `homing_ticks`, `lifetime_ticks`, `radius_m`, `pierce` (bool), `reflectable_by_parry` (bool), `hitbox` | giro entero con tope; si esquivás, sigue de largo |
 | `zone` (persistente) | `shape`, `delay_ticks`, `duration_ticks`, `hitbox_every_ticks`, `damage`, `status` | máx. 2 por luchador |
 | `beam` (rayo / aliento) | `length_m`, `width_m` o `angle_deg`, `duration_ticks`, `tick_interval`, `sweep_deg_per_sec` | hoy existe como cono («aliento») |
@@ -640,7 +643,7 @@ Extensiones previstas de paso/habilidad:
 | V15 | `unlock.phase` = 2 solo tiene sentido en el 3.er lugar de un preset (aviso si no) |
 | V16 | `branch`: opciones válidas, sin `input` repetido, `alt` con `hud_icon` y `label`, ventana dentro del paso |
 | V17 | piscinas: peor caso ≤ 6 proyectiles y ≤ 8 peligros simultáneos |
-| V18 | `interruptible_by` vacío ⇒ `armor.type = hyper` en los tramos largos y recuperación final ≥ 30 |
+| V18 | `interruptible_by` vacío es válido: la habilidad no se corta (solo se esquiva). No exige hiperarmadura |
 | V19 | nombres propios: nada de nombres de otras franquicias |
 
 **Mecánicas prohibidas (injustas):**
@@ -1051,38 +1054,27 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 | `champion.boss` (3 ids) + `P.boss_n = 2` (3.ª ranura bloqueada hasta la Fase II) | `presets[]` + `unlock.phase` |
 | Eventos genéricos `ability` / `ability_hit` / `ability_interrupt` con `code` | `events[]` con id estable por paso |
 
-### 13.4 Divergencias notables (hoy ≠ esquema)
+### 13.4 Decisiones (mandan sobre el esquema de arriba)
 
-1. **Recarga propia**: la sim solo tiene la **global** (`GLOBAL_CD = 85` ticks porque `tk(1,4)` da 85; el esquema
-   usa 84). El `cd` de las ampliadas no se usa en la sim y offline está apagado (`Fighter.per_ability_cd_enabled =
-   false`). Las de tipo ráfaga (`rafaga`, `saeta_oscura`, `orbe_lunar`) se encadenan consigo mismas salteando la global.
-2. **Interrupción**: hoy **cualquier** nivel de aturdimiento (incluso el tambaleo) corta la habilidad, salvo
-   inmunidad (`AB_IMM`: escudo; en el aire durante salto/combo) o la estocada (nunca se interrumpe). No hay
-   `interruptible_by` por habilidad.
-3. **Invulnerabilidad**: el campo `INVULN` de la sim es **inmunidad total** (el golpe cuenta como esquivado). Lo
-   usan la carga y la embestida de la estocada, el Paso Espectral, los i-frames de la Danza y los 51 ticks de la
-   Fase II. El esquema define «invulnerabilidad» como inmunidad al aturdimiento + daño ×0,85, y total solo en el
-   escudo de maná.
-4. **Derribo**: hoy **no** es invulnerable; es inmune al aturdimiento desde el derribo hasta levantarse + 36 ticks,
-   recibiendo daño ×0,85 (`GETUP_DMG_PM = 850`). El esquema lo quiere invulnerable hasta levantarse.
-5. **Costo de vida**: hoy la habilidad **no se puede usar** si `vida − costo ≤ 0`; al pagar se recorta a 1. El
-   esquema solo exige el recorte a 1.
-6. **Daño relativo al arma**: hoy el daño escala con el fuerte/ligero del arma equipada; el esquema usa daño
-   absoluto por golpe (con `damage_scaling` para atributos).
-7. **Imbloqueable = sin parry**: el golpe tipo 3 también ignora el parry. El esquema separa las dos cosas.
-8. **Cuándo se puede usar**: hoy solo en el suelo, sin montar, sin frasco, sin estar agotado y con la espada (no con
-   el arco) salvo el escudo; cableado en `SimAbilities.can_use`.
-9. **Remate alternativo / bit `alt`**: existe `IN_BOSS_VAR` (bit 21, acción `boss_variation`, tecla `M`, botón táctil
+1. **Recarga.** Solo la global de 85 ticks. El `cd` no se usa. La ráfaga se encadena y saltea la global. Más adelante: `max(global, propia)`.
+2. **Interrupción.** `interruptible_by` vacío = no se corta (solo se esquiva). Cada habilidad declara lo que la corta. La base ya no es «cualquier aturdimiento». La Danza del Cisne lo declara (`parry`, `stun_lvl2`, `knockdown`); no hay un `if id == danza_cisne` en el motor nuevo.
+3. **Inmunidad total** en los i-frames de la Danza, el Paso Espectral, la Fase II y el escudo de maná. La Estocada se migra como hoy (inmunidad en la carga y la embestida) y queda pendiente de balance.
+4. **Derribo:** daño ×0,85 e inmune al aturdimiento. No es invulnerable.
+5. **Costo de vida:** se rechaza el uso si la vida quedaría en 0. Al pagar, se recorta a 1.
+6. **Daño:** `damage_scaling` `weapon_heavy` o `weapon_light`. `damage_per_hit` es el multiplicador del arma. Lo mágico además × magia/100.
+7. **Imbloqueable = sin parry** (golpe tipo 3). Se mantiene.
+8. **Cuándo se puede usar:** `SimAbilities.can_use` (suelo, sin montar, sin frasco, sin agotamiento, espada salvo el escudo). Se mantiene.
+9. **Ondas:** `knockback_mps` por defecto 6.
+10. **Remate alternativo / bit `alt`**: existe `IN_BOSS_VAR` (bit 21, acción `boss_variation`, tecla `M`, botón táctil
    «Estocada»), pero **solo** lo entiende `combo_falso`, y la visibilidad del botón la calcula `hud.gd` a partir de
    `ab_id`/`ab_fired` del `Fighter` (que vuelca SimView). **No existe** un `branch` genérico ni un bit `alt` genérico
    en el empaquetado de entradas. Propuesta: reutilizar el bit 21 como `alt` (el único libre es el 31, que el paquete
    `PackedInt32Array` no usa), así que `alt2` hoy no tiene bit. Cambiar la semántica de los bits implica subir el
    protocolo (ver `docs/HANDOFF.md` §3).
-10. **Desfases de documentación** (`docs/design.md` vs código): la tabla dice Ráfaga 30 maná / 3 tajos y el código
-    10 maná / 1 tajo por pulsación; la tabla dice Carga en área 1,8 s / 4,5 m y el código 2,2 s / 7,5 m. En
-    «Principios» dice «sin recarga» y más abajo describe la global de 1,4 s. Manda el código.
-11. **IA**: decide en float con lógica específica por id; no hay bloque `ai` en los datos.
-12. **Presets**: hoy siempre son 3 ids por campeón y la 3.ª se bloquea por ranura (`boss_n`), no por habilidad.
+11. **Desfases de la tabla de las 6 base** (`docs/design.md`): la tabla dice Ráfaga 30 maná / 3 tajos y el código
+    10 maná / 1 tajo por pulsación; la tabla dice Carga en área 1,8 s / 4,5 m y el código 2,2 s / 7,5 m. Manda el código.
+12. **IA**: decide en float con lógica específica por id; no hay bloque `ai` en los datos.
+13. **Presets**: hoy siempre son 3 ids por campeón y la 3.ª se bloquea por ranura (`boss_n`), no por habilidad.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 

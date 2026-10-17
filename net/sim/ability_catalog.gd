@@ -24,7 +24,8 @@ const CATEGORIES := ["melee", "ranged", "magic", "grab", "buff", "summon", "zone
 const KNOWN_TAGS := ["unblockable", "delayed", "multi_hit", "aerial", "mana_shield", "tracking", "aoe", "projectile"]
 const USABLE := ["ground", "air", "mounted", "sprinting", "blocking"]
 const INTERRUPTS := ["stun_lvl1", "stun_lvl2", "knockdown", "parry", "guard_break", "stance_break", "grab"]
-const DEFAULT_INTERRUPTS := ["stun_lvl1", "stun_lvl2", "knockdown", "parry"]
+## Vacío = la habilidad no se corta: solo se esquiva. Quien se corta lo declara.
+const DEFAULT_INTERRUPTS: Array = []
 const OI_COOLDOWN := ["full", "global_only", "none"]
 const USE_WHEN := ["target_in_range", "target_recovering", "target_far", "target_close", "target_blocking",
 	"target_healing", "target_downed", "self_low_hp", "self_phase2", "opener"]
@@ -36,7 +37,8 @@ const TARGET_MODES := ["facing", "target", "lock_point", "away_from_target"]
 const ANCHORS := ["self", "lock_point", "spawn_point"]
 const SHAPES := ["circle", "arc", "line", "ring", "box"]
 const DMG_TYPES := ["physical", "fuego", "magico", "sagrado", "rayo", "hielo"]
-const DMG_SCALING := ["attacker", "magic", "none"]
+## weapon_*: damage_per_hit es el multiplicador del fuerte o del ligero del arma (× daño del atacante).
+const DMG_SCALING := ["attacker", "magic", "none", "weapon_heavy", "weapon_light"]
 const STUN_SCALING := ["physical", "magic", "none"]
 const FORCES := ["pull", "push", "launch", "root"]
 const BREAKABLE := ["roll", "jump", "parry", "damage_taken", "none"]
@@ -626,18 +628,7 @@ static func _ability_rules(c: Ctx, p: String, a: Dictionary, steps: Array, intr:
 		c.err(p, "V17", "hasta %d proyectiles simultáneos (peor caso %d)" % [MAX_PROJECTILES, proj])
 	if haz > MAX_HAZARDS:
 		c.err(p, "V17", "hasta %d peligros simultáneos (peor caso %d)" % [MAX_HAZARDS, haz])
-	# V18: sin interrupciones ⇒ armadura hyper y recuperación final ≥ 30
-	if intr == 0:
-		var hyper := false
-		for s: Dictionary in steps:
-			if s["armor"] != null and int(s["armor"]["type"]) == ARMOR.find("hyper"):
-				hyper = true
-		if not hyper:
-			c.err(_p(p, "interruptible_by"), "V18", "sin interrupciones requiere armadura hyper")
-		for i in steps.size():
-			var s: Dictionary = steps[i]
-			if bool(s.get("_terminal", false)) and int(s["recovery"]) < MIN_NOINTERRUPT_RECOVERY:
-				c.err("%s.steps[%d].recovery_ticks" % [p, i], "V18", "sin interrupciones: recuperación final ≥ %d" % MIN_NOINTERRUPT_RECOVERY)
+	# Lista vacía = no se corta (solo se esquiva). No exige hiperarmadura.
 	for s: Dictionary in steps:
 		s.erase("_terminal")
 
@@ -1023,7 +1014,7 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["interval"] = _int(c, s, "interval_ticks", p, false, 0, 0, 600)
 			out["on"] = _enum(c, s, "on", p, SPAWN_ON, false, "always")
 		"ground_wave":
-			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable", "on"])
+			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable", "on", "knockback_mps"])
 			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 40.0))
 			out["range"] = um(_num(c, s, "range_m", p, true, 0.0, 0.1, 40.0))
 			out["width"] = um(_num(c, s, "width_m", p, true, 0.0, 0.1, 10.0))
@@ -1033,6 +1024,7 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["stun"] = milli(_num(c, s, "stun_power", p, false, 0.0, 0.0, 500.0))
 			out["blockable"] = 1 if _bool(c, s, "blockable", p, true) else 0
 			out["on"] = _enum(c, s, "on", p, SPAWN_ON, false, "always")
+			out["knock"] = upt(_num(c, s, "knockback_mps", p, false, 6.0, 0.0, 40.0))
 		"projectile":
 			_unknown(c, s, p, common + ["speed_mps", "homing_deg", "homing_ticks", "lifetime_ticks", "radius_m", "pierce", "reflectable_by_parry", "hitbox"])
 			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 60.0))

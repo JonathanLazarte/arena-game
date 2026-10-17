@@ -102,7 +102,10 @@ func _run() -> void:
 		var c0: Dictionary = p0[0]["boss"][0]
 		var c1: Dictionary = p1[0]["boss"][0]
 		check(int(c0["type"]) == fam and int(c1["type"]) == SimAbilities.T_STEPS, "%s: tipo viejo %d y motor %d" % [id, fam, SimAbilities.T_STEPS])
-		check(int(c0["raw"]) == int(c1["raw"]) and int(c0["end"]) == int(c1["end"]) and int(c0.get("force", c1.get("force", 0))) == int(c1.get("force", -1)),
+		var same_force := true
+		if c0.has("force") or c1.has("force"):
+			same_force = int(c0.get("force", -1)) == int(c1.get("force", -2))
+		check(int(c0["raw"]) == int(c1["raw"]) and int(c0["end"]) == int(c1["end"]) and same_force,
 			"%s: raw %d/%d end %d/%d" % [id, int(c0["raw"]), int(c1["raw"]), int(c0["end"]), int(c1["end"])])
 		_same(p0, p1, 2200000, 220, "idle", "%s de cerca" % id)
 		_same(p0, p1, 14000000, 180, "idle", "%s de lejos" % id)
@@ -160,10 +163,30 @@ func _run() -> void:
 			dup = true
 	check(not dup and fx.cancelled == 0, "rollback: sin eventos duplicados ni cancelados de más (cancelados %d)" % fx.cancelled)
 	check(FightSim.checksum(rs) == int((played["sums"] as Array)[159]), "la re-simulación cae en el mismo estado")
+	await _interrupts()
 	await _graph()
 	SimParams.ab_engine = 0
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)
+
+func _interrupts() -> void:
+	var viejo: Array = await _bake(["tajo_retardado"], ["estocada"], 0)
+	var tajo: Array = await _bake(["tajo_retardado"], ["estocada"], 1)
+	var piso: Array = await _bake(["pisoton"], ["estocada"], 1)
+	var sv := FightSim.initial(viejo, 1, false)
+	var st := FightSim.initial(tajo, 1, false)
+	var sp := FightSim.initial(piso, 1, false)
+	sv[FightSim.AB_SLOT] = 0
+	st[FightSim.AB_SLOT] = 0
+	sp[FightSim.AB_SLOT] = 0
+	st[FightSim.AB_T] = 20
+	sp[FightSim.AB_T] = 20
+	FightSim._apply_stun(sv, 0, FightSim.T_STAGGER, viejo)
+	FightSim._apply_stun(st, 0, FightSim.T_STAGGER, tajo)
+	FightSim._apply_stun(sp, 0, FightSim.T_STAGGER, piso)
+	check(sv[FightSim.AB_SLOT] < 0, "camino viejo: el tambaleo corta el tajo")
+	check(st[FightSim.AB_SLOT] == 0 and st[FightSim.STUN] == 0, "tajo (lista vacía): el tambaleo no lo corta")
+	check(sp[FightSim.AB_SLOT] < 0 and sp[FightSim.STUN] == FightSim.T_STAGGER, "pisotón: el tambaleo sí lo corta")
 
 func _gstep(total: int, windup: int, reach: int, nxt: Dictionary, branch: Variant, cancel: Variant) -> Dictionary:
 	return {

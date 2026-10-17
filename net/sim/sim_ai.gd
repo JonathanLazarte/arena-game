@@ -338,7 +338,7 @@ func _decide() -> void:
 	if _roll_slash(mp):
 		return
 	var oab := ab_cur(_q, opp_i)
-	var otype := int(oab.get("type", -1))
+	var otype := int(oab.get("family", oab.get("type", -1)))
 	# salto con caída: alejarse; rodar al aterrizar
 	if otype == SimAbilities.T_SALTO and og(S.AB_AIR) != 0:
 		var land_in := (int(oab["land"]) - og(S.AB_T)) * DT
