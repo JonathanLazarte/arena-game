@@ -63,7 +63,7 @@ func _ready() -> void:
 		enemy = _make_fighter(ChampionCatalog.display_name(ch), 1, Color(0.85, 0.15, 0.15), Catalog.EIKONS[eid], cd,
 			Smithing.effective(wd, Smithing.rival_level(gs.char_level())), [], Attributes.auto_allocate(cd.id, gs.char_level()),
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(cd.id, gs.char_level())})
-		enemy.set_boss_abilities(ch["boss"].slice(0, 2))
+		enemy.set_boss_abilities(ch["boss"] if sim_mode else ch["boss"].slice(0, 2)) # sim: la 3.ª se desbloquea en Fase II (P.boss_n)
 		enemy.set_magic([String(ch["spell"])], String(ch["art"]))
 	elif gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
@@ -165,6 +165,14 @@ func _setup_sim_match() -> void:
 		time_left = 1.0e9
 	else:
 		sim_match.setup(player, enemy, self)
+		if champion_id != "":
+			var ch := ChampionCatalog.by_id(champion_id)
+			sim_match.params[1]["boss_n"] = 2
+			sim_match.params[1]["ph2"] = {"hp_pm": 500, "rage": 540, "invuln": 51, "summon": 1 if bool(ch.get("phase2_summon", false)) else 0}
+		sim_ai = SimAI.new(1, ai.profile, randi())
+		if champion_id != "":
+			sim_ai.configure_champion(ChampionCatalog.by_id(champion_id))
+		sim_match.input_override[1] = func(_t: int) -> int: return sim_ai.think(sim_match.state, sim_match.params)
 	sim_match.on_event = _on_sim_event
 	enemy.face_target = player
 	player.face_target = enemy
@@ -244,6 +252,12 @@ func _on_sim_event(ev: Dictionary) -> void:
 				hud.show_message("¡Habilidad del rival!", 0.8) # telegrafía (el aviso visual de la sim)
 		"grab", "eikon_special", "ability_hit":
 			shake = maxf(shake, 0.25)
+		"phase2":
+			if champion_id != "" and int(ev["player"]) == 1:
+				_begin_champion_phase_two()
+	if String(ev["kind"]) == "crit" and rig and not online:
+		var a := sim_match.fighters[int(ev["player"])]
+		rig.play_execution(a, sim_match.fighters[1 - int(ev["player"])], FightSim.CRIT_TIME / 60.0)
 
 ## Ronda 26: pide en hilo los modelos de los eikons de ambos luchadores y, cuando llegan,
 ## calienta una instancia oculta (fuera de cámara, 2 fotogramas) para compilar sombreadores
@@ -285,9 +299,11 @@ func _on_execution_cinematic(attacker: Fighter, target: Fighter, duration: float
 ## Ronda 23: hit-stop (el tiempo casi se detiene unos milisegundos, en tiempo real).
 const SHAKE_SCALE := 0.3
 static var hitstop_enabled: bool = true
-## Modo sim (fase online): ambos luchadores los mueve FightSim con dos entradas locales. Por defecto apagado.
-static var sim_mode: bool = false
+## Fase 8: toda partida (offline y online) corre sobre FightSim; los Fighter solo se dibujan.
+## false = camino antiguo (Fighter + AIController), solo para pruebas heredadas.
+static var sim_mode: bool = true
 var sim_match: SimMatch
+var sim_ai: SimAI ## IA del rival offline (emite bits de entrada de la sim)
 var net_overlay: NetOverlay
 var online: NetMatch ## partida online en curso (NetMatch.current al entrar)
 var hitstops: int = 0
@@ -529,7 +545,7 @@ func _physics_process(delta: float) -> void:
 			var pl := player.health / player.max_health
 			var en := enemy.health / enemy.max_health
 			_on_fighter_died(enemy if pl >= en else player)
-		if state == "fight" and champion_id != "" and not champion_phase2_started and enemy.alive and enemy.health <= enemy.max_health * 0.5:
+		if state == "fight" and sim_match == null and champion_id != "" and not champion_phase2_started and enemy.alive and enemy.health <= enemy.max_health * 0.5:
 			_begin_champion_phase_two()
 	rig.active = state == "fight"
 	rig.update(delta) # ronda 25: cámara orbital (ratón / arrastre táctil), colisión con pilares
@@ -589,13 +605,17 @@ func start_round(new_match: bool = false) -> void:
 	player.reset_for_round(Vector3(0, 0.2, SPAWN_DIST), Vector3.FORWARD, not new_match)
 	enemy.reset_for_round(Vector3(0, 0.2, -SPAWN_DIST), Vector3.BACK, not new_match)
 	enemy.rage_t = 0.0
-	if champion_id != "":
+	if champion_id != "" and sim_match == null:
 		# El aura de Fase II no debe quedar pegada al reiniciar la ronda.
 		if enemy._kv:
 			enemy._kv.set_glow(false, Color.BLACK)
 		enemy.set_boss_abilities(ChampionCatalog.by_id(champion_id)["boss"].slice(0, 2))
 	if ai:
 		ai.champion_phase_two = false
+	if sim_ai:
+		sim_ai.reset_round()
+	if champion_id != "" and enemy._kv:
+		enemy._kv.set_glow(false, Color.BLACK)
 	camera.global_position = player.global_position + Vector3(0, 5, 9)
 	if rig:
 		rig.reset_behind()
@@ -611,27 +631,31 @@ func start_round(new_match: bool = false) -> void:
 func _begin_champion_phase_two() -> void:
 	champion_phase2_started = true
 	var ch := ChampionCatalog.by_id(champion_id)
-	enemy.set_boss_abilities(ch.get("boss", [])) # desbloquea la tercera habilidad al 50 %
-	enemy.rage_t = 9.0
-	enemy.invuln = 0.85
+	if sim_match == null: # en la sim lo resuelve FightSim._phase_two (P.ph2)
+		enemy.set_boss_abilities(ch.get("boss", [])) # desbloquea la tercera habilidad al 50 %
+		enemy.rage_t = 9.0
+		enemy.invuln = 0.85
 	var phase_color := Color(1.0, 0.12, 0.04)
 	match String(ch.get("eikon", "")):
 		"lobo": phase_color = Color(0.35, 0.8, 1.0)
 		"grifo": phase_color = Color(0.95, 0.8, 0.2)
 		"golem": phase_color = Color(0.6, 0.75, 0.5)
-	if bool(ch.get("phase2_summon", false)):
+	if bool(ch.get("phase2_summon", false)) and sim_match == null:
 		enemy.meter = Fighter.METER_MAX
 		enemy.meter_changed.emit(enemy.meter)
 	enemy._burst_particles(phase_color)
 	if enemy._kv:
 		enemy._kv.set_glow(true, phase_color)
-	if ai:
+	if sim_ai:
+		sim_ai.enter_champion_phase_two()
+	elif ai:
 		ai.enter_champion_phase_two()
 		if bool(ch.get("phase2_summon", false)) and enemy.can_summon():
 			enemy.summon()
 	shake = maxf(shake, 0.32)
-	player.apply_local_hitstop(0.12)
-	enemy.apply_local_hitstop(0.12)
+	if sim_match == null:
+		player.apply_local_hitstop(0.12)
+		enemy.apply_local_hitstop(0.12)
 	hud.show_message("¡Fase II! %s libera su poder" % ch.get("name", "El campeón"), 2.4)
 
 func _update_round_label() -> void:
@@ -645,6 +669,9 @@ func _on_fighter_died(f: Fighter) -> void:
 	var winner := 1 if f == player else 0
 	if sim_match:
 		sim_match.running = false
+		# estadística de la ronda (la sim reinicia sus contadores en cada ronda)
+		player.hits_landed += int(sim_match.state[FightSim.HITS])
+		player.parries_landed += int(sim_match.state[FightSim.PARRIES])
 	wins[winner] += 1
 	_update_round_label()
 	player.dismiss_eikon()

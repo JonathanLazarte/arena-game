@@ -10,13 +10,7 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
-	check(Arena.sim_mode == false, "modo sim apagado por defecto")
-	change_scene_to_file("res://scenes/arena.tscn")
-	await process_frame
-	await process_frame
-	var off: Arena = current_scene as Arena
-	check(off.sim_match == null and not off.player.sim_driven and off.controller.enabled, "arena por defecto: juego offline intacto")
-	Arena.sim_mode = true
+	check(Arena.sim_mode == true, "fase 8: la sim es el camino por defecto (offline también)")
 	change_scene_to_file("res://scenes/arena.tscn")
 	await process_frame
 	await process_frame
@@ -25,6 +19,7 @@ func _run() -> void:
 	var m := a.sim_match
 	check(m != null and a.player.sim_driven and a.enemy.sim_driven, "modo sim: SimMatch creado y ambos Fighter en modo vista")
 	check(not a.controller.enabled and not a.ai.is_physics_processing(), "modo sim: IA y PlayerController desactivados")
+	check(a.sim_ai != null and m.input_override[1].is_valid(), "offline: el rival lo maneja SimAI con bits de entrada")
 	check(m.params_hash == SimParams.params_checksum(SimParams.bake(a.player, a.enemy)), "params_checksum calculado al empezar")
 	var z0 := a.player.global_position.z
 	check(absf(m.state[FightSim.Z] / 1.0e6 - z0) < 0.01, "estado inicial desde la aparición de la arena")
@@ -54,6 +49,5 @@ func _run() -> void:
 	# reinicio de ronda: vuelve a la aparición
 	a.start_round()
 	check(absf(m.state[FightSim.Z] / 1.0e6 - z0) < 0.01 and m.state[FightSim.HP] == m.params[0]["hp"], "start_round reinicia el estado de la sim")
-	Arena.sim_mode = false
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)

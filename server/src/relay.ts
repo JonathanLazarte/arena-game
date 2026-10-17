@@ -46,7 +46,7 @@ export class RelayServer {
   constructor(opts: RelayOptions = {}) {
     this.opts = {
       port: 47800, host: "0.0.0.0", roomTtlMs: 120_000, codeLength: 5, log: () => {},
-      region: "local", proto: 6, graceMs: 20_000, maxPacket: 1200, maxRooms: 5000,
+      region: "local", proto: 7, graceMs: 20_000, maxPacket: 1200, maxRooms: 5000,
       relayRate: 200, relayBurst: 400, ctlRate: 10, ctlBurst: 20, banViolations: 600, banMs: 60_000,
       queueTtlMs: 10_000, ...opts,
     };

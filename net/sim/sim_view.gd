@@ -91,6 +91,9 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.stance = s[o + S.STANCE] / 1000.0
 	f.shot_state = s[o + S.SHOT_STATE]
 	f.crit_t = s[o + S.CRIT_T] / hz if s[o + S.CRIT_T] >= 0 else -1.0
+	f.flask_t = s[o + S.FLASK_T] / hz
+	f.flask_charges = s[o + S.FLASKS]
+	f.rage_t = s[o + S.RAGE_T] / hz
 
 func _apply_arrows(s: PackedInt64Array) -> void:
 	if arrow_parent == null:

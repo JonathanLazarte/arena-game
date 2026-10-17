@@ -168,7 +168,7 @@ func sample_device(i: int) -> int:
 ## Fase 4: botones de jefe, magia, eikon y montura (la sim detecta el flanco de pulsación).
 const EXTRA_ACTIONS := {"boss": FightSim.IN_BOSS, "boss_next": FightSim.IN_BOSS_NEXT, "spell": FightSim.IN_SPELL,
 	"spell_next": FightSim.IN_SPELL_NEXT, "summon": FightSim.IN_EIKON, "special": FightSim.IN_ART, "mount": FightSim.IN_MOUNT,
-	"boss_variation": FightSim.IN_BOSS_VAR, "jump": FightSim.IN_JUMP}
+	"boss_variation": FightSim.IN_BOSS_VAR, "jump": FightSim.IN_JUMP, "flask": FightSim.IN_FLASK}
 var hud_buttons := 0 ## botones táctiles del HUD (los fija la arena)
 static func extra_buttons_from(held: Callable) -> int:
 	var v := 0

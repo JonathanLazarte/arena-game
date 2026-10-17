@@ -422,8 +422,15 @@ static func hazards(s: PackedInt64Array, P: Array) -> void:
 				s[owner * FightSim.F_FIELDS + FightSim.AB_HITS] += 1
 
 # ---------------- Entrada ----------------
-static func cycle(s: PackedInt64Array, P: Array, i: int) -> void:
+## Habilidades disponibles: el campeón guarda la tercera hasta su Fase II (P["boss_n"]).
+static func boss_avail(s: PackedInt64Array, P: Array, i: int) -> int:
 	var n: int = (P[i].get("boss", []) as Array).size()
+	if s[i * FightSim.F_FIELDS + FightSim.PH2] == 0:
+		n = mini(n, int(P[i].get("boss_n", n)))
+	return n
+
+static func cycle(s: PackedInt64Array, P: Array, i: int) -> void:
+	var n: int = boss_avail(s, P, i)
 	if n > 1:
 		s[i * FightSim.F_FIELDS + FightSim.AB_SEL] = (s[i * FightSim.F_FIELDS + FightSim.AB_SEL] + 1) % n
 
@@ -447,9 +454,9 @@ static func _pay(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
 	var o := i * FightSim.F_FIELDS
 	var boss: Array = P[i].get("boss", [])
-	if slot < 0 or slot >= boss.size():
+	if slot < 0 or slot >= boss_avail(s, P, i):
 		return false
-	if s[o + FightSim.AIR] != 0:
+	if s[o + FightSim.AIR] != 0 or s[o + FightSim.FLASK_T] > 0:
 		return false
 	var ab: Dictionary = boss[slot]
 	if s[o + FightSim.MOUNTED] != 0 or s[o + FightSim.ALIVE] == 0 or s[o + FightSim.STUN] > 0 or s[o + FightSim.EXH] > 0 or s[o + FightSim.CAST_T] > 0 or s[o + FightSim.CRIT_T] >= 0:
@@ -471,7 +478,7 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var boss: Array = P[i].get("boss", [])
 	if boss.is_empty():
 		return false
-	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, boss.size() - 1)
+	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
 	var ab: Dictionary = boss[slot]
 	if int(ab["type"]) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
 		if (s[o + FightSim.AB_FL] & FL_QUEUED) != 0 or s[o + FightSim.AB_FIRED] >= (ab["hits"] as Array).size():

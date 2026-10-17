@@ -24,6 +24,7 @@ const IN_MOUNT := 1 << 19      # desmontar del eikon montable
 const IN_ART := 1 << 20        # arte del arma (botón «Habilidad» sin habilidad propia)
 const IN_BOSS_VAR := 1 << 21   # variante: remate en estocada del combo de la pausa falsa
 const IN_JUMP := 1 << 22       # salto (fase 7)
+const IN_FLASK := 1 << 23      # frasco de curación (fase 8)
 
 static func make_input(dir32: int, move: bool, buttons: int) -> int:
 	return (dir32 & IN_DIR_MASK) | (IN_MOVE if move else 0) | buttons
@@ -56,6 +57,8 @@ enum {
 	MD_T, MD_HIT, MD_ATK, ART_CD, ART_T, ART_K, ATK_PET,
 	# fase 7: salto (altura µm, velocidad vertical µm/tick, en el aire, ticks en el aire, recuperación al caer)
 	FY, FVY, AIR, AIR_T, LAND_T,
+	# fase 8: frasco (ticks restantes, cargas) y Fase II del campeón (0/1)
+	FLASK_T, FLASKS, PH2,
 	# contadores de eventos de fase 4
 	AB_STARTS, AB_HITS, AB_INTR, GRABS, SPELLS, SUMMONS, EK_SPECIALS, EK_HITS, SHIELD_ABSORB, DISMOUNTS,
 	ARTS, PET_HITS, PET_KILLS, MDASH_HITS, JUMPS,
@@ -174,6 +177,7 @@ static func initial(params: Array, seed_v: int = 1, hitstop: bool = true) -> Pac
 		s[o + MANA] = p.get("mana_max", 0)
 		s[o + METER] = p.get("meter0", 0)
 		s[o + SP_SEL] = p.get("spell_sel0", 0)
+		s[o + FLASKS] = p.get("flasks", 1)
 	s[P_BASE + G_RNG] = (seed_v * 2654435761 + 1) & 0x7FFFFFFF
 	s[P_BASE + G_HITSTOP_ON] = 1 if hitstop else 0
 	return s
@@ -258,6 +262,8 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		_try(s, P, i, Act.ROLL)
 	if pressed & IN_JUMP:
 		_try(s, P, i, Act.JUMP)
+	if pressed & IN_FLASK:
+		_flask(s, P, i)
 	if pressed & IN_BOSS_NEXT:
 		SimAbilities.cycle(s, P, i)
 	if pressed & IN_BOSS:
@@ -320,12 +326,42 @@ static func _do(s: PackedInt64Array, P: Array, i: int, a: int, retry: bool) -> b
 			return _dash(s, P, i)
 	return false
 
+# ---------------- Fase 8: frasco y Fase II ----------------
+## Fighter.drink_flask: 1,1 s bebiendo (sin actuar, 25 % de velocidad) y cura el 35 % al acabar.
+static func _flask(s: PackedInt64Array, P: Array, i: int) -> bool:
+	var o := i * F_FIELDS
+	if s[o + FLASKS] <= 0 or s[o + HP] >= P[i]["hp"] or s[o + MOUNTED] != 0 or not _can_act(s, o) or s[o + EXH] > 0 or s[o + BACKSTEP_T] > 0:
+		return false
+	if s[o + ATK_STATE] != Atk.NONE or s[o + PARRY_STATE] != Parry.NONE or s[o + SWAP_T] > 0 or s[o + SHOT_STATE] != Shot.NONE or s[o + ROLL_T] >= 0 or s[o + AIR] != 0:
+		return false
+	s[o + FLASKS] -= 1
+	s[o + FLASK_T] = P[i].get("flask_t", 66)
+	s[o + BLOCKING] = 0
+	return true
+
+## Duelo de Campeones: al bajar del umbral de vida desbloquea todas sus habilidades, furia,
+## invulnerabilidad breve y (según campeón) medidor lleno para invocar.
+static func _phase_two(s: PackedInt64Array, P: Array, i: int) -> void:
+	var o := i * F_FIELDS
+	var ph: Dictionary = P[i].get("ph2", {})
+	if ph.is_empty() or s[o + PH2] != 0 or s[o + ALIVE] == 0:
+		return
+	if s[o + HP] * 1000 > P[i]["hp"] * int(ph.get("hp_pm", 500)):
+		return
+	s[o + PH2] = 1
+	s[o + RAGE_T] = maxi(s[o + RAGE_T], ph.get("rage", 540))
+	s[o + INVULN] = maxi(s[o + INVULN], ph.get("invuln", 51))
+	if int(ph.get("summon", 0)) != 0:
+		s[o + METER] = METER_MAX
+	if s[P_BASE + G_HITSTOP_ON] != 0:
+		s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], 7)
+
 # ---------------- Utilidades ----------------
 static func _opp(i: int) -> int:
 	return (1 - i) * F_FIELDS
 
 static func _can_act(s: PackedInt64Array, o: int) -> bool:
-	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0 and s[o + ART_T] <= 0 and s[o + LAND_T] <= 0
+	return s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + CRIT_T] < 0 and s[o + CAST_T] <= 0 and s[o + BS_PH] == 0 and s[o + AB_SLOT] < 0 and s[o + ART_T] <= 0 and s[o + LAND_T] <= 0 and s[o + FLASK_T] <= 0
 
 static func _spend(s: PackedInt64Array, P: Array, i: int, v: int) -> void:
 	var o := i * F_FIELDS
@@ -891,6 +927,11 @@ static func _update(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		if s[o + MD_T] <= 0 and s[o + ATK_STATE] != Atk.WINDUP:
 			s[o + MD_ATK] = 0
 	if s[o + LAND_T] > 0: s[o + LAND_T] -= 1
+	if s[o + FLASK_T] > 0:
+		s[o + FLASK_T] -= 1
+		if s[o + FLASK_T] <= 0 and s[o + ALIVE] != 0:
+			s[o + HP] = mini(s[o + HP] + p["hp"] * p.get("flask_heal_pm", 350) / 1000, p["hp"])
+	_phase_two(s, P, i)
 	if s[o + ART_CD] > 0: s[o + ART_CD] -= 1
 	if s[o + ART_T] > 0: s[o + ART_T] -= 1
 	_update_attack(s, P, i, inp)
@@ -1331,7 +1372,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if s[o + ALIVE] == 0 or s[o + STUN] > 0 or s[o + CRIT_T] >= 0 or s[o + CAST_T] > 0 or s[o + BS_PH] != 0 or ab_moving or s[o + ART_T] > 0:
 		moving = false
 	var want_block: bool = (inp & IN_BLOCK) != 0 # sin escudo el control local no envía IN_BLOCK
-	var wb: bool = want_block and s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + ROLL_T] < 0 and s[o + BACKSTEP_T] <= 0 and s[o + LOADOUT] == Load.SWORD and s[o + SWAP_T] <= 0 and s[o + ATK_STATE] == Atk.NONE and s[o + PARRY_STATE] == Parry.NONE
+	var wb: bool = want_block and s[o + ALIVE] != 0 and s[o + STUN] <= 0 and s[o + ROLL_T] < 0 and s[o + BACKSTEP_T] <= 0 and s[o + FLASK_T] <= 0 and s[o + LOADOUT] == Load.SWORD and s[o + SWAP_T] <= 0 and s[o + ATK_STATE] == Atk.NONE and s[o + PARRY_STATE] == Parry.NONE
 	s[o + BLOCKING] = 1 if wb else 0
 	if wb:
 		_spend(s, P, i, p["drain_block"])
@@ -1383,6 +1424,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if s[o + MOUNTED] != 0 and s[o + ATK_IDX] == SimParams.A_HEAVY and s[o + CHARGE_T] > 0 and (inp & IN_ATK):
 		mul = mul * MOUNTED_CHARGE_SLOW_PM / 1000
 	if s[o + LAND_T] > 0: mul = mul * 400 / 1000
+	if s[o + FLASK_T] > 0: mul = mul * 250 / 1000
 	if s[o + SHOT_STATE] == Shot.DRAW:
 		mul = 0
 		s[o + VX] = 0

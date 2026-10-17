@@ -36,6 +36,10 @@ static func diff(prev: PackedInt64Array, cur: PackedInt64Array) -> Array:
 			out.append(_ev(fr, "hurt", i))
 		if prev[o + FightSim.DOWN_T] <= 0 and cur[o + FightSim.DOWN_T] > 0:
 			out.append(_ev(fr, "knockdown", i))
+		if cur[o + FightSim.FLASKS] < prev[o + FightSim.FLASKS]:
+			out.append(_ev(fr, "flask", i))
+		if prev[o + FightSim.PH2] == 0 and cur[o + FightSim.PH2] != 0:
+			out.append(_ev(fr, "phase2", i))
 		if prev[o + FightSim.ALIVE] != 0 and cur[o + FightSim.ALIVE] == 0:
 			out.append(_ev(fr, "death", i))
 	return out

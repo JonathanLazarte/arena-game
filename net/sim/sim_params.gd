@@ -176,6 +176,10 @@ static func _bake_one(f: Fighter, o: Fighter) -> Dictionary:
 	p["counter_arrow_pm"] = pm(float(PhysTypes.COUNTER_DMG["estandar"]))
 	# Fase 4: habilidades de jefe, magia, eikon y montura (cubiertos por params_checksum)
 	p["boss"] = SimAbilities.compile_all(f)
+	# fase 8: frasco (Fighter.drink_flask)
+	p["flasks"] = 1
+	p["flask_t"] = tk(Fighter.FLASK_TIME)
+	p["flask_heal_pm"] = pm(Fighter.FLASK_HEAL_FRACTION)
 	SimMagic.bake(f, p)
 	p["m_dash_bc"] = milli(o.blocked_hit_cost(Fighter.DASH_DAMAGE, f) * float(o.tfx["stamina_cost"]))
 	return p
