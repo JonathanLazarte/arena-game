@@ -176,8 +176,15 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 
 **Mobile budget:** `FightSim.step` ≈ 44 µs on the dev Xeon in GDScript. Worst tick (8-tick rollback + new tick + copies) ≈ 0.4 ms desktop, ≈ 2 ms estimated on a mid phone (×5), against a 4 ms budget. The overlay shows the real per-device numbers ("Sim: paso … µs").
 
-## 12. Fase 4 (parcial)
+## 12. Fase 4
 - LAN: el socket escucha en 0.0.0.0:47801/udp. lan_addresses() lista primero 192.168/10 y excluye docker (172.17), virbr (192.168.122) e IPv6. El botón "Buscar" hace broadcast 'S' y el host responde 's'+nombre. El invitado acepta el 'l' de otra interfaz del host. El timeout es de 8 s ("lan_timeout"); el puerto ocupado da "port_busy:N".
 - Infusiones/estado en la sim: tabla de defensas elementales (códigos 5..7). El daño se reparte mitad físico, mitad elemental. Build-up de sangrado/veneno/congelación: decay tras 90 ticks, veneno de 840 ticks, congelación de 720 ticks (×1,15 al daño recibido, ×0,6 a la regeneración de stamina). Un bloqueo aplica el 30% del build-up y un crítico no aplica estado. Los eventos son PROC0..2.
 - Pilares: 6 posiciones fijas en µm (radio 23,8 m). El cuerpo se empuja hasta 1,65 m y las flechas se paran a 1,5 m. Solo se activan si params.pillars = 1.
-- Pendiente: magia/escudo de maná, proyectiles teledirigidos, habilidades de jefe, agarres/ejecuciones, monturas, eikons, y el loadout eikon/magia/jefe en params.
+- Bits de entrada nuevos (flanco de pulsación en la sim): IN_BOSS 1<<14, IN_BOSS_NEXT 1<<15, IN_SPELL 1<<16, IN_SPELL_NEXT 1<<17, IN_EIKON 1<<18 (invocar / especial montado), IN_MOUNT 1<<19 (desmontar).
+- Habilidades de jefe (SimAbilities): las 19 (13 + ext + estocada) compiladas a ticks en params["boss"]. Telegrafía ×1,12 (TELE_ONLINE, fija en ambos pares). Cooldown global 85 ticks (1,4 s). Golpe tipo 3 «jefe»: imbloqueable, sin parada, perforante, postura ×3. Un coste de vida nunca baja de 1. Hazards: 16 plazas, tipo 1 = AoE en suelo, tipo 2 = onda.
+- Proyectiles: 12 plazas; kinds 0 flecha, 1 tajo de jefe, 2 hechizo, 3 eikon. Ráfaga: 20 m/s, giro 60°/s (rumbo en mili-unidades).
+- Magia y eikons (SimMagic): maná, medidor (máx. 100000 mili, +20/tick), escudo de maná 100%, hechizos proyectil/cono/buff, invocación, montura, especiales llamarada/colmillo/vendaval. Una montura sin jinete no ataca online. Las mascotas y monturas no reciben daño en la sim. El medidor empieza a 0 online.
+- Equipo (NetLoadout): ahora también eikon, hechizos (4), arte, sello y jefe (3). Los dos pares hacen bake → params_checksum.
+- Carga: start_play → fase LOAD. Cada par envía «ka» (latido) mientras calienta la escena y luego «rdy» cada 200 ms. PLAY empieza solo con ambos listos. Plazo de carga de 30 s («load_timeout»); el de juego sigue en 4 s. La arena muestra «Cargando rival...».
+- Eventos: ability (con code = AB_LAST), ability_hit, ability_interrupt, grab, cast, summon, eikon_special, eikon_hit, shield_absorb, dismount.
+- Simplificaciones: montado, la voltereta y el ataque usan los parámetros a pie; no hay variante combo-falso de la estocada ni artes de arma; la ráfaga contra un blanco en movimiento difiere del offline.
