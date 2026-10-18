@@ -3,3 +3,4 @@ assets/
 *.tmp
 .DS_Store
 .idea/
+assets_raw/
