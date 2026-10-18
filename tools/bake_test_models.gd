@@ -6,7 +6,14 @@
 ## Uso: godot --headless --path . -s res://tools/bake_test_models.gd
 extends SceneTree
 
-const FPS := 30.0
+const FPS := 15.0
+## Clips KayKit que el juego no usa en ningún lado (ahorra ~40 % de tamaño en el APK).
+const SKIP := ["1H_Ranged_Shooting", "2H_Ranged_Shooting", "Block", "Cheer", "Death_A_Pose", "Death_B", "Death_B_Pose",
+	"Interact", "Jump_Full_Long", "Jump_Full_Short", "Lie_Idle", "Lie_Pose", "PickUp", "Running_B", "Sit_Chair_Down",
+	"Sit_Chair_Idle", "Sit_Chair_StandUp", "Sit_Floor_Down", "Sit_Floor_Idle", "Sit_Floor_Pose", "Sit_Floor_StandUp",
+	"Spellcast_Long", "Spellcast_Raise", "Spellcast_Shoot", "Spellcasting", "T-Pose", "Throw", "Unarmed_Idle",
+	"Unarmed_Melee_Attack_Kick", "Unarmed_Melee_Attack_Punch_A", "Unarmed_Melee_Attack_Punch_B", "Unarmed_Pose",
+	"Walking_B", "Walking_C"]
 const HEAD_FRAC := 0.87 # altura del hueso de la cabeza / altura total (adulto realista)
 
 const CHAIN := {"hips": "spine", "spine": "chest", "chest": "head",
@@ -233,6 +240,8 @@ func _bake(cfg: Dictionary, src_scene: Node3D, ssk: Skeleton3D, sap: AnimationPl
 		return dst
 	var lib := AnimationLibrary.new()
 	for a in sap.get_animation_list():
+		if String(a) in SKIP:
+			continue
 		lib.add_animation(a, bake_anim.call(sap.get_animation(a)))
 	var mlib := AnimationLibrary.new()
 	for a in mx.get_animation_list():

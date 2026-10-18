@@ -25,7 +25,9 @@ modelo propio o con licencia libre.
   `upperarm.l`...), añade `handslot.l/r`, ajusta la escala a la altura KayKit y achica las armas
   (`TEST_WEAPON_K`).
 - Estadísticas, pasiva y armas: las del Caballero. Se reclutan gratis (`Progression.req`).
-- Texturas reducidas a 1024 px como máximo (Android).
+- Texturas: 1024 px en el archivo y `process/size_limit=256` al importar; sin LOD ni mallas de
+  sombra; clips horneados a 15 fps y sin los clips KayKit que el juego no usa (`SKIP`). Todo
+  para que el APK de prueba entre en ~99 MB (límite de subida de 100 MB).
 - Rehornear tras cambiar un modelo o el mapa de huesos:
   `godot --headless --path . -s res://tools/bake_test_models.gd`
 - Prueba: `godot --headless --path . -s res://tests/test_test_models.gd`
