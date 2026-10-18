@@ -127,6 +127,10 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 	model.rotation.y = PI # KayKit mira a +Z; el juego usa -Z como frente
 	model.scale = Vector3.ONE * SCALE
 	add_child(model)
+	var rt_lib: AnimationLibrary = null
+	if cdef.retarget_lib != "" and ResourceLoader.exists(cdef.retarget_lib):
+		rt_lib = load(cdef.retarget_lib) as AnimationLibrary
+		_prepare_retarget(rt_lib)
 	var has_tex := cdef.texture_path != "" and ResourceLoader.exists(cdef.texture_path)
 	if has_tex:
 		body_mat = StandardMaterial3D.new()
@@ -193,12 +197,107 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 		"Running_Strafe_Right", "Blocking", "2H_Ranged_Aiming", "Sit_Chair_Pose", "Jump_Idle"])
 	author_dash_strike(ap, melee_w.anim_light[1 % melee_w.anim_light.size()])
 	# Ronda 16: combo de 3 golpes con clips propios (espejados / encadenados en Godot)
-	if not melee_w.combo.is_empty():
+	if not melee_w.combo.is_empty() and rt_lib == null: # espejado local no válido en rigs ajenos
 		for i in 3:
 			var h := melee_w.combo_hit(i, cdef)
 			states["light%d" % i] = author_combo_clip(ap, h)
 	_apply_mixamo(melee_w)
+	_compensate_attachments(sk)
 	_build_tree()
+
+# ---------------- Rama test-models: modelos humanoides no KayKit (solo visual) ----------------
+## Escala inversa para lo que se engancha a huesos (armas, escudo, arco, armadura): el esqueleto
+## del modelo ajeno tiene otra escala global que el KayKit.
+var _att_comp: float = 1.0
+## Las armas KayKit son grandes (estética chibi): en cuerpos realistas se encogen.
+const TEST_WEAPON_K := 0.65
+
+## Renombra los huesos mapeados a los nombres KayKit (así todo el código por nombre de hueso
+## sigue valiendo), añade handslot.l/r y monta un AnimationPlayer con los clips horneados.
+func _prepare_retarget(lib: AnimationLibrary) -> void:
+	for old: AnimationPlayer in model.find_children("*", "AnimationPlayer", true, false):
+		old.get_parent().remove_child(old)
+		old.free()
+	var sk := model.get_node_or_null(NodePath(String(lib.get_meta("skeleton_path", "")))) as Skeleton3D
+	if sk == null:
+		push_warning("retarget: sin esqueleto en " + cdef.model_path)
+		return
+	model.scale = Vector3.ONE * SCALE * float(lib.get_meta("fit_scale", 1.0))
+	_att_comp = TEST_WEAPON_K / float(lib.get_meta("att_scale", 1.0))
+	var bmap: Dictionary = lib.get_meta("bone_map", {})
+	var by_idx := {}
+	for k: String in bmap:
+		var i := sk.find_bone(bmap[k])
+		if i >= 0:
+			by_idx[i] = k
+	var final := {} # índice -> nombre nuevo
+	var ren := {} # nombre viejo -> nombre nuevo
+	for i in sk.get_bone_count():
+		var bn := sk.get_bone_name(i)
+		if by_idx.has(i):
+			final[i] = by_idx[i]
+		elif bmap.has(bn) or bn.begins_with("handslot."):
+			final[i] = bn + "_orig" # chocaría con un nombre KayKit
+		if final.has(i):
+			ren[bn] = final[i]
+	for i: int in final:
+		sk.set_bone_name(i, "__rt_%d" % i)
+	for i: int in final:
+		sk.set_bone_name(i, final[i])
+	for mi in AnimUtil.meshes(model):
+		if mi.skin:
+			var skin := mi.skin.duplicate() as Skin
+			for b in skin.get_bind_count():
+				var bn := String(skin.get_bind_name(b))
+				if ren.has(bn):
+					skin.set_bind_name(b, ren[bn])
+			mi.skin = skin
+	var hide: Array = lib.get_meta("hide_meshes", [])
+	var rebind: Dictionary = lib.get_meta("rebind", {})
+	for mi in AnimUtil.meshes(model):
+		if String(mi.name) in hide:
+			mi.visible = false
+		if rebind.has(String(mi.name)) and mi.skin:
+			var fb := sk.find_bone(rebind[mi.name][0])
+			var tb := sk.find_bone(rebind[mi.name][1])
+			if fb >= 0 and tb >= 0:
+				var adj := sk.get_bone_global_rest(tb).affine_inverse() * sk.get_bone_global_rest(fb)
+				for b in mi.skin.get_bind_count():
+					if String(mi.skin.get_bind_name(b)) == sk.get_bone_name(fb):
+						mi.skin.set_bind_name(b, sk.get_bone_name(tb))
+						mi.skin.set_bind_pose(b, adj * mi.skin.get_bind_pose(b))
+	for ba: BoneAttachment3D in model.find_children("*", "BoneAttachment3D", true, false):
+		ba.set_meta("rt_comp", true) # piezas propias del modelo: sin compensar
+		if ren.has(ba.bone_name):
+			ba.bone_name = ren[ba.bone_name]
+	var slots: Dictionary = lib.get_meta("handslot", {})
+	for nm: String in slots:
+		var i := sk.add_bone(nm)
+		sk.set_bone_parent(i, sk.find_bone("hand." + nm.get_extension()))
+		sk.set_bone_rest(i, slots[nm])
+		sk.reset_bone_pose(i)
+	var player := AnimationPlayer.new()
+	player.name = "AnimationPlayer"
+	model.add_child(player)
+	player.root_node = NodePath("..")
+	player.add_animation_library(&"", lib)
+	var mx_lib := lib.get_meta("mx", null) as AnimationLibrary
+	if mx_lib:
+		player.add_animation_library(&"mx", mx_lib)
+
+func _compensate_attachments(sk: Skeleton3D) -> void:
+	if sk == null or is_equal_approx(_att_comp, 1.0):
+		return
+	for att in sk.get_children():
+		if att is BoneAttachment3D and not att.has_meta("rt_comp"):
+			att.set_meta("rt_comp", true)
+			var holder := Node3D.new()
+			holder.name = "rt_comp"
+			holder.scale = Vector3.ONE * _att_comp
+			var kids := att.get_children()
+			att.add_child(holder)
+			for c: Node in kids:
+				c.reparent(holder, false)
 
 ## Ronda 28: clips Mixamo reapuntados (biblioteca «mx») para las acciones donde encajan mejor.
 func _apply_mixamo(melee_w: WeaponDef) -> void:
@@ -559,6 +658,8 @@ func _build_tree() -> void:
 	playback.start("none")
 
 func set_tint(c: Color, flash: bool, ec: Color = Color.WHITE) -> void:
+	if body_mat == null or accent_mat == null:
+		return # modelo con materiales propios (rama test-models)
 	body_mat.albedo_color = Color.WHITE.lerp(c, 0.25) * _char_tint
 	accent_mat.albedo_color = Color.WHITE.lerp(c, 0.9) * _char_tint
 	for m: StandardMaterial3D in [body_mat, accent_mat]:
@@ -1015,6 +1116,7 @@ func set_armor(pieces: Dictionary) -> void:
 			var mi := MeshUtil.box(att, d[2] * (1.12 if heavy else 1.0), d[1], a.tint)
 			mi.name = "ArmorMesh"
 			_armor_nodes.append(att)
+	_compensate_attachments(sk)
 
 
 ## Ronda 29: garantía visual de suelo. Si un clip (Mixamo retargeteado: estocadas, embestida, salto

@@ -27,6 +27,9 @@ extends Resource
 @export var body_prefix: String = "Knight_" ## mallas del cuerpo; el resto (armas del glb) se ocultan
 @export var shield_mesh: String = "Round_Shield" ## escudo de este personaje (si el arma lo permite)
 @export var shield_source: String = "res://assets/models/Knight.glb"
+## Rama test-models: biblioteca de animaciones horneada (tools/bake_test_models.gd) para modelos
+## humanoides no KayKit. Vacío = flujo KayKit normal. Solo visual.
+@export var retarget_lib: String = ""
 @export var tint: Color = Color(1, 1, 1)
 ## Ronda 14: habilidad especial (tecla G / botón "Habilidad"). "golpe_sismico" = área en el suelo.
 @export var special_id: String = ""

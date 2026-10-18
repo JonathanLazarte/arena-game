@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "test_yoomi"
+display_name = "Prueba: Chica urbana"
+role = "Prueba"
+description = "Modelo de prueba privado (rama test-models). Estadísticas del Caballero."
+passive_id = "guardia_firme"
+passive_name = "Guardia firme"
+passive_desc = "Bloquear golpes cuesta un 20 % menos de aguante."
+weapons = PackedStringArray("espada_escudo", "espada_larga", "hacha_2m", "dagas", "lanza", "arco", "ballesta")
+default_weapon = "espada_escudo"
+model_path = "res://assets/test_models/test_yoomi/yoomi.glb"
+texture_path = ""
+body_prefix = ""
+shield_mesh = "Round_Shield"
+retarget_lib = "res://assets/test_models/test_yoomi/test_yoomi_anims.res"

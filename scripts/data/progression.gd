@@ -85,7 +85,7 @@ const CHAR_REQ := [3, 2500]
 
 static func req(kind: String, id: String) -> Array:
 	match kind:
-		"character": return CHAR_REQ
+		"character": return [1, 0] if id.begins_with("test_") else CHAR_REQ # rama test-models: gratis
 		"weapon": return WEAPON_REQ.get(id, [1, 0])
 		"eikon": return EIKON_REQ.get(id, [1, 0])
 		"trinket":

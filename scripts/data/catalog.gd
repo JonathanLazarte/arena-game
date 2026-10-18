@@ -3,7 +3,11 @@ class_name Catalog
 
 const CHARACTERS := ["res://resources/characters/caballero.tres", "res://resources/characters/arquero.tres",
 	"res://resources/characters/berserker.tres", "res://resources/characters/paladin.tres", "res://resources/characters/asesino.tres",
-	"res://resources/characters/anime_girl.tres"]
+	"res://resources/characters/anime_girl.tres",
+	# Rama test-models (modelos de terceros, solo pruebas privadas; ver docs/TEST_MODELS.md)
+	"res://resources/characters/test_jane.tres", "res://resources/characters/test_yoomi.tres",
+	"res://resources/characters/test_mita.tres", "res://resources/characters/test_nightgown.tres",
+	"res://resources/characters/test_knight.tres"]
 const WEAPONS := ["res://resources/weapons/espada_escudo.tres", "res://resources/weapons/espada_larga.tres",
 	"res://resources/weapons/hacha_2m.tres", "res://resources/weapons/dagas.tres", "res://resources/weapons/lanza.tres",
 	"res://resources/weapons/arco.tres", "res://resources/weapons/ballesta.tres"]
