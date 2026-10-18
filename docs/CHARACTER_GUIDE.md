@@ -458,3 +458,38 @@ Ese pack se compró/descargó con licencia **por comprador de la Unity Asset Sto
 dentro de un juego, no redistribuir los archivos. Por eso los FBX crudos quedan fuera del repo. Pero
 las bibliotecas horneadas **también son derivadas** del pack: **recomendado hacer el repositorio
 privado** mientras estén commiteadas (o sacarlas del repo y hornearlas localmente antes de exportar).
+
+### Segundo pack: animaciones RPG (rig maniquí UE5) — perfil `doublel_ue5.json`
+
+```bash
+godot --headless --path . -s res://tools/import_anim_pack.gd -- \
+    --profile res://tools/anim_profiles/doublel_ue5.json --src /workspace/animpacks/doublel
+```
+
+- Se usan los FBX de la carpeta para Unreal (maniquí UE5: `pelvis`, `spine_01..05`, `neck_01`, `head`,
+  `clavicle_l`, `upperarm_l`, `lowerarm_l`, `hand_l`, `thigh_l`, `calf_l`, `foot_l`, `ball_l`).
+  Reposo = bind del maniquí base del pack (`Unreal_Base.fbx`); mismos ejes que los clips (`bind_axes` identidad).
+- En vez de `prefix`, cada grupo trae `clips` = `{nombre_salida: archivo}`: así se eligen las variantes
+  InPlace y se ponen nombres de juego. Bibliotecas por estilo: `doublel_one_hand.res` (espada y escudo),
+  `doublel_common.res` (golpes recibidos, ataques genéricos) y `doublel_bow.res`.
+- Este pack sube/baja el cuerpo con el hueso `root` (la pelvis no tiene traslación propia):
+  `"root_keep_vertical": true` conserva solo la altura de la raíz; x/z y rotación de la raíz se descartan.
+
+| estilo | clips | ranura sugerida |
+|---|---|---|
+| one_hand | `light_a1`, `light_a2`, `light_a3` | `light0`, `light1`, `light2` (combo de 3) |
+| one_hand | `light_b1`, `light_b2`, `light_b3` | combo alterno; `light_b1`/`light_b3` sirven de `heavy` |
+| one_hand | `block_idle`, `block_hit` | `block`, `block_hit` |
+| one_hand | `idle`, `walk_f`, `walk_b`, `walk_strafe_l/r` | `Idle`, `Walking_A`, `Walking_Backwards`, `Walk_Strafe_L/R` |
+| one_hand | `run_f`, `run_b`, `run_strafe_l/r`, `sprint` | `Running_A`, —, `Running_Strafe_L/R`, — |
+| one_hand | `jump`, `crouch_idle`, `crouch_walk` | `jump_up` (un solo clip), —, — |
+| common | `hit_1`, `hit_2` | `hit` / `stun` |
+| common | `enemy_attack`, `enemy_charge_attack` | `heavy` / `boss_lunge`, `dash_strike` |
+| common | `action_4_1`, `action_5_1`, `action_5_2` | gestos largos (3.5–4.8 s), sin ranura |
+| bow | `bow_attack_a`, `bow_attack_b`, `bow_idle` | `shoot`, `shoot` alterno, `aim` |
+
+El pack **no trae** parry, rodar/esquivar, caída/levantarse, muerte, ni estilos a dos manos, lanza o
+sin armas: esas ranuras siguen con los clips actuales. Los ataques duran 2–3 s (incluyen la vuelta a
+guardia): al usarlos como combo conviene recortar o acelerar (ver `"contact"` en `tools/retarget_kaykit.gd`).
+Licencia: igual que el pack anterior (licencia por comprador de la tienda de assets); FBX fuera del repo,
+bibliotecas derivadas → repo privado recomendado.
