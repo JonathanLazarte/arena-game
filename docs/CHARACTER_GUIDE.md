@@ -126,8 +126,8 @@ hueso `spine` que en realidad es la cadera), no pasa nada: al cargarse, ese hues
 
 ## 5. Hornear las animaciones (reapuntado)
 
-`tools/bake_test_models.gd` (rama `test-models`) toma los 76 clips de
-`res://assets/models/Knight.glb` y los 26 de la biblioteca Mixamo `res://assets/animations/mixamo/lib_kaykit.res`
+`tools/bake_test_models.gd` (rama `test-models`) toma los clips de
+`res://assets/models/Knight.glb` (salvo los que el juego no usa, lista `SKIP`) y los 26 de la biblioteca Mixamo `res://assets/animations/mixamo/lib_kaykit.res`
 y los reapunta al esqueleto de cada modelo:
 
 - Para cada hueso mapeado copia el **cambio de orientación global** respecto del reposo
@@ -161,7 +161,7 @@ godot --headless --path . -s res://tools/bake_test_models.gd            # todos
 ONLY=mi_personaje godot --headless --path . -s res://tools/bake_test_models.gd   # uno
 ```
 
-Tarda medio segundo por modelo y deja ~1,3 MB por personaje. Si falta un hueso del mapa, el
+Tarda medio segundo por modelo y deja ~0,5 MB por personaje (15 fps, `const FPS`). Si falta un hueso del mapa, el
 `assert` lo dice con el nombre exacto.
 
 ### 5.1 Alternativa: BoneMap + SkeletonProfileHumanoid de Godot
