@@ -781,14 +781,19 @@ func _ability_state(f: Fighter) -> String:
 
 ## Cada corte visual empieza antes de que salga su proyectil, para que el contacto de la hoja
 ## coincida con la emisión del tajo espectral.
+## El tajo arranca con la habilidad (contacto = fin del windup) y alterna izq → der por
+## pulsación según AB_STARTS (estado de la sim, así sobrevive al rollback).
 func _rafaga_swing_index(f: Fighter) -> int:
 	var d: Dictionary = BossAbilities.def("rafaga")
 	var windup := float(d.get("windup", 0.6))
-	var lead := 0.36
 	var tail := 0.5
-	if f.ab_t < windup - lead or f.ab_t >= windup + tail:
+	if f.ab_t >= windup + tail:
 		return -1
-	return posmod(int(f.ab_uses.get("rafaga", 1)) - 1, 3)
+	return rafaga_chain_index(f.ab_seq)
+
+## 0 = tajo izquierdo (light0), 1 = derecho (light1); n = nº de arranque (1, 2, 3…).
+static func rafaga_chain_index(n: int) -> int:
+	return posmod(n - 1, 2)
 
 
 func set_paused(paused: bool) -> void:
@@ -902,12 +907,12 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(wnd, 0.2))
 	elif f.ab_id == "rafaga" and s.begins_with("light"):
 		var swing_index := _rafaga_swing_index(f)
-		var key := 1000000 + swing_index * 1000 + int(f.ab_uses.get("rafaga", 0))
+		var key := 1000000 + swing_index * 1000 + f.ab_seq
 		if key != _ab_hit_key:
 			_ab_hit_key = key
 			playback.start(s, true)
 		var d: Dictionary = BossAbilities.def("rafaga")
-		var lead := float(d.get("rafaga_swing_lead", 0.36))
+		var lead := float(d.get("windup", 0.54))
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(lead, 0.1))
 	elif s == "heavy" and f.atk_state == Fighter.Atk.NONE:
 		# pose de carga: avanza el clip hasta ~60 % de la anticipación mientras se mantiene

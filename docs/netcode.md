@@ -240,3 +240,7 @@ Then type `host:47800` in the game's Online panel. Players who can punch through
 - La recarga del motor es la global de 85 ticks (el `cooldown` propio no se usa). El costo de vida se rechaza si el golpe dejaría 0.
 - Los eventos de paso salen de `SimEvents` con clave `frame:ab_ev:<jugador>:<code>:<paso>:<id>` y `SimFx` no los duplica tras un rollback.
 - Protocolo 9: un cliente de la fase 9 (protocolo 8) no entra al relay.
+
+## 19. Ráfaga encadenada (protocolo 12)
+- Campo del catálogo `global_cd_on_repeat` (bool, por defecto `true`). En `false` (ráfaga espectral, saeta oscura, orbe lunar) repetir la misma habilidad (`AB_LAST`) se salta la recarga, y una pulsación **después del disparo** queda en cola (`FL_QUEUED`) y arranca la siguiente al terminar la actual. Se hornea como `rep_free` en los params (cambia `params_checksum`).
+- La vista alterna el tajo (izq/der) con `AB_STARTS`, que es estado de la sim. Prueba: `tests/test_rafaga_chain.gd`.

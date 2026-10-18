@@ -662,7 +662,7 @@ func _update_contextual_buttons() -> void:
 
 	# Habilidad de jefe seleccionada, coste y tiempo de recarga
 	var bid := _player.selected_boss()
-	var cd_left: float = _player.boss_cd if not AdminMode.enabled else 0.0
+	var cd_left: float = _player.boss_cd if not AdminMode.enabled and not _player.boss_repeat_ready else 0.0
 	var on_cd: bool = cd_left > 0.05
 	var can_afford: bool = bid != "" and _player.boss_cost_ok(bid)
 	var boss_btn := btns["boss"] as TouchScreenButton
