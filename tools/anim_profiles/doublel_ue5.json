@@ -64,6 +64,22 @@
 		"toes.l": "foot.l",
 		"toes.r": "foot.r"
 	},
+	"roll_ref": {
+		"l": [
+			"index_01_l",
+			"pinky_01_l"
+		],
+		"r": [
+			"index_01_r",
+			"pinky_01_r"
+		]
+	},
+	"target_across": [
+		0,
+		0,
+		1
+	],
+	"forearm_twist": 1.0,
 	"loop_patterns": [
 		"idle",
 		"walk",
