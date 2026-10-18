@@ -27,7 +27,8 @@ func _run() -> void:
 	check(current_scene.name == "FirstRun", "la primera vez el lobby lleva a la pantalla de elección (%s)" % current_scene.name)
 	var fr := current_scene
 	var cd: CharacterDef = fr.selected()
-	check(fr.role_buttons.size() == 5 and fr.stage.preview != null and fr.name_label.text == cd.display_name, "presenta los 5 roles con modelo y ficha")
+	var n_roles := Catalog.characters().filter(func(c: CharacterDef) -> bool: return not c.id.begins_with("test_")).size() # test-models: los de prueba no salen aquí
+	check(fr.role_buttons.size() == n_roles and fr.stage.preview != null and fr.name_label.text == cd.display_name, "presenta los %d roles con modelo y ficha" % n_roles)
 	fr.select(fr.index + 1)
 	fr.select(fr.index + 1)
 	check(fr.selected().id == "berserker" and fr.stage.preview.cdef.id == "berserker", "navega entre roles (modelo cambia)")

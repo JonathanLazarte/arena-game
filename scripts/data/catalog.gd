@@ -3,7 +3,6 @@ class_name Catalog
 
 const CHARACTERS := ["res://resources/characters/caballero.tres", "res://resources/characters/arquero.tres",
 	"res://resources/characters/berserker.tres", "res://resources/characters/paladin.tres", "res://resources/characters/asesino.tres",
-	"res://resources/characters/anime_girl.tres",
 	# Rama test-models (modelos de terceros, solo pruebas privadas; ver docs/TEST_MODELS.md)
 	"res://resources/characters/test_jane.tres", "res://resources/characters/test_yoomi.tres",
 	"res://resources/characters/test_mita.tres", "res://resources/characters/test_nightgown.tres",
