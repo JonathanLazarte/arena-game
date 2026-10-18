@@ -12,7 +12,10 @@ static var capture_mouse: bool = false
 const PITCH_MIN := -0.15 ## rad (un poco por debajo del horizonte)
 const PITCH_MAX := 1.1 ## rad (~63°, casi cenital)
 const PITCH_DEFAULT := 0.5
-const DIST := 9.5
+const DIST := 7.8 ## libre (antes 9,5: −18 %, más cerca del personaje; mismo valor en PC y móvil)
+const LOCK_DIST := 6.6 ## fijado: base (antes 8,0)
+const LOCK_DIST_K := 0.13 ## fijado: + distancia al rival × K (antes 0,15)
+const LOCK_DIST_EXTRA := 4.2 ## fijado: tope del extra (antes 5,0) → máx. 10,8 m (antes 13)
 const MOUSE_K := 0.005
 const TOUCH_K := 0.008
 const FLICK_PX := 140.0 ## tirón horizontal (px en 0,25 s) que cambia de objetivo con lock-on
@@ -125,7 +128,7 @@ func update(delta: float) -> void:
 		var dl := d.length()
 		var dn := d.normalized() if dl > 0.1 else player.facing
 		yaw = lerp_angle(yaw, atan2(-dn.x, -dn.z), clampf(delta * 6.0, 0.0, 1.0))
-		dist = 8.0 + clampf(dl * 0.15, 0.0, 5.0)
+		dist = LOCK_DIST + clampf(dl * LOCK_DIST_K, 0.0, LOCK_DIST_EXTRA)
 		pivot += dn.cross(Vector3.UP) * 1.6
 		look = player.global_position.lerp(tgt.global_position, 0.5) + Vector3(0, 1.5, 0)
 	elif _idle_t > RECENTER_DELAY and player.planar_vel.length() > 2.0:
