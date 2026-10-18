@@ -1,0 +1,58 @@
+{
+	"character": "mage",
+	"clips": [
+		{
+			"length": 1.333,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Mage@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Mage@Fall"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "idle (none/Idle)",
+			"source": "Mage@Idle"
+		},
+		{
+			"length": 1.5,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Mage@Jump"
+		},
+		{
+			"length": 0.533,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Mage@Run"
+		},
+		{
+			"length": 0.8,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Mage@Walk"
+		},
+		{
+			"length": 1.6,
+			"loop": true,
+			"name": "walk_slow",
+			"slot": "Walking_Backwards (lento) / Walking_A alterno",
+			"source": "Mage@WalkSlow"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}

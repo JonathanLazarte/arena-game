@@ -1,0 +1,58 @@
+{
+	"character": "hammer",
+	"clips": [
+		{
+			"length": 1.733,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Hammer@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Hammer@Fall"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "idle (none/Idle)",
+			"source": "Hammer@Idle"
+		},
+		{
+			"length": 1.833,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Hammer@Jump"
+		},
+		{
+			"length": 0.8,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Hammer@Run"
+		},
+		{
+			"length": 1.067,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Hammer@Walk"
+		},
+		{
+			"length": 2.133,
+			"loop": true,
+			"name": "walk_slow",
+			"slot": "Walking_Backwards (lento) / Walking_A alterno",
+			"source": "Hammer@WalkSlow"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}

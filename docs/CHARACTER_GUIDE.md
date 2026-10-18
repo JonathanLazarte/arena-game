@@ -371,3 +371,90 @@ y escribí un test como `tests/test_test_models.gd` para tus ids. **Nunca** haga
 | Archivos de `assets/` no aparecen en `git status` | `assets/` está en `.gitignore` | `git add -f` |
 | `Parse Error: Cannot infer the type` en un `for` | GDScript tipado estricto | tipar la variable del bucle (`for side: String in [...]`) |
 | Clips del modelo sin nombre (`[Action Stash]`) | export sin acciones nombradas | no usarlos (`animation/import=false`) y hornear KayKit + Mixamo |
+
+## 13. Convertir un pack de clips externo a biblioteca KayKit (`tools/import_anim_pack.gd`)
+
+Para packs de **solo animaciones** (FBX de otro rig) que queremos usar en los personajes KayKit
+sin tocar sus modelos. El conversor es headless y se configura por pack con un **perfil JSON**
+en `tools/anim_profiles/`.
+
+### Reglas
+
+- Los FBX crudos **nunca** entran al repo (es público). Guardalos fuera (`/workspace/animpacks/<pack>/`)
+  o en `assets_raw/` (está en `.gitignore`). El conversor los copia a un proyecto temporal en `/tmp`,
+  no al proyecto del juego.
+- Solo se commitea: la herramienta, el perfil y la biblioteca horneada (`assets/animations/*.res`
+  + su `*.manifest.json`; `assets/` está ignorado, así que van con `git add -f`).
+
+### Uso
+
+```bash
+# un personaje del pack
+godot --headless --path . -s res://tools/import_anim_pack.gd -- \
+    --profile res://tools/anim_profiles/explosivellc_knight.json --src /workspace/animpacks/explosivellc
+# todo el pack (12 bibliotecas) o uno solo con --only <id>
+godot --headless --path . -s res://tools/import_anim_pack.gd -- \
+    --profile res://tools/anim_profiles/explosivellc_all.json --src /workspace/animpacks/explosivellc [--only mage]
+godot --headless --path . --import            # registra los .res nuevos
+godot --headless --path . -s res://tests/test_anim_pack.gd
+```
+
+### Qué hace
+
+1. Copia `<Prefijo>@*.FBX` + el modelo del personaje (`<Prefijo>.FBX`) a `/tmp/anim_pack_<pack>/`,
+   importa con `nodes/import_as_skeleton_bones=true` (dos pasadas: .import por defecto y luego forzado).
+   Si algún FBX igual trae los huesos como `Node3D`, se arma un esqueleto equivalente desde esa jerarquía.
+2. **Reposo fuente = bind pose del modelo del pack** (`model` en el perfil), llevado al espacio de los
+   clips con `bind_axes` (el modelo viene Z-arriba/X-adelante; los clips Y-arriba/Z-adelante). Esto
+   arregla el giro de antebrazo/mano que daba usar el frame 0 como reposo. Sin modelo, cae al frame 0.
+3. Reapunta con delta global (la misma matemática de `tools/retarget_kaykit.gd`, ver §5):
+   `Ws = Apose · Grest⁻¹ ; Adest = Ws · C · Grest_KayKit`, con `C` alineando cada segmento de las
+   cadenas del perfil (`chain`); los huesos hoja heredan (`inherit`).
+4. **Sin root motion**: el hueso `root_bone` se ignora entero; de la pelvis queda solo la altura
+   (escalada por la relación de alturas de cadera); x/z fijos en el reposo KayKit.
+5. Bucle por nombre (`loop_patterns`: idle/walk/run/strafe), nombres en snake_case
+   (`Knight@WalkSlow.FBX` → `walk_slow`), 30 fps.
+6. Escribe `assets/animations/<out>.res` (AnimationLibrary, pistas `Rig/Skeleton3D:<hueso>`) y
+   `<out>.manifest.json` con nombre, duración, bucle y ranura sugerida (`slots` del perfil).
+
+### Perfil (resumen de campos)
+
+`target` (glb KayKit de referencia), `fps`, `root_bone`, `bind_axes` (columnas: a dónde va x/y/z del
+modelo), `bone_map` (hueso KayKit → hueso fuente), `chain`, `inherit`, `loop_patterns`, `slots`,
+`characters[]` (`id`, `prefix`, `model`, `out`). `"extends": "<otro perfil>"` hereda y pisa campos.
+Para otro pack: copiá el perfil, cambiá `bone_map`/`root_bone`/`bind_axes` y los personajes.
+
+### Usar los clips en el juego (no se recablea nada por defecto)
+
+Las bibliotecas no están conectadas a ningún personaje. Para probarlas, cargá la biblioteca en el
+`AnimationPlayer` con un prefijo propio y apuntá el arma a esos nombres:
+
+```gdscript
+# en KnightVisual._apply_mixamo (o donde se arme el AnimationPlayer)
+if not ap.has_animation_library(&"xk"):
+    ap.add_animation_library(&"xk", load("res://assets/animations/explosive_knight.res"))
+```
+
+- `WeaponDef.anim_light = ["xk/attack1", ...]` (y `anim_heavy`, `anim_aim`…) en el `.tres` del arma.
+- O en `MX_WEAPON` de `knight_visual.gd`: los valores se prefijan con `mx/`, así que para usar otra
+  biblioteca agregá la entrada con su ruta completa y quitá el prefijo para valores que ya traen `/`.
+
+Ranuras sugeridas (también en cada manifiesto):
+
+| clip | ranura (§6) |
+|---|---|
+| `idle` / `idle1` | `none` / `Idle` |
+| `walk` | `Walking_A` |
+| `walk_slow` | `Walking_Backwards` (lento) o `Walking_A` alterno |
+| `run` | `Running_A` |
+| `jump` | `jump_up` |
+| `fall` | `jump_air` |
+| `attack1` | `light0` (un solo golpe por personaje: repetir o mezclar con otros para `light1/2`) |
+| `stunned` (solo `sorceress`) | `stun` |
+
+### Licencia
+
+Ese pack se compró/descargó con licencia **por comprador de la Unity Asset Store**: permite usarlo
+dentro de un juego, no redistribuir los archivos. Por eso los FBX crudos quedan fuera del repo. Pero
+las bibliotecas horneadas **también son derivadas** del pack: **recomendado hacer el repositorio
+privado** mientras estén commiteadas (o sacarlas del repo y hornearlas localmente antes de exportar).

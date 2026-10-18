@@ -82,6 +82,8 @@ func _character(ch: Dictionary, tsk: Skeleton3D) -> bool:
 			skipped.append({"file": f, "why": "no importa"}); continue
 		var src: Node = scn.instantiate()
 		var ssk := src.find_child("Skeleton3D", true, false) as Skeleton3D
+		if ssk == null:
+			ssk = _node_skeleton(src) # algunos FBX ignoran import_as_skeleton_bones: huesos como Node3D
 		var sap := src.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		if ssk == null or sap == null or sap.get_animation_list().is_empty():
 			skipped.append({"file": f, "why": "sin esqueleto o sin animación"}); src.free(); continue
@@ -107,6 +109,26 @@ func _character(ch: Dictionary, tsk: Skeleton3D) -> bool:
 	print("[anim] %s: %d clips, %d saltados %s" % [ch.id, manifest.size(), skipped.size(), skipped])
 	return true
 
+## Esqueleto equivalente a una jerarquía de Node3D (reposo = transform de cada nodo).
+func _node_skeleton(src: Node) -> Skeleton3D:
+	var top := src.get_node_or_null(String(P.get("root_bone", "")))
+	if top == null or not top is Node3D:
+		return null
+	var sk := Skeleton3D.new()
+	var stack: Array = [[top, -1]]
+	while not stack.is_empty():
+		var it: Array = stack.pop_front()
+		var nd := it[0] as Node3D
+		var i := sk.get_bone_count()
+		sk.add_bone(nd.name)
+		sk.set_bone_parent(i, it[1])
+		sk.set_bone_rest(i, nd.transform)
+		for c in nd.get_children():
+			if c is Node3D and not c is MeshInstance3D:
+				stack.append([c, i])
+	src.add_child(sk)
+	return sk
+
 func _retarget(anim: Animation, ssk: Skeleton3D, tsk: Skeleton3D, tg: Array[Transform3D], ti: Dictionary, bind: Dictionary) -> Animation:
 	var MAP: Dictionary = P.bone_map
 	var CHAIN: Dictionary = P.chain
@@ -126,7 +148,9 @@ func _retarget(anim: Animation, ssk: Skeleton3D, tsk: Skeleton3D, tg: Array[Tran
 		cq[k] = cq[INHERIT[k]]
 	var tracks := {}
 	for t in anim.get_track_count():
-		tracks[String(anim.track_get_path(t).get_concatenated_subnames()) + str(anim.track_get_type(t))] = t
+		var tp := anim.track_get_path(t)
+		var bn := String(tp.get_concatenated_subnames()) if tp.get_subname_count() > 0 else String(tp.get_name(tp.get_name_count() - 1))
+		tracks[bn + str(anim.track_get_type(t))] = t
 	var order: Array = MAP.keys()
 	var depth := func(i: int) -> int:
 		var d := 0

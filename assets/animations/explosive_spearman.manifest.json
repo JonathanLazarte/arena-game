@@ -1,0 +1,58 @@
+{
+	"character": "spearman",
+	"clips": [
+		{
+			"length": 1.133,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Spearman@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Spearman@Fall"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "idle (none/Idle)",
+			"source": "Spearman@Idle"
+		},
+		{
+			"length": 1.167,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Spearman@Jump"
+		},
+		{
+			"length": 0.533,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Spearman@Run"
+		},
+		{
+			"length": 0.8,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Spearman@Walk"
+		},
+		{
+			"length": 1.6,
+			"loop": true,
+			"name": "walk_slow",
+			"slot": "Walking_Backwards (lento) / Walking_A alterno",
+			"source": "Spearman@WalkSlow"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}
