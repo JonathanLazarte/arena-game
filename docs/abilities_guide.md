@@ -10,6 +10,8 @@
 
 ---
 
+> Animación de cada paso (qué clip, cómo alinearlo con windup/activo/recuperación): [ABILITY_ANIMATION_GUIDE.md](ABILITY_ANIMATION_GUIDE.md).
+
 ## Índice
 1. Reglas del juego que el esquema respeta
 2. Unidades, escalas y conversión tick ↔ ms
@@ -208,6 +210,7 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 | `cost.stamina` / `.mana` / `.health` | number ≥ 0 | sí (al menos uno > 0) | `0` | puntos; se pueden combinar. El de aguante se multiplica por los modificadores de costo del luchador (talismanes) en `bake` |
 | `cooldown_ticks` | int ≥ 0 | sí | — | recarga propia; arranca al **terminar** la habilidad (o al interrumpirse si `on_interrupt.cooldown` = `full`) |
 | `uses_global_cd` | bool | no | `true` | respeta y dispara la recarga global de 84 ticks |
+| `global_cd_on_repeat` | bool | no | `true` | en `false`, repetir la misma habilidad se salta la recarga y una pulsación tras el disparo queda en cola (encadenado de la ráfaga) |
 | `usable_while` | array<enum> | no | `["ground"]` | `ground` · `air` · `mounted` · `sprinting` · `blocking`. Fuera de esos estados la habilidad no arranca. Nunca: muerto, aturdido, bebiendo frasco, agotado |
 | `interruptible_by` | array<enum> | no | `[]` | `stun_lvl1` (tambaleo) · `stun_lvl2` (aturdido) · `knockdown` · `parry` · `guard_break` · `stance_break` · `grab`. **Lista vacía = no se corta** (solo se esquiva). Quien se corta lo declara, por ejemplo `["stun_lvl2","knockdown","parry"]` |
 | `interrupt_priority` | int | no | `0` | desempate determinista (§8.4) |

@@ -519,7 +519,7 @@ static func _names(c: Ctx, path: String, texts: Array) -> void:
 
 static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Dictionary:
 	_unknown(c, a, p, ["id", "name", "icon", "category", "tags", "unlock", "cost", "cooldown_ticks", "uses_global_cd",
-		"usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source",
+		"global_cd_on_repeat", "usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source",
 		"origin", "requires_weapon"])
 	if a.has("source") and not (a["source"] is Dictionary):
 		c.err(_p(p, "source"), "SCHEMA", "source debe ser un objeto (el programa numérico). El origen va en origin")
@@ -570,6 +570,7 @@ static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Di
 		c.err(_p(p, "cost"), "V10", "al menos un costo debe ser > 0")
 	var cd := _int(c, a, "cooldown_ticks", p, true, 0, 0, 36000)
 	var gcd := _bool(c, a, "uses_global_cd", p, true)
+	var gcd_rep := _bool(c, a, "global_cd_on_repeat", p, true)
 	var usable := _mask(c, a, "usable_while", p, USABLE, ["ground"])
 	var intr := _mask(c, a, "interruptible_by", p, INTERRUPTS, DEFAULT_INTERRUPTS)
 	var iprio := _int(c, a, "interrupt_priority", p, false, 0, -100, 100)
@@ -649,7 +650,7 @@ static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Di
 		_graph(c, p, steps, entry, ssrc)
 		_ability_rules(c, p, a, steps, intr, ssrc)
 	return {"index": ai, "id": id, "name": name, "icon": icon, "category": cat, "tags": tags, "unlock_phase": phase,
-		"cost": cost, "cooldown": cd, "uses_global_cd": 1 if gcd else 0, "usable_mask": usable, "interrupt_mask": intr,
+		"cost": cost, "cooldown": cd, "uses_global_cd": 1 if gcd else 0, "global_cd_on_repeat": 1 if gcd_rep else 0, "usable_mask": usable, "interrupt_mask": intr,
 		"interrupt_priority": iprio, "on_interrupt": on_int, "entry": entry, "steps": steps, "ai": aiout,
 		"origin": origin, "requires_weapon": weapons}
 

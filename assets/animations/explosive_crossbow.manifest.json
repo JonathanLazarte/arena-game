@@ -1,0 +1,58 @@
+{
+	"character": "crossbow",
+	"clips": [
+		{
+			"length": 1.133,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Crossbow@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Crossbow@Fall"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "idle (none/Idle)",
+			"source": "Crossbow@Idle"
+		},
+		{
+			"length": 1.333,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Crossbow@Jump"
+		},
+		{
+			"length": 0.6,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Crossbow@Run"
+		},
+		{
+			"length": 0.8,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Crossbow@Walk"
+		},
+		{
+			"length": 1.6,
+			"loop": true,
+			"name": "walk_slow",
+			"slot": "Walking_Backwards (lento) / Walking_A alterno",
+			"source": "Crossbow@WalkSlow"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}

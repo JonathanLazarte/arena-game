@@ -239,7 +239,8 @@
 			"usable_while": [
 				"ground"
 			],
-			"uses_global_cd": true
+			"uses_global_cd": true,
+			"global_cd_on_repeat": false
 		},
 		{
 			"ai": {
@@ -3752,7 +3753,8 @@
 			"usable_while": [
 				"ground"
 			],
-			"uses_global_cd": true
+			"uses_global_cd": true,
+			"global_cd_on_repeat": false
 		},
 		{
 			"ai": {
@@ -3831,7 +3833,8 @@
 			"usable_while": [
 				"ground"
 			],
-			"uses_global_cd": true
+			"uses_global_cd": true,
+			"global_cd_on_repeat": false
 		},
 		{
 			"ai": {

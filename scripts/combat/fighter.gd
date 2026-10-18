@@ -1210,7 +1210,10 @@ var buffered: bool = false ## ataque ligero encolado en el búfer
 var ab_marker: Node3D
 var ab_aoe: Node3D
 var ab_bubble: MeshInstance3D
-var ab_uses: Dictionary = {}
+var ab_uses: Dictionary = {} ## lo escribe SimView: id → AB_STARTS del último arranque
+var boss_repeat_ready: bool = false ## SimView: la seleccionada se repite sin esperar recarga
+var ab_tick: int = 0 ## SimView: AB_T entero (tick del paso actual + 1)
+var ab_seq: int = 0 ## SimView: AB_STARTS (contador de arranques, rollback-safe)
 var ab_interrupted: int = 0
 var ab_hits_landed: int = 0
 signal ability_started(id: String)

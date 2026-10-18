@@ -1,0 +1,31 @@
+{
+	"_doc": "Perfil de importación de clips externos (ver tools/import_anim_pack.gd y docs/CHARACTER_GUIDE.md §13). Los FBX crudos NO van al repo.",
+	"pack": "explosivellc",
+	"target": "res://assets/models/Knight.glb",
+	"fps": 30,
+	"root_bone": "Motion",
+	"hips_source": "B_Pelvis",
+	"bind_axes": [[0, 0, 1], [1, 0, 0], [0, 1, 0]],
+	"bone_map": {
+		"hips": "B_Pelvis", "spine": "B_Spine", "chest": "B_Spine1", "head": "B_Head",
+		"upperarm.l": "B_L_UpperArm", "lowerarm.l": "B_L_Forearm", "wrist.l": "B_L_Hand",
+		"upperarm.r": "B_R_UpperArm", "lowerarm.r": "B_R_Forearm", "wrist.r": "B_R_Hand",
+		"upperleg.l": "B_L_Thigh", "lowerleg.l": "B_L_Calf", "foot.l": "B_L_Foot", "toes.l": "B_L_Toe0",
+		"upperleg.r": "B_R_Thigh", "lowerleg.r": "B_R_Calf", "foot.r": "B_R_Foot", "toes.r": "B_R_Toe0"
+	},
+	"chain": {
+		"hips": "spine", "spine": "chest", "chest": "head",
+		"upperarm.l": "lowerarm.l", "lowerarm.l": "wrist.l", "upperarm.r": "lowerarm.r", "lowerarm.r": "wrist.r",
+		"upperleg.l": "lowerleg.l", "lowerleg.l": "foot.l", "foot.l": "toes.l",
+		"upperleg.r": "lowerleg.r", "lowerleg.r": "foot.r", "foot.r": "toes.r"
+	},
+	"inherit": {"head": "chest", "wrist.l": "lowerarm.l", "wrist.r": "lowerarm.r", "toes.l": "foot.l", "toes.r": "foot.r"},
+	"loop_patterns": ["idle", "walk", "run", "strafe"],
+	"slots": {
+		"idle": "idle (none/Idle)", "idle1": "idle (none/Idle)", "walk": "Walking_A", "walk_slow": "Walking_Backwards (lento) / Walking_A alterno",
+		"run": "Running_A", "jump": "jump_up", "fall": "jump_air", "attack1": "light0", "stunned": "stun"
+	},
+	"characters": [
+		{"id": "knight", "prefix": "Knight", "model": "Knight.FBX", "out": "res://assets/animations/explosive_knight.res"}
+	]
+}

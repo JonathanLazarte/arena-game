@@ -1,0 +1,78 @@
+{
+	"_doc": "Todo el pack: mismo rig y mapa que explosivellc_knight.json; una biblioteca por personaje.",
+	"extends": "explosivellc_knight.json",
+	"characters": [
+		{
+			"id": "knight",
+			"prefix": "Knight",
+			"model": "Knight.FBX",
+			"out": "res://assets/animations/explosive_knight.res"
+		},
+		{
+			"id": "swordsman",
+			"prefix": "Swordsman",
+			"model": "Swordsman.FBX",
+			"out": "res://assets/animations/explosive_swordsman.res"
+		},
+		{
+			"id": "spearman",
+			"prefix": "Spearman",
+			"model": "Spearman.FBX",
+			"out": "res://assets/animations/explosive_spearman.res"
+		},
+		{
+			"id": "hammer",
+			"prefix": "Hammer",
+			"model": "Hammer.FBX",
+			"out": "res://assets/animations/explosive_hammer.res"
+		},
+		{
+			"id": "crossbow",
+			"prefix": "Crossbow",
+			"model": "Crossbow.FBX",
+			"out": "res://assets/animations/explosive_crossbow.res"
+		},
+		{
+			"id": "mage",
+			"prefix": "Mage",
+			"model": "Mage.FBX",
+			"out": "res://assets/animations/explosive_mage.res"
+		},
+		{
+			"id": "archer",
+			"prefix": "Archer",
+			"model": "Archer.FBX",
+			"out": "res://assets/animations/explosive_archer.res"
+		},
+		{
+			"id": "two_handed",
+			"prefix": "2Handed",
+			"model": "2Handed.FBX",
+			"out": "res://assets/animations/explosive_two_handed.res"
+		},
+		{
+			"id": "sorceress",
+			"prefix": "Sorceress",
+			"model": "Sorceress.FBX",
+			"out": "res://assets/animations/explosive_sorceress.res"
+		},
+		{
+			"id": "ninja",
+			"prefix": "Ninja",
+			"model": "Ninja.FBX",
+			"out": "res://assets/animations/explosive_ninja.res"
+		},
+		{
+			"id": "karate",
+			"prefix": "Karate",
+			"model": "Karate.FBX",
+			"out": "res://assets/animations/explosive_karate.res"
+		},
+		{
+			"id": "brute",
+			"prefix": "Brute",
+			"model": "Brute.FBX",
+			"out": "res://assets/animations/explosive_brute.res"
+		}
+	]
+}

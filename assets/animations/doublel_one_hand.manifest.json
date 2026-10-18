@@ -1,0 +1,156 @@
+{
+	"character": "one_hand",
+	"clips": [
+		{
+			"length": 0.8,
+			"loop": false,
+			"name": "block_hit",
+			"slot": "block_hit",
+			"source": "AS_1Hand_Up_Shield_Block_Hit_1_InPlace"
+		},
+		{
+			"length": 3.5,
+			"loop": true,
+			"name": "block_idle",
+			"slot": "block",
+			"source": "AS_1Hand_Up_Shield_Block_Idle_1"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "crouch_idle",
+			"slot": "",
+			"source": "AS_1Hand_Up_Crouch_Idle_1"
+		},
+		{
+			"length": 1.0,
+			"loop": true,
+			"name": "crouch_walk",
+			"slot": "",
+			"source": "AS_1Hand_Up_Crouch_F_InPlace"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "none/Idle",
+			"source": "AS_1Hand_Up_Stand_Idle_A_2"
+		},
+		{
+			"length": 1.333,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up/jump_air/jump_land (un solo clip)",
+			"source": "AS_1Hand_Up_Jump_B_InPlace"
+		},
+		{
+			"length": 2.4,
+			"loop": false,
+			"name": "light_a1",
+			"slot": "light0",
+			"source": "AS_1Hand_Up_Attack_A_1_InPlace"
+		},
+		{
+			"length": 2.6,
+			"loop": false,
+			"name": "light_a2",
+			"slot": "light1",
+			"source": "AS_1Hand_Up_Attack_A_2_InPlace"
+		},
+		{
+			"length": 2.0,
+			"loop": false,
+			"name": "light_a3",
+			"slot": "light2",
+			"source": "AS_1Hand_Up_Attack_A_3_InPlace"
+		},
+		{
+			"length": 3.0,
+			"loop": false,
+			"name": "light_b1",
+			"slot": "light0 (combo alterno) / heavy",
+			"source": "AS_1Hand_Up_Attack_B_1_InPlace"
+		},
+		{
+			"length": 2.0,
+			"loop": false,
+			"name": "light_b2",
+			"slot": "light1 (combo alterno)",
+			"source": "AS_1Hand_Up_Attack_B_2_InPlace"
+		},
+		{
+			"length": 2.267,
+			"loop": false,
+			"name": "light_b3",
+			"slot": "light2 (combo alterno) / heavy",
+			"source": "AS_1Hand_Up_Attack_B_3_InPlace"
+		},
+		{
+			"length": 0.667,
+			"loop": true,
+			"name": "run_b",
+			"slot": "(correr atrás)",
+			"source": "AS_1Hand_Up_Run_A_B_InPlace"
+		},
+		{
+			"length": 0.667,
+			"loop": true,
+			"name": "run_f",
+			"slot": "Running_A",
+			"source": "AS_1Hand_Up_Run_A_F_InPlace"
+		},
+		{
+			"length": 0.667,
+			"loop": true,
+			"name": "run_strafe_l",
+			"slot": "Running_Strafe_L",
+			"source": "AS_1Hand_Up_Run_A_F_L90_A_InPlace"
+		},
+		{
+			"length": 0.667,
+			"loop": true,
+			"name": "run_strafe_r",
+			"slot": "Running_Strafe_R",
+			"source": "AS_1Hand_Up_Run_A_F_R90_A_InPlace"
+		},
+		{
+			"length": 0.667,
+			"loop": true,
+			"name": "sprint",
+			"slot": "(sprint)",
+			"source": "AS_1Hand_Up_Sprint_A_F_InPlace"
+		},
+		{
+			"length": 1.067,
+			"loop": true,
+			"name": "walk_b",
+			"slot": "Walking_Backwards",
+			"source": "AS_1Hand_Up_Walk_A_B_InPlace"
+		},
+		{
+			"length": 1.067,
+			"loop": true,
+			"name": "walk_f",
+			"slot": "Walking_A",
+			"source": "AS_1Hand_Up_Walk_A_F_InPlace"
+		},
+		{
+			"length": 1.067,
+			"loop": true,
+			"name": "walk_strafe_l",
+			"slot": "Walk_Strafe_L",
+			"source": "AS_1Hand_Up_Walk_A_F_L90_A_InPlace"
+		},
+		{
+			"length": 1.067,
+			"loop": true,
+			"name": "walk_strafe_r",
+			"slot": "Walk_Strafe_R",
+			"source": "AS_1Hand_Up_Walk_A_F_R90_A_InPlace"
+		}
+	],
+	"fps": 30.0,
+	"pack": "doublel",
+	"rest": "bind",
+	"skipped": []
+}

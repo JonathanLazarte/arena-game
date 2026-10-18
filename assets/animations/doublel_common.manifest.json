@@ -1,0 +1,58 @@
+{
+	"character": "common",
+	"clips": [
+		{
+			"length": 3.667,
+			"loop": false,
+			"name": "action_4_1",
+			"slot": "(gesto largo con agachada, no es caída)",
+			"source": "AS_Action_A_4_1"
+		},
+		{
+			"length": 4.833,
+			"loop": false,
+			"name": "action_5_1",
+			"slot": "(gesto largo con agachada, no es caída)",
+			"source": "AS_Action_A_5_1"
+		},
+		{
+			"length": 3.5,
+			"loop": false,
+			"name": "action_5_2",
+			"slot": "(gesto largo con agachada, no es caída)",
+			"source": "AS_Action_A_5_2"
+		},
+		{
+			"length": 2.167,
+			"loop": false,
+			"name": "enemy_attack",
+			"slot": "boss_lunge / heavy",
+			"source": "AS_Enemy_Attack_1_InPlace"
+		},
+		{
+			"length": 2.4,
+			"loop": false,
+			"name": "enemy_charge_attack",
+			"slot": "dash_strike",
+			"source": "AS_Enemy_Attack_1_Run_InPlace"
+		},
+		{
+			"length": 1.833,
+			"loop": false,
+			"name": "hit_1",
+			"slot": "hit",
+			"source": "AS_Hit_B_4_InPlace"
+		},
+		{
+			"length": 0.567,
+			"loop": false,
+			"name": "hit_2",
+			"slot": "hit (variante) / stun",
+			"source": "AS_Hit_B_5_InPlace"
+		}
+	],
+	"fps": 30.0,
+	"pack": "doublel",
+	"rest": "bind",
+	"skipped": []
+}

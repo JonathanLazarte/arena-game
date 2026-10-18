@@ -1,0 +1,58 @@
+{
+	"character": "sorceress",
+	"clips": [
+		{
+			"length": 1.333,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Sorceress@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Sorceress@Fall"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "idle (none/Idle)",
+			"source": "Sorceress@Idle"
+		},
+		{
+			"length": 1.667,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Sorceress@Jump"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Sorceress@Run"
+		},
+		{
+			"length": 2.0,
+			"loop": false,
+			"name": "stunned",
+			"slot": "stun",
+			"source": "Sorceress@Stunned"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Sorceress@Walk"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}

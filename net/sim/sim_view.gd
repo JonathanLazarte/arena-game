@@ -106,11 +106,20 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.boss_sel = s[o + S.AB_SEL]
 	if not params.is_empty():
 		f.boss_avail = SimAbilities.boss_avail(s, params, 0 if o == 0 else 1)
+		var bl: Array = params[0 if o == 0 else 1].get("boss", [])
+		var sel: int = s[o + S.AB_SEL]
+		f.boss_repeat_ready = sel >= 0 and sel < bl.size() and int((bl[sel] as Dictionary).get("rep_free", 0)) != 0 \
+			and s[o + S.AB_LAST] == int((bl[sel] as Dictionary).get("code", -1))
 	f.ab_t = s[o + S.AB_T] / hz
+	f.ab_tick = s[o + S.AB_T]
 	f.ab_air = s[o + S.AB_AIR] != 0
 	f.ab_locked = (s[o + S.AB_FL] & SimAbilities.FL_LOCKED) != 0
 	var abk: int = s[o + S.AB_SLOT]
 	f.ab_id = String(f.boss_ids[abk]) if abk >= 0 and abk < f.boss_ids.size() else ""
+	## nº de arranque (estado de la sim): alterna los tajos encadenados de la ráfaga, etc.
+	f.ab_seq = s[o + S.AB_STARTS]
+	if f.ab_id != "":
+		f.ab_uses[f.ab_id] = f.ab_seq
 	f.ab_fired = s[o + S.AB_FIRED]
 	var abfl: int = s[o + S.AB_FL]
 	f.ab_combo_finisher = (abfl & SimAbilities.FL_FINISHER) != 0

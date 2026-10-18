@@ -1,0 +1,58 @@
+{
+	"character": "brute",
+	"clips": [
+		{
+			"length": 1.5,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Brute@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Brute@Fall"
+		},
+		{
+			"length": 1.0,
+			"loop": true,
+			"name": "idle",
+			"slot": "idle (none/Idle)",
+			"source": "Brute@Idle"
+		},
+		{
+			"length": 1.833,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Brute@Jump"
+		},
+		{
+			"length": 0.667,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Brute@Run"
+		},
+		{
+			"length": 1.067,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Brute@Walk"
+		},
+		{
+			"length": 2.133,
+			"loop": true,
+			"name": "walk_slow",
+			"slot": "Walking_Backwards (lento) / Walking_A alterno",
+			"source": "Brute@WalkSlow"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}

@@ -1,0 +1,58 @@
+{
+	"character": "archer",
+	"clips": [
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "attack1",
+			"slot": "light0",
+			"source": "Archer@Attack1"
+		},
+		{
+			"length": 1.0,
+			"loop": false,
+			"name": "fall",
+			"slot": "jump_air",
+			"source": "Archer@Fall"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "idle1",
+			"slot": "idle (none/Idle)",
+			"source": "Archer@Idle1"
+		},
+		{
+			"length": 1.333,
+			"loop": false,
+			"name": "jump",
+			"slot": "jump_up",
+			"source": "Archer@Jump"
+		},
+		{
+			"length": 0.533,
+			"loop": true,
+			"name": "run",
+			"slot": "Running_A",
+			"source": "Archer@Run"
+		},
+		{
+			"length": 0.8,
+			"loop": true,
+			"name": "walk",
+			"slot": "Walking_A",
+			"source": "Archer@Walk"
+		},
+		{
+			"length": 1.6,
+			"loop": true,
+			"name": "walk_slow",
+			"slot": "Walking_Backwards (lento) / Walking_A alterno",
+			"source": "Archer@WalkSlow"
+		}
+	],
+	"fps": 30.0,
+	"pack": "explosivellc",
+	"rest": "bind",
+	"skipped": []
+}

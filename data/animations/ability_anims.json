@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "libraries": {
+    "xh": "res://assets/animations/explosive_hammer.res"
+  },
+  "abilities": {
+    "golpe_fisura": {
+      "file": "res://data/abilities/golpe_fisura_skill.json",
+      "steps": {
+        "saltar": [
+          {"clip": "xh/jump", "keys": [[0, 0.0], [14, 0.40], [31, 0.80]]}
+        ],
+        "martillazo": [
+          {"clip": "xh/attack1", "keys": [[0, 0.30], [14, 0.75], [18, 0.85], [58, 1.73]]}
+        ]
+      }
+    },
+    "voltereta_cuchilla": {
+      "file": "res://data/abilities/artorias_caballero_umbral.json",
+      "steps": {
+        "salto_1": [
+          {"clip": "mx/roll_f", "unit": "frac", "keys": [[0, 0.0], [52, 1.0]]},
+          {"clip": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "keys": [[52, 0.10], [66, 0.42], [76, 0.60], [88, 1.0]]}
+        ],
+        "salida": [
+          {"clip": "Dodge_Backward", "unit": "frac", "keys": [[0, 0.0], [37, 1.0]]}
+        ],
+        "salto_2": [
+          {"clip": "mx/roll_f", "unit": "frac", "keys": [[0, 0.0], [52, 1.0]]},
+          {"clip": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "mirror": true, "keys": [[52, 0.10], [66, 0.42], [76, 0.60], [118, 1.0]]}
+        ]
+      }
+    }
+  }
+}

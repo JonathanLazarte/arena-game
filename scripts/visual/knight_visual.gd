@@ -72,6 +72,9 @@ const MX_LOCO := {"Walk_Strafe_L": "strafe_a", "Walk_Strafe_R": "strafe_b"}
 var idle_clip: String = "Idle"
 
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
+const AB_STATES := ["ab0", "ab1"] ## habilidades de catálogo con clip propio (AbilityAnims)
+var _ab_anim: Dictionary = {}
+var _ab_smp: Dictionary = {} ## muestra del cuadro actual (clip, time, seg) ## estado → AnimationNodeAnimation (se le cambia el clip)
 const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap", "reload"]
 
 var model: Node3D
@@ -203,6 +206,7 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 			states["light%d" % i] = author_combo_clip(ap, h)
 	_apply_mixamo(melee_w)
 	_compensate_attachments(sk)
+	_setup_ability_anims()
 	_build_tree()
 
 # ---------------- Rama test-models: modelos humanoides no KayKit (solo visual) ----------------
@@ -299,6 +303,52 @@ func _compensate_attachments(sk: Skeleton3D) -> void:
 			for c: Node in kids:
 				c.reparent(holder, false)
 
+
+## Animación de habilidades de catálogo (AbilityAnims): bibliotecas con prefijo y espejos.
+func _setup_ability_anims() -> void:
+	if ap == null:
+		return
+	var libs: Dictionary = AbilityAnims.libraries()
+	for pre: String in libs:
+		if not ap.has_animation_library(StringName(pre)) and ResourceLoader.exists(String(libs[pre])):
+			var lib := load(String(libs[pre])) as AnimationLibrary
+			if lib:
+				ap.add_animation_library(StringName(pre), lib)
+	var mlib: AnimationLibrary = null
+	for id: String in AbilityAnims.all_ids():
+		for seg: Dictionary in AbilityAnims.segments(id):
+			var src := String(seg.get("clip", ""))
+			if not bool(seg.get("mirror", false)) or not ap.has_animation(src):
+				continue
+			if mlib == null:
+				if ap.has_animation_library(AbilityAnims.MIRROR_LIB):
+					mlib = ap.get_animation_library(AbilityAnims.MIRROR_LIB)
+				else:
+					mlib = AnimationLibrary.new()
+					ap.add_animation_library(AbilityAnims.MIRROR_LIB, mlib)
+			var nm := StringName(src.replace("/", "__"))
+			if not mlib.has_animation(nm):
+				mlib.add_animation(nm, _mirrored(ap.get_animation(src)))
+
+## Clip y tiempo de la habilidad actual según la sim (paso = ab_fired, tick = ab_tick - 1).
+## {} = sin animación propia (o clip ausente sin «fallback»): sigue la pose genérica.
+func _ability_sample(f: Fighter) -> Dictionary:
+	if f.ab_id == "" or not AbilityAnims.has(f.ab_id):
+		return {}
+	var smp := AbilityAnims.sample(f.ab_id, f.ab_fired, f.ab_tick - 1)
+	if smp.is_empty():
+		return {}
+	var seg: Dictionary = smp["seg"]
+	var clip := AbilityAnims.clip_name(seg)
+	if not ap.has_animation(clip):
+		clip = String(seg.get("fallback", ""))
+		if clip == "" or not ap.has_animation(clip):
+			return {}
+	var L := ap.get_animation(clip).length
+	smp["clip"] = clip
+	smp["time"] = clampf(AbilityAnims.clip_time(seg, float(f.ab_tick - 1), L), 0.0, L)
+	return smp
+
 ## Ronda 28: clips Mixamo reapuntados (biblioteca «mx») para las acciones donde encajan mejor.
 func _apply_mixamo(melee_w: WeaponDef) -> void:
 	if MX_LIB == null or ap == null:
@@ -319,6 +369,9 @@ func _apply_mixamo(melee_w: WeaponDef) -> void:
 		if ap.has_animation(MX + String(MX_LOCO[k])):
 			_loco_clips[k] = MX + String(MX_LOCO[k])
 var _loco_clips: Dictionary = {}
+var _loco_pts: Array = [] ## puntos con TimeScale presentes en el BlendSpace2D "loco"
+var _loco_dyn: Array = [] ## de esos, los que escalan su velocidad con |blend_position|
+var _loco_bp := Vector2.ZERO ## blend_position suavizada (solo vista)
 
 const RETARGET_BONE_MAP := {
 	"hips": "Hip", "spine": "Spine", "chest": "Chest", "neck": "Neck", "head": "Head",
@@ -597,15 +650,22 @@ func _build_tree() -> void:
 	var loco := AnimationNodeBlendSpace2D.new()
 	loco.add_blend_point(AnimUtil.anim_node(idle_clip), Vector2(0, 0), -1, &"Idle")
 	loco.add_blend_point(AnimUtil.anim_node("Walking_A"), Vector2(0, 0.45), -1, &"Walking_A")
-	loco.add_blend_point(AnimUtil.anim_node("Running_A"), Vector2(0, 1.0), -1, &"Running_A")
-	loco.add_blend_point(AnimUtil.anim_node("Walking_Backwards"), Vector2(0, -0.45), -1, &"Walking_Backwards")
-	loco.add_blend_point(AnimUtil.anim_node("Running_Strafe_Left"), Vector2(-1, 0), -1, &"Running_Strafe_Left")
-	loco.add_blend_point(AnimUtil.anim_node("Running_Strafe_Right"), Vector2(1, 0), -1, &"Running_Strafe_Right")
 	# Ronda 15: locomoción direccional para correr fijado (souls). KayKit no trae carrera hacia
 	# atrás ni strafe caminando: se reutilizan clips acelerados/ralentizados (ver LOCO_SPEEDS).
+	# Cada clip aparece UNA sola vez en el espacio: dos copias del mismo clip a distinta velocidad
+	# se desfasan y la mezcla parece reiniciarse cada pocos pasos (bug del strafe corriendo).
+	# A la velocidad intermedia la escala del clip sigue al módulo de la velocidad (_loco_dyn).
+	_loco_pts.clear()
+	_loco_dyn.clear()
 	for nm: String in LOCO_SPEEDS:
 		var lc: String = _loco_clips.get(nm, LOCO_SPEEDS[nm][0])
+		if nm.begins_with("Walk_Strafe") and not _loco_clips.has(nm):
+			continue # sin strafe caminando propio: lo cubre el de carrera, más lento
+		if nm == "Run_Back" or (nm.begins_with("Run_Strafe") and not _loco_clips.has(nm.replace("Run_", "Walk_"))):
+			_loco_dyn.append(nm)
+		_loco_pts.append(nm)
 		loco.add_blend_point(AnimUtil.scaled_anim(lc), LOCO_SPEEDS[nm][1], -1, StringName(nm))
+	loco.sync = true # los clips sin peso siguen avanzando: al volver no retoman una fase vieja
 	loco.min_space = Vector2(-1.4, -1.4)
 	loco.max_space = Vector2(1.4, 1.4)
 	root.add_node("loco", loco)
@@ -626,6 +686,28 @@ func _build_tree() -> void:
 				var tr := AnimationNodeStateMachineTransition.new()
 				tr.xfade_time = 0.14 if "swap" in [a, b] else 0.08
 				act.add_transition(a, b, tr)
+	# Habilidades de catálogo (AbilityAnims): dos estados que se alternan por tramo para fundir.
+	# anim → seek (lo pide la vista cada cuadro) → ts a 0: la pose sale del tick de la sim.
+	for nm: String in AB_STATES:
+		var bt := AnimationNodeBlendTree.new()
+		bt.add_node("anim", AnimUtil.anim_node(states["none"]))
+		bt.add_node("seek", AnimationNodeTimeSeek.new())
+		bt.add_node("ts", AnimationNodeTimeScale.new())
+		bt.connect_node("seek", 0, "anim")
+		bt.connect_node("ts", 0, "seek")
+		bt.connect_node("output", 0, "ts")
+		act.add_node(nm, bt)
+		_ab_anim[nm] = bt.get_node("anim")
+	for a: String in AB_STATES:
+		for b: String in STATES.keys() + AB_STATES:
+			if a != b:
+				var t1 := AnimationNodeStateMachineTransition.new()
+				t1.xfade_time = 0.08
+				act.add_transition(a, b, t1)
+				if not b in AB_STATES:
+					var t2 := AnimationNodeStateMachineTransition.new()
+					t2.xfade_time = 0.08
+					act.add_transition(b, a, t2)
 	act.add_transition("Start", "none", AnimationNodeStateMachineTransition.new())
 	root.add_node("act", act)
 	mix = AnimationNodeBlend2.new()
@@ -651,7 +733,7 @@ func _build_tree() -> void:
 	tree.anim_player = tree.get_path_to(ap)
 	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	tree.active = true
-	for nm: String in LOCO_SPEEDS:
+	for nm: String in _loco_pts:
 		# los strafes Mixamo andan a ~1,2 m/s: velocidad 1 al caminar
 		tree.set("parameters/loco/%s/ts/scale" % nm, 1.0 if _loco_clips.has(nm) else LOCO_SPEEDS[nm][2])
 	playback = tree.get("parameters/act/playback") as AnimationNodeStateMachinePlayback
@@ -882,14 +964,19 @@ func _ability_state(f: Fighter) -> String:
 
 ## Cada corte visual empieza antes de que salga su proyectil, para que el contacto de la hoja
 ## coincida con la emisión del tajo espectral.
+## El tajo arranca con la habilidad (contacto = fin del windup) y alterna izq → der por
+## pulsación según AB_STARTS (estado de la sim, así sobrevive al rollback).
 func _rafaga_swing_index(f: Fighter) -> int:
 	var d: Dictionary = BossAbilities.def("rafaga")
 	var windup := float(d.get("windup", 0.6))
-	var lead := 0.36
 	var tail := 0.5
-	if f.ab_t < windup - lead or f.ab_t >= windup + tail:
+	if f.ab_t >= windup + tail:
 		return -1
-	return posmod(int(f.ab_uses.get("rafaga", 1)) - 1, 3)
+	return rafaga_chain_index(f.ab_seq)
+
+## 0 = tajo izquierdo (light0), 1 = derecho (light1); n = nº de arranque (1, 2, 3…).
+static func rafaga_chain_index(n: int) -> int:
+	return posmod(n - 1, 2)
 
 
 func set_paused(paused: bool) -> void:
@@ -914,6 +1001,11 @@ func update(f: Fighter, delta: float) -> void:
 		s = "down"
 	elif f.is_getting_up() and not f.mounted:
 		s = "getup"
+	elif f.ab_id != "" and not _ability_sample(f).is_empty():
+		var smp := _ability_sample(f)
+		s = AB_STATES[int(smp["index"]) % 2]
+		upper = String((smp["seg"] as Dictionary).get("layer", "full")) == "upper"
+		_ab_smp = smp
 	elif f.ab_id != "":
 		s = _ability_state(f)
 	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE and not (oneshot == "hit" and oneshot_t > 0.0 and f.stun <= f.last_hitstun + 0.01):
@@ -973,6 +1065,12 @@ func update(f: Fighter, delta: float) -> void:
 			Fighter.Atk.RECOVERY:
 				scd = Ld * maxf(1.0 - DS_CONTACT - 0.12, 0.05) / maxf(f.atk_dur, 0.05)
 		tree.set("parameters/act/dash_strike/ts/scale", scd)
+	elif s in AB_STATES:
+		var an: AnimationNodeAnimation = _ab_anim[s]
+		if an.animation != StringName(_ab_smp["clip"]):
+			an.animation = StringName(_ab_smp["clip"])
+		tree.set("parameters/act/%s/ts/scale" % s, 0.0)
+		tree.set("parameters/act/%s/seek/seek_request" % s, float(_ab_smp["time"]))
 	elif s == "down":
 		tree.set("parameters/act/down/ts/scale", _clip_len(s) / StunRules.DOWN_T)
 	elif s == "getup":
@@ -1003,12 +1101,12 @@ func update(f: Fighter, delta: float) -> void:
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(wnd, 0.2))
 	elif f.ab_id == "rafaga" and s.begins_with("light"):
 		var swing_index := _rafaga_swing_index(f)
-		var key := 1000000 + swing_index * 1000 + int(f.ab_uses.get("rafaga", 0))
+		var key := 1000000 + swing_index * 1000 + f.ab_seq
 		if key != _ab_hit_key:
 			_ab_hit_key = key
 			playback.start(s, true)
 		var d: Dictionary = BossAbilities.def("rafaga")
-		var lead := float(d.get("rafaga_swing_lead", 0.36))
+		var lead := float(d.get("windup", 0.54))
 		tree.set("parameters/act/%s/ts/scale" % s, _clip_len(s) * CONTACT / maxf(lead, 0.1))
 	elif s == "heavy" and f.atk_state == Fighter.Atk.NONE:
 		# pose de carga: avanza el clip hasta ~60 % de la anticipación mientras se mantiene
@@ -1079,7 +1177,23 @@ func update(f: Fighter, delta: float) -> void:
 	var st := f.stats()
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)
 	var bp := Vector2(v.dot(f.facing.cross(Vector3.UP)), v.dot(f.facing))
-	tree.set("parameters/loco/blend_position", bp)
+	tree.set("parameters/loco/blend_position", loco_filter(bp, delta))
+	for nm: String in _loco_dyn:
+		var pt: Vector2 = LOCO_SPEEDS[nm][1]
+		tree.set("parameters/loco/%s/ts/scale" % nm, float(LOCO_SPEEDS[nm][2]) * clampf(_loco_bp.length() / pt.length(), 0.5, 1.1))
+
+## Filtro de la mezcla de locomoción (solo vista; la sim no lo ve). Zona muerta proporcional
+## en el eje menor (histéresis: un strafe con algo de avance no salta entre triángulos del
+## BlendSpace2D) y suavizado exponencial para que el ruido de la velocidad no haga temblar.
+func loco_filter(bp: Vector2, delta: float) -> Vector2:
+	var ax := absf(bp.x)
+	var ay := absf(bp.y)
+	if ax > ay:
+		bp.y = signf(bp.y) * maxf(ay - 0.15 * ax, 0.0)
+	else:
+		bp.x = signf(bp.x) * maxf(ax - 0.15 * ay, 0.0)
+	_loco_bp = _loco_bp.lerp(bp, clampf(delta * 14.0, 0.0, 1.0))
+	return _loco_bp
 
 # ---------------- Ronda 19: armadura visible ----------------
 ## Piezas sencillas (cajas/esferas teñidas con el color de la pieza) enganchadas a los huesos

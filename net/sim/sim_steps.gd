@@ -45,6 +45,9 @@ static func wrap(c: Dictionary, id: String) -> Dictionary:
 	c["imask"] = _mask(id)
 	c["graph"] = 0
 	c["evs"] = _events_of(id)
+	## global_cd_on_repeat=false (catálogo): repetir la misma habilidad se salta la recarga
+	## y una pulsación tras el disparo queda en cola para encadenar (ráfaga).
+	c["rep_free"] = 1 if int(catalog().get(id, {}).get("global_cd_on_repeat", 1)) == 0 else 0
 	return c
 
 static func _events_of(id: String) -> Array:

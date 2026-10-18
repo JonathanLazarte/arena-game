@@ -557,7 +557,7 @@ static func can_use(s: PackedInt64Array, P: Array, i: int, slot: int) -> bool:
 		var ph: Dictionary = P[i].get("ph2", {})
 		if not ph.is_empty() and s[o + FightSim.PH2] == 0:
 			return false
-	if not AdminMode.enabled and slot < 64 and s[o + FightSim.BCD_BASE + slot] > 0 and not (kind_of(ab) == T_RAFAGA and s[o + FightSim.AB_LAST] == int(ab["code"])):
+	if not AdminMode.enabled and slot < 64 and s[o + FightSim.BCD_BASE + slot] > 0 and not (int(ab.get("rep_free", 0)) != 0 and s[o + FightSim.AB_LAST] == int(ab["code"])):
 		return false
 	return _cost_ok(s, i, ab)
 
@@ -574,6 +574,11 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 			return true
 	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
 	var ab: Dictionary = boss[slot]
+	if int(ab.get("rep_free", 0)) != 0 and s[o + FightSim.AB_SLOT] == slot and s[o + FightSim.AB_T] >= int(ab.get("w", 0)) \
+			and kind_of(ab) == T_RAFAGA and s[o + FightSim.AB_FIRED] >= int(ab.get("count", 1)):
+		## ventana de encadenado: ya disparó → la próxima queda en cola y arranca al terminar
+		s[o + FightSim.AB_FL] |= FL_QUEUED
+		return true
 	if kind_of(ab) == T_COMBO and s[o + FightSim.AB_SLOT] == slot:
 		if s[o + FightSim.AB_FIRED] >= (ab["hits"] as Array).size():
 			return false
@@ -895,7 +900,15 @@ static func _rafaga(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> vo
 			ab["force"], -1, 0, ab["home_t"], ab["home"], ab["pitch"], true)
 		s[o + FightSim.AB_FIRED] += 1
 	if s[o + FightSim.AB_T] >= int(ab["end"]):
+		var slot: int = s[o + FightSim.AB_SLOT]
+		var chain := (s[o + FightSim.AB_FL] & FL_QUEUED) != 0
 		end_ability(s, o, false)
+		## encadenado (global_cd_on_repeat=false): la pulsación en cola arranca la siguiente ya
+		if chain and slot == s[o + FightSim.AB_SEL] and can_use(s, P, i, slot):
+			_pay(s, P, i, ab)
+			s[o + FightSim.AB_LAST] = ab["code"]
+			s[o + FightSim.AB_STARTS] += 1
+			_start(s, P, i, slot)
 
 static func _timeline(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 	var o := i * FightSim.F_FIELDS
