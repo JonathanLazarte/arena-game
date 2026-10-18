@@ -770,6 +770,8 @@ func load_loadout() -> void:
 			migrated_from = ver
 	if migrated_from > 0 and migrated_from < 3:
 		_migrate_mounts(old_mounts)
+	# Personajes que ya no existen en el catálogo (p. ej. eliminados): fuera de la lista
+	unlocked_chars = unlocked_chars.filter(func(id: Variant) -> bool: return Catalog.character(String(id)).id == String(id))
 	if first_run_done and unlocked_chars.is_empty():
 		_unlock_char(character_id)
 	if first_run_done and not character_id in unlocked_chars:
