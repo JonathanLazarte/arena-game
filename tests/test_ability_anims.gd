@@ -54,7 +54,7 @@ func _run() -> void:
 		if String(ev["id"]) == "ev_impacto":
 			ev_t = int(ev["tick"])
 	var seg_m: Dictionary = AbilityAnims.sample("golpe_fisura", 1, ev_t)["seg"]
-	check(ev_t == int(mz["windup_ticks"]) and absf(AbilityAnims.clip_time(seg_m, ev_t, 1.73) - 0.75) < 0.001, "Fisura: impacto del clip (0,75 s) en el tick %d = windup" % ev_t)
+	check(ev_t == int(mz["windup_ticks"]) and absf(AbilityAnims.clip_time(seg_m, ev_t, 1.63) - 0.85) < 0.001, "Fisura: impacto del clip (0,85 s) en el tick %d = windup" % ev_t)
 	# 2) vista: clips presentes y pose derivada del tick
 	var f := _fighter(["golpe_fisura", "voltereta_cuchilla"])
 	await process_frame
@@ -75,7 +75,7 @@ func _run() -> void:
 		var pos := float(kv.tree.get("parameters/act/%s/anim/current_position" % st)) if st in KnightVisual.AB_STATES else -1.0
 		seen.append(pos)
 	check(kv.state in KnightVisual.AB_STATES, "Fisura usa el estado de clip propio (%s)" % kv.state)
-	check(absf(seen[0] - 0.75) < 0.02, "tick 14 del martillazo → 0,75 s del clip (%.3f)" % seen[0])
+	check(absf(seen[0] - 0.85) < 0.02, "tick 14 del martillazo → 0,85 s del clip (%.3f)" % seen[0])
 	check(absf(seen[0] - seen[2]) < 0.001 and seen[1] > seen[0], "pose = f(tick): volver al tick 15 da la misma pose (%s)" % [seen])
 	f.ab_id = "voltereta_cuchilla"
 	f.ab_fired = 2
@@ -83,7 +83,13 @@ func _run() -> void:
 	kv.update(f, 1.0 / 60.0)
 	await physics_frame
 	var an: AnimationNodeAnimation = kv._ab_anim[kv.state]
-	check(String(an.animation).begins_with("abm/"), "Volteretas: el 2.º tajo es el espejado (%s)" % an.animation)
+	check(String(an.animation) == "1H_Melee_Attack_Slice_Horizontal_Reverse", "Volteretas: el 2.º tajo es el revés con la mano del arma, sin espejar (%s)" % an.animation)
+	# fin limpio: pasado el último tick el clip queda en su final (pose de guardia), sin salirse
+	f.ab_tick = 400
+	kv.update(f, 1.0 / 60.0)
+	await physics_frame
+	var L2 := kv.ap.get_animation("1H_Melee_Attack_Slice_Horizontal_Reverse").length
+	check(absf(float(kv._ab_smp.get("time", -1.0)) - L2) < 0.001, "Volteretas: más allá del final se sujeta en el último cuadro (%.3f / %.3f)" % [float(kv._ab_smp.get("time", -1.0)), L2])
 	# 3) sim: los pasos duran lo que dicen las claves
 	var b := _fighter(["estocada"])
 	await process_frame

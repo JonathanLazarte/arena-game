@@ -902,7 +902,8 @@ func update(f: Fighter, delta: float) -> void:
 	elif f.ab_id != "" and not _ability_sample(f).is_empty():
 		var smp := _ability_sample(f)
 		s = AB_STATES[int(smp["index"]) % 2]
-		upper = String((smp["seg"] as Dictionary).get("layer", "full")) == "upper"
+		# montado: solo el tren superior (las piernas siguen a horcajadas en la silla)
+		upper = f.mounted or String((smp["seg"] as Dictionary).get("layer", "full")) == "upper"
 		_ab_smp = smp
 	elif f.ab_id != "":
 		s = _ability_state(f)

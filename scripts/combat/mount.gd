@@ -95,6 +95,47 @@ func _build_model() -> void:
 	tree.active = true
 	tree.advance(0.0)
 	_last_pos = global_position
+	_measure_seat(sk)
+
+## Altura real del lomo (solo vista). El punto de silla de los datos no siempre coincidía con la
+## malla: con 1,3 m fijos el jinete quedaba hundido en el grifo (su lomo está a ~2,2 m) y, en
+## monturas cuyo hueso Torso sí anima el lomo, no seguía el galope. Se mide una vez en reposo la
+## cima de la malla bajo el punto de silla; la cadera queda SEAT_SINK por debajo (el cuerpo del
+## chibi apoya en el lomo). En voladoras se respeta saddle_offset (las alas en reposo tapan el lomo).
+var seat_fix: float = 0.0 ## corrección vertical del punto de silla (hueso + saddle_offset)
+var seat_top: float = -1.0 ## altura de la cadera sobre la raíz (lomo − SEAT_SINK); -1 = sin medir
+var _bone_seat := false ## el hueso Torso está en el lomo (no en el origen): la silla lo sigue
+
+func _measure_seat(sk: Skeleton3D) -> void:
+	var inv := global_transform.affine_inverse()
+	var base := SADDLE_FALLBACK
+	if sk and sk.find_bone(SADDLE_BONE) >= 0:
+		var bt := sk.global_transform * sk.get_bone_global_rest(sk.find_bone(SADDLE_BONE))
+		var bl := inv * bt.origin
+		_bone_seat = bl.y > 0.3
+		base = bl + data.saddle_offset if _bone_seat else Vector3(data.saddle_offset.x, SADDLE_FALLBACK.y, data.saddle_offset.z)
+	var top := -INF
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		var xf := inv * m.global_transform
+		for si in m.mesh.get_surface_count():
+			var arr := m.mesh.surface_get_arrays(si)
+			for v: Vector3 in arr[Mesh.ARRAY_VERTEX]:
+				var p := xf * v
+				if Vector2(p.x - base.x, p.z - base.z).length() < SEAT_R:
+					top = maxf(top, p.y)
+	if top > -INF and data.hover <= 0.0:
+		seat_top = top - SEAT_SINK
+		seat_fix = seat_top - base.y
+
+## ¿La silla sigue al hueso del lomo? (voladoras, y monturas de suelo con Torso en el lomo)
+func seat_follows_bone() -> bool:
+	return saddle != null and (is_flying() or _bone_seat)
+
+const SEAT_SINK := 0.15 ## la cadera del jinete queda esto por debajo de la cima del lomo
+const SEAT_R := 0.2 ## radio horizontal donde se busca la cima del lomo
 
 func _update_anim(delta: float) -> void:
 	var d := MeshUtil.flat(global_position - _last_pos).length() / maxf(delta, 0.001)
@@ -105,9 +146,13 @@ func _update_anim(delta: float) -> void:
 ## Punto de la silla en el mundo (lomo del caballo, con el balanceo de la animación).
 func saddle_position() -> Vector3:
 	if saddle and saddle.is_inside_tree():
-		return saddle.global_position + global_basis * data.saddle_offset
+		return saddle.global_position + global_basis * (data.saddle_offset + Vector3(0, seat_fix, 0))
 	# La raíz ya está a data.hover (SimWorld). No sumar el vuelo otra vez.
-	return global_transform * SADDLE_FALLBACK
+	return global_transform * (SADDLE_FALLBACK + Vector3(0, seat_fix, 0))
+
+## Altura de la silla sobre la raíz para monturas que no vuelan (lomo medido en la malla).
+func seat_height() -> float:
+	return seat_top if seat_top > 0.0 else SADDLE_FALLBACK.y
 
 func is_free() -> bool:
 	return rider == null
