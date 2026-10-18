@@ -72,6 +72,9 @@ const MX_LOCO := {"Walk_Strafe_L": "strafe_a", "Walk_Strafe_R": "strafe_b"}
 var idle_clip: String = "Idle"
 
 ## Estados que solo afectan al tren superior aunque se vaya a pie.
+const AB_STATES := ["ab0", "ab1"] ## habilidades de catálogo con clip propio (AbilityAnims)
+var _ab_anim: Dictionary = {}
+var _ab_smp: Dictionary = {} ## muestra del cuadro actual (clip, time, seg) ## estado → AnimationNodeAnimation (se le cambia el clip)
 const UPPER_STATES := ["block", "block_hit", "aim", "shoot", "swap", "reload"]
 
 var model: Node3D
@@ -198,7 +201,53 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 			var h := melee_w.combo_hit(i, cdef)
 			states["light%d" % i] = author_combo_clip(ap, h)
 	_apply_mixamo(melee_w)
+	_setup_ability_anims()
 	_build_tree()
+
+## Animación de habilidades de catálogo (AbilityAnims): bibliotecas con prefijo y espejos.
+func _setup_ability_anims() -> void:
+	if ap == null:
+		return
+	var libs: Dictionary = AbilityAnims.libraries()
+	for pre: String in libs:
+		if not ap.has_animation_library(StringName(pre)) and ResourceLoader.exists(String(libs[pre])):
+			var lib := load(String(libs[pre])) as AnimationLibrary
+			if lib:
+				ap.add_animation_library(StringName(pre), lib)
+	var mlib: AnimationLibrary = null
+	for id: String in AbilityAnims.all_ids():
+		for seg: Dictionary in AbilityAnims.segments(id):
+			var src := String(seg.get("clip", ""))
+			if not bool(seg.get("mirror", false)) or not ap.has_animation(src):
+				continue
+			if mlib == null:
+				if ap.has_animation_library(AbilityAnims.MIRROR_LIB):
+					mlib = ap.get_animation_library(AbilityAnims.MIRROR_LIB)
+				else:
+					mlib = AnimationLibrary.new()
+					ap.add_animation_library(AbilityAnims.MIRROR_LIB, mlib)
+			var nm := StringName(src.replace("/", "__"))
+			if not mlib.has_animation(nm):
+				mlib.add_animation(nm, _mirrored(ap.get_animation(src)))
+
+## Clip y tiempo de la habilidad actual según la sim (paso = ab_fired, tick = ab_tick - 1).
+## {} = sin animación propia (o clip ausente sin «fallback»): sigue la pose genérica.
+func _ability_sample(f: Fighter) -> Dictionary:
+	if f.ab_id == "" or not AbilityAnims.has(f.ab_id):
+		return {}
+	var smp := AbilityAnims.sample(f.ab_id, f.ab_fired, f.ab_tick - 1)
+	if smp.is_empty():
+		return {}
+	var seg: Dictionary = smp["seg"]
+	var clip := AbilityAnims.clip_name(seg)
+	if not ap.has_animation(clip):
+		clip = String(seg.get("fallback", ""))
+		if clip == "" or not ap.has_animation(clip):
+			return {}
+	var L := ap.get_animation(clip).length
+	smp["clip"] = clip
+	smp["time"] = clampf(AbilityAnims.clip_time(seg, float(f.ab_tick - 1), L), 0.0, L)
+	return smp
 
 ## Ronda 28: clips Mixamo reapuntados (biblioteca «mx») para las acciones donde encajan mejor.
 func _apply_mixamo(melee_w: WeaponDef) -> void:
@@ -537,6 +586,28 @@ func _build_tree() -> void:
 				var tr := AnimationNodeStateMachineTransition.new()
 				tr.xfade_time = 0.14 if "swap" in [a, b] else 0.08
 				act.add_transition(a, b, tr)
+	# Habilidades de catálogo (AbilityAnims): dos estados que se alternan por tramo para fundir.
+	# anim → seek (lo pide la vista cada cuadro) → ts a 0: la pose sale del tick de la sim.
+	for nm: String in AB_STATES:
+		var bt := AnimationNodeBlendTree.new()
+		bt.add_node("anim", AnimUtil.anim_node(states["none"]))
+		bt.add_node("seek", AnimationNodeTimeSeek.new())
+		bt.add_node("ts", AnimationNodeTimeScale.new())
+		bt.connect_node("seek", 0, "anim")
+		bt.connect_node("ts", 0, "seek")
+		bt.connect_node("output", 0, "ts")
+		act.add_node(nm, bt)
+		_ab_anim[nm] = bt.get_node("anim")
+	for a: String in AB_STATES:
+		for b: String in STATES.keys() + AB_STATES:
+			if a != b:
+				var t1 := AnimationNodeStateMachineTransition.new()
+				t1.xfade_time = 0.08
+				act.add_transition(a, b, t1)
+				if not b in AB_STATES:
+					var t2 := AnimationNodeStateMachineTransition.new()
+					t2.xfade_time = 0.08
+					act.add_transition(b, a, t2)
 	act.add_transition("Start", "none", AnimationNodeStateMachineTransition.new())
 	root.add_node("act", act)
 	mix = AnimationNodeBlend2.new()
@@ -828,6 +899,11 @@ func update(f: Fighter, delta: float) -> void:
 		s = "down"
 	elif f.is_getting_up() and not f.mounted:
 		s = "getup"
+	elif f.ab_id != "" and not _ability_sample(f).is_empty():
+		var smp := _ability_sample(f)
+		s = AB_STATES[int(smp["index"]) % 2]
+		upper = String((smp["seg"] as Dictionary).get("layer", "full")) == "upper"
+		_ab_smp = smp
 	elif f.ab_id != "":
 		s = _ability_state(f)
 	elif f.stun > 0.0 and f.atk_state == Fighter.Atk.NONE and not (oneshot == "hit" and oneshot_t > 0.0 and f.stun <= f.last_hitstun + 0.01):
@@ -887,6 +963,12 @@ func update(f: Fighter, delta: float) -> void:
 			Fighter.Atk.RECOVERY:
 				scd = Ld * maxf(1.0 - DS_CONTACT - 0.12, 0.05) / maxf(f.atk_dur, 0.05)
 		tree.set("parameters/act/dash_strike/ts/scale", scd)
+	elif s in AB_STATES:
+		var an: AnimationNodeAnimation = _ab_anim[s]
+		if an.animation != StringName(_ab_smp["clip"]):
+			an.animation = StringName(_ab_smp["clip"])
+		tree.set("parameters/act/%s/ts/scale" % s, 0.0)
+		tree.set("parameters/act/%s/seek/seek_request" % s, float(_ab_smp["time"]))
 	elif s == "down":
 		tree.set("parameters/act/down/ts/scale", _clip_len(s) / StunRules.DOWN_T)
 	elif s == "getup":

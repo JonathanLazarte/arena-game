@@ -111,6 +111,7 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 		f.boss_repeat_ready = sel >= 0 and sel < bl.size() and int((bl[sel] as Dictionary).get("rep_free", 0)) != 0 \
 			and s[o + S.AB_LAST] == int((bl[sel] as Dictionary).get("code", -1))
 	f.ab_t = s[o + S.AB_T] / hz
+	f.ab_tick = s[o + S.AB_T]
 	f.ab_air = s[o + S.AB_AIR] != 0
 	f.ab_locked = (s[o + S.AB_FL] & SimAbilities.FL_LOCKED) != 0
 	var abk: int = s[o + S.AB_SLOT]
