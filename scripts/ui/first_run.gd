@@ -19,7 +19,7 @@ var accept_button: Button
 
 func _ready() -> void:
 	gs = get_node("/root/GameState")
-	chars = Catalog.characters()
+	chars.assign(Catalog.characters().filter(func(c: CharacterDef) -> bool: return not c.id.begins_with("test_"))) # rama test-models: se reclutan en el lobby
 	stage = ShowcaseStage.new()
 	stage.cam_x = -0.2
 	add_child(stage)

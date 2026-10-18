@@ -24,7 +24,7 @@ func _run() -> void:
 	check(not Catalog.weapon("espada_larga").allows_shield and Catalog.weapon("lanza").allows_shield, "escudo: lanza sí, espada larga no (el escudo de «espada y escudo» va en la mano izquierda)")
 	for c in cs:
 		check(c.display_name != "" and c.role != "" and c.description != "" and c.passive_name != "", "%s: nombre, rol, descripción y pasiva" % c.id)
-		check(c.allows(c.default_weapon) and ResourceLoader.exists(c.model_path) and ResourceLoader.exists(c.texture_path), "%s: arma por defecto compatible y modelo existe" % c.id)
+		check(c.allows(c.default_weapon) and ResourceLoader.exists(c.model_path) and (ResourceLoader.exists(c.texture_path) or c.texture_path == "" and c.retarget_lib != ""), "%s: arma por defecto compatible y modelo existe" % c.id)
 		for wid: String in c.weapons:
 			check(ids.has(wid), "%s: arma %s existe" % [c.id, wid])
 		check(Catalog.weapons_for(c).size() == c.weapons.size(), "%s: filtro de armas por rol" % c.id)
