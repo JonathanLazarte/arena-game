@@ -220,6 +220,9 @@ func _apply_mixamo(melee_w: WeaponDef) -> void:
 		if ap.has_animation(MX + String(MX_LOCO[k])):
 			_loco_clips[k] = MX + String(MX_LOCO[k])
 var _loco_clips: Dictionary = {}
+var _loco_pts: Array = [] ## puntos con TimeScale presentes en el BlendSpace2D "loco"
+var _loco_dyn: Array = [] ## de esos, los que escalan su velocidad con |blend_position|
+var _loco_bp := Vector2.ZERO ## blend_position suavizada (solo vista)
 
 const RETARGET_BONE_MAP := {
 	"hips": "Hip", "spine": "Spine", "chest": "Chest", "neck": "Neck", "head": "Head",
@@ -498,15 +501,22 @@ func _build_tree() -> void:
 	var loco := AnimationNodeBlendSpace2D.new()
 	loco.add_blend_point(AnimUtil.anim_node(idle_clip), Vector2(0, 0), -1, &"Idle")
 	loco.add_blend_point(AnimUtil.anim_node("Walking_A"), Vector2(0, 0.45), -1, &"Walking_A")
-	loco.add_blend_point(AnimUtil.anim_node("Running_A"), Vector2(0, 1.0), -1, &"Running_A")
-	loco.add_blend_point(AnimUtil.anim_node("Walking_Backwards"), Vector2(0, -0.45), -1, &"Walking_Backwards")
-	loco.add_blend_point(AnimUtil.anim_node("Running_Strafe_Left"), Vector2(-1, 0), -1, &"Running_Strafe_Left")
-	loco.add_blend_point(AnimUtil.anim_node("Running_Strafe_Right"), Vector2(1, 0), -1, &"Running_Strafe_Right")
 	# Ronda 15: locomoción direccional para correr fijado (souls). KayKit no trae carrera hacia
 	# atrás ni strafe caminando: se reutilizan clips acelerados/ralentizados (ver LOCO_SPEEDS).
+	# Cada clip aparece UNA sola vez en el espacio: dos copias del mismo clip a distinta velocidad
+	# se desfasan y la mezcla parece reiniciarse cada pocos pasos (bug del strafe corriendo).
+	# A la velocidad intermedia la escala del clip sigue al módulo de la velocidad (_loco_dyn).
+	_loco_pts.clear()
+	_loco_dyn.clear()
 	for nm: String in LOCO_SPEEDS:
 		var lc: String = _loco_clips.get(nm, LOCO_SPEEDS[nm][0])
+		if nm.begins_with("Walk_Strafe") and not _loco_clips.has(nm):
+			continue # sin strafe caminando propio: lo cubre el de carrera, más lento
+		if nm == "Run_Back" or (nm.begins_with("Run_Strafe") and not _loco_clips.has(nm.replace("Run_", "Walk_"))):
+			_loco_dyn.append(nm)
+		_loco_pts.append(nm)
 		loco.add_blend_point(AnimUtil.scaled_anim(lc), LOCO_SPEEDS[nm][1], -1, StringName(nm))
+	loco.sync = true # los clips sin peso siguen avanzando: al volver no retoman una fase vieja
 	loco.min_space = Vector2(-1.4, -1.4)
 	loco.max_space = Vector2(1.4, 1.4)
 	root.add_node("loco", loco)
@@ -552,7 +562,7 @@ func _build_tree() -> void:
 	tree.anim_player = tree.get_path_to(ap)
 	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	tree.active = true
-	for nm: String in LOCO_SPEEDS:
+	for nm: String in _loco_pts:
 		# los strafes Mixamo andan a ~1,2 m/s: velocidad 1 al caminar
 		tree.set("parameters/loco/%s/ts/scale" % nm, 1.0 if _loco_clips.has(nm) else LOCO_SPEEDS[nm][2])
 	playback = tree.get("parameters/act/playback") as AnimationNodeStateMachinePlayback
@@ -983,7 +993,23 @@ func update(f: Fighter, delta: float) -> void:
 	var st := f.stats()
 	var v := MeshUtil.flat(f.planar_vel) / maxf(st.speed, 0.1)
 	var bp := Vector2(v.dot(f.facing.cross(Vector3.UP)), v.dot(f.facing))
-	tree.set("parameters/loco/blend_position", bp)
+	tree.set("parameters/loco/blend_position", loco_filter(bp, delta))
+	for nm: String in _loco_dyn:
+		var pt: Vector2 = LOCO_SPEEDS[nm][1]
+		tree.set("parameters/loco/%s/ts/scale" % nm, float(LOCO_SPEEDS[nm][2]) * clampf(_loco_bp.length() / pt.length(), 0.5, 1.1))
+
+## Filtro de la mezcla de locomoción (solo vista; la sim no lo ve). Zona muerta proporcional
+## en el eje menor (histéresis: un strafe con algo de avance no salta entre triángulos del
+## BlendSpace2D) y suavizado exponencial para que el ruido de la velocidad no haga temblar.
+func loco_filter(bp: Vector2, delta: float) -> Vector2:
+	var ax := absf(bp.x)
+	var ay := absf(bp.y)
+	if ax > ay:
+		bp.y = signf(bp.y) * maxf(ay - 0.15 * ax, 0.0)
+	else:
+		bp.x = signf(bp.x) * maxf(ax - 0.15 * ay, 0.0)
+	_loco_bp = _loco_bp.lerp(bp, clampf(delta * 14.0, 0.0, 1.0))
+	return _loco_bp
 
 # ---------------- Ronda 19: armadura visible ----------------
 ## Piezas sencillas (cajas/esferas teñidas con el color de la pieza) enganchadas a los huesos
