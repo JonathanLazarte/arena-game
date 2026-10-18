@@ -36,6 +36,7 @@ var _pr: Array = [] ## Dictionary por ranura: root, slash, orb, core, trail, r
 ## Para pruebas: lo que se ha disparado (bursts, trails) por luchador.
 var bursts: Array[int] = [0, 0]
 var trails: Array[int] = [0, 0]
+var _swing: Array[int] = [-1, -1]
 
 func _init(a: Fighter, b: Fighter, p: Node3D) -> void:
 	fighters = [a, b]
@@ -76,6 +77,7 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 	if slot != _act[i] or t < _act_t[i]:
 		_act[i] = slot
 		_fired[i] = 0
+		_swing[i] = -1
 		_countered[i] = false
 		if _vanished[i]:
 			_set_vanished(f, i, false, id)
@@ -128,6 +130,16 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 		elif fam == A.T_BREATH:
 			_burst(f, i, ab_color(id))
 			_cone_t[i] = 20
+	if typ == A.T_CATALOG and slot >= 0 and f._kv:
+		var steps: Array = ab.get("steps", [])
+		var si: int = s[o + S.AB_FIRED]
+		if si >= 0 and si < steps.size():
+			var wu := int(steps[si].get("w", 0))
+			var ts := t - 1
+			if wu > 0 and ts >= wu and _swing[i] < wu:
+				f._kv.flash_sword_trail(ab_color(id))
+				trails[i] += 1
+			_swing[i] = ts
 	_fired[i] = fired if slot >= 0 else 0
 	_breath_cone(s, ab, f, i)
 	# --- contragolpe: destello azul al activarse ---
@@ -375,8 +387,9 @@ func _hazards(s: PackedInt64Array, P: Array) -> void:
 		fill.visible = aoe
 		edge.visible = aoe
 		column.visible = aoe and _pillar(id) and not done
-		line.visible = not aoe and t < warn
-		crest.visible = not aoe and t >= warn
+		var still := not aoe and s[q + S.HZ_SPD] == 0
+		line.visible = (not aoe and t < warn) or still
+		crest.visible = not aoe and t >= warn and not still
 		if aoe:
 			root.rotation = Vector3.ZERO
 			var r := maxf(s[q + S.HZ_R] / 1.0e6, 0.2)
@@ -415,7 +428,9 @@ func _hazards(s: PackedInt64Array, P: Array) -> void:
 			if line.visible:
 				line.scale = Vector3(w, 1, rng)
 				line.position = Vector3(0, 0.05, -rng * 0.5)
-				(line.material_override as StandardMaterial3D).albedo_color.a = lerpf(0.2, 0.65, float(t) / warn)
+				var lm: StandardMaterial3D = line.material_override
+				lm.albedo_color = c
+				lm.albedo_color.a = 0.9 if still and t >= warn else lerpf(0.2, 0.65, float(t) / warn)
 			if crest.visible:
 				crest.scale = Vector3(w, 1, 1)
 				crest.position = Vector3(0, 0.45, 0)

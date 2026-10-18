@@ -36,7 +36,7 @@
       "steps": [
         {
           "id": "tajo_1",
-          "windup_ticks": 16,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 4,
           "telegraph": {
@@ -50,13 +50,13 @@
           },
           "tracking": {
             "deg_per_sec": 260,
-            "lock_at_tick": 8,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 10,
-            "to_tick": 24,
+            "to_tick": 41,
             "speed_mps": 8,
             "max_distance_m": 1.8,
             "target_mode": "facing",
@@ -86,7 +86,7 @@
           "events": [
             {
               "id": "ev_t1",
-              "tick": 16,
+              "tick": 33,
               "vfx": "vfx_trail_silver",
               "sfx": "sfx_swing_fast"
             }
@@ -94,18 +94,18 @@
         },
         {
           "id": "tajo_2",
-          "windup_ticks": 8,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 4,
           "tracking": {
             "deg_per_sec": 200,
-            "lock_at_tick": 2,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 4,
-            "to_tick": 16,
+            "to_tick": 41,
             "speed_mps": 7,
             "max_distance_m": 1.4,
             "target_mode": "facing",
@@ -135,7 +135,7 @@
           "events": [
             {
               "id": "ev_t2",
-              "tick": 8,
+              "tick": 33,
               "vfx": "vfx_trail_silver",
               "sfx": "sfx_swing_fast"
             }
@@ -143,12 +143,12 @@
         },
         {
           "id": "tajo_3",
-          "windup_ticks": 10,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 12,
           "tracking": {
             "deg_per_sec": 180,
-            "lock_at_tick": 4,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "hitboxes": [
@@ -170,8 +170,8 @@
             }
           ],
           "branch": {
-            "window_from_tick": 12,
-            "window_to_tick": 26,
+            "window_from_tick": 35,
+            "window_to_tick": 49,
             "time_base": "step",
             "only_on": "any",
             "buffer_ticks": 6,
@@ -196,7 +196,7 @@
           "events": [
             {
               "id": "ev_t3",
-              "tick": 10,
+              "tick": 33,
               "vfx": "vfx_trail_silver",
               "sfx": "sfx_swing_fast"
             }
@@ -204,7 +204,7 @@
         },
         {
           "id": "estocada_final",
-          "windup_ticks": 18,
+          "windup_ticks": 33,
           "active_ticks": 3,
           "recovery_ticks": 36,
           "telegraph": {
@@ -219,20 +219,20 @@
                 "width_m": 1.2
               },
               "anchor": "self",
-              "fill_ticks": 18
+              "fill_ticks": 33
             },
             "at_tick": 0,
             "text": "Se agacha y la punta de la hoja apunta a vos."
           },
           "tracking": {
             "deg_per_sec": 220,
-            "lock_at_tick": 10,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 12,
-            "to_tick": 21,
+            "to_tick": 36,
             "speed_mps": 18,
             "max_distance_m": 5.0,
             "target_mode": "facing",
@@ -262,7 +262,7 @@
         },
         {
           "id": "patada_final",
-          "windup_ticks": 14,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 30,
           "telegraph": {
@@ -277,14 +277,14 @@
                 "width_m": 1.6
               },
               "anchor": "self",
-              "fill_ticks": 14
+              "fill_ticks": 33
             },
             "at_tick": 0,
             "text": "Levanta la pierna con la hoja baja."
           },
           "tracking": {
             "deg_per_sec": 200,
-            "lock_at_tick": 6,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "hitboxes": [
@@ -415,25 +415,25 @@
         },
         {
           "id": "giro_1",
-          "windup_ticks": 10,
+          "windup_ticks": 33,
           "active_ticks": 5,
           "recovery_ticks": 2,
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 17,
+            "to_tick": 40,
             "poise_bonus_pct": 60,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 180,
-            "lock_at_tick": 4,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 6,
-            "to_tick": 17,
+            "to_tick": 40,
             "speed_mps": 8,
             "max_distance_m": 2.0,
             "target_mode": "facing",
@@ -463,7 +463,7 @@
           "events": [
             {
               "id": "ev_g1",
-              "tick": 10,
+              "tick": 33,
               "vfx": "vfx_trail_gold",
               "sfx": "sfx_swing_spin"
             }
@@ -471,25 +471,25 @@
         },
         {
           "id": "giro_2",
-          "windup_ticks": 8,
+          "windup_ticks": 33,
           "active_ticks": 5,
           "recovery_ticks": 2,
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 15,
+            "to_tick": 40,
             "poise_bonus_pct": 60,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 180,
-            "lock_at_tick": 2,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 4,
-            "to_tick": 15,
+            "to_tick": 40,
             "speed_mps": 8,
             "max_distance_m": 1.6,
             "target_mode": "facing",
@@ -519,7 +519,7 @@
           "events": [
             {
               "id": "ev_g2",
-              "tick": 8,
+              "tick": 33,
               "vfx": "vfx_trail_gold",
               "sfx": "sfx_swing_spin"
             }
@@ -527,25 +527,25 @@
         },
         {
           "id": "giro_3",
-          "windup_ticks": 8,
+          "windup_ticks": 33,
           "active_ticks": 5,
           "recovery_ticks": 2,
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 15,
+            "to_tick": 40,
             "poise_bonus_pct": 60,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 180,
-            "lock_at_tick": 2,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 4,
-            "to_tick": 15,
+            "to_tick": 40,
             "speed_mps": 8,
             "max_distance_m": 1.6,
             "target_mode": "facing",
@@ -575,7 +575,7 @@
           "events": [
             {
               "id": "ev_g3",
-              "tick": 8,
+              "tick": 33,
               "vfx": "vfx_trail_gold",
               "sfx": "sfx_swing_spin"
             }
@@ -607,7 +607,7 @@
         },
         {
           "id": "caida_tajo",
-          "windup_ticks": 18,
+          "windup_ticks": 48,
           "active_ticks": 4,
           "recovery_ticks": 42,
           "telegraph": {
@@ -621,20 +621,20 @@
                 "radius_m": 3.2
               },
               "anchor": "lock_point",
-              "fill_ticks": 18
+              "fill_ticks": 48
             },
             "at_tick": 0,
             "text": "Anillo dorado en el suelo: la caída final."
           },
           "tracking": {
             "deg_per_sec": 0,
-            "lock_at_tick": 0,
+            "lock_at_tick": 24,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "slam",
             "from_tick": 0,
-            "to_tick": 18,
+            "to_tick": 48,
             "target_mode": "lock_point",
             "max_distance_m": 3
           },
@@ -669,7 +669,7 @@
           "events": [
             {
               "id": "ev_golpe",
-              "tick": 18,
+              "tick": 48,
               "vfx": "vfx_crack_ring",
               "sfx": "sfx_slam",
               "camera_shake": 2
@@ -765,7 +765,7 @@
         },
         {
           "id": "clavada",
-          "windup_ticks": 14,
+          "windup_ticks": 48,
           "active_ticks": 4,
           "recovery_ticks": 40,
           "telegraph": {
@@ -779,20 +779,20 @@
                 "radius_m": 3.4
               },
               "anchor": "lock_point",
-              "fill_ticks": 14
+              "fill_ticks": 48
             },
             "at_tick": 0,
             "text": "Anillo violeta bajo el objetivo."
           },
           "tracking": {
             "deg_per_sec": 0,
-            "lock_at_tick": 0,
+            "lock_at_tick": 24,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "slam",
             "from_tick": 0,
-            "to_tick": 14,
+            "to_tick": 48,
             "target_mode": "lock_point",
             "max_distance_m": 4
           },
@@ -827,7 +827,7 @@
           "events": [
             {
               "id": "ev_clavada",
-              "tick": 14,
+              "tick": 48,
               "vfx": "vfx_crack_ring",
               "sfx": "sfx_slam",
               "camera_shake": 2

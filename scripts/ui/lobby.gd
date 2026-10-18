@@ -6,6 +6,7 @@ extends Node3D
 ## Ronda 14: sin pestaña Monturas (los eikons son las monturas).
 ## Ronda 19: pestaña Tienda (las compras se hacen aquí; las demás solo equipan lo que tienes).
 ## Ronda 20: pestañas Herrero y Ajustes; cada panel tiene «✕» (y Esc / Atrás) para cerrarlo.
+const ExtraCatalog = preload("res://scripts/data/extra_catalog.gd")
 const TABS := ["Personaje", "Eikons", "Habilidades", "Jefe", "Herrero", "Tienda", "Reclutar", "Ajustes"]
 const TAB_GROUPS := [
 	{"title": "EQUIPO", "tabs": ["Personaje", "Eikons"]},
@@ -1214,9 +1215,32 @@ func _build_settings() -> void:
 func _build_boss() -> void:
 	var eq: Array = gs.boss_abilities()
 	list_box.add_child(UIKit.label("Equipadas %d/%d · B usa · N cambia" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.MUTED))
+	_boss_presets()
 	_boss_group("De jefe", "boss", eq)
 	_boss_group("De arma", "weapon", eq)
 	detail.text = "[b]Habilidades[/b]\nLas de jefe y las de arma van aparte. Cuestan aguante, maná (Energía) o vida (nunca te dejan a 0). Recarga global de 1,4 s entre habilidades.\n\n" + BossAbilities.codex(String(eq[0]))
+
+func _boss_presets() -> void:
+	var shown := false
+	for row: Dictionary in ExtraCatalog.preset_rows():
+		var ids: Array = row.get("abilities", [])
+		if ids.size() != BossAbilities.MAX_EQUIPPED:
+			continue
+		if not shown:
+			list_box.add_child(UIKit.label("Sets", 14, UIKit.YELLOW))
+			shown = true
+		var pname := String(row.get("name", ""))
+		var pid := String(row.get("id", ""))
+		var loadout: Array = ids.duplicate()
+		var b := UIKit.button(pname, 16, UIKit.BLUE)
+		b.name = "Preset_" + pid
+		b.pressed.connect(func() -> void:
+			if not gs.set_boss_loadout(loadout):
+				return
+			gs.save_loadout()
+			_refresh_all(false)
+			detail.text = "[b]%s[/b]\n%s" % [pname, BossAbilities.codex(String(loadout[0]))])
+		list_box.add_child(b)
 
 func _boss_group(title: String, origin: String, eq: Array) -> void:
 	var ids: Array = BossAbilities.ids_of(origin)

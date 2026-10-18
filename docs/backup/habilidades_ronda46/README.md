@@ -9,5 +9,5 @@ Godot registraría el respaldo en lugar de los scripts vivos.
 - `scripts/data/boss_abilities.gd` (6 base)
 - `scripts/combat/boss_abilities_ext.gd` (39 ampliadas)
 
-Las habilidades nuevas (Hoja Escarlata) viven en `docs/hoja_escarlata_catalog.json`
+Las habilidades nuevas (Hoja Escarlata) viven en `data/abilities/hoja_escarlata_catalog.json`
 y se ejecutan aparte (`AbilityCatalog` / `SimCatalog`). Estas 45 no se reescribieron.

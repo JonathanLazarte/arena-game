@@ -145,7 +145,7 @@ func _ready() -> void:
 	admin_toggle_btn = Button.new()
 	admin_toggle_btn.name = "AdminToggle"
 	admin_toggle_btn.text = "⚙ Admin: OFF"
-	admin_toggle_btn.tooltip_text = "Modo Admin [F1]: Vida/Aguante/Maná infinitos, rival inmortal, 58 habilidades"
+	admin_toggle_btn.tooltip_text = "Modo Admin [F1]: Vida/Aguante/Maná infinitos, rival inmortal, %d habilidades" % BossAbilities.all_ids().size()
 	admin_toggle_btn.focus_mode = Control.FOCUS_NONE
 	admin_toggle_btn.custom_minimum_size = Vector2(130, 32)
 	admin_toggle_btn.position = Vector2(575, 82)
@@ -277,7 +277,7 @@ func _update_admin_ui() -> void:
 		admin_toggle_btn.modulate = Color(1.0, 0.85, 0.2) if AdminMode.enabled else Color(1, 1, 1, 0.65)
 	if boss_list_btn:
 		boss_list_btn.visible = not (_player and _player.mounted) and (AdminMode.enabled or (_player != null and _player.avail_boss_ids().size() > 3))
-	show_message("MODO ADMIN: ACTIVADO (Vida/Aguante/Maná infinitos · Rival inmortal · 58 habilidades)" if AdminMode.enabled else "MODO ADMIN: DESACTIVADO", 2.2)
+	show_message("MODO ADMIN: ACTIVADO (Vida/Aguante/Maná infinitos · Rival inmortal · %d habilidades)" % BossAbilities.all_ids().size() if AdminMode.enabled else "MODO ADMIN: DESACTIVADO", 2.2)
 
 func toggle_ability_picker() -> void:
 	if ability_picker_panel == null:
@@ -973,7 +973,7 @@ func _build_pause_menu() -> void:
 	pause_settings.add_child(inv)
 	var admin_chk := CheckBox.new()
 	admin_chk.name = "PauseAdminToggle"
-	admin_chk.text = "Modo Admin (F1: Infinito / Rival Inmortal / 58 Habilidades)"
+	admin_chk.text = "Modo Admin (F1: Infinito / Rival Inmortal / %d Habilidades)" % BossAbilities.all_ids().size()
 	admin_chk.button_pressed = AdminMode.enabled
 	admin_chk.toggled.connect(func(on: bool) -> void:
 		AdminMode.enabled = on

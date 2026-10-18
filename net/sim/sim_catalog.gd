@@ -15,11 +15,14 @@ const INT_PARRY := 8
 const BLEED_BUILD := 25000 ## por debajo del umbral: no estalla en un solo golpe
 const CD_MASK := 65535
 const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
+const ExtraCatalog = preload("res://scripts/data/extra_catalog.gd")
 
 static func compile(f: Fighter, id: String) -> Dictionary:
 	var a := HojaCatalog.ability(id)
 	if a.is_empty() and EldenCatalog.has(id):
 		a = EldenCatalog.ability(id)
+	if a.is_empty() and ExtraCatalog.has(id):
+		a = ExtraCatalog.ability(id)
 	if a.is_empty():
 		return {}
 	var w := f.melee()
@@ -112,15 +115,18 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 	var mode := 0
 	if mv is Dictionary:
 		mv_k = int(mv.get("type", 0))
-		if mv_k > 3:
+		if mv_k != 1 and mv_k != 2 and mv_k != 3 and mv_k != 6:
 			mv_k = 0
 		mv0 = int(mv.get("from", 0))
 		mv1 = int(mv.get("to", 0))
 		spd = int(mv.get("speed", 0))
-		maxd = int(mv.get("max", 0))
+		maxd = SimAbilities.reach_up(int(mv.get("max", 0)))
 		stop = int(mv.get("stop", 0))
 		height = int(mv.get("height", 0))
 		mode = 1 if int(mv.get("target", 0)) == 2 else 0
+	var imp := 0
+	if mv is Dictionary:
+		imp = int(mv.get("imp", 0))
 	var hb: Dictionary = {}
 	var boxes: Array = src.get("hitboxes", [])
 	if not boxes.is_empty() and boxes[0] is Dictionary:
@@ -149,6 +155,9 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 			hb_k = 3
 			hbr = int(shape.get("len", 0))
 			hbw = int(shape.get("w", 0))
+	if int(hb.get("ground_only", 0)) == 0:
+		hbr = SimAbilities.reach_up(hbr)
+		hbw = SimAbilities.reach_up(hbw)
 	var armor: Variant = src.get("armor", null)
 	var arm_k := 0
 	var af := 0
@@ -186,10 +195,18 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 	if nx is Dictionary:
 		nxt = int(nx.get("default", -1))
 	var spawn: Dictionary = {}
+	var marks: Array = []
+	var waves: Array = []
 	for sp: Variant in src.get("spawns", []):
-		if sp is Dictionary and int((sp as Dictionary).get("type", -1)) == 3:
+		if not (sp is Dictionary):
+			continue
+		var sk: int = int((sp as Dictionary).get("type", -1))
+		if sk == 3 and spawn.is_empty():
 			spawn = sp
-			break
+		elif sk == 0:
+			marks.append(sp)
+		elif sk == 1:
+			waves.append(sp)
 	var sp_shape: Dictionary = spawn.get("shape", {}) if spawn.get("shape") is Dictionary else {}
 	var delay := int(spawn.get("delay", 0))
 	var every := maxi(int(spawn.get("every", 30)), 1)
@@ -203,13 +220,18 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 	var st: Variant = hb.get("status", null)
 	var bleed := 1 if st is Dictionary and int((st as Dictionary).get("type", -1)) == 0 else 0
 	var sp_st: Variant = spawn.get("status", null)
+	var evs: Array = []
+	for ev: Variant in src.get("events", []):
+		if ev is Dictionary:
+			var e: Dictionary = ev
+			evs.append({"id": String(e.get("id", "")), "tick": int(e.get("tick", 0)), "shake": int(e.get("shake", 0))})
 	return {
 		"w": int(src.get("windup", 0)), "a": int(src.get("active", 0)), "r": int(src.get("recovery", 0)),
 		"dur": int(src.get("total", 0)),
 		"trk": _headings(int(tr.get("turn", 0))),
 		"trk2": _headings(int(tr.get("post", 0))),
-		"lock": int(tr.get("lock", 0)),
-		"mv": mv_k, "mv0": mv0, "mv1": mv1, "spd": spd, "maxd": maxd, "stop": stop, "height": height, "mode": mode,
+		"lock": SimAbilities.pursue_lock(int(tr.get("lock", 0)), int(src.get("windup", 0))),
+		"mv": mv_k, "mv0": mv0, "mv1": mv1, "spd": spd, "maxd": maxd, "stop": stop, "height": height, "mode": mode, "imp": imp,
 		"hb": hb_k, "hbr": hbr, "hbw": hbw, "hbcos": hbcos,
 		"hbf": int(hb.get("from", 0)), "hbt": int(hb.get("to", 0)),
 		"off": int(hb.get("fwd", 0)),
@@ -233,6 +255,9 @@ static func _step(src: Dictionary, dm: float, magia: float, phys_f: float, sd: f
 		"spraw": _scaled(int(spawn.get("dmg", 0)), 0, dm, magia),
 		"spdelay": delay,
 		"spbleed": 1 if sp_st is Dictionary and int((sp_st as Dictionary).get("type", -1)) == 0 else 0,
+		"marks": _marks(marks, dm, magia),
+		"waves": _waves(waves, dm, magia),
+		"evs": evs,
 	}
 
 # ---------------- consulta (con P, durante el golpe) ----------------
@@ -404,6 +429,8 @@ static func tick(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 	_vert(s, o, step, t)
 	_hit(s, P, i, step, t)
 	_spawn(s, P, i, step, t)
+	_spawn_marks(s, P, i, step, t)
+	_spawn_waves(s, P, i, step, t)
 
 static func _advance(s: PackedInt64Array, P: Array, i: int, step: Dictionary, steps: Array) -> void:
 	var o := i * FightSim.F_FIELDS
@@ -459,7 +486,10 @@ static func _horiz(s: PackedInt64Array, i: int, step: Dictionary, t: int) -> voi
 		return
 	var dx: int
 	var dz: int
-	if int(step["mode"]) == 1 or mv == 3:
+	if mv == 6:
+		dx = s[o + FightSim.X] - s[b + FightSim.X]
+		dz = s[o + FightSim.Z] - s[b + FightSim.Z]
+	elif int(step["mode"]) == 1 or mv == 3:
 		dx = s[o + FightSim.AB_X] - s[o + FightSim.X]
 		dz = s[o + FightSim.AB_Z] - s[o + FightSim.Z]
 	else:
@@ -467,10 +497,12 @@ static func _horiz(s: PackedInt64Array, i: int, step: Dictionary, t: int) -> voi
 		dz = s[b + FightSim.Z] - s[o + FightSim.Z]
 	var dist := FxMath.length(dx, dz)
 	var stop: int = int(step["stop"])
-	if mv != 3 and stop > 0 and dist <= stop:
+	if mv != 3 and mv != 6 and stop > 0 and dist <= stop:
 		return
 	var f: int = s[o + FightSim.FACE]
-	if (int(step["mode"]) == 1 or mv == 3) and dist > 100000:
+	if mv == 6 and dist > 100000:
+		f = FxMath.dir_of(dx, dz, f)
+	elif (int(step["mode"]) == 1 or mv == 3) and dist > 100000:
 		f = FxMath.dir_of(dx, dz, f)
 		s[o + FightSim.FACE] = f
 	var spd: int
@@ -492,6 +524,15 @@ static func _horiz(s: PackedInt64Array, i: int, step: Dictionary, t: int) -> voi
 	s[o + FightSim.AB_VZ] = FxMath.SIN[f] * spd / FxMath.ONE
 	s[o + FightSim.AB_TICK] += spd
 
+## Impulso vertical. La gravedad del tick hace el arco; height_m solo fija la fuerza.
+static func _impulse(s: PackedInt64Array, o: int, h: int) -> void:
+	if h <= 0:
+		return
+	s[o + FightSim.AIR] = 1
+	s[o + FightSim.AIR_T] = 0
+	s[o + FightSim.FY] = 0
+	s[o + FightSim.FVY] = FxMath.isqrt(2 * FightSim.GRAVITY_T * h)
+
 static func _set_fy(s: PackedInt64Array, o: int, h: int) -> void:
 	if s[o + FightSim.AIR] == 0:
 		s[o + FightSim.AIR] = 1
@@ -509,6 +550,10 @@ static func _vert(s: PackedInt64Array, o: int, step: Dictionary, t: int) -> void
 		return
 	var u: int = t - int(step["mv0"])
 	if mv == 2:
+		if int(step.get("imp", 0)) != 0:
+			if u == 0:
+				_impulse(s, o, int(step["height"]))
+			return
 		var h: int = int(step["height"]) * (2 * u + 1) * (2 * n - 2 * u - 1) / (n * n)
 		_set_fy(s, o, h)
 		return
@@ -605,6 +650,98 @@ static func _spawn(s: PackedInt64Array, P: Array, i: int, step: Dictionary, t: i
 		if int(step["spbleed"]) != 0:
 			var q := FightSim.HZ_BASE + j * FightSim.HZ_FIELDS
 			s[q + FightSim.HZ_KIND] = 1
+
+static func _marks(src: Array, dm: float, magia: float) -> Array:
+	var out: Array = []
+	for sp: Variant in src:
+		if not (sp is Dictionary):
+			continue
+		var m: Dictionary = sp
+		var shape: Dictionary = m.get("shape", {}) if m.get("shape") is Dictionary else {}
+		var rad := int(shape.get("r", 0))
+		if rad <= 0:
+			rad = int(shape.get("outer", 0))
+		if rad <= 0:
+			rad = maxi(int(shape.get("len", 0)), int(shape.get("w", 0))) / 2
+		out.append({
+			"at": int(m.get("at", -1)),
+			"fwd": int(m.get("fwd", 0)),
+			"right": int(m.get("right", 0)),
+			"warn": int(m.get("warn", 30)),
+			"r": rad,
+			"raw": _scaled(int(m.get("dmg", 0)), 0, dm, magia),
+			"force": _stun(int(m.get("stun", 0)), 0, 0.0, 1.0, 0.0),
+			"knock": int(m.get("knock", 0)),
+		})
+	return out
+
+static func _waves(src: Array, dm: float, magia: float) -> Array:
+	var out: Array = []
+	for sp: Variant in src:
+		if not (sp is Dictionary):
+			continue
+		var w: Dictionary = sp
+		var spd := int(w.get("speed", 0))
+		var rng := int(w.get("range", 0))
+		var wid := int(w.get("width", 0))
+		if spd != 0:
+			rng = SimAbilities.reach_up(rng)
+			wid = SimAbilities.reach_up(wid)
+		out.append({
+			"at": int(w.get("at", -1)),
+			"fwd": int(w.get("fwd", 0)),
+			"right": int(w.get("right", 0)),
+			"warn": int(w.get("warn", 0)),
+			"spd": spd,
+			"range": rng,
+			"width": wid,
+			"raw": _scaled(int(w.get("dmg", 0)), 0, dm, magia),
+			"force": _stun(int(w.get("stun", 0)), 0, 0.0, 1.0, 0.0),
+			"knock": int(w.get("knock", 0)),
+		})
+	return out
+
+## Onda o línea quieta (ground_wave). speed 0 no viaja: la franja espera y pega entera.
+static func _spawn_waves(s: PackedInt64Array, P: Array, i: int, step: Dictionary, t: int) -> void:
+	var waves: Variant = step.get("waves", [])
+	if not (waves is Array) or (waves as Array).is_empty():
+		return
+	var o := i * FightSim.F_FIELDS
+	var f: int = s[o + FightSim.FACE]
+	var fx: int = FxMath.COS[f]
+	var fz: int = FxMath.SIN[f]
+	for sp: Variant in waves:
+		if not (sp is Dictionary):
+			continue
+		var w: Dictionary = sp
+		if t != int(w["at"]) or int(w["range"]) <= 0:
+			continue
+		var fwd := int(w["fwd"])
+		var right := int(w["right"])
+		var x: int = s[o + FightSim.X] + fx * fwd / FxMath.ONE + fz * right / FxMath.ONE
+		var z: int = s[o + FightSim.Z] + fz * fwd / FxMath.ONE - fx * right / FxMath.ONE
+		SimAbilities.spawn_hz(s, i, 2, x, z, int(w["warn"]), 0, SimAbilities.raw_live(s, P, i, int(w["raw"])), int(w["force"]), int(w["knock"]), 0, f, int(w["spd"]), int(w["range"]), int(w["width"]))
+
+## Marcas de suelo (ground_mark). La piscina es circular: una línea usa el mayor entre largo y ancho.
+static func _spawn_marks(s: PackedInt64Array, P: Array, i: int, step: Dictionary, t: int) -> void:
+	var marks: Variant = step.get("marks", [])
+	if not (marks is Array) or (marks as Array).is_empty():
+		return
+	var o := i * FightSim.F_FIELDS
+	var f: int = s[o + FightSim.FACE]
+	var fx: int = FxMath.COS[f]
+	var fz: int = FxMath.SIN[f]
+	for sp: Variant in marks:
+		if not (sp is Dictionary):
+			continue
+		var m: Dictionary = sp
+		if t != int(m["at"]) or int(m["r"]) <= 0:
+			continue
+		var fwd := int(m["fwd"])
+		var right := int(m["right"])
+		var x: int = s[o + FightSim.X] + fx * fwd / FxMath.ONE + fz * right / FxMath.ONE
+		var z: int = s[o + FightSim.Z] + fz * fwd / FxMath.ONE - fx * right / FxMath.ONE
+		SimAbilities.spawn_hz(s, i, 1, x, z, int(m["warn"]), int(m["r"]), SimAbilities.raw_live(s, P, i, int(m["raw"])), int(m["force"]), int(m["knock"]), 0)
 
 ## La marca de suelo del catálogo acumula sangrado al conectar. La piscina no guarda un DoT.
 static func on_zone_hit(s: PackedInt64Array, P: Array, owner: int) -> void:

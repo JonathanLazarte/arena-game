@@ -7,19 +7,39 @@
       "name": "Martillo del Alba",
       "icon": "generic",
       "category": "melee",
-      "tags": ["delayed", "multi_hit"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 30, "mana": 0, "health": 0 },
+      "tags": [
+        "delayed",
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 30,
+        "mana": 0,
+        "health": 0
+      },
       "cooldown_ticks": 480,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl2", "knockdown", "parry"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
       "interrupt_priority": 0,
-      "on_interrupt": { "recovery_ticks": 16, "cancel_spawns": true, "cooldown": "full", "refund_pct": 0 },
+      "on_interrupt": {
+        "recovery_ticks": 16,
+        "cancel_spawns": true,
+        "cooldown": "full",
+        "refund_pct": 0
+      },
       "steps": [
         {
           "id": "apertura",
-          "windup_ticks": 28,
+          "windup_ticks": 33,
           "active_ticks": 6,
           "recovery_ticks": 18,
           "telegraph": {
@@ -31,33 +51,61 @@
             "at_tick": 0,
             "text": "Alza el martillo irradiando luz dorada."
           },
-          "tracking": { "deg_per_sec": 240, "lock_at_tick": 20, "post_lock_deg_per_sec": 0 },
-          "movement": { "type": "dash", "from_tick": 22, "to_tick": 30, "speed_mps": 6.0, "max_distance_m": 1.8, "target_mode": "facing", "stop_at_m": 1.0 },
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 22,
+            "to_tick": 35,
+            "speed_mps": 6.0,
+            "max_distance_m": 1.8,
+            "target_mode": "facing",
+            "stop_at_m": 1.0
+          },
           "hitboxes": [
             {
               "id": "hb_apertura",
-              "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 110 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 110
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 18,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": true,
-              "stun_power": 22, "stun_scaling": "physical",
-              "on_hit": { "knockback": { "speed_mps": 4, "duration_ticks": 6 } }
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 22,
+              "stun_scaling": "physical",
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 4,
+                  "duration_ticks": 6
+                }
+              }
             }
           ],
           "cancel_into": {
-            "window_from_tick": 34,
-            "window_to_tick": 50,
-            "steps": ["segundo_golpe"],
+            "window_from_tick": 39,
+            "window_to_tick": 55,
+            "steps": [
+              "segundo_golpe"
+            ],
             "only_on": "any",
             "trigger": "auto"
           },
-          "next": { "default": "segundo_golpe" }
+          "next": {
+            "default": "segundo_golpe"
+          }
         },
         {
           "id": "segundo_golpe",
-          "windup_ticks": 32,
+          "windup_ticks": 33,
           "active_ticks": 6,
           "recovery_ticks": 40,
           "telegraph": {
@@ -69,57 +117,104 @@
             "at_tick": 0,
             "text": "Gira sobre su eje acumulando fuerza sagrada."
           },
-          "tracking": { "deg_per_sec": 200, "lock_at_tick": 24, "post_lock_deg_per_sec": 0 },
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_segundo",
-              "shape": { "type": "arc", "radius_m": 3.0, "angle_deg": 130 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.0,
+                "angle_deg": 130
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 22,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": true,
-              "stun_power": 28, "stun_scaling": "physical"
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 28,
+              "stun_scaling": "physical"
             }
           ],
           "branch": {
-            "window_from_tick": 32,
-            "window_to_tick": 70,
+            "window_from_tick": 33,
+            "window_to_tick": 71,
             "time_base": "step",
             "only_on": "any",
             "buffer_ticks": 6,
             "commit": "window_end",
             "options": [
-              { "input": "skill", "step": "remate_estallido" },
-              { "input": "alt", "step": "remate_barrido", "hud_icon": "generic", "label": "Barrido", "extra_cost": { "stamina": 10 } }
+              {
+                "input": "skill",
+                "step": "remate_estallido"
+              },
+              {
+                "input": "alt",
+                "step": "remate_barrido",
+                "hud_icon": "generic",
+                "label": "Barrido",
+                "extra_cost": {
+                  "stamina": 10
+                }
+              }
             ],
             "default_if_no_input": "end"
           },
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "remate_estallido",
-          "windup_ticks": 36,
+          "windup_ticks": 45,
           "active_ticks": 6,
           "recovery_ticks": 48,
-          "extra_cost": { "stamina": 8 },
+          "extra_cost": {
+            "stamina": 8
+          },
           "telegraph": {
             "id": "tg_alba_estallido",
             "style": "ground_ring",
             "color": "#FAD02C",
             "sound": "sfx_tele_slam_holy",
-            "ground_marker": { "shape": { "type": "circle", "radius_m": 3.8 }, "anchor": "self", "fill_ticks": 36 },
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.8
+              },
+              "anchor": "self",
+              "fill_ticks": 45
+            },
             "at_tick": 0,
             "text": "Alza el martillo a dos manos y marca un círculo dorado en el suelo."
           },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 42, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
-          "tracking": { "deg_per_sec": 90, "lock_at_tick": 20, "post_lock_deg_per_sec": 0 },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 51,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 90,
+            "lock_at_tick": 21,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_estallido",
-              "shape": { "type": "circle", "radius_m": 3.8 },
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.8
+              },
               "ground_only": false,
-              "from_tick": 0, "to_tick": 6,
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 28,
               "damage_type": "sagrado",
               "damage_scaling": "weapon_heavy",
@@ -127,28 +222,35 @@
               "parryable": false,
               "stun_power": 45,
               "stun_scaling": "physical",
-              "on_hit": { "knockdown": true }
+              "on_hit": {
+                "knockdown": true
+              }
             }
           ],
           "spawns": [
             {
               "id": "sp_grieta",
               "type": "ground_mark",
-              "at_tick": 42,
+              "at_tick": 51,
               "anchor": "self",
               "count": 1,
-              "shape": { "type": "circle", "radius_m": 4.5 },
-              "warn_ticks": 30,
+              "shape": {
+                "type": "circle",
+                "radius_m": 4.5
+              },
+              "warn_ticks": 45,
               "damage": 20,
               "stun_power": 35,
               "blockable": true
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "remate_barrido",
-          "windup_ticks": 22,
+          "windup_ticks": 33,
           "active_ticks": 6,
           "recovery_ticks": 40,
           "telegraph": {
@@ -160,30 +262,52 @@
             "at_tick": 0,
             "text": "Barrido bajo a toda velocidad con destello horizontal."
           },
-          "tracking": { "deg_per_sec": 300, "lock_at_tick": 18, "post_lock_deg_per_sec": 0 },
+          "tracking": {
+            "deg_per_sec": 300,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_barrido",
-              "shape": { "type": "arc", "radius_m": 3.4, "angle_deg": 160 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "arc",
+                "radius_m": 3.4,
+                "angle_deg": 160
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 24,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
               "blockable": true,
               "parryable": true,
               "stun_power": 30,
-              "on_hit": { "knockback": { "speed_mps": 9, "duration_ticks": 10 } }
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 9,
+                  "duration_ticks": 10
+                }
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
       "ai": {
         "range_min": 1.5,
         "range_max": 4.5,
         "weight": 12,
-        "use_when": ["target_in_range", "target_blocking"],
-        "branch_weights": { "remate_estallido": 60, "remate_barrido": 40 }
+        "use_when": [
+          "target_in_range",
+          "target_blocking"
+        ],
+        "branch_weights": {
+          "remate_estallido": 60,
+          "remate_barrido": 40
+        }
       },
       "hint": {
         "dodge": "roll_late",
@@ -196,17 +320,33 @@
       "name": "Lanza del Veredicto",
       "icon": "generic",
       "category": "ranged",
-      "tags": ["projectile", "delayed"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 0, "mana": 25, "health": 0 },
+      "tags": [
+        "projectile",
+        "delayed"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 0,
+        "mana": 25,
+        "health": 0
+      },
       "cooldown_ticks": 420,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl1", "stun_lvl2", "knockdown", "parry"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl1",
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
       "steps": [
         {
           "id": "lanzamiento",
-          "windup_ticks": 30,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 34,
           "telegraph": {
@@ -214,47 +354,88 @@
             "style": "weapon_flash",
             "color": "#E5A93C",
             "sound": "sfx_tele_holy_spear",
-            "ground_marker": { "shape": { "type": "circle", "radius_m": 3.2 }, "anchor": "lock_point", "fill_ticks": 30 },
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.2
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 33
+            },
             "at_tick": 0,
             "text": "Condensa un relámpago sagrado y apunta hacia la posición del rival."
           },
-          "tracking": { "deg_per_sec": 260, "lock_at_tick": 22, "post_lock_deg_per_sec": 0 },
+          "tracking": {
+            "deg_per_sec": 260,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
           "spawns": [
             {
               "id": "sp_lanza_suelo",
               "type": "ground_mark",
-              "at_tick": 30,
+              "at_tick": 33,
               "anchor": "lock_point",
               "count": 1,
-              "shape": { "type": "circle", "radius_m": 3.2 },
-              "warn_ticks": 30,
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.2
+              },
+              "warn_ticks": 33,
               "damage": 26,
               "stun_power": 36,
               "blockable": true
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
-      "ai": { "range_min": 5.0, "range_max": 14.0, "weight": 10, "use_when": ["target_far"] },
-      "hint": { "dodge": "roll_early", "direction": "side", "text": "Salí del área marcada antes de que la lanza detone." }
+      "ai": {
+        "range_min": 5.0,
+        "range_max": 14.0,
+        "weight": 10,
+        "use_when": [
+          "target_far"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_early",
+        "direction": "side",
+        "text": "Salí del área marcada antes de que la lanza detone."
+      }
     },
     {
       "id": "triptico_sagrado",
       "name": "Tríptico Sagrado",
       "icon": "generic",
       "category": "melee",
-      "tags": ["unblockable", "delayed", "aoe"],
-      "unlock": { "phase": 2 },
-      "cost": { "stamina": 40, "mana": 20, "health": 0 },
+      "tags": [
+        "unblockable",
+        "delayed",
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 2
+      },
+      "cost": {
+        "stamina": 40,
+        "mana": 20,
+        "health": 0
+      },
       "cooldown_ticks": 720,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["knockdown"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "knockdown"
+      ],
       "steps": [
         {
           "id": "salto_1",
-          "windup_ticks": 26,
+          "windup_ticks": 60,
           "active_ticks": 6,
           "recovery_ticks": 10,
           "telegraph": {
@@ -266,26 +447,45 @@
             "at_tick": 0,
             "text": "Se eleva en el aire mientras su martillo emite pulsaciones doradas."
           },
-          "movement": { "type": "leap", "from_tick": 4, "to_tick": 26, "height_m": 2.2, "target_mode": "target", "max_distance_m": 4.5, "stop_at_m": 1.0 },
-          "tracking": { "deg_per_sec": 180, "lock_at_tick": 18, "post_lock_deg_per_sec": 0 },
+          "movement": {
+            "type": "leap",
+            "from_tick": 4,
+            "to_tick": 60,
+            "height_m": 2.2,
+            "target_mode": "target",
+            "max_distance_m": 4.5,
+            "stop_at_m": 1.0
+          },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 36,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_trip_1",
-              "shape": { "type": "circle", "radius_m": 3.0 },
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.0
+              },
               "ground_only": true,
-              "from_tick": 0, "to_tick": 6,
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 16,
               "damage_type": "sagrado",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": false,
+              "blockable": true,
+              "parryable": false,
               "stun_power": 20
             }
           ],
-          "next": { "default": "salto_2" }
+          "next": {
+            "default": "salto_2"
+          }
         },
         {
           "id": "salto_2",
-          "windup_ticks": 28,
+          "windup_ticks": 60,
           "active_ticks": 6,
           "recovery_ticks": 12,
           "telegraph": {
@@ -297,26 +497,45 @@
             "at_tick": 0,
             "text": "Vuelve a impulsarse en un arco más amplio."
           },
-          "movement": { "type": "leap", "from_tick": 4, "to_tick": 28, "height_m": 2.5, "target_mode": "target", "max_distance_m": 5.0, "stop_at_m": 1.0 },
-          "tracking": { "deg_per_sec": 180, "lock_at_tick": 20, "post_lock_deg_per_sec": 0 },
+          "movement": {
+            "type": "leap",
+            "from_tick": 4,
+            "to_tick": 60,
+            "height_m": 2.5,
+            "target_mode": "target",
+            "max_distance_m": 5.0,
+            "stop_at_m": 1.0
+          },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 36,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_trip_2",
-              "shape": { "type": "circle", "radius_m": 3.5 },
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.5
+              },
               "ground_only": true,
-              "from_tick": 0, "to_tick": 6,
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 20,
               "damage_type": "sagrado",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": false,
+              "blockable": true,
+              "parryable": false,
               "stun_power": 25
             }
           ],
-          "next": { "default": "salto_final" }
+          "next": {
+            "default": "salto_final"
+          }
         },
         {
           "id": "salto_final",
-          "windup_ticks": 44,
+          "windup_ticks": 48,
           "active_ticks": 8,
           "recovery_ticks": 56,
           "telegraph": {
@@ -324,48 +543,112 @@
             "style": "ground_ring",
             "color": "#FFAA00",
             "sound": "sfx_tele_triptico_final",
-            "ground_marker": { "shape": { "type": "circle", "radius_m": 5.0 }, "anchor": "lock_point", "fill_ticks": 40 },
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 5.0
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 40
+            },
             "at_tick": 0,
             "text": "Permanece suspendido en lo alto y cubre el suelo de un inmenso sello áureo."
           },
-          "armor": { "type": "hyper", "from_tick": 0, "to_tick": 50, "poise_bonus_pct": 200, "dmg_reduction_pct": 20 },
-          "movement": { "type": "slam", "from_tick": 24, "to_tick": 44, "target_mode": "lock_point", "max_distance_m": 6.0, "stop_at_m": 0.5 },
-          "tracking": { "deg_per_sec": 120, "lock_at_tick": 24, "post_lock_deg_per_sec": 0 },
+          "armor": {
+            "type": "hyper",
+            "from_tick": 0,
+            "to_tick": 54,
+            "poise_bonus_pct": 200,
+            "dmg_reduction_pct": 20
+          },
+          "movement": {
+            "type": "slam",
+            "from_tick": 24,
+            "to_tick": 48,
+            "target_mode": "lock_point",
+            "max_distance_m": 6.0,
+            "stop_at_m": 0.5
+          },
+          "tracking": {
+            "deg_per_sec": 120,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_trip_final",
-              "shape": { "type": "circle", "radius_m": 5.0 },
+              "shape": {
+                "type": "circle",
+                "radius_m": 5.0
+              },
               "ground_only": false,
-              "from_tick": 0, "to_tick": 8,
+              "from_tick": 0,
+              "to_tick": 8,
               "damage_per_hit": 34,
               "damage_type": "sagrado",
               "damage_scaling": "weapon_heavy",
               "blockable": false,
               "parryable": false,
               "stun_power": 55,
-              "on_hit": { "knockdown": true }
+              "on_hit": {
+                "knockdown": true
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
-      "ai": { "range_min": 3.0, "range_max": 8.0, "weight": 14, "use_when": ["self_phase2", "target_in_range"] },
-      "hint": { "dodge": "roll_late", "direction": "back", "text": "Saltá los dos primeros impactos y rodá en el último cuando caiga desde lo alto." }
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 8.0,
+        "weight": 14,
+        "use_when": [
+          "self_phase2",
+          "target_in_range"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "back",
+        "text": "Saltá los dos primeros impactos y rodá en el último cuando caiga desde lo alto."
+      }
     },
     {
       "id": "danza_espirales",
       "name": "Danza de Espirales",
       "icon": "generic",
       "category": "melee",
-      "tags": ["aerial", "multi_hit"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 34, "mana": 0, "health": 0 },
+      "tags": [
+        "aerial",
+        "multi_hit"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 34,
+        "mana": 0,
+        "health": 0
+      },
       "cooldown_ticks": 540,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl2", "knockdown", "parry"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
       "interrupt_priority": 0,
-      "on_interrupt": { "recovery_ticks": 14, "cancel_spawns": true, "cooldown": "full", "refund_pct": 0 },
+      "on_interrupt": {
+        "recovery_ticks": 14,
+        "cancel_spawns": true,
+        "cooldown": "full",
+        "refund_pct": 0
+      },
       "steps": [
         {
           "id": "elevacion",
@@ -381,13 +664,28 @@
             "at_tick": 0,
             "text": "Se suspende en el aire envuelta en un aura escarlata antes de desatar la danza."
           },
-          "tracking": { "deg_per_sec": 360, "lock_at_tick": 24, "post_lock_deg_per_sec": 60 },
-          "movement": { "type": "leap", "from_tick": 20, "to_tick": 26, "height_m": 2.8, "speed_mps": 8, "max_distance_m": 4.0, "target_mode": "target", "stop_at_m": 1.2 },
-          "next": { "default": "primera_rafaga" }
+          "tracking": {
+            "deg_per_sec": 360,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 60
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 20,
+            "to_tick": 26,
+            "height_m": 2.8,
+            "speed_mps": 8,
+            "max_distance_m": 4.0,
+            "target_mode": "target",
+            "stop_at_m": 1.2
+          },
+          "next": {
+            "default": "primera_rafaga"
+          }
         },
         {
           "id": "primera_rafaga",
-          "windup_ticks": 10,
+          "windup_ticks": 60,
           "active_ticks": 14,
           "recovery_ticks": 18,
           "telegraph": {
@@ -399,63 +697,130 @@
             "at_tick": 0,
             "text": "Tornado de cortes en espiral descendente."
           },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 24, "poise_bonus_pct": 60, "dmg_reduction_pct": 0 },
-          "tracking": { "deg_per_sec": 200, "lock_at_tick": 8, "post_lock_deg_per_sec": 0 },
-          "movement": { "type": "leap", "from_tick": 0, "to_tick": 24, "height_m": 2.2, "speed_mps": 6, "max_distance_m": 2.5, "target_mode": "facing" },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 74,
+            "poise_bonus_pct": 60,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 36,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "leap",
+            "from_tick": 0,
+            "to_tick": 74,
+            "height_m": 2.2,
+            "speed_mps": 6,
+            "max_distance_m": 2.5,
+            "target_mode": "facing"
+          },
           "hitboxes": [
             {
               "id": "hb_esp_1",
-              "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 160 },
-              "from_tick": 0, "to_tick": 14,
-              "hits": 3, "hit_interval_ticks": 4,
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 160
+              },
+              "from_tick": 0,
+              "to_tick": 14,
+              "hits": 3,
+              "hit_interval_ticks": 4,
               "damage_per_hit": 6,
               "damage_type": "physical",
               "damage_scaling": "weapon_light",
-              "blockable": true, "parryable": true,
-              "stun_power": 8, "stun_scaling": "physical"
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 8,
+              "stun_scaling": "physical"
             }
           ],
           "branch": {
-            "window_from_tick": 18,
-            "window_to_tick": 32,
+            "window_from_tick": 68,
+            "window_to_tick": 82,
             "time_base": "step",
             "only_on": "any",
             "buffer_ticks": 6,
             "commit": "window_end",
             "options": [
-              { "input": "skill", "step": "segunda_rafaga" },
-              { "input": "alt", "step": "corte_evasivo", "hud_icon": "generic", "label": "Repliegue", "extra_cost": { "stamina": 8 } }
+              {
+                "input": "skill",
+                "step": "segunda_rafaga"
+              },
+              {
+                "input": "alt",
+                "step": "corte_evasivo",
+                "hud_icon": "generic",
+                "label": "Repliegue",
+                "extra_cost": {
+                  "stamina": 8
+                }
+              }
             ],
             "default_if_no_input": "end"
           },
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "segunda_rafaga",
-          "windup_ticks": 8,
+          "windup_ticks": 33,
           "active_ticks": 14,
           "recovery_ticks": 6,
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 22, "poise_bonus_pct": 60, "dmg_reduction_pct": 0 },
-          "tracking": { "deg_per_sec": 240, "lock_at_tick": 8, "post_lock_deg_per_sec": 0 },
-          "movement": { "type": "dash", "from_tick": 0, "to_tick": 22, "speed_mps": 8, "max_distance_m": 3.0, "target_mode": "target", "stop_at_m": 0.8 },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 47,
+            "poise_bonus_pct": 60,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 0,
+            "to_tick": 47,
+            "speed_mps": 8,
+            "max_distance_m": 3.0,
+            "target_mode": "target",
+            "stop_at_m": 0.8
+          },
           "hitboxes": [
             {
               "id": "hb_esp_2",
-              "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 160 },
-              "from_tick": 0, "to_tick": 14,
-              "hits": 3, "hit_interval_ticks": 4,
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.8,
+                "angle_deg": 160
+              },
+              "from_tick": 0,
+              "to_tick": 14,
+              "hits": 3,
+              "hit_interval_ticks": 4,
               "damage_per_hit": 7,
               "damage_type": "physical",
               "damage_scaling": "weapon_light",
-              "blockable": true, "parryable": true,
-              "stun_power": 10, "stun_scaling": "physical"
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 10,
+              "stun_scaling": "physical"
             }
           ],
-          "next": { "default": "caida_espiral" }
+          "next": {
+            "default": "caida_espiral"
+          }
         },
         {
           "id": "caida_espiral",
-          "windup_ticks": 14,
+          "windup_ticks": 48,
           "active_ticks": 6,
           "recovery_ticks": 44,
           "telegraph": {
@@ -463,29 +828,55 @@
             "style": "ground_ring",
             "color": "#FF3333",
             "sound": "sfx_tele_espiral_fin",
-            "ground_marker": { "shape": { "type": "circle", "radius_m": 3.2 }, "anchor": "lock_point", "fill_ticks": 14 },
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.2
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 48
+            },
             "at_tick": 0,
             "text": "Aterriza con un tajo esférico cortante."
           },
-          "movement": { "type": "slam", "from_tick": 0, "to_tick": 14, "target_mode": "lock_point", "max_distance_m": 2.5 },
+          "movement": {
+            "type": "slam",
+            "from_tick": 0,
+            "to_tick": 48,
+            "target_mode": "lock_point",
+            "max_distance_m": 2.5
+          },
           "hitboxes": [
             {
               "id": "hb_esp_fin",
-              "shape": { "type": "circle", "radius_m": 3.2 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.2
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 18,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": false,
-              "stun_power": 32, "stun_scaling": "physical",
-              "on_hit": { "knockback": { "speed_mps": 6, "duration_ticks": 8 } }
+              "blockable": true,
+              "parryable": false,
+              "stun_power": 32,
+              "stun_scaling": "physical",
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 6,
+                  "duration_ticks": 8
+                }
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "corte_evasivo",
-          "windup_ticks": 6,
+          "windup_ticks": 33,
           "active_ticks": 6,
           "recovery_ticks": 36,
           "telegraph": {
@@ -497,29 +888,54 @@
             "at_tick": 0,
             "text": "Tajo rasante al suelo mientras salta hacia atrás."
           },
-          "movement": { "type": "retreat", "from_tick": 2, "to_tick": 20, "speed_mps": 10, "max_distance_m": 3.6, "target_mode": "away_from_target" },
+          "movement": {
+            "type": "retreat",
+            "from_tick": 2,
+            "to_tick": 47,
+            "speed_mps": 10,
+            "max_distance_m": 3.6,
+            "target_mode": "away_from_target"
+          },
           "hitboxes": [
             {
               "id": "hb_esp_evasivo",
-              "shape": { "type": "arc", "radius_m": 2.6, "angle_deg": 120 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "arc",
+                "radius_m": 2.6,
+                "angle_deg": 120
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 14,
               "damage_type": "physical",
               "damage_scaling": "weapon_light",
-              "blockable": true, "parryable": true,
+              "blockable": true,
+              "parryable": true,
               "stun_power": 16,
-              "on_hit": { "knockback": { "speed_mps": 5, "duration_ticks": 6 } }
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 5,
+                  "duration_ticks": 6
+                }
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
       "ai": {
         "range_min": 2.5,
         "range_max": 6.5,
         "weight": 12,
-        "use_when": ["target_in_range"],
-        "branch_weights": { "segunda_rafaga": 65, "corte_evasivo": 35 }
+        "use_when": [
+          "target_in_range"
+        ],
+        "branch_weights": {
+          "segunda_rafaga": 65,
+          "corte_evasivo": 35
+        }
       },
       "hint": {
         "dodge": "roll_late",
@@ -532,13 +948,28 @@
       "name": "Estocada Penetrante",
       "icon": "generic",
       "category": "melee",
-      "tags": ["unblockable", "delayed", "tracking"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 26, "mana": 0, "health": 0 },
+      "tags": [
+        "unblockable",
+        "delayed",
+        "tracking"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 26,
+        "mana": 0,
+        "health": 0
+      },
       "cooldown_ticks": 420,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl2", "knockdown"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown"
+      ],
       "steps": [
         {
           "id": "arremetida",
@@ -554,41 +985,98 @@
             "at_tick": 0,
             "text": "Adopta postura baja con la espada apuntando al frente; destello agudo antes de arremeter."
           },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 54, "poise_bonus_pct": 50, "dmg_reduction_pct": 0 },
-          "tracking": { "deg_per_sec": 240, "lock_at_tick": 38, "post_lock_deg_per_sec": 0 },
-          "movement": { "type": "dash", "from_tick": 44, "to_tick": 54, "speed_mps": 20, "max_distance_m": 5.5, "target_mode": "facing", "stop_at_m": 0.8 },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 54,
+            "poise_bonus_pct": 50,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 240,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 44,
+            "to_tick": 54,
+            "speed_mps": 20,
+            "max_distance_m": 5.5,
+            "target_mode": "facing",
+            "stop_at_m": 0.8
+          },
           "hitboxes": [
             {
               "id": "hb_penetrante",
-              "shape": { "type": "line", "length_m": 3.2, "width_m": 1.2 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "line",
+                "length_m": 3.2,
+                "width_m": 1.2
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 32,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
               "blockable": false,
               "parryable": false,
-              "stun_power": 38, "stun_scaling": "physical",
-              "on_hit": { "knockback": { "speed_mps": 6, "duration_ticks": 8 } }
+              "stun_power": 38,
+              "stun_scaling": "physical",
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 6,
+                  "duration_ticks": 8
+                }
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
-      "ai": { "range_min": 3.0, "range_max": 7.0, "weight": 11, "use_when": ["target_in_range", "target_blocking"] },
-      "hint": { "dodge": "roll_late", "direction": "side", "text": "No ruedes al inicio del amague: esperá el destello en la hoja y rodá hacia un costado." }
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 7.0,
+        "weight": 11,
+        "use_when": [
+          "target_in_range",
+          "target_blocking"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "No ruedes al inicio del amague: esperá el destello en la hoja y rodá hacia un costado."
+      }
     },
     {
       "id": "floracion_purpurea",
       "name": "Floración Purpúrea",
       "icon": "generic",
       "category": "melee",
-      "tags": ["unblockable", "delayed", "aoe"],
-      "unlock": { "phase": 2 },
-      "cost": { "stamina": 20, "mana": 30, "health": 0 },
+      "tags": [
+        "unblockable",
+        "delayed",
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 2
+      },
+      "cost": {
+        "stamina": 20,
+        "mana": 30,
+        "health": 0
+      },
       "cooldown_ticks": 780,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["knockdown"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "knockdown"
+      ],
       "steps": [
         {
           "id": "ascenso_flor",
@@ -604,13 +1092,28 @@
             "at_tick": 0,
             "text": "Se eleva lentamente floreciendo alas carmesí."
           },
-          "movement": { "type": "leap", "from_tick": 10, "to_tick": 30, "height_m": 3.8, "speed_mps": 8, "max_distance_m": 4.5, "target_mode": "target", "stop_at_m": 1.0 },
-          "tracking": { "deg_per_sec": 180, "lock_at_tick": 24, "post_lock_deg_per_sec": 0 },
-          "next": { "default": "impacto_flor" }
+          "movement": {
+            "type": "leap",
+            "from_tick": 10,
+            "to_tick": 30,
+            "height_m": 3.8,
+            "speed_mps": 8,
+            "max_distance_m": 4.5,
+            "target_mode": "target",
+            "stop_at_m": 1.0
+          },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 24,
+            "post_lock_deg_per_sec": 0
+          },
+          "next": {
+            "default": "impacto_flor"
+          }
         },
         {
           "id": "impacto_flor",
-          "windup_ticks": 30,
+          "windup_ticks": 48,
           "active_ticks": 6,
           "recovery_ticks": 50,
           "telegraph": {
@@ -618,17 +1121,41 @@
             "style": "ground_ring",
             "color": "#D12B85",
             "sound": "sfx_tele_flower_burst",
-            "ground_marker": { "shape": { "type": "circle", "radius_m": 4.2 }, "anchor": "lock_point", "fill_ticks": 30 },
+            "ground_marker": {
+              "shape": {
+                "type": "circle",
+                "radius_m": 4.2
+              },
+              "anchor": "lock_point",
+              "fill_ticks": 48
+            },
             "at_tick": 0,
             "text": "Cae en picado y despliega una flor escarlata que estalla en el suelo."
           },
-          "armor": { "type": "hyper", "from_tick": 0, "to_tick": 36, "poise_bonus_pct": 200, "dmg_reduction_pct": 25 },
-          "movement": { "type": "slam", "from_tick": 0, "to_tick": 30, "target_mode": "lock_point", "max_distance_m": 5.0, "stop_at_m": 0.5 },
+          "armor": {
+            "type": "hyper",
+            "from_tick": 0,
+            "to_tick": 54,
+            "poise_bonus_pct": 200,
+            "dmg_reduction_pct": 25
+          },
+          "movement": {
+            "type": "slam",
+            "from_tick": 0,
+            "to_tick": 48,
+            "target_mode": "lock_point",
+            "max_distance_m": 5.0,
+            "stop_at_m": 0.5
+          },
           "hitboxes": [
             {
               "id": "hb_flor_golpe",
-              "shape": { "type": "circle", "radius_m": 4.2 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "circle",
+                "radius_m": 4.2
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 34,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
@@ -647,30 +1174,64 @@
               }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
-      "ai": { "range_min": 3.0, "range_max": 8.5, "weight": 14, "use_when": ["self_phase2", "target_in_range"] },
-      "hint": { "dodge": "roll_late", "direction": "back", "text": "Al verla flotar prepará la voltereta hacia atrás para quedar fuera del radio de la flor." }
+      "ai": {
+        "range_min": 3.0,
+        "range_max": 8.5,
+        "weight": 14,
+        "use_when": [
+          "self_phase2",
+          "target_in_range"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "back",
+        "text": "Al verla flotar prepará la voltereta hacia atrás para quedar fuera del radio de la flor."
+      }
     },
     {
       "id": "pisoton_telurico",
       "name": "Pisotón Telúrico",
       "icon": "generic",
       "category": "melee",
-      "tags": ["delayed", "aoe"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 30, "mana": 0, "health": 0 },
+      "tags": [
+        "delayed",
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 30,
+        "mana": 0,
+        "health": 0
+      },
       "cooldown_ticks": 480,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl2", "knockdown", "parry"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown",
+        "parry"
+      ],
       "interrupt_priority": 0,
-      "on_interrupt": { "recovery_ticks": 16, "cancel_spawns": true, "cooldown": "full", "refund_pct": 0 },
+      "on_interrupt": {
+        "recovery_ticks": 16,
+        "cancel_spawns": true,
+        "cooldown": "full",
+        "refund_pct": 0
+      },
       "steps": [
         {
           "id": "pisoton",
-          "windup_ticks": 24,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 24,
           "telegraph": {
@@ -682,17 +1243,26 @@
             "at_tick": 0,
             "text": "Alza el talón con un crujido de piedras antes de pisar con fuerza."
           },
-          "tracking": { "deg_per_sec": 180, "lock_at_tick": 18, "post_lock_deg_per_sec": 0 },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_pisoton_cuerpo",
-              "shape": { "type": "circle", "radius_m": 2.2 },
+              "shape": {
+                "type": "circle",
+                "radius_m": 2.2
+              },
               "ground_only": true,
-              "from_tick": 0, "to_tick": 4,
+              "from_tick": 0,
+              "to_tick": 4,
               "damage_per_hit": 16,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": false,
+              "blockable": true,
+              "parryable": false,
               "stun_power": 24
             }
           ],
@@ -700,67 +1270,114 @@
             {
               "id": "sp_onda_pisoton",
               "type": "ground_wave",
-              "at_tick": 24,
+              "at_tick": 33,
               "anchor": "self",
               "damage": 14,
               "speed_mps": 12,
               "range_m": 9.0,
               "width_m": 1.4,
-              "warn_ticks": 20,
+              "warn_ticks": 45,
               "ring": true,
               "knockback_mps": 6
             }
           ],
           "branch": {
             "window_from_tick": 20,
-            "window_to_tick": 50,
+            "window_to_tick": 59,
             "time_base": "step",
             "only_on": "any",
             "buffer_ticks": 6,
             "commit": "window_end",
             "options": [
-              { "input": "skill", "step": "hachazo_partidor" },
-              { "input": "alt", "step": "rugido_guerra", "hud_icon": "generic", "label": "Rugido", "extra_cost": { "stamina": 12 } }
+              {
+                "input": "skill",
+                "step": "hachazo_partidor"
+              },
+              {
+                "input": "alt",
+                "step": "rugido_guerra",
+                "hud_icon": "generic",
+                "label": "Rugido",
+                "extra_cost": {
+                  "stamina": 12
+                }
+              }
             ],
             "default_if_no_input": "end"
           },
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "hachazo_partidor",
-          "windup_ticks": 34,
+          "windup_ticks": 45,
           "active_ticks": 6,
           "recovery_ticks": 44,
-          "extra_cost": { "stamina": 8 },
+          "extra_cost": {
+            "stamina": 8
+          },
           "telegraph": {
             "id": "tg_telurico_hachazo",
             "style": "weapon_glow",
             "color": "#CCD5AE",
             "sound": "sfx_tele_axe_slam",
-            "ground_marker": { "shape": { "type": "line", "length_m": 4.5, "width_m": 1.6 }, "anchor": "self", "fill_ticks": 34 },
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 4.5,
+                "width_m": 1.6
+              },
+              "anchor": "self",
+              "fill_ticks": 45
+            },
             "at_tick": 0,
             "text": "Baja el hacha a dos manos descargando todo el peso de su cuerpo."
           },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 40, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
-          "tracking": { "deg_per_sec": 120, "lock_at_tick": 22, "post_lock_deg_per_sec": 0 },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 51,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 120,
+            "lock_at_tick": 21,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_hacha_partir",
-              "shape": { "type": "line", "length_m": 4.5, "width_m": 1.6 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "line",
+                "length_m": 4.5,
+                "width_m": 1.6
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 34,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": true,
-              "stun_power": 46, "stun_scaling": "physical",
-              "on_hit": { "knockback": { "speed_mps": 7, "duration_ticks": 8 } }
+              "blockable": true,
+              "parryable": true,
+              "stun_power": 46,
+              "stun_scaling": "physical",
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 7,
+                  "duration_ticks": 8
+                }
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "rugido_guerra",
-          "windup_ticks": 16,
+          "windup_ticks": 33,
           "active_ticks": 6,
           "recovery_ticks": 40,
           "telegraph": {
@@ -772,29 +1389,52 @@
             "at_tick": 0,
             "text": "Rugido salvaje que desata una onda de choque omnidireccional."
           },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 22, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 39,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
           "hitboxes": [
             {
               "id": "hb_rugido_empuje",
-              "shape": { "type": "circle", "radius_m": 3.8 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "circle",
+                "radius_m": 3.8
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 18,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": false,
+              "blockable": true,
+              "parryable": false,
               "stun_power": 34,
-              "on_hit": { "knockback": { "speed_mps": 10, "duration_ticks": 10 } }
+              "on_hit": {
+                "knockback": {
+                  "speed_mps": 10,
+                  "duration_ticks": 10
+                }
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
       "ai": {
         "range_min": 1.5,
         "range_max": 5.5,
         "weight": 12,
-        "use_when": ["target_in_range"],
-        "branch_weights": { "hachazo_partidor": 60, "rugido_guerra": 40 }
+        "use_when": [
+          "target_in_range"
+        ],
+        "branch_weights": {
+          "hachazo_partidor": 60,
+          "rugido_guerra": 40
+        }
       },
       "hint": {
         "dodge": "jump",
@@ -806,17 +1446,30 @@
       "name": "Presa del Coloso",
       "icon": "generic",
       "category": "grab",
-      "tags": ["unblockable"],
-      "unlock": { "phase": 1 },
-      "cost": { "stamina": 32, "mana": 0, "health": 0 },
+      "tags": [
+        "unblockable"
+      ],
+      "unlock": {
+        "phase": 1
+      },
+      "cost": {
+        "stamina": 32,
+        "mana": 0,
+        "health": 0
+      },
       "cooldown_ticks": 540,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["stun_lvl2", "knockdown"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "stun_lvl2",
+        "knockdown"
+      ],
       "steps": [
         {
           "id": "carrera_presa",
-          "windup_ticks": 36,
+          "windup_ticks": 45,
           "active_ticks": 8,
           "recovery_ticks": 6,
           "telegraph": {
@@ -824,17 +1477,42 @@
             "style": "body_pose",
             "color": "#B07D62",
             "sound": "sfx_tele_grab_rush",
-            "ground_marker": { "shape": { "type": "box", "length_m": 5.0, "width_m": 1.8 }, "anchor": "self", "fill_ticks": 36 },
+            "ground_marker": {
+              "shape": {
+                "type": "box",
+                "length_m": 5.0,
+                "width_m": 1.8
+              },
+              "anchor": "self",
+              "fill_ticks": 45
+            },
             "at_tick": 0,
             "text": "Abre los brazos de par en par y avanza decidido para atrapar al rival."
           },
-          "tracking": { "deg_per_sec": 200, "lock_at_tick": 28, "post_lock_deg_per_sec": 0 },
-          "movement": { "type": "dash", "from_tick": 24, "to_tick": 44, "speed_mps": 12, "max_distance_m": 4.8, "target_mode": "facing", "stop_at_m": 0.8 },
+          "tracking": {
+            "deg_per_sec": 200,
+            "lock_at_tick": 21,
+            "post_lock_deg_per_sec": 0
+          },
+          "movement": {
+            "type": "dash",
+            "from_tick": 24,
+            "to_tick": 53,
+            "speed_mps": 12,
+            "max_distance_m": 4.8,
+            "target_mode": "facing",
+            "stop_at_m": 0.8
+          },
           "hitboxes": [
             {
               "id": "hb_presa_enganche",
-              "shape": { "type": "box", "length_m": 2.2, "width_m": 1.8 },
-              "from_tick": 0, "to_tick": 8,
+              "shape": {
+                "type": "box",
+                "length_m": 2.2,
+                "width_m": 1.8
+              },
+              "from_tick": 0,
+              "to_tick": 8,
               "hits": 1,
               "damage_per_hit": 6,
               "damage_type": "physical",
@@ -849,16 +1527,21 @@
                   "strength_mps": 12,
                   "duration_ticks": 18,
                   "max_distance_m": 3.2,
-                  "breakable_by": ["roll"]
+                  "breakable_by": [
+                    "roll"
+                  ]
                 }
               }
             }
           ],
-          "next": { "default": "estrellamiento", "on_whiff": "fallo_presa" }
+          "next": {
+            "default": "estrellamiento",
+            "on_whiff": "fallo_presa"
+          }
         },
         {
           "id": "estrellamiento",
-          "windup_ticks": 30,
+          "windup_ticks": 45,
           "active_ticks": 4,
           "recovery_ticks": 46,
           "telegraph": {
@@ -870,50 +1553,92 @@
             "at_tick": 0,
             "text": "Alza al rival y lo estrella de espaldas contra la piedra."
           },
-          "armor": { "type": "hyper", "from_tick": 0, "to_tick": 34, "poise_bonus_pct": 200, "dmg_reduction_pct": 0 },
+          "armor": {
+            "type": "hyper",
+            "from_tick": 0,
+            "to_tick": 49,
+            "poise_bonus_pct": 200,
+            "dmg_reduction_pct": 0
+          },
           "hitboxes": [
             {
               "id": "hb_estrellar",
-              "shape": { "type": "circle", "radius_m": 2.5 },
-              "from_tick": 0, "to_tick": 4,
+              "shape": {
+                "type": "circle",
+                "radius_m": 2.5
+              },
+              "from_tick": 0,
+              "to_tick": 4,
               "damage_per_hit": 36,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
               "blockable": false,
               "parryable": false,
               "stun_power": 55,
-              "on_hit": { "knockdown": true }
+              "on_hit": {
+                "knockdown": true
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         },
         {
           "id": "fallo_presa",
           "windup_ticks": 1,
           "active_ticks": 1,
           "recovery_ticks": 44,
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
-      "ai": { "range_min": 2.0, "range_max": 6.0, "weight": 9, "use_when": ["target_in_range", "target_blocking"] },
-      "hint": { "dodge": "roll_late", "direction": "side", "text": "Imbloqueable: rodá hacia un costado cuando sus brazos estén por cerrarse." }
+      "ai": {
+        "range_min": 2.0,
+        "range_max": 6.0,
+        "weight": 9,
+        "use_when": [
+          "target_in_range",
+          "target_blocking"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Imbloqueable: rodá hacia un costado cuando sus brazos estén por cerrarse."
+      }
     },
     {
       "id": "hendedura_cataclismica",
       "name": "Hendedura Cataclísmica",
       "icon": "generic",
       "category": "melee",
-      "tags": ["unblockable", "delayed", "aoe"],
-      "unlock": { "phase": 2 },
-      "cost": { "stamina": 38, "mana": 15, "health": 0 },
+      "tags": [
+        "unblockable",
+        "delayed",
+        "aoe"
+      ],
+      "unlock": {
+        "phase": 2
+      },
+      "cost": {
+        "stamina": 38,
+        "mana": 15,
+        "health": 0
+      },
       "cooldown_ticks": 750,
       "uses_global_cd": true,
-      "usable_while": ["ground"],
-      "interruptible_by": ["knockdown"],
+      "usable_while": [
+        "ground"
+      ],
+      "interruptible_by": [
+        "knockdown"
+      ],
       "steps": [
         {
           "id": "desgarro",
-          "windup_ticks": 32,
+          "windup_ticks": 33,
           "active_ticks": 6,
           "recovery_ticks": 14,
           "telegraph": {
@@ -921,29 +1646,55 @@
             "style": "weapon_glow",
             "color": "#A25A38",
             "sound": "sfx_tele_earth_rip",
-            "ground_marker": { "shape": { "type": "line", "length_m": 7.0, "width_m": 2.0 }, "anchor": "self", "fill_ticks": 32 },
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 7.0,
+                "width_m": 2.0
+              },
+              "anchor": "self",
+              "fill_ticks": 33
+            },
             "at_tick": 0,
             "text": "Hunde el hacha profundamente en la tierra abriendo una fisura."
           },
-          "armor": { "type": "super", "from_tick": 0, "to_tick": 38, "poise_bonus_pct": 100, "dmg_reduction_pct": 0 },
-          "tracking": { "deg_per_sec": 180, "lock_at_tick": 24, "post_lock_deg_per_sec": 0 },
+          "armor": {
+            "type": "super",
+            "from_tick": 0,
+            "to_tick": 39,
+            "poise_bonus_pct": 100,
+            "dmg_reduction_pct": 0
+          },
+          "tracking": {
+            "deg_per_sec": 180,
+            "lock_at_tick": 9,
+            "post_lock_deg_per_sec": 0
+          },
           "hitboxes": [
             {
               "id": "hb_desgarro_linea",
-              "shape": { "type": "line", "length_m": 7.0, "width_m": 2.0 },
-              "from_tick": 0, "to_tick": 6,
+              "shape": {
+                "type": "line",
+                "length_m": 7.0,
+                "width_m": 2.0
+              },
+              "from_tick": 0,
+              "to_tick": 6,
               "damage_per_hit": 22,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
-              "blockable": true, "parryable": false,
+              "blockable": true,
+              "parryable": false,
               "stun_power": 30
             }
           ],
-          "next": { "default": "erupcion_rocas" }
+          "next": {
+            "default": "erupcion_rocas"
+          }
         },
         {
           "id": "erupcion_rocas",
-          "windup_ticks": 36,
+          "windup_ticks": 45,
           "active_ticks": 8,
           "recovery_ticks": 52,
           "telegraph": {
@@ -951,49 +1702,96 @@
             "style": "ground_line",
             "color": "#BC6C25",
             "sound": "sfx_tele_earth_erupt",
-            "ground_marker": { "shape": { "type": "line", "length_m": 8.5, "width_m": 2.4 }, "anchor": "self", "fill_ticks": 36 },
+            "ground_marker": {
+              "shape": {
+                "type": "line",
+                "length_m": 8.5,
+                "width_m": 2.4
+              },
+              "anchor": "self",
+              "fill_ticks": 45
+            },
             "at_tick": 0,
             "text": "Arranca el hacha levantando columnas de roca y tierra ardiente."
           },
-          "armor": { "type": "hyper", "from_tick": 0, "to_tick": 44, "poise_bonus_pct": 200, "dmg_reduction_pct": 20 },
+          "armor": {
+            "type": "hyper",
+            "from_tick": 0,
+            "to_tick": 53,
+            "poise_bonus_pct": 200,
+            "dmg_reduction_pct": 20
+          },
           "hitboxes": [
             {
               "id": "hb_erupcion_colosal",
-              "shape": { "type": "line", "length_m": 8.5, "width_m": 2.4 },
-              "from_tick": 0, "to_tick": 8,
+              "shape": {
+                "type": "line",
+                "length_m": 8.5,
+                "width_m": 2.4
+              },
+              "from_tick": 0,
+              "to_tick": 8,
               "damage_per_hit": 38,
               "damage_type": "physical",
               "damage_scaling": "weapon_heavy",
               "blockable": false,
               "parryable": false,
               "stun_power": 55,
-              "on_hit": { "knockdown": true }
+              "on_hit": {
+                "knockdown": true
+              }
             }
           ],
-          "next": { "default": null }
+          "next": {
+            "default": null
+          }
         }
       ],
-      "ai": { "range_min": 2.5, "range_max": 8.0, "weight": 14, "use_when": ["self_phase2", "target_in_range"] },
-      "hint": { "dodge": "roll_late", "direction": "side", "text": "Salí inmediatamente de la línea de la fisura antes de la erupción de rocas." }
+      "ai": {
+        "range_min": 2.5,
+        "range_max": 8.0,
+        "weight": 14,
+        "use_when": [
+          "self_phase2",
+          "target_in_range"
+        ]
+      },
+      "hint": {
+        "dodge": "roll_late",
+        "direction": "side",
+        "text": "Salí inmediatamente de la línea de la fisura antes de la erupción de rocas."
+      }
     }
   ],
   "presets": [
     {
       "id": "orden_dorada",
       "name": "Guardián de la Orden Dorada",
-      "abilities": ["martillo_alba", "lanza_veredicto", "triptico_sagrado"],
+      "abilities": [
+        "martillo_alba",
+        "lanza_veredicto",
+        "triptico_sagrado"
+      ],
       "notes": "Arquetipo inspirado en Radagon: castigo sagrado, proyectil con retraso y remates devastadores en Fase II."
     },
     {
       "id": "hoja_espiral",
       "name": "Duelista de la Hoja Espiral",
-      "abilities": ["danza_espirales", "estocada_penetrante", "floracion_purpurea"],
+      "abilities": [
+        "danza_espirales",
+        "estocada_penetrante",
+        "floracion_purpurea"
+      ],
       "notes": "Arquetipo inspirado en Malenia: danza de ráfagas con bifurcación evasiva, estocada penetrante y floración en Fase II."
     },
     {
       "id": "senor_telurico",
       "name": "Señor Telúrico",
-      "abilities": ["pisoton_telurico", "presa_del_coloso", "hendedura_cataclismica"],
+      "abilities": [
+        "pisoton_telurico",
+        "presa_del_coloso",
+        "hendedura_cataclismica"
+      ],
       "notes": "Arquetipo inspirado en Godfrey: pisotón telúrico saltable con branch, agarre imbloqueable y erupción en Fase II."
     }
   ]

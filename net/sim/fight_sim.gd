@@ -78,6 +78,12 @@ enum {
 }
 const BCD_MAX := 64
 const F_FIELDS := BCD_BASE + BCD_MAX
+
+## Ranuras de recarga propias: 64. El admin puede listar más habilidades; fuera de rango la recarga leída es 0.
+static func boss_cd_read(s: PackedInt64Array, o: int, sel: int) -> int:
+	if sel < 0 or sel >= BCD_MAX:
+		return 0
+	return int(s[o + BCD_BASE + sel])
 const P_BASE := 2 * F_FIELDS
 enum { G_FRAME, G_FREEZE, G_RNG, G_HITSTOP_ON, G_WINS0, G_WINS1, G_ROUND, G_END_T, G_FIELDS }
 ## G_END_T: ticks desde que cayó un luchador en esta ronda (0 = ronda en curso). FightEngine reinicia la ronda.

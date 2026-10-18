@@ -1086,3 +1086,15 @@ func toggle_boss_ability(id: String) -> bool:
 		a.append(id)
 	char_boss[character_id] = a
 	return true
+
+## Reemplaza las equipadas por un set (1 a 3 ids válidos).
+func set_boss_loadout(ids: Array) -> bool:
+	var a: Array = []
+	for id: Variant in ids:
+		var s := String(id)
+		if BossAbilities.has(s) and not s in a and a.size() < BossAbilities.MAX_EQUIPPED:
+			a.append(s)
+	if a.is_empty():
+		return false
+	char_boss[character_id] = a
+	return true

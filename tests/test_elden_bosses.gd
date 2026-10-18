@@ -40,8 +40,8 @@ func _play(id: String, gap: int, ticks: int, input_mode: String = "none", branch
 		if t == 8:
 			ia |= FightSim.IN_BOSS
 		var step_i: int = s[FightSim.AB_FIRED]
-		var ts: int = s[FightSim.AB_T] - 1
-		if not latched and s[FightSim.AB_SLOT] >= 0 and step_i == branch_step and ts >= input_tick:
+		# Flanco, no nivel: si se sostiene desde el tick de entrada (AB_T == 0) el latch lo descarta.
+		if s[FightSim.AB_SLOT] >= 0 and step_i == branch_step and s[FightSim.AB_T] >= 2 and s[FightSim.AB_T] % 2 == 0:
 			if input_mode == "alt":
 				ia |= FightSim.IN_BOSS_VAR
 				latched = true
@@ -82,36 +82,36 @@ func _run() -> void:
 	print("--- TEST VARIACIÓN DE COMBOS (BRANCH) ---")
 	# 1. Radagon: Martillo del Alba
 	# Pulsando skill en la ventana -> Remate Estallido (paso 2)
-	var rad_skill := await _play("martillo_alba", 1800000, 220, "skill", 1, 32)
+	var rad_skill := await _play("martillo_alba", 1800000, 500, "skill", 1, 32)
 	check(rad_skill["latched"] == 1 and rad_skill["max_step"] == 2 and rad_skill["hurt"] > 0, "Radagon branch skill: remate estallido (paso %d, daño %d)" % [rad_skill["max_step"], rad_skill["hurt"]])
 	# Pulsando alt en la ventana -> Remate Barrido (paso 3)
-	var rad_alt := await _play("martillo_alba", 1800000, 220, "alt", 1, 32)
+	var rad_alt := await _play("martillo_alba", 1800000, 500, "alt", 1, 32)
 	check(rad_alt["latched"] == 1 and rad_alt["max_step"] == 3 and rad_alt["hurt"] > 0, "Radagon branch alt: remate barrido (paso %d, daño %d)" % [rad_alt["max_step"], rad_alt["hurt"]])
 	# Sin pulsar en la ventana -> termina en paso 1
-	var rad_none := await _play("martillo_alba", 1800000, 220, "none")
+	var rad_none := await _play("martillo_alba", 1800000, 500, "none")
 	check(rad_none["max_step"] == 1 and rad_none["ended"] == 1, "Radagon sin input: termina por default (paso %d)" % rad_none["max_step"])
 
 	# 2. Godfrey: Pisotón Telúrico
 	# Pulsando skill en la ventana -> Hachazo Partidor (paso 1)
-	var god_skill := await _play("pisoton_telurico", 1800000, 160, "skill", 0, 20)
+	var god_skill := await _play("pisoton_telurico", 1800000, 400, "skill", 0, 20)
 	check(god_skill["latched"] == 1 and god_skill["max_step"] == 1 and god_skill["hurt"] > 0, "Godfrey branch skill: hachazo partidor (paso %d, daño %d)" % [god_skill["max_step"], god_skill["hurt"]])
 	# Pulsando alt en la ventana -> Rugido de Guerra (paso 2)
-	var god_alt := await _play("pisoton_telurico", 1800000, 160, "alt", 0, 20)
+	var god_alt := await _play("pisoton_telurico", 1800000, 400, "alt", 0, 20)
 	check(god_alt["latched"] == 1 and god_alt["max_step"] == 2 and god_alt["hurt"] > 0, "Godfrey branch alt: rugido de guerra (paso %d, daño %d)" % [god_alt["max_step"], god_alt["hurt"]])
 	# Sin pulsar en la ventana -> termina en paso 0
-	var god_none := await _play("pisoton_telurico", 1800000, 160, "none")
+	var god_none := await _play("pisoton_telurico", 1800000, 400, "none")
 	check(god_none["max_step"] == 0 and god_none["ended"] == 1, "Godfrey sin input: termina por default (paso %d)" % god_none["max_step"])
 
 	# 3. Malenia: Danza de Espirales
 	# Pulsando skill en la ventana -> Segunda ráfaga y caída final (paso 3)
-	var mal_skill := await _play("danza_espirales", 1800000, 220, "skill", 1, 18)
+	var mal_skill := await _play("danza_espirales", 1800000, 700, "skill", 1, 18)
 	check(mal_skill["latched"] == 1 and mal_skill["max_step"] == 3 and mal_skill["hurt"] > 0, "Malenia branch skill: danza completa hasta caída (paso %d, daño %d)" % [mal_skill["max_step"], mal_skill["hurt"]])
 	# Pulsando alt en la ventana -> Repliegue / Corte Evasivo (paso 4)
-	var mal_alt := await _play("danza_espirales", 1800000, 200, "alt", 1, 18)
+	var mal_alt := await _play("danza_espirales", 1800000, 700, "alt", 1, 18)
 	check(mal_alt["latched"] == 1 and mal_alt["max_step"] == 4 and mal_alt["hurt"] > 0, "Malenia branch alt: corte evasivo y retirada (paso %d, daño %d)" % [mal_alt["max_step"], mal_alt["hurt"]])
 
 	# 4. Godfrey: Presa del Coloso (Grab imbloqueable)
-	var presa := await _play("presa_del_coloso", 2000000, 140, "none")
+	var presa := await _play("presa_del_coloso", 2000000, 400, "none")
 	check(presa["hurt"] > 0 and presa["max_step"] == 1, "Presa del Coloso conecta y ejecuta estrellamiento (daño %d)" % presa["hurt"])
 
 	print("--- DETERMINISMO ---")

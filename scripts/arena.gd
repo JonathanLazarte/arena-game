@@ -298,6 +298,8 @@ func _on_sim_event(ev: Dictionary) -> void:
 				hud.show_message("¡Habilidad del rival!", 0.8) # telegrafía (el aviso visual de la sim)
 		"grab", "eikon_special", "ability_hit":
 			shake = maxf(shake, 0.25)
+		"ab_ev", "ground_boom":
+			_rumble(int(ev.get("shake", 0)))
 		"phase2":
 			if champion_id != "" and int(ev["player"]) == 1:
 				_begin_champion_phase_two()
@@ -337,6 +339,14 @@ func _warm_async(paths: Array[String]) -> void:
 
 func _on_impact(strength: float) -> void:
 	shake = maxf(shake, SHAKE_SCALE * strength)
+
+## Golpe fuerte al suelo: la cámara tiembla y el teléfono vibra. El nivel sale del dato (1..3).
+func _rumble(level: int) -> void:
+	var lv := clampi(level, 0, 3)
+	if lv == 0:
+		return
+	shake = maxf(shake, [0.0, 0.35, 0.58, 0.82][lv])
+	Input.vibrate_handheld(30 * lv * lv)
 
 func _on_execution_cinematic(attacker: Fighter, target: Fighter, duration: float) -> void:
 	if rig and is_instance_valid(attacker) and is_instance_valid(target):

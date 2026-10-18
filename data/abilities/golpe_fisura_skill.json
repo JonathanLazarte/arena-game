@@ -107,7 +107,7 @@
             "from_tick": 0,
             "to_tick": 14,
             "target_mode": "lock_point",
-            "max_distance_m": 3
+            "max_distance_m": 0.3
           },
           "hitboxes": [
             {
@@ -129,88 +129,20 @@
           ],
           "spawns": [
             {
-              "id": "sp_fisura_1",
-              "type": "ground_mark",
+              "id": "sp_fisura",
+              "type": "ground_wave",
               "at_tick": 14,
               "anchor": "self",
               "offset": {
-                "forward_m": 4.25,
+                "forward_m": 1.5,
                 "right_m": 0.0
               },
               "count": 1,
               "spread_deg": 0,
-              "shape": {
-                "type": "line",
-                "length_m": 2.5,
-                "width_m": 1.8
-              },
-              "warn_ticks": 90,
-              "damage": 22,
-              "stun_power": 22,
-              "knockback_mps": 5,
-              "blockable": true
-            },
-            {
-              "id": "sp_fisura_2",
-              "type": "ground_mark",
-              "at_tick": 14,
-              "anchor": "self",
-              "offset": {
-                "forward_m": 6.75,
-                "right_m": 0.0
-              },
-              "count": 1,
-              "spread_deg": 0,
-              "shape": {
-                "type": "line",
-                "length_m": 2.5,
-                "width_m": 1.8
-              },
-              "warn_ticks": 110,
-              "damage": 22,
-              "stun_power": 22,
-              "knockback_mps": 5,
-              "blockable": true
-            },
-            {
-              "id": "sp_fisura_3",
-              "type": "ground_mark",
-              "at_tick": 14,
-              "anchor": "self",
-              "offset": {
-                "forward_m": 9.25,
-                "right_m": 0.0
-              },
-              "count": 1,
-              "spread_deg": 0,
-              "shape": {
-                "type": "line",
-                "length_m": 2.5,
-                "width_m": 1.8
-              },
-              "warn_ticks": 130,
-              "damage": 22,
-              "stun_power": 22,
-              "knockback_mps": 5,
-              "blockable": true
-            },
-            {
-              "id": "sp_fisura_4",
-              "type": "ground_mark",
-              "at_tick": 14,
-              "anchor": "self",
-              "offset": {
-                "forward_m": 11.75,
-                "right_m": 0.0
-              },
-              "count": 1,
-              "spread_deg": 0,
-              "shape": {
-                "type": "line",
-                "length_m": 2.5,
-                "width_m": 1.8
-              },
-              "warn_ticks": 150,
+              "speed_mps": 0,
+              "range_m": 28,
+              "width_m": 2.1,
+              "warn_ticks": 60,
               "damage": 22,
               "stun_power": 22,
               "knockback_mps": 5,
@@ -239,7 +171,7 @@
       ],
       "ai": {
         "range_min": 3.0,
-        "range_max": 9.0,
+        "range_max": 16.0,
         "weight": 12,
         "use_when": [
           "target_far",
@@ -249,7 +181,7 @@
       "hint": {
         "dodge": "jump",
         "direction": "side",
-        "text": "Saltá el martillazo. Después salí de la línea roja antes de que cada tramo estalle."
+        "text": "Saltá el martillazo. La línea queda quieta 1 s y es larga: salí de lado antes de que estalle toda junta."
       }
     }
   ],

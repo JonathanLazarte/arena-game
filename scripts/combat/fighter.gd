@@ -23,7 +23,7 @@ signal execution_cinematic(attacker: Fighter, target: Fighter, duration: float)
 signal boss_started
 enum Boss { NONE, CHARGE, LUNGE, RECOVER }
 const BOSS_CHARGE := 1.6 ## carga visible (pose, brillo y partículas en la hoja, sonido que sube)
-const BOSS_TRACK := 1.6 ## ronda 31: sigue al objetivo TODA la carga (no se esquiva caminando)
+const BOSS_TRACK := 1.6 ## la sim deja de seguir 18 ticks antes de la embestida
 const BOSS_DIST := 12.0 ## ronda 31: más alcance (antes 7,5)
 const BOSS_SPEED := 30.0 ## m/s (0,4 s de embestida)
 const BOSS_LUNGE_HOME_T := 0.15 ## ronda 33: la embestida solo se corrige durante 0,15 s

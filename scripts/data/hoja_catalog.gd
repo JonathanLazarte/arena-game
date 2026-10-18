@@ -3,7 +3,7 @@ extends RefCounted
 ## Hoja Escarlata para el códice y la sim. El horneado lo hace AbilityCatalog
 ## (net/sim/ability_catalog.gd). Si el JSON no valida, el catálogo queda vacío.
 
-const PATH := "res://docs/hoja_escarlata_catalog.json"
+const PATH := "res://data/abilities/hoja_escarlata_catalog.json"
 static var _res: Dictionary = {}
 static var _raw: Dictionary = {}
 static var _ok := false

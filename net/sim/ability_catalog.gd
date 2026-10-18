@@ -804,7 +804,7 @@ static func _step(c: Ctx, s: Dictionary, p: String, si: int, sidx: Dictionary, i
 	var msrc: Variant = _obj(c, s, "movement", p, false)
 	if msrc != null:
 		var mp := _p(p, "movement")
-		_unknown(c, msrc, mp, ["type", "from_tick", "to_tick", "target_mode", "speed_mps", "max_distance_m", "stop_at_m", "height_m", "distance_m", "orbit_deg"])
+		_unknown(c, msrc, mp, ["type", "from_tick", "to_tick", "target_mode", "speed_mps", "max_distance_m", "stop_at_m", "height_m", "distance_m", "orbit_deg", "impulse"])
 		var mt := _enum(c, msrc, "type", mp, MOVES, true)
 		var r: Array = [0, 0]
 		if MOVES[mt] != "none":
@@ -817,7 +817,8 @@ static func _step(c: Ctx, s: Dictionary, p: String, si: int, sidx: Dictionary, i
 			"stop": um(_num(c, msrc, "stop_at_m", mp, false, 0.0, 0.0, 10.0)),
 			"height": um(_num(c, msrc, "height_m", mp, false, 0.0, 0.0, 8.0)),
 			"dist": um(_num(c, msrc, "distance_m", mp, false, 0.0, 0.0, 4.0)),
-			"orbit": heading(_num(c, msrc, "orbit_deg", mp, false, 0.0, -720.0, 720.0))}
+			"orbit": heading(_num(c, msrc, "orbit_deg", mp, false, 0.0, -720.0, 720.0)),
+			"imp": 1 if _bool(c, msrc, "impulse", mp, false) else 0}
 	# hitboxes
 	var unbl := false
 	var hbs: Array = []
@@ -1108,7 +1109,10 @@ static func _spawn(c: Ctx, s: Dictionary, p: String, total: int, windup: int) ->
 			out["hits_airborne"] = 1 if _bool(c, s, "hits_airborne", p, false) else 0
 		"ground_wave":
 			_unknown(c, s, p, common + ["speed_mps", "range_m", "width_m", "warn_ticks", "ring", "damage", "stun_power", "blockable", "on", "knockback_mps", "hits_airborne"])
-			out["speed"] = upt(_num(c, s, "speed_mps", p, true, 0.0, 0.1, 40.0))
+			var spd_m := _num(c, s, "speed_mps", p, true, 0.0, 0.0, 40.0)
+			if spd_m > 0.0 and spd_m < 0.1:
+				c.err(_p(p, "speed_mps"), "SCHEMA", "una onda que viaja va a 0,1 m/s o más; 0 es la línea quieta")
+			out["speed"] = upt(spd_m)
 			out["range"] = um(_num(c, s, "range_m", p, true, 0.0, 0.1, 40.0))
 			out["width"] = um(_num(c, s, "width_m", p, true, 0.0, 0.1, 10.0))
 			out["warn"] = _int(c, s, "warn_ticks", p, true, 0, 0, 600)

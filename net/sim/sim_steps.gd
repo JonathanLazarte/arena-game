@@ -54,7 +54,7 @@ static func _events_of(id: String) -> Array:
 	for st: Dictionary in steps:
 		var evs: Array = st.get("events", [])
 		for ev: Dictionary in evs:
-			out.append({"id": String(ev.get("id", "")), "tick": int(ev.get("tick", 0)), "step": int(st.get("index", 0))})
+			out.append({"id": String(ev.get("id", "")), "tick": int(ev.get("tick", 0)), "step": int(st.get("index", 0)), "shake": int(ev.get("shake", 0))})
 	return out
 
 static func _mask(id: String) -> int:

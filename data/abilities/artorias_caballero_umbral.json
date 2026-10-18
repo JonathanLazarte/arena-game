@@ -36,7 +36,7 @@
       "steps": [
         {
           "id": "tajo_1",
-          "windup_ticks": 14,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 3,
           "telegraph": {
@@ -50,13 +50,13 @@
           },
           "tracking": {
             "deg_per_sec": 240,
-            "lock_at_tick": 6,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 8,
-            "to_tick": 21,
+            "to_tick": 40,
             "speed_mps": 8,
             "max_distance_m": 1.8,
             "target_mode": "facing",
@@ -85,7 +85,7 @@
           "events": [
             {
               "id": "ev_m1",
-              "tick": 14,
+              "tick": 33,
               "vfx": "vfx_trail_steel",
               "sfx": "sfx_swing_fast"
             }
@@ -93,18 +93,18 @@
         },
         {
           "id": "tajo_2",
-          "windup_ticks": 8,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 3,
           "tracking": {
             "deg_per_sec": 200,
-            "lock_at_tick": 2,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 4,
-            "to_tick": 15,
+            "to_tick": 40,
             "speed_mps": 7,
             "max_distance_m": 1.5,
             "target_mode": "facing",
@@ -133,7 +133,7 @@
           "events": [
             {
               "id": "ev_m2",
-              "tick": 8,
+              "tick": 33,
               "vfx": "vfx_trail_steel",
               "sfx": "sfx_swing_fast"
             }
@@ -141,18 +141,18 @@
         },
         {
           "id": "tajo_3",
-          "windup_ticks": 10,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 26,
           "tracking": {
             "deg_per_sec": 180,
-            "lock_at_tick": 4,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 6,
-            "to_tick": 14,
+            "to_tick": 37,
             "speed_mps": 6,
             "max_distance_m": 1.0,
             "target_mode": "facing",
@@ -181,7 +181,7 @@
           "events": [
             {
               "id": "ev_m3",
-              "tick": 10,
+              "tick": 33,
               "vfx": "vfx_trail_steel",
               "sfx": "sfx_swing_heavy"
             }
@@ -237,7 +237,7 @@
       "steps": [
         {
           "id": "estocada_1",
-          "windup_ticks": 24,
+          "windup_ticks": 33,
           "active_ticks": 3,
           "recovery_ticks": 4,
           "telegraph": {
@@ -252,20 +252,20 @@
                 "width_m": 1.4
               },
               "anchor": "self",
-              "fill_ticks": 24
+              "fill_ticks": 33
             },
             "at_tick": 0,
             "text": "Se agacha con la punta al frente y una línea azul en el suelo."
           },
           "tracking": {
             "deg_per_sec": 260,
-            "lock_at_tick": 14,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 14,
-            "to_tick": 31,
+            "to_tick": 40,
             "speed_mps": 20,
             "max_distance_m": 6.0,
             "target_mode": "facing",
@@ -303,18 +303,18 @@
         },
         {
           "id": "estocada_2",
-          "windup_ticks": 6,
+          "windup_ticks": 33,
           "active_ticks": 3,
           "recovery_ticks": 42,
           "tracking": {
             "deg_per_sec": 0,
-            "lock_at_tick": 0,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 2,
-            "to_tick": 9,
+            "to_tick": 36,
             "speed_mps": 10,
             "max_distance_m": 1.4,
             "target_mode": "facing",
@@ -574,7 +574,7 @@
         },
         {
           "id": "corte_horizontal",
-          "windup_ticks": 14,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 36,
           "telegraph": {
@@ -589,14 +589,14 @@
                 "angle_deg": 150
               },
               "anchor": "self",
-              "fill_ticks": 14
+              "fill_ticks": 33
             },
             "at_tick": 0,
             "text": "Cono turquesa frente a él: tajo horizontal."
           },
           "tracking": {
             "deg_per_sec": 160,
-            "lock_at_tick": 6,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "hitboxes": [
@@ -622,7 +622,7 @@
         },
         {
           "id": "corte_descendente",
-          "windup_ticks": 18,
+          "windup_ticks": 33,
           "active_ticks": 4,
           "recovery_ticks": 40,
           "telegraph": {
@@ -637,14 +637,14 @@
                 "width_m": 1.2
               },
               "anchor": "self",
-              "fill_ticks": 18
+              "fill_ticks": 33
             },
             "at_tick": 0,
             "text": "Línea turquesa frente a él: tajo hacia abajo."
           },
           "tracking": {
             "deg_per_sec": 160,
-            "lock_at_tick": 10,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "hitboxes": [
@@ -721,7 +721,7 @@
       "steps": [
         {
           "id": "giro_a",
-          "windup_ticks": 22,
+          "windup_ticks": 33,
           "active_ticks": 5,
           "recovery_ticks": 3,
           "telegraph": {
@@ -736,19 +736,19 @@
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 30,
+            "to_tick": 41,
             "poise_bonus_pct": 60,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 200,
-            "lock_at_tick": 12,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 14,
-            "to_tick": 30,
+            "to_tick": 41,
             "speed_mps": 7,
             "max_distance_m": 1.8,
             "target_mode": "facing",
@@ -777,7 +777,7 @@
           "events": [
             {
               "id": "ev_ga",
-              "tick": 22,
+              "tick": 33,
               "vfx": "vfx_spin_orange",
               "sfx": "sfx_swing_spin"
             }
@@ -785,25 +785,25 @@
         },
         {
           "id": "giro_b",
-          "windup_ticks": 6,
+          "windup_ticks": 33,
           "active_ticks": 5,
           "recovery_ticks": 42,
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 11,
+            "to_tick": 38,
             "poise_bonus_pct": 60,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 0,
-            "lock_at_tick": 0,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 2,
-            "to_tick": 11,
+            "to_tick": 38,
             "speed_mps": 6,
             "max_distance_m": 1.0,
             "target_mode": "facing",
@@ -832,7 +832,7 @@
           "events": [
             {
               "id": "ev_gb",
-              "tick": 6,
+              "tick": 33,
               "vfx": "vfx_spin_orange",
               "sfx": "sfx_swing_spin"
             }
@@ -889,7 +889,7 @@
       "steps": [
         {
           "id": "clavada_1",
-          "windup_ticks": 22,
+          "windup_ticks": 33,
           "active_ticks": 3,
           "recovery_ticks": 2,
           "telegraph": {
@@ -903,7 +903,7 @@
                 "radius_m": 3.0
               },
               "anchor": "self",
-              "fill_ticks": 22
+              "fill_ticks": 33
             },
             "at_tick": 0,
             "text": "Levanta la espada con las dos manos; círculo rojo en el suelo."
@@ -911,19 +911,19 @@
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 27,
+            "to_tick": 38,
             "poise_bonus_pct": 40,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 200,
-            "lock_at_tick": 12,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 10,
-            "to_tick": 22,
+            "to_tick": 33,
             "speed_mps": 8,
             "max_distance_m": 2.0,
             "target_mode": "facing",
@@ -952,7 +952,7 @@
           "events": [
             {
               "id": "ev_c1",
-              "tick": 22,
+              "tick": 33,
               "vfx": "vfx_crack_ring",
               "sfx": "sfx_slam",
               "camera_shake": 1
@@ -961,25 +961,25 @@
         },
         {
           "id": "clavada_2",
-          "windup_ticks": 16,
+          "windup_ticks": 33,
           "active_ticks": 3,
           "recovery_ticks": 2,
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 21,
+            "to_tick": 38,
             "poise_bonus_pct": 40,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 160,
-            "lock_at_tick": 6,
+            "lock_at_tick": 9,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 6,
-            "to_tick": 16,
+            "to_tick": 33,
             "speed_mps": 8,
             "max_distance_m": 1.6,
             "target_mode": "facing",
@@ -1008,7 +1008,7 @@
           "events": [
             {
               "id": "ev_c2",
-              "tick": 16,
+              "tick": 33,
               "vfx": "vfx_crack_ring",
               "sfx": "sfx_slam",
               "camera_shake": 1
@@ -1017,7 +1017,7 @@
         },
         {
           "id": "clavada_3",
-          "windup_ticks": 18,
+          "windup_ticks": 45,
           "active_ticks": 4,
           "recovery_ticks": 42,
           "telegraph": {
@@ -1031,7 +1031,7 @@
                 "radius_m": 3.8
               },
               "anchor": "self",
-              "fill_ticks": 18
+              "fill_ticks": 45
             },
             "at_tick": 0,
             "text": "Círculo rojo más grande: el último golpe."
@@ -1039,19 +1039,19 @@
           "armor": {
             "type": "super",
             "from_tick": 0,
-            "to_tick": 22,
+            "to_tick": 49,
             "poise_bonus_pct": 40,
             "dmg_reduction_pct": 0
           },
           "tracking": {
             "deg_per_sec": 160,
-            "lock_at_tick": 8,
+            "lock_at_tick": 21,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "dash",
             "from_tick": 8,
-            "to_tick": 18,
+            "to_tick": 45,
             "speed_mps": 8,
             "max_distance_m": 1.6,
             "target_mode": "facing",
@@ -1086,7 +1086,7 @@
           "events": [
             {
               "id": "ev_c3",
-              "tick": 18,
+              "tick": 45,
               "vfx": "vfx_crack_ring",
               "sfx": "sfx_slam",
               "camera_shake": 2
@@ -1184,7 +1184,7 @@
         },
         {
           "id": "clavar",
-          "windup_ticks": 12,
+          "windup_ticks": 48,
           "active_ticks": 4,
           "recovery_ticks": 48,
           "telegraph": {
@@ -1198,20 +1198,20 @@
                 "radius_m": 2.6
               },
               "anchor": "lock_point",
-              "fill_ticks": 12
+              "fill_ticks": 48
             },
             "at_tick": 0,
             "text": "Círculo verde bajo el objetivo."
           },
           "tracking": {
             "deg_per_sec": 0,
-            "lock_at_tick": 0,
+            "lock_at_tick": 24,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "slam",
             "from_tick": 0,
-            "to_tick": 12,
+            "to_tick": 48,
             "target_mode": "lock_point",
             "max_distance_m": 3.0
           },
@@ -1245,7 +1245,7 @@
           "events": [
             {
               "id": "ev_clavar",
-              "tick": 12,
+              "tick": 48,
               "vfx": "vfx_crack_ring",
               "sfx": "sfx_slam",
               "camera_shake": 2
@@ -1301,61 +1301,45 @@
       },
       "steps": [
         {
-          "id": "retroceso_1",
-          "windup_ticks": 16,
-          "active_ticks": 1,
-          "recovery_ticks": 0,
+          "id": "salto_1",
+          "windup_ticks": 66,
+          "active_ticks": 10,
+          "recovery_ticks": 12,
           "telegraph": {
-            "id": "tg_voltereta_lila",
+            "id": "tg_salto_1",
             "style": "body_pose",
             "color": "#D9A5F5",
             "sound": "sfx_tele_voltereta",
             "ground_marker": null,
             "at_tick": 0,
-            "text": "Se agacha de lado, listo para saltar hacia atrás."
+            "text": "Se impulsa hacia arriba y persigue un segundo antes de caer con el tajo."
           },
-          "movement": {
-            "type": "retreat",
-            "from_tick": 4,
-            "to_tick": 17,
-            "speed_mps": 10,
-            "max_distance_m": 3.0,
-            "target_mode": "away_from_target"
-          },
-          "next": {
-            "default": "tajo_regreso_1"
-          }
-        },
-        {
-          "id": "tajo_regreso_1",
-          "windup_ticks": 10,
-          "active_ticks": 4,
-          "recovery_ticks": 2,
           "tracking": {
             "deg_per_sec": 240,
-            "lock_at_tick": 2,
+            "lock_at_tick": 42,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "leap",
+            "impulse": true,
             "from_tick": 0,
-            "to_tick": 16,
-            "height_m": 1.6,
-            "speed_mps": 14,
-            "max_distance_m": 4.5,
+            "to_tick": 66,
+            "height_m": 2.4,
+            "speed_mps": 12,
+            "max_distance_m": 5.0,
             "target_mode": "lock_point",
-            "stop_at_m": 1.0
+            "stop_at_m": 1.2
           },
           "hitboxes": [
             {
-              "id": "hb_v1",
+              "id": "hb_salto_1",
               "shape": {
                 "type": "arc",
                 "radius_m": 2.8,
                 "angle_deg": 130
               },
               "from_tick": 0,
-              "to_tick": 4,
+              "to_tick": 8,
               "hits": 1,
               "damage_per_hit": 16,
               "blockable": true,
@@ -1364,64 +1348,74 @@
             }
           ],
           "next": {
-            "default": "retroceso_2"
+            "default": "salida"
           },
           "events": [
             {
               "id": "ev_v1",
-              "tick": 10,
+              "tick": 66,
               "vfx": "vfx_trail_lilac",
               "sfx": "sfx_swing_fast"
             }
           ]
         },
         {
-          "id": "retroceso_2",
-          "windup_ticks": 12,
+          "id": "salida",
+          "windup_ticks": 18,
           "active_ticks": 1,
-          "recovery_ticks": 0,
+          "recovery_ticks": 18,
           "movement": {
             "type": "retreat",
-            "from_tick": 2,
-            "to_tick": 13,
+            "from_tick": 0,
+            "to_tick": 37,
             "speed_mps": 10,
-            "max_distance_m": 2.5,
+            "max_distance_m": 3.0,
             "target_mode": "away_from_target"
           },
           "next": {
-            "default": "tajo_regreso_2"
+            "default": "salto_2"
           }
         },
         {
-          "id": "tajo_regreso_2",
-          "windup_ticks": 10,
-          "active_ticks": 4,
-          "recovery_ticks": 40,
+          "id": "salto_2",
+          "windup_ticks": 66,
+          "active_ticks": 10,
+          "recovery_ticks": 42,
+          "telegraph": {
+            "id": "tg_salto_2",
+            "style": "body_pose",
+            "color": "#D9A5F5",
+            "sound": "sfx_tele_voltereta",
+            "ground_marker": null,
+            "at_tick": 0,
+            "text": "Se impulsa hacia arriba y persigue un segundo antes de caer con el tajo."
+          },
           "tracking": {
             "deg_per_sec": 240,
-            "lock_at_tick": 2,
+            "lock_at_tick": 42,
             "post_lock_deg_per_sec": 0
           },
           "movement": {
             "type": "leap",
+            "impulse": true,
             "from_tick": 0,
-            "to_tick": 16,
-            "height_m": 1.6,
-            "speed_mps": 14,
-            "max_distance_m": 4.5,
+            "to_tick": 66,
+            "height_m": 2.4,
+            "speed_mps": 12,
+            "max_distance_m": 5.0,
             "target_mode": "lock_point",
-            "stop_at_m": 1.0
+            "stop_at_m": 1.2
           },
           "hitboxes": [
             {
-              "id": "hb_v2",
+              "id": "hb_salto_2",
               "shape": {
                 "type": "arc",
                 "radius_m": 2.8,
                 "angle_deg": 130
               },
               "from_tick": 0,
-              "to_tick": 4,
+              "to_tick": 8,
               "hits": 1,
               "damage_per_hit": 20,
               "blockable": true,
@@ -1435,7 +1429,7 @@
           "events": [
             {
               "id": "ev_v2",
-              "tick": 10,
+              "tick": 66,
               "vfx": "vfx_trail_lilac",
               "sfx": "sfx_swing_fast"
             }
@@ -1454,7 +1448,7 @@
       "hint": {
         "dodge": "roll_late",
         "direction": "side",
-        "text": "Dos saltos hacia atrás y regreso con tajo. Esperá a que vuelva y rodá después del segundo."
+        "text": "Salta con impulso y se queda en el aire un segundo. El tajo cae con el aterrizaje. Sale, y el segundo salto repite el golpe: rodá cada caída."
       }
     },
     {

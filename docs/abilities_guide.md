@@ -434,6 +434,7 @@ pueden pegar en el mismo tick (se suman, y cada uno aporta a la acumulación de 
 | `max_distance_m` | number ≤ 14 | — | **tope obligatorio** de recorrido |
 | `stop_at_m` | number | `0` | se detiene a esta distancia del objetivo (no lo atraviesa) |
 | `height_m` | number 0..8 | — | `leap`: altura del arco; durante `leap` el luchador está en el aire |
+| `impulse` | bool | `false` | `leap`: el despegue es un impulso y la gravedad hace el arco. Sin esto, la altura va escrita tick a tick |
 | `distance_m` | number 0..4 | — | `teleport_behind`: distancia detrás del objetivo |
 | `orbit_deg` | number | — | `orbit`: grados a rodear (signo = sentido) |
 
@@ -611,7 +612,7 @@ ocupen más de **6 proyectiles** u **8 peligros** a la vez.
 | Tipo | Campos propios | Notas |
 |---|---|---|
 | `ground_mark` (hoy «lluvia») | `shape`, `warn_ticks` (≥ 30), `damage`, `stun_power`, `knockback_mps`, `blockable`, `mode: track\|scatter`, `scatter_radius_m`, `interval_ticks`, `hits_airborne` | `scatter` usa el RNG de la sim. `hits_airborne` por defecto **false** |
-| `ground_wave` (hoy «onda») | `speed_mps`, `range_m`, `width_m`, `warn_ticks`, `ring` (bool), `knockback_mps`, `hits_airborne` | por defecto no pega en el aire (`hits_airborne: false`; se salta). El empuje `knockback_mps` vale **6** si se omite |
+| `ground_wave` (hoy «onda») | `speed_mps`, `range_m`, `width_m`, `warn_ticks`, `ring` (bool), `knockback_mps`, `hits_airborne` | por defecto no pega en el aire (`hits_airborne: false`; se salta). El empuje `knockback_mps` vale **6** si se omite. **`speed_mps: 0` no viaja:** es una línea quieta de `range_m` × `width_m`. Se ve entera durante `warn_ticks` y pega una vez, en toda la franja, al cumplirse el aviso. Una onda que se mueve va a 0,1 m/s o más |
 | `projectile` | `speed_mps`, `homing_deg` (°/s), `homing_ticks`, `lifetime_ticks`, `radius_m`, `pierce` (bool), `reflectable_by_parry` (bool), `hitbox` | giro entero con tope; si esquivás, sigue de largo |
 | `zone` (persistente) | `shape`, `delay_ticks`, `duration_ticks`, `hitbox_every_ticks`, `damage`, `status`, `hits_airborne` | máx. 2 por luchador. `hits_airborne` por defecto **false** |
 
@@ -681,6 +682,39 @@ La altura ya está en `SimParams` (`EIKON_FLY_M` = 3,5 m, `eikon_fly_m`). No hay
 
 **Permitido (y buen diseño):** castigar la **voltereta de pánico** con un golpe retrasado + tracking que se
 bloquea tarde (como el Tajo Retardado): el defensor tiene información (el aviso) y una ventana real.
+
+### 11.2 Toda habilidad se esquiva
+
+Una habilidad de jefe no es un golpe sorpresa que confirma el combo. Cada impacto se tiene que poder esquivar,
+con tiempo de verlo. Unas dejan más tiempo que otras. Ninguna es «ya pegó».
+
+La referencia que ya se siente así es el **Combo de la pausa falsa**: cada tajo espera **0,55 s** (`stage_windup`)
+antes de pegar, el siguiente no sale solo (hay que volver a pulsar) y el remate es un salto de **0,9 s** con aviso
+propio. El defensor ve la hoja, elige rodar, y el golpe que sigue no lo castiga por haber esquivado el anterior.
+
+Reglas, de ahora en adelante:
+
+- Del aviso visible al tick que hace daño hay por lo menos **33 ticks (0,55 s)** en un tajo normal. Un golpe
+  pesado, un salto o una línea en el suelo dejan más. 33 ticks es el piso, no el objetivo de todo.
+- Ese tiempo sale del movimiento y del `windup`, no de un campo aparte. `lock_at_tick` queda al menos **18 ticks**
+  antes del primer tick activo, para que el tracking no corrija la esquiva.
+- Una cadena deja un hueco en el suelo entre impactos. Esquivar uno no te mete en el siguiente.
+- Un salto que es el golpe se **ve en el aire** y el tajo cae con ese aterrizaje. Volteretas Cortantes se
+  impulsa, se queda en el aire **alrededor de un segundo** y el tajo es ese aterrizaje. Persigue dentro del
+  alcance del salto. Luego sale por el suelo y el segundo salto repite el golpe. Entre los dos hay hueco.
+- Una fisura no es una tanda de marcas. Es una **línea quieta** (`ground_wave` con `speed_mps: 0`) que se lee
+  durante el aviso y estalla entera. Golpe de Fisura espera **60 ticks (1 s)**, con una franja de **28 m × 2,1 m**.
+  El salto puede acercarse. El martillazo, no: cae casi sin salir de su sitio.
+- El catálogo **persigue** hasta `windup − 24` ticks y nunca bloquea el tracking después de `windup − 18`.
+  El último tramo queda quieto para poder rodar. Fisura sigue siendo el golpe a un punto: el martillazo cae
+  y la línea no viaja.
+- Los tajos de jefe, la distancia máxima de sus saltos, las ondas que viajan y la vida de sus proyectiles
+  salen con **+40 %** (`REACH_PM`). No entran los básicos, las artes de arma, los círculos de suelo ni la línea quieta.
+- Un `camera_shake` de 1 a 3 sacude la cámara y, en el teléfono, vibra. La línea quieta vibra al estallar,
+  aunque no haya nadie encima.
+- El catálogo cumple ese piso. Un tajo normal espera al menos 33 ticks, y un golpe pesado, un salto o una
+  línea esperan más. El tracking se bloquea al menos 18 ticks antes del activo. Entre dos golpes de una cadena
+  hay hueco en el suelo. Los básicos y las artes de arma no entran en esta regla.
 
 **Determinismo:** todo valor en la sim es entero o punto fijo; azar solo con `rng_next`; ningún campo depende del
 framerate, del dispositivo ni del reloj.
@@ -1108,10 +1142,11 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 15. **Alturas.** Montura a 1,2 m (`mount_hover_m`). Vuelo alto del Eikon a 3,5 m (`eikon_fly_m`), solo como parámetro. El diseño del vuelo alto está en §11.1 y no está implementado. Esos números no entran en `params_checksum`.
 16. **Origen.** `origin`: `boss` (default) o `weapon`. Las de arma llevan `requires_weapon` con ids que existen. El objeto `source` sigue siendo el programa de las 45. El HUD (catálogo admin) y la pestaña de loadout separan las dos listas. La sim no rechaza todavía una de arma si no llevás ese arma: lo hace el botón del loadout.
 17. **Spawns de suelo.** `ground_wave`, `ground_mark` y `zone` tienen `hits_airborne` (default false), por spawn. La sim no lo lee todavía.
+18. **Se esquiva.** Toda habilidad deja tiempo de ver el golpe y apartarse (§11.2). El piso de un tajo normal es el de la pausa falsa: 0,55 s. Un golpe pesado, un salto o una línea esperan más. `lock_at_tick` queda al menos 18 ticks antes del activo y una cadena deja hueco en el suelo entre golpes. `ground_wave` con `speed_mps: 0` es una línea quieta: se ve `warn_ticks` y pega una vez en toda la franja. Golpe de Fisura espera 1 s, mide 28 m × 2,1 m y, después del salto, el martillazo casi no se desplaza. Volteretas Cortantes se impulsa, permanece en el aire alrededor de 1 s y el tajo es el aterrizaje; sale y el segundo salto repite el golpe. El catálogo persigue hasta 24 ticks antes del activo y deja al menos 18. El alcance de los tajos de jefe, sus ondas y la vida de sus proyectiles suma 40 % (`REACH_PM`). Los básicos y las artes no cambian.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 
-Las 45 están en `data/abilities/catalog.json`. `BossAbilities` las lee de ahí. `docs/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las 45 de `SimSteps.IDS` salen siempre por `SimSteps`: `source` alimenta el programa numérico y el horneado aporta `interruptible_by` y los eventos. `ab_engine` queda en los params y por defecto es 1; ya no elige el camino. El protocolo es 11: el 9 metió `ab_engine` en los params, el 10 generaliza el bit 21 como `alt` y el 11 enciende el motor.
+Las 45 están en `data/abilities/catalog.json`. `BossAbilities` las lee de ahí. `data/abilities/hoja_escarlata_catalog.json` se hornea con `AbilityCatalog.load_file` y lo ejecuta `SimCatalog` (`T_CATALOG`), reusando los campos `AB_*`. Las 45 de `SimSteps.IDS` salen siempre por `SimSteps`: `source` alimenta el programa numérico y el horneado aporta `interruptible_by` y los eventos. `ab_engine` queda en los params y por defecto es 1; ya no elige el camino. El protocolo es 11: el 9 metió `ab_engine` en los params, el 10 generaliza el bit 21 como `alt` y el 11 enciende el motor.
 
 Adaptaciones respecto del esquema:
 
@@ -1147,6 +1182,8 @@ A 150 ms de RTT el rival ve tu acción ~4–5 ticks tarde, y las correcciones po
 - [ ] Nombre propio, sin referencias a otras franquicias.
 - [ ] El preset tiene alguna respuesta a 2,5 m (proyectil, rayo o `reach_height_m`). V20 avisa si no.
 - [ ] Una clavada de suelo que se esquiva saltando se queda en 0,35 m. No le subas el alcance para «tapar» la levitación: esa respuesta va en otra habilidad del preset.
+- [x] Del aviso al daño hay ≥ 33 ticks en un tajo normal, y más si es pesado, un salto o una línea. `lock_at_tick` queda ≥ 18 ticks antes del activo. Entre dos golpes de una cadena hay hueco en el suelo (§11.2).
+- [ ] Una línea que estalla es `ground_wave` con `speed_mps: 0`, no una fila de `ground_mark`.
 
 ---
 

@@ -41,7 +41,9 @@ const GLYPHS := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso
 	"trazos_hoja", "danza_garza", "caida_hoja", "floracion_escarlata",
 	"martillo_alba", "lanza_veredicto", "triptico_sagrado",
 	"danza_espirales", "estocada_penetrante", "floracion_purpurea",
-	"pisoton_telurico", "presa_del_coloso", "hendedura_cataclismica"]
+	"pisoton_telurico", "presa_del_coloso", "hendedura_cataclismica",
+	"cadena_mandobles", "embestida_perforante", "carga_abisal", "tajo_deslizante", "giros_dobles",
+	"triple_clavada", "salto_estocada", "voltereta_cuchilla", "potenciar_filo", "golpe_fisura"]
 
 func _draw() -> void:
 	var s := minf(size.x, size.y)
@@ -306,6 +308,46 @@ func _glyph_extra(ability_id: String, P: Callable, s: float, c: Color, w: float)
 			draw_polyline(PackedVector2Array([P.call(0.5, 0.18), P.call(0.44, 0.35), P.call(0.54, 0.52), P.call(0.46, 0.68), P.call(0.5, 0.82)]), c, w * 1.4, true)
 			draw_colored_polygon(PackedVector2Array([P.call(0.3, 0.78), P.call(0.4, 0.5), P.call(0.46, 0.78)]), Color(c, 0.8))
 			draw_colored_polygon(PackedVector2Array([P.call(0.54, 0.78), P.call(0.62, 0.44), P.call(0.72, 0.78)]), Color(c, 0.8))
+		"cadena_mandobles":
+			draw_line(P.call(0.18, 0.68), P.call(0.42, 0.32), c, w * 1.2, true)
+			draw_line(P.call(0.4, 0.7), P.call(0.64, 0.3), c, w * 1.2, true)
+			draw_line(P.call(0.62, 0.68), P.call(0.86, 0.28), c, w * 1.2, true)
+		"embestida_perforante":
+			draw_line(P.call(0.16, 0.5), P.call(0.78, 0.5), c, w * 1.3, true)
+			draw_colored_polygon(PackedVector2Array([P.call(0.72, 0.4), P.call(0.9, 0.5), P.call(0.72, 0.6)]), c)
+			draw_line(P.call(0.28, 0.34), P.call(0.46, 0.34), Color(c, 0.6), w * 0.6, true)
+		"carga_abisal":
+			draw_circle(P.call(0.5, 0.5), s * 0.1, c)
+			draw_arc(P.call(0.5, 0.5), s * 0.22, 0.0, TAU, 16, Color(c, 0.85), w, true)
+			draw_arc(P.call(0.5, 0.5), s * 0.34, 0.0, TAU, 20, Color(c, 0.5), w * 0.7, true)
+		"tajo_deslizante":
+			draw_line(P.call(0.16, 0.62), P.call(0.84, 0.38), c, w * 1.3, true)
+			draw_line(P.call(0.22, 0.78), P.call(0.7, 0.78), Color(c, 0.55), w * 0.7, true)
+		"giros_dobles":
+			draw_arc(P.call(0.4, 0.5), s * 0.22, -2.6, 0.4, 14, c, w * 1.2, true)
+			draw_arc(P.call(0.62, 0.5), s * 0.22, 0.8, 3.8, 14, Color(c, 0.75), w * 1.2, true)
+		"triple_clavada":
+			for k in 3:
+				var y := 0.28 + k * 0.2
+				draw_line(P.call(0.38, y), P.call(0.62, y + 0.08), c, w, true)
+			draw_arc(P.call(0.5, 0.78), s * 0.16, 0.3, PI - 0.3, 8, Color(c, 0.7), w * 0.7, true)
+		"salto_estocada":
+			draw_line(P.call(0.3, 0.78), P.call(0.7, 0.22), c, w * 1.3, true)
+			draw_colored_polygon(PackedVector2Array([P.call(0.62, 0.18), P.call(0.8, 0.16), P.call(0.74, 0.32)]), c)
+			draw_arc(P.call(0.42, 0.7), s * 0.12, PI, TAU, 8, Color(c, 0.6), w * 0.6, true)
+		"voltereta_cuchilla":
+			draw_arc(P.call(0.42, 0.55), s * 0.2, 0.4, PI + 0.6, 12, c, w, true)
+			draw_line(P.call(0.58, 0.4), P.call(0.84, 0.28), c, w * 1.2, true)
+		"potenciar_filo":
+			draw_line(P.call(0.5, 0.22), P.call(0.5, 0.78), c, w * 1.2, true)
+			draw_arc(P.call(0.5, 0.4), s * 0.16, 0.0, TAU, 12, Color(c, 0.7), w * 0.7, true)
+			draw_circle(P.call(0.5, 0.4), s * 0.05, c)
+		"golpe_fisura":
+			draw_line(P.call(0.5, 0.18), P.call(0.5, 0.55), c, w * 1.4, true)
+			draw_rect(Rect2(P.call(0.34, 0.16), Vector2(0.32, 0.12) * s), c, true)
+			draw_line(P.call(0.22, 0.72), P.call(0.78, 0.72), c, w, true)
+			draw_line(P.call(0.32, 0.64), P.call(0.46, 0.84), Color(c, 0.75), w * 0.8, true)
+			draw_line(P.call(0.54, 0.64), P.call(0.7, 0.84), Color(c, 0.75), w * 0.8, true)
 		_:
 			return false
 	return true

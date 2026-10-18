@@ -161,7 +161,7 @@ func cycle_boss_prev() -> void:
 	var n: int = SimAbilities.boss_avail(state, params, local_slot)
 	if n > 1:
 		state[po + FightSim.AB_SEL] = (int(state[po + FightSim.AB_SEL]) - 1 + n) % n
-		state[po + FightSim.BOSS_CD] = state[po + FightSim.BCD_BASE + state[po + FightSim.AB_SEL]]
+		state[po + FightSim.BOSS_CD] = FightSim.boss_cd_read(state, po, state[po + FightSim.AB_SEL])
 
 func select_boss_ability(idx: int) -> void:
 	if state.is_empty() or params.is_empty():
@@ -170,7 +170,7 @@ func select_boss_ability(idx: int) -> void:
 	var n: int = SimAbilities.boss_avail(state, params, local_slot)
 	if n > 0:
 		state[po + FightSim.AB_SEL] = clampi(idx, 0, n - 1)
-		state[po + FightSim.BOSS_CD] = state[po + FightSim.BCD_BASE + state[po + FightSim.AB_SEL]]
+		state[po + FightSim.BOSS_CD] = FightSim.boss_cd_read(state, po, state[po + FightSim.AB_SEL])
 
 func step_once() -> void:
 	if net:

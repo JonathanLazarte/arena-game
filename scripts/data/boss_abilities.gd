@@ -5,6 +5,7 @@ class_name BossAbilities
 
 const MAX_EQUIPPED := 3
 const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
+const ExtraCatalog = preload("res://scripts/data/extra_catalog.gd")
 const DEFAULT := ["estocada"]
 const ORDER := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso", "salto_caida"]
 const EXT_ORDER := [
@@ -42,6 +43,10 @@ const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfag
 	"columnas_rayo": "Columnas", "saeta_oscura": "Saeta", "orbe_lunar": "Orbe",
 	"aliento_rayo": "Fulgor", "aliento_escarcha": "Escarcha", "chorro_lava": "Lava",
 	"grito_guerra": "Grito", "guardia_reflejo": "Reflejo",
+	"cadena_mandobles": "Mandobles", "embestida_perforante": "Embestida", "carga_abisal": "Abisal",
+	"tajo_deslizante": "Deslizante", "giros_dobles": "Giros", "triple_clavada": "Clavadas",
+	"salto_estocada": "Zambullida", "voltereta_cuchilla": "Voltereta", "potenciar_filo": "Filo",
+	"golpe_fisura": "Fisura",
 	"trazos_hoja": "Trazos", "danza_garza": "Garza", "caida_hoja": "Clavada",
 	"floracion_escarlata": "Floración",
 	"martillo_alba": "Alba", "lanza_veredicto": "Veredicto", "triptico_sagrado": "Tríptico",
@@ -63,11 +68,11 @@ static func color_of(id: String) -> Color:
 	return d.get("color", Color(0.9, 0.85, 0.7)) if not d.is_empty() else Color(0.9, 0.85, 0.7)
 
 static func all_ids() -> Array:
-	return ORDER + EXT_ORDER + HojaCatalog.ids() + EldenCatalog.ids()
+	return ORDER + EXT_ORDER + HojaCatalog.ids() + EldenCatalog.ids() + ExtraCatalog.ids()
 
 static func has(id: String) -> bool:
 	_ensure()
-	return _source.has(id) or HojaCatalog.has(id) or EldenCatalog.has(id)
+	return _source.has(id) or HojaCatalog.has(id) or EldenCatalog.has(id) or ExtraCatalog.has(id)
 
 ## "boss" o "weapon". El programa numérico sigue en source; el origen es origin.
 static func origin_of(id: String) -> String:
@@ -93,6 +98,8 @@ static func def(id: String) -> Dictionary:
 		return HojaCatalog.view_def(id)
 	if EldenCatalog.has(id):
 		return EldenCatalog.view_def(id)
+	if ExtraCatalog.has(id):
+		return ExtraCatalog.view_def(id)
 	_ensure()
 	return _source.get(id, {})
 
@@ -165,6 +172,8 @@ static func codex(id: String) -> String:
 		return HojaCatalog.codex(id)
 	if EldenCatalog.has(id):
 		return EldenCatalog.codex(id)
+	if ExtraCatalog.has(id):
+		return ExtraCatalog.codex(id)
 	var d := def(id)
 	if d.is_empty():
 		return ""

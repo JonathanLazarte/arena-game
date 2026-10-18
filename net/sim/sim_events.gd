@@ -43,6 +43,7 @@ static func diff(prev: PackedInt64Array, cur: PackedInt64Array, P: Array = []) -
 		if prev[o + FightSim.ALIVE] != 0 and cur[o + FightSim.ALIVE] == 0:
 			out.append(_ev(fr, "death", i))
 		_ab_events(prev, cur, P, out, fr, i)
+	_ground_booms(prev, cur, out, fr)
 	return out
 
 ## Eventos del motor de pasos. La clave sale del estado (habilidad, paso, tick): un rollback
@@ -58,10 +59,23 @@ static func _ab_events(prev: PackedInt64Array, cur: PackedInt64Array, P: Array, 
 	if slot < 0 or slot >= boss.size():
 		return
 	var ab: Dictionary = boss[slot]
-	if int(ab.get("type", -1)) != SimAbilities.T_STEPS:
+	var typ := int(ab.get("type", -1))
+	var evs: Array = []
+	var step_i := 0
+	if typ == SimAbilities.T_CATALOG:
+		var steps: Array = ab.get("steps", [])
+		step_i = cur[o + FightSim.AB_FIRED]
+		if step_i < 0 or step_i >= steps.size():
+			return
+		var st: Dictionary = steps[step_i]
+		evs = st.get("evs", [])
+	elif typ == SimAbilities.T_STEPS:
+		evs = ab.get("evs", [])
+	else:
 		return
-	var evs: Array = ab.get("evs", [])
 	var same := prev[o + FightSim.AB_SLOT] == slot and prev[o + FightSim.AB_LAST] == cur[o + FightSim.AB_LAST]
+	if typ == SimAbilities.T_CATALOG:
+		same = same and prev[o + FightSim.AB_FIRED] == cur[o + FightSim.AB_FIRED]
 	var ts_prev := prev[o + FightSim.AB_T] - 1 if same else -1
 	var ts := cur[o + FightSim.AB_T] - 1
 	var code := int(cur[o + FightSim.AB_LAST])
@@ -69,11 +83,25 @@ static func _ab_events(prev: PackedInt64Array, cur: PackedInt64Array, P: Array, 
 		var tick := int(ev.get("tick", 0))
 		if ts_prev < tick and ts >= tick:
 			var id := String(ev.get("id", ""))
-			var step := int(ev.get("step", 0))
+			var step := step_i if typ == SimAbilities.T_CATALOG else int(ev.get("step", 0))
 			out.append({
 				"key": "%d:ab_ev:%d:%d:%d:%s" % [fr, i, code, step, id],
-				"frame": fr, "kind": "ab_ev", "player": i,
+				"frame": fr, "kind": "ab_ev", "player": i, "shake": int(ev.get("shake", 0)),
 			})
+
+## La línea quieta estalla entera. La sacudida sale del cambio de estado, no de un tick suelto.
+static func _ground_booms(prev: PackedInt64Array, cur: PackedInt64Array, out: Array, fr: int) -> void:
+	for j in FightSim.HZ_MAX:
+		var q := FightSim.HZ_BASE + j * FightSim.HZ_FIELDS
+		if cur[q + FightSim.HZ_ON] == 0 or cur[q + FightSim.HZ_TYPE] != 2 or cur[q + FightSim.HZ_SPD] != 0:
+			continue
+		if prev[q + FightSim.HZ_DONE] != 0 or cur[q + FightSim.HZ_DONE] == 0:
+			continue
+		var owner := int(cur[q + FightSim.HZ_OWNER])
+		out.append({
+			"key": "%d:ground_boom:%d:%d" % [fr, owner, j],
+			"frame": fr, "kind": "ground_boom", "player": owner, "shake": 2,
+		})
 
 static func _ev(fr: int, kind: String, p: int) -> Dictionary:
 	return {"key": "%d:%s:%d" % [fr, kind, p], "frame": fr, "kind": kind, "player": p}

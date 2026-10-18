@@ -14,6 +14,7 @@ extends RefCounted
 const TELE_ONLINE := 1.12
 const GLOBAL_CD := 85 # tk(Fighter.BOSS_GLOBAL_CD = 1,4 s)
 const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
+const ExtraCatalog = preload("res://scripts/data/extra_catalog.gd")
 enum { T_ESTOCADA, T_CARGA, T_RAFAGA, T_ESCUDO, T_COMBO, T_SALTO, T_TIMELINE = 10, T_WAVE, T_RAIN, T_BREATH, T_RAGE, T_COUNTER, T_CATALOG = 16, T_STEPS = 17 }
 ## AB_FL: bits de la habilidad en curso
 const FL_LANDED := 1
@@ -46,6 +47,29 @@ static func _turn(deg_s: float) -> int:
 static func _um(m: float) -> int:
 	return SimParams.um(m)
 
+## +40 % de alcance en tajos, persecuciones y ondas que viajan. No entra en básicos ni en artes.
+const REACH_PM := 1400
+## Ticks de rumbo quieto antes del activo. El piso de §11.2.
+const DODGE_LOCK := 18
+
+static func reach_up(v: int) -> int:
+	if v <= 0:
+		return 0
+	return v * REACH_PM / 1000
+
+## El catálogo persigue hasta cerca del golpe y deja al menos 18 ticks para rodar.
+static func pursue_lock(authored: int, windup: int) -> int:
+	var latest := windup - 18
+	if latest < 0:
+		latest = 0
+	var lock := authored
+	var pursue := windup - 24
+	if pursue > lock:
+		lock = pursue
+	if lock > latest:
+		lock = latest
+	return lock
+
 static func _ml(v: float) -> int:
 	return SimParams.milli(v)
 
@@ -59,7 +83,7 @@ static func compile_all(f: Fighter) -> Array:
 	return out
 
 static func compile(f: Fighter, id: String) -> Dictionary:
-	if HojaCatalog.has(id) or EldenCatalog.has(id):
+	if HojaCatalog.has(id) or EldenCatalog.has(id) or ExtraCatalog.has(id):
 		return SimCatalog.compile(f, id)
 	var d := BossAbilities.def(id)
 	if d.is_empty():
@@ -89,12 +113,12 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["type"] = T_ESTOCADA
 			c["raw"] = _ml(w.heavy_damage * dm * Fighter.BOSS_DMG_MULT)
 			c["charge"] = _tk(Fighter.BOSS_CHARGE)
-			c["track"] = _tk(Fighter.BOSS_TRACK)
+			c["track"] = maxi(c["charge"] - DODGE_LOCK, 0)
 			c["home_t"] = _tk(Fighter.BOSS_LUNGE_HOME_T)
 			c["home"] = int(round(Fighter.BOSS_HOME_DEG / 60.0 * 256000.0 / 360.0))
 			c["spd"] = _um(Fighter.BOSS_SPEED / 60.0)
-			c["dist"] = _um(Fighter.BOSS_DIST)
-			c["reach"] = _um(Fighter.BOSS_REACH)
+			c["dist"] = reach_up(_um(Fighter.BOSS_DIST))
+			c["reach"] = reach_up(_um(Fighter.BOSS_REACH))
 			c["cos_arc"] = SimParams.cos_q(Fighter.BOSS_ARC_DEG)
 			c["rec_hit"] = _tk(Fighter.BOSS_RECOVER_HIT)
 			c["rec_miss"] = _tk(Fighter.BOSS_RECOVER_MISS)
@@ -125,7 +149,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["leap_fall"] = _tk(float(d.get("final_fall_time", 0.34)))
 			c["chain"] = _tk(float(d.get("chain_window", 1.15)))
 			c["recovery"] = _tk(float(d["recovery"]))
-			c["strike_r"] = _um(float(d["strike_radius"]))
+			c["strike_r"] = reach_up(_um(float(d["strike_radius"])))
 			c["turn"] = _turn(float(d["turn_deg"]))
 			c["lunge_t"] = _tk(float(d["stage_windup"]) - float(d["lunge_time"]))
 			c["lunge_spd"] = _um(float(d["lunge_speed"]) / 60.0)
@@ -142,7 +166,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["var_lunge_t"] = _tk(float(d["variant_windup"]) - float(d["lunge_time"]))
 			c["var_stop"] = _um(1.4)
 			c["var_dist_v"] = _um(float(d["lunge_dist"]) * 1.45 / float(d["lunge_time"]) / 60.0)
-			c["var_reach"] = _um(float(d.get("variation_reach", 6.5)))
+			c["var_reach"] = reach_up(_um(float(d.get("variation_reach", 6.5))))
 			c["var_cos"] = SimParams.cos_q(65.0)
 			c["var_k"] = _ml(float(hl[1]) * 1.2)
 			c["var_force"] = fphys.call(float(hl[2]) + 8.0)
@@ -170,15 +194,16 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			var hs: Array = []
 			for h: Array in hits:
 				var th := float(h[0]) * tk
-				hs.append([_tk(th), _ml(float(h[1])), fphys.call(float(h[2])), _um((float(h[3]) if h.size() > 3 else 0.0) / 60.0),
-					_tk(th - 0.06), _tk(th - 0.25), _tk(th + 0.04)])
+				var hit_tk := _tk(th)
+				hs.append([hit_tk, _ml(float(h[1])), fphys.call(float(h[2])), _um((float(h[3]) if h.size() > 3 else 0.0) / 60.0),
+					maxi(hit_tk - DODGE_LOCK, 0), _tk(th - 0.25), _tk(th + 0.04)])
 			c["hits"] = hs
 			var unbl := bool(d.get("unblockable", false))
 			c["kind"] = 3 if unbl or String(d.get("kind", "melee")) == "jefe" else 0
 			c["sub"] = SimParams.sub_code(w.phys_type)
 			c["pd_pm"] = SimParams.pm(2.0 * w.poise_damage_mult * float(PhysTypes.POISE_MOD.get(w.phys_type, 1.0)) * float(f.ad["impacto"])) if c["kind"] == 0 else 2000
 			c["counter_pm"] = SimParams.pm(float(PhysTypes.COUNTER_DMG.get(w.phys_type, 1.15)))
-			c["reach"] = _um(float(d.get("reach", 2.8)))
+			c["reach"] = reach_up(_um(float(d.get("reach", 2.8))))
 			c["gap"] = _um(float(d.get("reach", 2.6)) * 0.55)
 			c["cos_arc"] = SimParams.cos_q(float(d.get("arc", 60.0)))
 			c["track"] = _turn(float(d.get("track", 180.0)))
@@ -219,8 +244,8 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 				offs.append(-int(round(ang * 256.0 / 360.0))) # rotated(UP, +a) = rumbo − a
 			c["offs"] = offs
 			c["spd"] = _um(float(d["speed"]) / 60.0)
-			c["range"] = _um(float(d["range"]))
-			c["width"] = _um(float(d["width"]))
+			c["range"] = reach_up(_um(float(d["range"])))
+			c["width"] = reach_up(_um(float(d["width"])))
 			c["warn"] = _tk(float(d["warn"]) * tk)
 			c["force"] = fphys.call(float(d.get("force", 30.0)))
 			c["end"] = _tk(float(d["windup"]) * tk + float(d.get("recovery", 0.8)))
@@ -249,7 +274,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 				t -= 1.0 / 60.0
 				n += 1
 			c["tick"] = n
-			c["range"] = _um(float(d.get("range", 7.5)))
+			c["range"] = reach_up(_um(float(d.get("range", 7.5))))
 			c["cos_arc"] = SimParams.cos_q(float(d.get("arc", 28.0)))
 			c["turn"] = _turn(float(d.get("turn_deg", 70.0)))
 			c["elem"] = SimParams.SUBS.size() + SimParams.ELEMS.find(String(d.get("element", "fuego")))
@@ -266,7 +291,7 @@ static func compile(f: Fighter, id: String) -> Dictionary:
 			c["ws"] = _tk(float(d["windup"]) * tk + float(d["stance"]) * tk)
 			c["rec_hit"] = _tk(float(d["recovery_hit"]))
 			c["end_miss"] = _tk(float(d["windup"]) * tk + float(d["stance"]) * tk + float(d["recovery_miss"]))
-			c["reach"] = _um(float(d.get("reach", 4.0)))
+			c["reach"] = reach_up(_um(float(d.get("reach", 4.0))))
 			c["c_raw"] = _ml(w.heavy_damage * dm * float(d.get("cmult", 1.6)))
 			c["c_force"] = fphys.call(float(d.get("cforce", 55.0)))
 		"rafaga":
@@ -285,7 +310,7 @@ static func _compile_rafaga(c: Dictionary, d: Dictionary, fmag: Callable, scale:
 	c["turn"] = _turn(360.0)
 	c["count"] = int(d["count"])
 	c["spd"] = _um(float(d["speed"]) / 60.0)
-	c["life"] = _tk(float(d["life"]))
+	c["life"] = reach_up(_tk(float(d["life"])))
 	c["radius"] = _um(float(d.get("radius", 0.7)))
 	c["force"] = fmag.call(float(d["force"]))
 	c["home_t"] = _tk(float(d["home_time"]) * scale)
@@ -426,6 +451,28 @@ static func hazards(s: PackedInt64Array, P: Array) -> void:
 				else:
 					s[b + FightSim.KX] = FxMath.COS[s[b + FightSim.FACE]] * kv / FxMath.ONE
 					s[b + FightSim.KZ] = FxMath.SIN[s[b + FightSim.FACE]] * kv / FxMath.ONE
+				s[owner * FightSim.F_FIELDS + FightSim.AB_HITS] += 1
+		elif s[q + FightSim.HZ_SPD] == 0:
+			if s[q + FightSim.HZ_DONE] != 0:
+				if s[q + FightSim.HZ_T] >= s[q + FightSim.HZ_WARN] + 24:
+					s[q + FightSim.HZ_ON] = 0
+				continue
+			if s[q + FightSim.HZ_T] < s[q + FightSim.HZ_WARN]:
+				continue
+			s[q + FightSim.HZ_DONE] = 1
+			if s[b + FightSim.ALIVE] == 0 or not _grounded(s, b):
+				continue
+			var lx: int = s[b + FightSim.X] - s[q + FightSim.HZ_X]
+			var lz: int = s[b + FightSim.Z] - s[q + FightSim.HZ_Z]
+			var hr0: int = P[1 - owner]["hit_radius"]
+			var along0: int = (lx * s[q + FightSim.HZ_DX] + lz * s[q + FightSim.HZ_DZ]) / FxMath.ONE
+			var side0: int = absi(lx * s[q + FightSim.HZ_DZ] - lz * s[q + FightSim.HZ_DX]) / FxMath.ONE
+			if along0 < -hr0 or along0 > s[q + FightSim.HZ_RANGE] + hr0 or side0 > s[q + FightSim.HZ_W] / 2 + hr0:
+				continue
+			var res3 := FightSim._take_hit(s, P, owner, 5, s[q + FightSim.HZ_RAW], 0, s[q + FightSim.HZ_FORCE], 2000, 1000, 0)
+			if res3 == 1:
+				s[b + FightSim.KX] = s[q + FightSim.HZ_DX] * s[q + FightSim.HZ_KNOCK] / FxMath.ONE
+				s[b + FightSim.KZ] = s[q + FightSim.HZ_DZ] * s[q + FightSim.HZ_KNOCK] / FxMath.ONE
 				s[owner * FightSim.F_FIELDS + FightSim.AB_HITS] += 1
 		else:
 			if s[q + FightSim.HZ_T] < s[q + FightSim.HZ_WARN]:
@@ -687,7 +734,7 @@ static func end_ability(s: PackedInt64Array, o: int, interrupted: bool) -> void:
 		s[o + FightSim.FY] = 0
 		s[o + FightSim.AIR] = 0
 		s[o + FightSim.FVY] = 0
-	s[o + FightSim.BOSS_CD] = s[o + FightSim.BCD_BASE + s[o + FightSim.AB_SEL]]
+	s[o + FightSim.BOSS_CD] = FightSim.boss_cd_read(s, o, s[o + FightSim.AB_SEL])
 
 static func _end_combo(s: PackedInt64Array, P: Array, i: int, penalize: bool) -> void:
 	var o := i * FightSim.F_FIELDS
@@ -834,11 +881,11 @@ static func _end_boss(s: PackedInt64Array, o: int) -> void:
 	s[o + FightSim.BS_PH] = 0
 	s[o + FightSim.BS_T] = 0
 	s[o + FightSim.AB_SLOT] = -1
-	s[o + FightSim.BOSS_CD] = s[o + FightSim.BCD_BASE + s[o + FightSim.AB_SEL]]
+	s[o + FightSim.BOSS_CD] = FightSim.boss_cd_read(s, o, s[o + FightSim.AB_SEL])
 
 static func _rafaga(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 	var o := i * FightSim.F_FIELDS
-	if s[o + FightSim.AB_T] < int(ab["w"]):
+	if s[o + FightSim.AB_T] < int(ab["w"]) - DODGE_LOCK:
 		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
 	while s[o + FightSim.AB_FIRED] < int(ab["count"]) and s[o + FightSim.AB_T] >= int(ab["w"]):
 		var f: int = s[o + FightSim.FACE]
@@ -945,7 +992,7 @@ static func _strike(s: PackedInt64Array, P: Array, i: int, ab: Dictionary, h: Ar
 static func _wave(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 	var o := i * FightSim.F_FIELDS
 	var t: int = s[o + FightSim.AB_T]
-	if t < int(ab["w"]):
+	if t < int(ab["w"]) - DODGE_LOCK:
 		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
 	if s[o + FightSim.AB_FIRED] == 0 and t >= int(ab["w"]):
 		var raw := raw_live(s, P, i, ab["raw"])
@@ -985,7 +1032,7 @@ static func _rain(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void
 static func _breath(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> void:
 	var o := i * FightSim.F_FIELDS
 	var t: int = s[o + FightSim.AB_T]
-	if t < int(ab["w_end"]):
+	if t < int(ab["w"]) - DODGE_LOCK:
 		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
 	if t >= int(ab["w"]) and t < int(ab["w_end"]):
 		s[o + FightSim.AB_TICK] -= 1
@@ -1093,7 +1140,7 @@ static func _combo(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> voi
 		s[o + FightSim.FY] = cur_h
 		s[o + FightSim.AIR] = 1 if cur_h > 0 else 0
 		s[o + FightSim.FVY] = 0
-		if s[b + FightSim.ALIVE] != 0:
+		if t < strike - DODGE_LOCK and s[b + FightSim.ALIVE] != 0:
 			var ax: int = s[o + FightSim.X] - s[b + FightSim.X]
 			var az: int = s[o + FightSim.Z] - s[b + FightSim.Z]
 			var al := FxMath.length(ax, az)
@@ -1101,7 +1148,8 @@ static func _combo(s: PackedInt64Array, P: Array, i: int, ab: Dictionary) -> voi
 				s[o + FightSim.AB_VX] = ax * int(ab["retreat"]) / al
 				s[o + FightSim.AB_VZ] = az * int(ab["retreat"]) / al
 	if s[b + FightSim.ALIVE] != 0 and FightSim._dist_to_opp(s, i) > 100000:
-		s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
+		if t < strike - DODGE_LOCK:
+			s[o + FightSim.FACE] = FxMath.turn_toward(s[o + FightSim.FACE], _tdir(s, i), ab["turn"])
 		var lt: int = ab["var_lunge_t"] if variant else ab["lunge_t"]
 		if (not final_hit or variant) and t >= lt and t < strike:
 			var gap := FightSim._dist_to_opp(s, i)
