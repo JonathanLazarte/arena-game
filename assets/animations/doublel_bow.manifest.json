@@ -1,0 +1,30 @@
+{
+	"character": "bow",
+	"clips": [
+		{
+			"length": 2.333,
+			"loop": false,
+			"name": "bow_attack_a",
+			"slot": "shoot",
+			"source": "AS_Bow_Attack_A_1_All"
+		},
+		{
+			"length": 2.167,
+			"loop": false,
+			"name": "bow_attack_b",
+			"slot": "shoot (variante)",
+			"source": "AS_Bow_Attack_B_1_All"
+		},
+		{
+			"length": 2.0,
+			"loop": true,
+			"name": "bow_idle",
+			"slot": "aim / idle con arco",
+			"source": "AS_Bow_Idle_B"
+		}
+	],
+	"fps": 30.0,
+	"pack": "doublel",
+	"rest": "bind",
+	"skipped": []
+}

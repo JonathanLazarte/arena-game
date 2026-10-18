@@ -34,7 +34,12 @@ func _init() -> void:
 			var low := f.to_lower()
 			if not (low.ends_with(".fbx")):
 				continue
-			if f.begins_with(String(ch.prefix) + "@") or f == String(ch.get("model", "")):
+			var want: bool = f == String(ch.get("model", ""))
+			if ch.has("clips"): # lista explícita {nombre_salida: archivo_sin_extensión}
+				want = want or (ch.clips as Dictionary).values().has(f.get_basename())
+			elif ch.has("prefix"):
+				want = want or f.begins_with(String(ch.prefix) + "@")
+			if want and not FileAccess.file_exists(scratch + "/src/" + f.get_basename() + ".fbx"):
 				var dn := f.get_basename() + ".fbx" # Godot solo importa la extensión en minúsculas
 				_copy(src.path_join(f), scratch + "/src/" + dn)
 				n += 1

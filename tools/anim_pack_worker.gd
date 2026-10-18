@@ -6,7 +6,7 @@ extends SceneTree
 ## fuente (cadenas caderas-columna-cabeza, brazos, piernas); los huesos hoja la heredan.
 ## Reposo fuente = pose de bind del modelo del pack (si existe; arregla el giro de antebrazo/mano),
 ## llevada al espacio de los clips con «bind_axes». Si no hay modelo, se usa el frame 0.
-## Root motion: el hueso raíz («root_bone») se ignora entero; de la pelvis solo queda la altura
+## Root motion: el hueso raíz («root_bone») se ignora entero (con «root_keep_vertical» se conserva su altura); de la pelvis solo queda la altura
 ## (escalada por la relación de alturas de cadera); x/z quedan en el reposo KayKit.
 
 var P: Dictionary
@@ -71,12 +71,21 @@ func _character(ch: Dictionary, tsk: Skeleton3D) -> bool:
 	var lib := AnimationLibrary.new()
 	var manifest: Array = []
 	var skipped: Array = []
-	var files := DirAccess.get_files_at("res://src")
-	files.sort()
-	for f in files:
-		if not f.begins_with(String(ch.prefix) + "@") or not f.to_lower().ends_with(".fbx"):
-			continue
-		var clip_name := snake(f.get_basename().split("@")[1])
+	var jobs: Array = [] # [nombre_salida, archivo]
+	if ch.has("clips"):
+		for k: String in ch.clips:
+			jobs.append([k, String(ch.clips[k]) + ".fbx"])
+	else:
+		var files := DirAccess.get_files_at("res://src")
+		files.sort()
+		for f in files:
+			if f.begins_with(String(ch.prefix) + "@") and f.to_lower().ends_with(".fbx"):
+				jobs.append([snake(f.get_basename().split("@")[1]), f])
+	for job: Array in jobs:
+		var clip_name: String = job[0]
+		var f: String = job[1]
+		if not FileAccess.file_exists("res://src/" + f):
+			skipped.append({"file": f, "why": "no está en --src"}); continue
 		var scn = load("res://src/" + f)
 		if scn == null:
 			skipped.append({"file": f, "why": "no importa"}); continue
@@ -134,6 +143,7 @@ func _retarget(anim: Animation, ssk: Skeleton3D, tsk: Skeleton3D, tg: Array[Tran
 	var CHAIN: Dictionary = P.chain
 	var INHERIT: Dictionary = P.get("inherit", {})
 	var root_bone := String(P.get("root_bone", ""))
+	var keep_y := bool(P.get("root_keep_vertical", false))
 	var sg0 := grest(ssk)
 	var sg := {} # clave KayKit -> reposo global fuente
 	for k: String in MAP:
@@ -191,7 +201,10 @@ func _retarget(anim: Animation, ssk: Skeleton3D, tsk: Skeleton3D, tg: Array[Tran
 			var b := r.basis
 			var o := r.origin
 			var nm := ssk.get_bone_name(i)
-			if nm != root_bone: # el hueso raíz (root motion) se descarta entero
+			if nm == root_bone and keep_y and tracks.has(nm + str(Animation.TYPE_POSITION_3D)):
+				# packs que suben/bajan el cuerpo con la raíz (saltos, agacharse): solo se conserva la altura
+				o.y = anim.position_track_interpolate(tracks[nm + str(Animation.TYPE_POSITION_3D)], tt).y
+			elif nm != root_bone: # el hueso raíz (root motion) se descarta entero
 				var kr := nm + str(Animation.TYPE_ROTATION_3D)
 				var kp := nm + str(Animation.TYPE_POSITION_3D)
 				if tracks.has(kr): b = Basis(anim.rotation_track_interpolate(tracks[kr], tt))

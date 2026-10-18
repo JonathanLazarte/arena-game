@@ -1,0 +1,162 @@
+{
+	"_doc": "Pack de animaciones RPG (rig maniqu\u00ed UE5). Clips InPlace cuando existen; reposo = bind del maniqu\u00ed base del pack. Ver docs/CHARACTER_GUIDE.md \u00a713.",
+	"pack": "doublel",
+	"target": "res://assets/models/Knight.glb",
+	"fps": 30,
+	"root_bone": "root",
+	"hips_source": "pelvis",
+	"bind_axes": [
+		[
+			1,
+			0,
+			0
+		],
+		[
+			0,
+			1,
+			0
+		],
+		[
+			0,
+			0,
+			1
+		]
+	],
+	"bone_map": {
+		"hips": "pelvis",
+		"spine": "spine_02",
+		"chest": "spine_05",
+		"head": "head",
+		"upperarm.l": "upperarm_l",
+		"lowerarm.l": "lowerarm_l",
+		"wrist.l": "hand_l",
+		"upperleg.l": "thigh_l",
+		"lowerleg.l": "calf_l",
+		"foot.l": "foot_l",
+		"toes.l": "ball_l",
+		"upperarm.r": "upperarm_r",
+		"lowerarm.r": "lowerarm_r",
+		"wrist.r": "hand_r",
+		"upperleg.r": "thigh_r",
+		"lowerleg.r": "calf_r",
+		"foot.r": "foot_r",
+		"toes.r": "ball_r"
+	},
+	"chain": {
+		"hips": "spine",
+		"spine": "chest",
+		"chest": "head",
+		"upperarm.l": "lowerarm.l",
+		"lowerarm.l": "wrist.l",
+		"upperarm.r": "lowerarm.r",
+		"lowerarm.r": "wrist.r",
+		"upperleg.l": "lowerleg.l",
+		"lowerleg.l": "foot.l",
+		"foot.l": "toes.l",
+		"upperleg.r": "lowerleg.r",
+		"lowerleg.r": "foot.r",
+		"foot.r": "toes.r"
+	},
+	"inherit": {
+		"head": "chest",
+		"wrist.l": "lowerarm.l",
+		"wrist.r": "lowerarm.r",
+		"toes.l": "foot.l",
+		"toes.r": "foot.r"
+	},
+	"loop_patterns": [
+		"idle",
+		"walk",
+		"run",
+		"strafe",
+		"sprint"
+	],
+	"slots": {
+		"light_a1": "light0",
+		"light_a2": "light1",
+		"light_a3": "light2",
+		"light_b1": "light0 (combo alterno) / heavy",
+		"light_b2": "light1 (combo alterno)",
+		"light_b3": "light2 (combo alterno) / heavy",
+		"block_idle": "block",
+		"block_hit": "block_hit",
+		"idle": "none/Idle",
+		"crouch_idle": "",
+		"crouch_walk": "",
+		"walk_f": "Walking_A",
+		"walk_b": "Walking_Backwards",
+		"walk_strafe_l": "Walk_Strafe_L",
+		"walk_strafe_r": "Walk_Strafe_R",
+		"run_f": "Running_A",
+		"run_b": "(correr atr\u00e1s)",
+		"run_strafe_l": "Running_Strafe_L",
+		"run_strafe_r": "Running_Strafe_R",
+		"sprint": "(sprint)",
+		"jump": "jump_up/jump_air/jump_land (un solo clip)",
+		"hit_1": "hit",
+		"hit_2": "hit (variante) / stun",
+		"action_4_1": "(gesto largo con agachada, no es ca\u00edda)",
+		"action_5_1": "(gesto largo con agachada, no es ca\u00edda)",
+		"action_5_2": "(gesto largo con agachada, no es ca\u00edda)",
+		"enemy_attack": "boss_lunge / heavy",
+		"bow_attack_a": "shoot",
+		"bow_attack_b": "shoot (variante)",
+		"bow_idle": "aim / idle con arco",
+		"enemy_charge_attack": "dash_strike"
+	},
+	"characters": [
+		{
+			"id": "one_hand",
+			"model": "Unreal_Base.fbx",
+			"clips": {
+				"light_a1": "AS_1Hand_Up_Attack_A_1_InPlace",
+				"light_a2": "AS_1Hand_Up_Attack_A_2_InPlace",
+				"light_a3": "AS_1Hand_Up_Attack_A_3_InPlace",
+				"light_b1": "AS_1Hand_Up_Attack_B_1_InPlace",
+				"light_b2": "AS_1Hand_Up_Attack_B_2_InPlace",
+				"light_b3": "AS_1Hand_Up_Attack_B_3_InPlace",
+				"block_idle": "AS_1Hand_Up_Shield_Block_Idle_1",
+				"block_hit": "AS_1Hand_Up_Shield_Block_Hit_1_InPlace",
+				"idle": "AS_1Hand_Up_Stand_Idle_A_2",
+				"crouch_idle": "AS_1Hand_Up_Crouch_Idle_1",
+				"crouch_walk": "AS_1Hand_Up_Crouch_F_InPlace",
+				"walk_f": "AS_1Hand_Up_Walk_A_F_InPlace",
+				"walk_b": "AS_1Hand_Up_Walk_A_B_InPlace",
+				"walk_strafe_l": "AS_1Hand_Up_Walk_A_F_L90_A_InPlace",
+				"walk_strafe_r": "AS_1Hand_Up_Walk_A_F_R90_A_InPlace",
+				"run_f": "AS_1Hand_Up_Run_A_F_InPlace",
+				"run_b": "AS_1Hand_Up_Run_A_B_InPlace",
+				"run_strafe_l": "AS_1Hand_Up_Run_A_F_L90_A_InPlace",
+				"run_strafe_r": "AS_1Hand_Up_Run_A_F_R90_A_InPlace",
+				"sprint": "AS_1Hand_Up_Sprint_A_F_InPlace",
+				"jump": "AS_1Hand_Up_Jump_B_InPlace"
+			},
+			"out": "res://assets/animations/doublel_one_hand.res"
+		},
+		{
+			"id": "common",
+			"model": "Unreal_Base.fbx",
+			"clips": {
+				"hit_1": "AS_Hit_B_4_InPlace",
+				"hit_2": "AS_Hit_B_5_InPlace",
+				"action_4_1": "AS_Action_A_4_1",
+				"action_5_1": "AS_Action_A_5_1",
+				"action_5_2": "AS_Action_A_5_2",
+				"enemy_attack": "AS_Enemy_Attack_1_InPlace",
+				"enemy_charge_attack": "AS_Enemy_Attack_1_Run_InPlace"
+			},
+			"out": "res://assets/animations/doublel_common.res"
+		},
+		{
+			"id": "bow",
+			"model": "Unreal_Base.fbx",
+			"clips": {
+				"bow_attack_a": "AS_Bow_Attack_A_1_All",
+				"bow_attack_b": "AS_Bow_Attack_B_1_All",
+				"bow_idle": "AS_Bow_Idle_B"
+			},
+			"out": "res://assets/animations/doublel_bow.res"
+		}
+	],
+	"root_keep_vertical": true
+}

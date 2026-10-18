@@ -50,6 +50,30 @@ func _initialize() -> void:
 		check(bad_root == 0 and max_xz < 0.001, "%s: sin traslación de raíz (desvío x/z caderas %.4f m)" % [f, max_xz])
 		check(bad_loop == 0, "%s: bucles como en el manifiesto" % f)
 	check(n > 0, "hay al menos una biblioteca convertida (%d)" % n)
+	# perfiles con lista explícita de clips: la biblioteca trae exactamente esos nombres
+	for pf in DirAccess.get_files_at("res://tools/anim_profiles"):
+		var prof = JSON.parse_string(FileAccess.get_file_as_string("res://tools/anim_profiles/" + pf))
+		if typeof(prof) != TYPE_DICTIONARY:
+			continue
+		for ch: Dictionary in prof.get("characters", []):
+			if not ch.has("clips") or not ResourceLoader.exists(String(ch.out)):
+				continue
+			var lib := load(String(ch.out)) as AnimationLibrary
+			var want: Array = (ch.clips as Dictionary).keys()
+			var have: Array = Array(lib.get_animation_list()).map(func(x): return String(x))
+			want.sort(); have.sort()
+			check(want == have, "%s/%s: clips del perfil (%d) = biblioteca (%d)" % [pf, ch.id, want.size(), have.size()])
+	# raíz que lleva la altura (root_keep_vertical): el salto mueve las caderas en y
+	if ResourceLoader.exists("res://assets/animations/doublel_one_hand.res"):
+		var j := (load("res://assets/animations/doublel_one_hand.res") as AnimationLibrary).get_animation("jump")
+		var lo := 9.0
+		var hi := -9.0
+		for t in j.get_track_count():
+			if j.track_get_type(t) == Animation.TYPE_POSITION_3D:
+				for k in j.track_get_key_count(t):
+					var y: float = j.track_get_key_value(t, k).y
+					lo = minf(lo, y); hi = maxf(hi, y)
+		check(hi - lo > 0.05, "doublel jump: altura de caderas varía (%.2f m)" % (hi - lo))
 	kay.free()
 	print("\n%s (%d fallos)" % ["OK" if fails == 0 else "FALLÓ", fails])
 	quit(1 if fails > 0 else 0)
