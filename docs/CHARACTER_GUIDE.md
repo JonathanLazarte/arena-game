@@ -13,6 +13,8 @@ nuevo no altera a los demás.
 > modelos de terceros que **no pueden** llegar a `master`. Si querés usar el reapuntado en
 > `master`, traé **solo el código** (ver §11), nunca la carpeta `assets/test_models/`.
 
+> Animar habilidades (clips alineados con los ticks de la sim, espejos, bucles, rollback): [ABILITY_ANIMATION_GUIDE.md](ABILITY_ANIMATION_GUIDE.md).
+
 ## 0. Resumen rápido
 
 1. Conseguí un modelo humanoide con licencia que te permita usarlo (§1).

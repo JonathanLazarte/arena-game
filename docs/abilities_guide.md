@@ -10,6 +10,8 @@
 
 ---
 
+> Animación de cada paso (qué clip, cómo alinearlo con windup/activo/recuperación): [ABILITY_ANIMATION_GUIDE.md](ABILITY_ANIMATION_GUIDE.md).
+
 ## Índice
 1. Reglas del juego que el esquema respeta
 2. Unidades, escalas y conversión tick ↔ ms
