@@ -12,10 +12,13 @@ static var capture_mouse: bool = false
 const PITCH_MIN := -0.15 ## rad (un poco por debajo del horizonte)
 const PITCH_MAX := 1.1 ## rad (~63°, casi cenital)
 const PITCH_DEFAULT := 0.5
-const DIST := 7.8 ## libre (antes 9,5: −18 %, más cerca del personaje; mismo valor en PC y móvil)
-const LOCK_DIST := 6.6 ## fijado: base (antes 8,0)
-const LOCK_DIST_K := 0.13 ## fijado: + distancia al rival × K (antes 0,15)
-const LOCK_DIST_EXTRA := 4.2 ## fijado: tope del extra (antes 5,0) → máx. 10,8 m (antes 13)
+## Ronda p13: medido en la arena real (tests/print_camera.gd), la tanda anterior (−18 % en las
+## constantes) solo acercaba la cámara al jugador un 15,6 % (9,24 → 7,80 m a <9 m del rival): el
+## pivote (+2 m) y el hombro (1,6 m) no escalan. Ahora −19 % efectivo (9,24 → 7,50 m).
+const DIST := 7.4 ## libre (antes 9,5 → 7,8 → 7,4; mismo valor en PC y móvil)
+const LOCK_DIST := 6.3 ## fijado: base (antes 8,0 → 6,6)
+const LOCK_DIST_K := 0.12 ## fijado: + distancia al rival × K (antes 0,15 → 0,13)
+const LOCK_DIST_EXTRA := 4.0 ## fijado: tope del extra (antes 5,0 → 4,2) → máx. 10,3 m (antes 13)
 const MOUSE_K := 0.005
 const TOUCH_K := 0.008
 const FLICK_PX := 140.0 ## tirón horizontal (px en 0,25 s) que cambia de objetivo con lock-on

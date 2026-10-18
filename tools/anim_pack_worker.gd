@@ -2,14 +2,39 @@ extends SceneTree
 ## Trabajador de tools/import_anim_pack.gd: corre DENTRO del proyecto temporal (no en el repo).
 ## Reapuntado por delta global (misma matemática que tools/retarget_kaykit.gd):
 ##   Ws = Apose_src · Grest_src⁻¹ ;  Apose_tgt = Ws · C · Grest_tgt
-## C = rotación mínima que lleva la dirección de cada segmento del reposo KayKit a la del reposo
-## fuente (cadenas caderas-columna-cabeza, brazos, piernas); los huesos hoja la heredan.
+## C = rotación que lleva cada segmento del reposo KayKit al del reposo fuente (cadenas
+## caderas-columna-cabeza, brazos, piernas); los huesos hoja la heredan. En los brazos C es la
+## rotación completa entre marcos (dirección + rollo, con «roll_ref»: índice/meñique del modelo
+## fuente frente a «target_across»), no solo la mínima entre direcciones. «forearm_twist» reparte
+## el giro mano/antebrazo (rigs con huesos de giro dejan el antebrazo quieto y la mano girada).
 ## Reposo fuente = pose de bind del modelo del pack (si existe; arregla el giro de antebrazo/mano),
 ## llevada al espacio de los clips con «bind_axes». Si no hay modelo, se usa el frame 0.
 ## Root motion: el hueso raíz («root_bone») se ignora entero (con «root_keep_vertical» se conserva su altura); de la pelvis solo queda la altura
 ## (escalada por la relación de alturas de cadera); x/z quedan en el reposo KayKit.
 
 var P: Dictionary
+var roll_fix := {} ## hueso -> grados corregidos por rollo (diagnóstico)
+var twist_max := [0.0, 0.0] ## giro mano/antebrazo máx. [fuente, que queda en la muñeca destino]
+var fa_twist := 0.0
+const MAX_ROLL_FIX := 45.0 ## más que esto = dedos del modelo mal identificados
+
+## Marco ortonormal: X = dirección del hueso, Y = «b» sin su componente en X.
+static func _frame(x: Vector3, b: Vector3) -> Basis:
+	var y := (b - x * b.dot(x)).normalized()
+	return Basis(x, y, x.cross(y))
+
+## Ángulo con signo del giro de «r» alrededor de «axis» (descomposición swing-twist).
+static func _twist_angle(r: Quaternion, axis: Vector3) -> float:
+	var v := Vector3(r.x, r.y, r.z)
+	var p := axis * v.dot(axis)
+	var t := Quaternion(p.x, p.y, p.z, r.w)
+	if t.length_squared() < 1e-12:
+		return 0.0
+	t = t.normalized()
+	var ang := 2.0 * atan2(Vector3(t.x, t.y, t.z).length(), t.w)
+	if Vector3(t.x, t.y, t.z).dot(axis) < 0.0:
+		ang = -ang
+	return wrapf(ang, -PI, PI)
 
 static func q(b: Basis) -> Quaternion:
 	return b.orthonormalized().get_rotation_quaternion()
@@ -47,6 +72,9 @@ func _init() -> void:
 
 func _character(ch: Dictionary, tsk: Skeleton3D) -> bool:
 	var MAP: Dictionary = P.bone_map
+	roll_fix = {}
+	twist_max = [0.0, 0.0]
+	fa_twist = float(P.get("forearm_twist", 0.0))
 	var tg := grest(tsk)
 	var ti := {}
 	for k: String in MAP:
@@ -110,6 +138,7 @@ func _character(ch: Dictionary, tsk: Skeleton3D) -> bool:
 			"loop": out.loop_mode != Animation.LOOP_NONE, "slot": P.get("slots", {}).get(clip_name, "")})
 		print("[anim] %s/%s  %.2fs loop=%s  (%s)" % [ch.id, clip_name, out.length, out.loop_mode != 0, f])
 		src.free()
+	print("[anim] %s: rollo corregido %s ; giro mano/antebrazo máx %.0f° → en muñeca %.0f° (forearm_twist %.2f)" % [ch.id, roll_fix, twist_max[0], twist_max[1], fa_twist])
 	ResourceSaver.save(lib, "res://out_%s.res" % ch.id, ResourceSaver.FLAG_COMPRESS)
 	var mf := FileAccess.open("res://out_%s.json" % ch.id, FileAccess.WRITE)
 	mf.store_string(JSON.stringify({"pack": P.pack, "character": ch.id, "fps": P.fps, "rest": "bind" if not bind.is_empty() else "frame0",
@@ -154,6 +183,30 @@ func _retarget(anim: Animation, ssk: Skeleton3D, tsk: Skeleton3D, tg: Array[Tran
 		var dt: Vector3 = (tg[ti[CHAIN[k]]].origin - tg[ti[k]].origin).normalized()
 		var ds: Vector3 = ((sg[CHAIN[k]] as Transform3D).origin - (sg[k] as Transform3D).origin).normalized()
 		cq[k] = Quaternion(dt, ds)
+	# Rollo (giro alrededor del hueso): la rotación mínima entre direcciones no fija el giro.
+	# «roll_ref» da, por lado, [índice, meñique] del rig fuente: el eje «a través de la palma»
+	# del reposo fuente debe coincidir con «target_across» (KayKit en T: palmas abajo, índice a +Z).
+	# C pasa a ser la rotación completa entre los dos marcos (dirección + ese eje) en todo el brazo.
+	var RR: Dictionary = P.get("roll_ref", {})
+	var ta: Array = P.get("target_across", [0, 0, 1])
+	var across_t := Vector3(ta[0], ta[1], ta[2]).normalized()
+	var srest := func(bn: String) -> Transform3D:
+		return bind[bn] if bind.has(bn) else sg0[ssk.find_bone(bn)]
+	for side: String in RR:
+		var a_s: Vector3 = ((srest.call(RR[side][0]) as Transform3D).origin - (srest.call(RR[side][1]) as Transform3D).origin).normalized()
+		for k: String in ["upperarm." + side, "lowerarm." + side]:
+			var dt: Vector3 = (tg[ti[CHAIN[k]]].origin - tg[ti[k]].origin).normalized()
+			var ds: Vector3 = ((sg[CHAIN[k]] as Transform3D).origin - (sg[k] as Transform3D).origin).normalized()
+			var full: Quaternion = q(_frame(ds, a_s) * _frame(dt, across_t).inverse())
+			var fix := rad_to_deg(((cq[k] as Quaternion).inverse() * full).get_angle())
+			if fix > 180.0:
+				fix = 360.0 - fix
+			if fix > MAX_ROLL_FIX:
+				# referencia de dedos poco fiable en este modelo: se queda la rotación mínima
+				roll_fix[k] = "omitido %.0f°" % fix
+				continue
+			roll_fix[k] = snappedf(fix, 0.1)
+			cq[k] = full
 	for k: String in INHERIT:
 		cq[k] = cq[INHERIT[k]]
 	var tracks := {}
@@ -212,9 +265,30 @@ func _retarget(anim: Animation, ssk: Skeleton3D, tsk: Skeleton3D, tg: Array[Tran
 			var p := ssk.get_bone_parent(i)
 			g.append((g[p] if p >= 0 else Transform3D.IDENTITY) * Transform3D(b, o))
 		var at := {}
+		var wsd := {}
 		for k: String in order:
 			var ws: Quaternion = q(g[sidx[k]].basis) * q((sg[k] as Transform3D).basis).inverse()
+			wsd[k] = ws
 			at[k] = ws * cq.get(k, Quaternion.IDENTITY) * q(tg[ti[k]].basis)
+		# Reparto del giro del antebrazo: en rigs con huesos de giro (UE) el antebrazo principal no
+		# gira y todo el giro queda en la mano; el rig KayKit lo lleva en el antebrazo (sus clips
+		# nativos: muñeca/antebrazo ≈ 2°), así que la mano «retorcida» sobre un antebrazo quieto se ve
+		# como brazos torcidos. «forearm_twist» = fracción del giro mano/antebrazo (alrededor del eje
+		# del antebrazo) que pasa al antebrazo destino (1 = convención KayKit).
+		for side: String in ["l", "r"]:
+			var lk := "lowerarm." + side
+			var wk := "wrist." + side
+			if not at.has(lk) or not at.has(wk):
+				continue
+			var d: Vector3 = ((wsd[lk] as Quaternion) * (cq[lk] as Quaternion)) * (tg[ti[wk]].origin - tg[ti[lk]].origin).normalized()
+			var rel: Quaternion = (wsd[wk] as Quaternion) * (wsd[lk] as Quaternion).inverse()
+			var th := _twist_angle(rel, d)
+			var moved := th * fa_twist
+			if absf(moved) > 0.0001:
+				at[lk] = Quaternion(d, moved) * (at[lk] as Quaternion)
+			twist_max[0] = maxf(twist_max[0], absf(rad_to_deg(th)))
+			twist_max[1] = maxf(twist_max[1], absf(rad_to_deg(th - moved)))
+		for k: String in order:
 			var ap: Quaternion = (at[pkey[k]] as Quaternion) * pchain[k] if pkey[k] != "" else pchain[k]
 			out.rotation_track_insert_key(rt[k], tt, (ap.inverse() * at[k]).normalized())
 		var hp := tg[ti.hips].origin

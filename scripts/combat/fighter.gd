@@ -753,11 +753,13 @@ func _build_visuals() -> void:
 	_shield = _kv.shield
 
 func _apply_mount_visuals() -> void:
-	if mounted and is_instance_valid(mount_node) and mount_node.is_flying():
+	if mounted and is_instance_valid(mount_node) and mount_node.seat_follows_bone():
 		_rider_root.global_position = mount_node.saddle_position()
 	else:
-		# A pie, o en lobo/grifo: la silla fija. El hueso Torso de esos modelos queda en el origen.
-		_rider_root.position = Vector3(0, 1.3 if mounted else 0.0, 0)
+		# A pie, o en lobo/grifo: silla a la altura del lomo medida en la malla (el hueso Torso de
+		# esos modelos queda en el origen y 1,3 m fijo hundía al jinete en el grifo).
+		var seat_h := mount_node.seat_height() if mounted and is_instance_valid(mount_node) else 1.3
+		_rider_root.position = Vector3(0, seat_h if mounted else 0.0, 0)
 	for l in _legs:
 		l.visible = not mounted
 	# Espada más larga montado (alcance real)
@@ -789,8 +791,9 @@ var sim_driven: bool = false
 ## Fase 8: la jugabilidad vive solo en net/sim; este nodo es la vista (SimView escribe su estado).
 func _physics_process(delta: float) -> void:
 	rotation.y = atan2(-facing.x, -facing.z)
-	# El fénix anima el lomo lejos del suelo. La cadera sigue ese punto; el nodo del luchador no se mueve.
-	if mounted and is_instance_valid(mount_node) and mount_node.is_flying():
+	# El fénix anima el lomo lejos del suelo (y el grifo lo mueve al galopar). La cadera sigue ese
+	# punto; el nodo del luchador no se mueve.
+	if mounted and is_instance_valid(mount_node) and mount_node.seat_follows_bone():
 		_rider_root.global_position = mount_node.saddle_position()
 	if _kv:
 		_kv.update(self, delta)

@@ -98,7 +98,10 @@ Cada paso (`steps.<id_paso>`) tiene su lista de tramos. Para alternar lados:
 
 - **Espejo**: `"mirror": true` arma (una sola vez, al cargar) una copia espejada del clip en la
   biblioteca `abm` (intercambia huesos `.l`/`.r` y refleja en X). Así un tajo derecho se vuelve
-  izquierdo sin otro clip. Volteretas usa el mismo tajo en `salto_1` y espejado en `salto_2`.
+  izquierdo sin otro clip. **Ojo**: el arma sigue en la mano derecha, así que en un personaje de
+  espada y escudo el brazo del arma hace el gesto del escudo (se ve torcido). Para golpes con arma
+  preferí un clip de revés del mismo lado (Volteretas: `1H_Melee_Attack_Slice_Horizontal_Reverse`
+  en `salto_2`); el espejo queda para gestos sin arma o simétricos.
 - **Clips distintos por paso**: `light_a1` → `light_a2` → `light_a3`, uno por paso.
 - **Alternancia por pulsación** (habilidades que se repiten, como la ráfaga): usá
   `f.ab_seq` (`AB_STARTS`, cuenta los arranques en la sim). Ejemplo: `KnightVisual.rafaga_chain_index(n) = (n - 1) % 2`
@@ -131,7 +134,7 @@ propio (salto, embestida, retroceso), usá `full`; si el paso deja caminar, `upp
   caja de golpe y en online "rebotaría" con cada corrección.
 - La altura de la cadera en el clip (agacharse, impulso) está permitida: es pose, no
   desplazamiento. Si un clip de salto sube mucho la cadera y la sim también eleva al personaje,
-  usá solo el tramo del impulso y una pose aérea quieta, como en la Fisura (`xh/jump` de 0 a 0,8 s).
+  usá solo el tramo del impulso y una pose aérea quieta, como en la Fisura (`Jump_Start`).
 - El conversor (`tools/import_anim_pack.gd`) ya fija X/Z de la cadera; `root_keep_vertical`
   conserva solo la altura.
 
@@ -160,7 +163,7 @@ propio (salto, embestida, retroceso), usá `full`; si el paso deja caminar, `upp
 - que cada paso de la habilidad tenga tramos, con claves en orden;
 - que la última clave caiga en `T` (o que el tramo tenga `loop`);
 - que todos los clips (y los espejos `abm/…`) existan en el `AnimationPlayer`;
-- que el contacto de la Fisura (0,75 s) caiga en el tick del impacto;
+- que el contacto de la Fisura (0,85 s) caiga en el tick del impacto;
 - que la pose dependa solo del tick (ir a 40 y volver a 15 da el mismo tiempo de clip);
 - que la sim corra los pasos con la duración que suponen las claves.
 
@@ -193,33 +196,38 @@ Datos de la sim (`data/abilities/golpe_fisura_skill.json`):
 | `saltar` | 30 | 1 | 0 | 31 | `movement` leap de 14 a 31 (despegue en el tick 14, `ev_salto`) |
 | `martillazo` | 14 | 4 | 40 | 58 | caja de golpe y `ev_impacto` en el tick 14 |
 
-Clip: `xh/attack1` (martillo a dos manos, golpe vertical de arriba hacia abajo). La cadera baja
-de 0,39 a 0,26 m entre 0,53 y 0,80 s: el impacto está en ~0,75 s. Para el salto, `xh/jump`: se
-agacha hasta 0,27 s y despega en ~0,40 s.
+Clip: `2H_Melee_Attack_Chop` (KayKit, golpe vertical a dos manos de arriba hacia abajo; 1,63 s):
+el arma está arriba a ~0,45 s y baja al frente a ~0,85 s. Para el salto, `Jump_Start` (0,6 s)
+estirado a los 31 ticks del paso. (Antes se usaban clips convertidos de un pack externo; en el
+juego se leían casi como reposo desde la cámara: con brazos bajos y el cuerpo girando de espaldas.
+Si un clip convertido no se lee claro desde la cámara de juego, usá uno nativo.)
 
 ```json
 "golpe_fisura": {
   "file": "res://data/abilities/golpe_fisura_skill.json",
   "steps": {
-    "saltar":     [ { "clip": "xh/jump",    "keys": [[0, 0.0], [14, 0.40], [31, 0.80]] } ],
-    "martillazo": [ { "clip": "xh/attack1", "keys": [[0, 0.30], [14, 0.75], [18, 0.85], [58, 1.73]] } ]
+    "saltar":     [ { "clip": "Jump_Start", "unit": "frac", "keys": [[0, 0.0], [31, 1.0]] } ],
+    "martillazo": [ { "clip": "2H_Melee_Attack_Chop", "keys": [[0, 0.45], [14, 0.85], [18, 0.95], [58, 1.63]] } ]
   }
 }
 ```
 
 Cuentas:
 
-- `saltar`: el impulso del clip (0,40 s) cae en el tick 14, cuando la sim despega. Escala del
-  agache: `0,40 / (14/60) = 1,71`. En el aire (ticks 14–31) avanza 0,40 s en 17 ticks
-  (`escala 1,41`) hasta una pose aérea, sin llegar al aterrizaje del clip (lo hace el paso
-  siguiente).
-- `martillazo`: arranca en 0,30 s (brazos ya arriba, viene del salto). Impacto: `[14, 0.75]`, o
-  sea `escala = (0,75 - 0,30) / (14/60) = 1,93`. El activo dura 4 ticks (`[18, 0.85]`). La
-  recuperación estira de 0,85 a 1,73 s en 40 ticks (`escala 1,32`).
+- `saltar`: el clip entero (0,6 s) en los 31 ticks del paso (`frac` 0 → 1, escala 1,16).
+- `martillazo`: arranca en 0,45 s (arma ya arriba, viene del salto). Impacto: `[14, 0.85]`, o
+  sea `escala = (0,85 - 0,45) / (14/60) = 1,71`. El activo dura 4 ticks (`[18, 0.95]`). La
+  recuperación estira de 0,95 a 1,63 s en 40 ticks (`escala 1,02`) y termina en la guardia.
 - Cuerpo entero: la sim mueve al personaje en los dos pasos.
 - Cada paso alterna `ab0`/`ab1`, así el salto funde con el martillazo.
 
 Volteretas Cortantes (`voltereta_cuchilla`) sigue el mismo patrón: en cada salto, `mx/roll_f`
 (voltereta) mientras la sim lo eleva (ticks 0–52) y después el tajo horizontal con contacto en el
 tick 66 (`windup_ticks`); en `salida` un `Dodge_Backward` que llena los 37 ticks del retroceso, y
-el segundo salto repite con el tajo **espejado** para alternar lado.
+el segundo salto repite con el **revés** (`1H_Melee_Attack_Slice_Horizontal_Reverse`) para
+alternar lado sin cambiar el arma de mano. Pasado el último tick el clip queda en su último cuadro
+(la guardia) y funde con el reposo en ~0,1 s.
+
+`tests/test_ability_anims_runtime.gd` lanza cada habilidad del JSON por la sim real con cada
+personaje jugable y comprueba que su `AnimationPlayer` resuelva todos los clips, que la vista
+entre en `ab0`/`ab1` y que la pose se mueva.
