@@ -108,7 +108,7 @@ func _run() -> void:
 	check(latched_early, "SimCatalog.latch succeeds early during windup (buffered)")
 	var cinfo_queued: Dictionary = SimAbilities.combo_info(sim.state, sim.params, 0)
 	check(cinfo_queued.get("queued", false), "combo_info queued = true after early buffer")
-	check(is_equal_approx(float(cinfo_queued.get("progress", 0.0)), 0.5), "pisoton_telurico progress updates immediately to 0.5 (half circumference) upon touching the button")
+	check(is_equal_approx(float(cinfo_queued.get("progress", 0.0)), 1.0), "pisoton_telurico progress updates immediately to 1.0 (full, 2-step combo) upon touching the button")
 	
 	# Test changing queued choice to variation (alt)
 	var latched_var := SimCatalog.latch(sim.state, sim.params, 0, true)
@@ -136,7 +136,7 @@ func _run() -> void:
 	AdminMode.enabled = false
 	
 	# 5. Check Static combo progress (Pausa Falsa style: 2-hit combo with 1st step gives 0.5)
-	check(is_equal_approx(float(cinfo_queued.get("progress", 0.0)), 0.5), "pisoton_telurico static progress is exactly 0.5 (half circumference)")
+	check(is_equal_approx(float(cinfo_queued.get("progress", 0.0)), 1.0), "pisoton_telurico static progress is exactly 1.0 (2-step combo, full)")
 
 	# 6. Check cooldown starts on press and counts down
 	sim.state[po + FightSim.BCD_BASE + 0] = 0

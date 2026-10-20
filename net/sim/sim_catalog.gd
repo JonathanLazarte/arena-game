@@ -377,12 +377,10 @@ static func combo_info(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
 	var c_idx: int = int(step.get("chain_idx", 0))
 	var fl := s[o + FightSim.AB_FL]
 	var queued := (fl & (SimAbilities.FL_QUEUED | SimAbilities.FL_VARIANT)) != 0
-	var step_count: int = c_idx + (1 if queued else 0)
+	var step_count: int = (c_idx + 1) + (1 if queued else 0)
 	var prog: float = 1.0
 	if total_ch > 1:
-		prog = 1.0 - float(step_count) / float(total_ch)
-		if prog <= 0.05:
-			prog = 1.0 / float(total_ch)
+		prog = clampf(float(step_count) / float(total_ch - 1), 0.0, 1.0)
 	return {
 		"can_combo": true,
 		"active": active,

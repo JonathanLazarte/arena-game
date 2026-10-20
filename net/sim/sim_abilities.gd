@@ -665,7 +665,7 @@ static func combo_info(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
 		var queued := (fl & (FL_QUEUED | FL_VARIANT)) != 0
 		var active := true
 		var step_count: int = (fired + 1) + (1 if queued else 0)
-		var prog := clampf(1.0 - float(step_count) / maxf(float(hits.size()), 1.0), 0.0, 1.0)
+		var prog := 1.0 if hits.size() <= 1 else clampf(float(step_count) / float(hits.size() - 1), 0.0, 1.0)
 		return {"can_combo": can, "active": active, "progress": prog, "queued": queued, "label": "Estocada" if fired == hits.size() - 1 else ""}
 	return {"can_combo": false, "active": false, "progress": 0.0, "queued": false, "label": ""}
 

@@ -154,13 +154,13 @@ func _ready() -> void:
 
 	boss_list_btn = Button.new()
 	boss_list_btn.name = "BossList"
-	boss_list_btn.text = "☰"
-	boss_list_btn.tooltip_text = "Catálogo de habilidades (Admin)"
+	boss_list_btn.text = "⇄"
+	boss_list_btn.tooltip_text = "Alternar las siguientes 4 habilidades"
 	boss_list_btn.focus_mode = Control.FOCUS_NONE
 	boss_list_btn.custom_minimum_size = Vector2(30, 30)
 	boss_list_btn.position = Vector2(915, 235)
 	boss_list_btn.add_theme_font_size_override("font_size", 15)
-	boss_list_btn.pressed.connect(toggle_ability_picker)
+	boss_list_btn.pressed.connect(_on_boss_page)
 	add_child(boss_list_btn)
 
 	admin_toggle_btn = Button.new()
@@ -268,8 +268,23 @@ var boss_slot_icons: Array = []
 var boss_slot_labels: Array = []
 var rematch_btn: Button
 
+## Página actual de habilidades de jefe (grupos de 4); el botón ⇄ rota entre todas.
+var boss_page: int = 0
+
+func _boss_pages() -> int:
+	if _player == null:
+		return 1
+	return maxi(ceili(_player.avail_boss_ids().size() / 4.0), 1)
+
+func _on_boss_page() -> void:
+	boss_page = (boss_page + 1) % _boss_pages()
+	show_message("Habilidades %d/%d" % [boss_page + 1, _boss_pages()], 0.8)
+
 func _on_boss_slot_pressed(k: int) -> void:
 	if _player == null:
+		return
+	k += boss_page * 4
+	if k >= _player.avail_boss_ids().size():
 		return
 	if _player.boss_sel != k:
 		_player.boss_sel = k
@@ -306,7 +321,7 @@ func _update_admin_ui() -> void:
 		admin_toggle_btn.text = "⚙ Admin: ON" if AdminMode.enabled else "⚙ Admin: OFF"
 		admin_toggle_btn.modulate = Color(1.0, 0.85, 0.2) if AdminMode.enabled else Color(1, 1, 1, 0.65)
 	if boss_list_btn:
-		boss_list_btn.visible = not (_player and _player.mounted) and (AdminMode.enabled or (_player != null and _player.avail_boss_ids().size() > 3))
+		boss_list_btn.visible = not (_player and _player.mounted) and (_player != null and _player.avail_boss_ids().size() > 4)
 	show_message("MODO ADMIN: ACTIVADO (Vida/Aguante/Maná infinitos · Rival inmortal · %d habilidades)" % BossAbilities.all_ids().size() if AdminMode.enabled else "MODO ADMIN: DESACTIVADO", 2.2)
 
 func toggle_ability_picker() -> void:
@@ -462,21 +477,12 @@ class _Circle extends Node2D:
 		draw_arc(Vector2.ZERO, r, 0, TAU, 48, border_color, 3.0)
 		if cooldown_active:
 			draw_circle(Vector2.ZERO, r - 1.0, Color(0.0, 0.0, 0.0, 0.45))
-		if combo_can or combo_active:
-			var segs := maxi(total_segments, 4)
-			var gap := 0.10 # separación angular entre fragmentos de la circunferencia
-			var seg_rad := TAU / segs
-			var arc_col := Color(0.2, 1.0, 0.45) if combo_queued else Color(1.0, 0.85, 0.15)
-			for i in segs:
-				var a0 := -PI * 0.5 + i * seg_rad + gap * 0.5
-				var a1 := -PI * 0.5 + (i + 1) * seg_rad - gap * 0.5
-				var seg_frac := float(i + 1) / float(segs)
-				if combo_active and seg_frac <= combo_prog + 0.02:
-					draw_arc(Vector2.ZERO, r + 4.0, a0, a1, 16, arc_col, 5.0)
-				elif combo_queued:
-					draw_arc(Vector2.ZERO, r + 4.0, a0, a1, 16, Color(0.2, 1.0, 0.5, 0.8), 3.5)
-				else:
-					draw_arc(Vector2.ZERO, r + 4.0, a0, a1, 16, Color(1.0, 0.82, 0.2, 0.22), 2.0)
+		if combo_can:
+			# Se LLENA con las fases del combo: cambia al pulsar y no varía hasta la siguiente pulsación.
+			var arc_col := Color(0.2, 1.0, 0.45) if combo_prog >= 0.999 else Color(1.0, 0.85, 0.15)
+			draw_arc(Vector2.ZERO, r + 4.0, 0, TAU, 48, Color(1, 1, 1, 0.15), 2.0)
+			if combo_prog > 0.0:
+				draw_arc(Vector2.ZERO, r + 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(combo_prog, 0.0, 1.0), 48, arc_col, 5.0)
 
 ## Ronda 20: barras de acumulación de estados (HUD propio, del rival y sobre el rival).
 var status_p: Dictionary = {}
@@ -670,7 +676,7 @@ func _update_contextual_buttons() -> void:
 	if boss_prev_btn:
 		boss_prev_btn.visible = false
 	if boss_list_btn:
-		boss_list_btn.visible = not _player.mounted and (AdminMode.enabled or _player.avail_boss_ids().size() > 3)
+		boss_list_btn.visible = not _player.mounted and _player.avail_boss_ids().size() > 4
 
 	var alt_c: _Circle = btn_circles.get("boss_variation")
 	if alt_c:
@@ -694,19 +700,21 @@ func _update_contextual_buttons() -> void:
 	var cd_left: float = _player.boss_cd if not AdminMode.enabled and not _player.boss_repeat_ready else 0.0
 	var on_cd: bool = cd_left > 0.05
 
+	boss_page = clampi(boss_page, 0, _boss_pages() - 1)
 	for k in mini(boss_slot_btns.size(), 4):
 		var slot_btn: TouchScreenButton = boss_slot_btns[k]
 		var slot_lbl: Label = boss_slot_labels[k]
 		var slot_ic: BossIcon = boss_slot_icons[k]
 		var slot_act := "boss" if k == 0 else "boss_%d" % k
 		var slot_c: _Circle = btn_circles.get(slot_act)
-		if k < avail.size():
+		var gk: int = boss_page * 4 + k
+		if gk < avail.size():
 			slot_btn.visible = tv and not _player.mounted
-			var sk_id := String(avail[k])
+			var sk_id := String(avail[gk])
 			if _changed(slot_ic, sk_id):
 				slot_ic.id = sk_id
 			slot_ic.visible = true
-			var is_selected := (_player.boss_sel == k)
+			var is_selected := (_player.boss_sel == gk)
 			if slot_c:
 				if is_selected:
 					slot_c.combo_can = _player.ab_combo_can
