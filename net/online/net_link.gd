@@ -63,6 +63,10 @@ var found_hosts: Dictionary = {} ## búsqueda LAN: "ip" -> {name, ms}
 var host_name := ""
 const DISCOVER_MS := 500 ## unirse antes de que exista la sala: reintentar este tiempo
 var _join_deadline := 0
+## DNS en cola (no bloquea el hilo). -1 = no hay consulta.
+var _dns_id := -1
+var _dns_host := ""
+var _dns_kind := "" ## "relay" | "lan"
 
 static func now_ms() -> int:
 	return Time.get_ticks_msec()
@@ -116,15 +120,18 @@ func host_lan(port: int = LAN_PORT) -> void:
 
 func join_lan(ip: String, port: int = LAN_PORT) -> void:
 	if not _open(0): return
-	var addr := ip if ip.is_valid_ip_address() else IP.resolve_hostname(ip, IP.TYPE_IPV4)
-	if addr == "":
-		_fail("no se encuentra %s" % ip); return
 	mode = "lan_guest"; slot = 1; direct = true
-	peer_ip = addr; peer_port = port
+	peer_port = port
 	_ctl = PackedByteArray([0x4C]) # 'L'
 	_lan_deadline = now_ms() + lan_timeout_ms
 	state = St.CONNECTING
 	_retry_at = 0
+	if ip.is_valid_ip_address():
+		peer_ip = ip
+		return
+	peer_ip = ""
+	if not _queue_dns(ip, "lan"):
+		_fail("no se encuentra %s" % ip)
 
 ## Busca anfitriones LAN por difusión (sin escribir IP). Rellena found_hosts al llegar respuestas.
 func discover_lan(port: int = LAN_PORT) -> void:
@@ -140,8 +147,14 @@ func close() -> void:
 	if state == St.CONNECTED or state == St.WAITING or state == St.PUNCHING:
 		if mode == "relay" and relay_ip != "":
 			_raw(PackedByteArray([0x58]), relay_ip, relay_port, true) # 'X'
+	_clear_dns()
 	udp.close()
 	state = St.CLOSED
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _dns_id >= 0:
+		IP.erase_resolve_item(_dns_id)
+		_dns_id = -1
 
 ## Direcciones LAN de este equipo (para mostrar al anfitrión).
 ## Primero las de wifi/LAN domésticas (192.168, 10.), luego 172.16-31; fuera puentes de
@@ -178,10 +191,71 @@ func _open(port: int) -> bool:
 	return true
 
 func _set_relay(host: String, port: int) -> bool:
-	relay_ip = host if host.is_valid_ip_address() else IP.resolve_hostname(host, IP.TYPE_IPV4)
 	relay_port = port
-	if relay_ip == "":
-		_fail("relay_dns:%s" % host); return false
+	if host.is_valid_ip_address():
+		_clear_dns()
+		relay_ip = host
+		return true
+	relay_ip = ""
+	if not _queue_dns(host, "relay"):
+		_fail("relay_dns:%s" % host)
+		return false
+	return true
+
+## Encola el nombre. Una IP numérica no pasa por aquí. false = la cola de 32 está llena.
+func _queue_dns(host: String, kind: String) -> bool:
+	_clear_dns()
+	_dns_host = host
+	_dns_kind = kind
+	_dns_id = IP.resolve_hostname_queue_item(host, IP.TYPE_IPV4)
+	if _dns_id < 0:
+		_dns_host = ""
+		_dns_kind = ""
+		return false
+	return true
+
+func _clear_dns() -> void:
+	if _dns_id >= 0:
+		IP.erase_resolve_item(_dns_id)
+	_dns_id = -1
+	_dns_host = ""
+	_dns_kind = ""
+
+## true cuando ya hay IP (o no había consulta). Mientras espera no se manda UDP.
+## Un nombre que no resuelve, o que no llega antes del plazo, falla igual que antes.
+func _finish_dns() -> bool:
+	if _dns_id < 0:
+		return true
+	var st := IP.get_resolve_item_status(_dns_id)
+	if st == IP.RESOLVER_STATUS_NONE or st == IP.RESOLVER_STATUS_WAITING:
+		var t := now_ms()
+		if _dns_kind == "relay" and _relay_deadline > 0 and t >= _relay_deadline:
+			var host := _dns_host
+			_clear_dns()
+			_fail("relay_dns:%s" % host)
+		elif _dns_kind == "lan" and _lan_deadline > 0 and t >= _lan_deadline:
+			var host := _dns_host
+			_clear_dns()
+			_fail("no se encuentra %s" % host)
+		return false
+	var addr := ""
+	if st == IP.RESOLVER_STATUS_DONE:
+		addr = IP.get_resolve_item_address(_dns_id)
+	var kind := _dns_kind
+	var host := _dns_host
+	_clear_dns()
+	if addr == "":
+		if kind == "relay":
+			_fail("relay_dns:%s" % host)
+		else:
+			_fail("no se encuentra %s" % host)
+		return false
+	if kind == "relay":
+		relay_ip = addr
+		_arm_relay_timeout()
+	else:
+		peer_ip = addr
+		_lan_deadline = now_ms() + lan_timeout_ms
 	return true
 
 func _arm_relay_timeout() -> void:
@@ -224,6 +298,8 @@ func _raw(b: PackedByteArray, ip: String, port: int, now: bool = false) -> void:
 # ---------------- bucle ----------------
 func poll() -> void:
 	if state == St.IDLE or state == St.CLOSED or state == St.FAILED:
+		return
+	if not _finish_dns():
 		return
 	var t := now_ms()
 	if not _outq.is_empty():

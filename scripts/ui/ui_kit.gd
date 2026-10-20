@@ -1,22 +1,23 @@
 class_name UIKit
-## Ronda 13: estilo inspirado en los menús de Final Fantasy. Paneles azul medianoche
-## translúcidos con filos finos plateados/dorados y degradado suave, barra de selección
-## con cursor, motivos de cristal, Cinzel (títulos) y Lato (texto), ambas OFL.
-## Los nombres de color se mantienen por compatibilidad: ORANGE/YELLOW = oro,
-## BLUE = medianoche, CYAN = cristal, GREEN = verde jade, RED = carmesí apagado.
+## Estilo refinado de fantasía oscura inspirado en Elden Ring y FromSoftware.
+## Paneles de piedra obsidiana translúcidos con sutiles filos de latón/oro envejecido,
+## barra de selección con resplandor dorado rúnico, Cinzel (títulos tallados) y Lato (texto de pergamino).
+## Los nombres de color se mantienen por compatibilidad: ORANGE/YELLOW = oro de Gracia/luz,
+## BLUE = carbón / piedra oscura, CYAN = azul espiritual / maná, GREEN = verde savia / resistencia,
+## RED = carmesí profundo (Lágrima Carmesí).
 
-const NAVY := Color(0.03, 0.06, 0.16)
-const BLUE := Color(0.08, 0.16, 0.36)
-const CYAN := Color(0.45, 0.78, 1.0) ## cristal
-const ORANGE := Color(0.82, 0.68, 0.4) ## oro
-const YELLOW := Color(0.95, 0.86, 0.6) ## oro claro
-const RED := Color(0.78, 0.32, 0.36)
-const GREEN := Color(0.45, 0.85, 0.7)
-const SILVER := Color(0.78, 0.82, 0.9)
-const TEXT := Color(0.94, 0.95, 1.0)
-const MUTED := Color(0.66, 0.72, 0.84)
-const OUTLINE := Color(0.0, 0.02, 0.08)
-const PANEL_BG := Color(0.03, 0.07, 0.18, 0.82)
+const NAVY := Color(0.04, 0.04, 0.05) ## obsidiana de fondo
+const BLUE := Color(0.09, 0.09, 0.10) ## carbón / piedra oscura
+const CYAN := Color(0.42, 0.62, 0.82) ## azul rúnico / espiritual
+const ORANGE := Color(0.85, 0.72, 0.42) ## oro de la Gracia / latón bruñido
+const YELLOW := Color(0.96, 0.88, 0.62) ## oro pálido / luz
+const RED := Color(0.78, 0.18, 0.20) ## carmesí profundo (Lágrima Carmesí)
+const GREEN := Color(0.28, 0.64, 0.36) ## verde oliva oscuro (Resistencia)
+const SILVER := Color(0.58, 0.50, 0.38, 0.65) ## latón envejecido
+const TEXT := Color(0.92, 0.90, 0.84) ## pergamino marfil
+const MUTED := Color(0.58, 0.55, 0.49) ## ceniza cálida
+const OUTLINE := Color(0.01, 0.01, 0.02)
+const PANEL_BG := Color(0.045, 0.045, 0.055, 0.92) ## menú translúcido FromSoftware
 
 static var _display: Font
 static var _body: Font
@@ -45,14 +46,14 @@ static func bold_font() -> Font:
 		_bold = load("res://assets/fonts/Lato-Bold.ttf")
 	return _bold
 
-## Caja translúcida con filo fino.
-static func box(bg: Color, border: Color = Color(SILVER, 0.45), bw: int = 1, radius: int = 4, shadow: int = 8) -> StyleBoxFlat:
+## Caja translúcida con filo fino de piedra/latón.
+static func box(bg: Color, border: Color = Color(SILVER, 0.45), bw: int = 1, radius: int = 2, shadow: int = 6) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border
 	sb.set_border_width_all(bw)
 	sb.set_corner_radius_all(radius)
-	sb.shadow_color = Color(0, 0.02, 0.1, 0.45)
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
 	sb.shadow_size = shadow
 	sb.anti_aliasing = true
 	sb.content_margin_left = 16
@@ -61,11 +62,11 @@ static func box(bg: Color, border: Color = Color(SILVER, 0.45), bw: int = 1, rad
 	sb.content_margin_bottom = 8
 	return sb
 
-## Barra de selección: degradado azul cristal que se desvanece hacia la derecha.
+## Barra de selección: degradado dorado rúnico que se desvanece suavemente hacia la derecha.
 static func highlight_bar(alpha: float = 0.85) -> StyleBoxTexture:
 	var g := Gradient.new()
-	g.set_color(0, Color(0.3, 0.52, 0.9, alpha))
-	g.set_color(1, Color(0.1, 0.2, 0.45, alpha * 0.15))
+	g.set_color(0, Color(0.85, 0.70, 0.35, alpha * 0.7))
+	g.set_color(1, Color(0.20, 0.16, 0.08, alpha * 0.05))
 	var gt := GradientTexture2D.new()
 	gt.gradient = g
 	gt.width = 64
@@ -79,8 +80,8 @@ static func highlight_bar(alpha: float = 0.85) -> StyleBoxTexture:
 	return sb
 
 ## Estilo de botón según su papel: ORANGE/YELLOW/RED = seleccionado (barra + cursor),
-## GREEN = disponible (filo cristal), gris = apagado, el resto = normal.
-static func button_styles(b: Button, c: Color, _radius: int = 4) -> void:
+## GREEN = disponible (filo de savia/runa), gris = apagado, el resto = normal de piedra.
+static func button_styles(b: Button, c: Color, _radius: int = 2) -> void:
 	var selected := c == ORANGE or c == YELLOW or c == RED
 	var avail := c == GREEN
 	var dim := not selected and not avail and c != BLUE and c != NAVY and c != CYAN
@@ -89,16 +90,16 @@ static func button_styles(b: Button, c: Color, _radius: int = 4) -> void:
 	if selected:
 		normal = highlight_bar()
 	elif avail:
-		normal = box(Color(0.05, 0.12, 0.28, 0.7), Color(CYAN, 0.85), 1, 4, 10)
+		normal = box(Color(0.05, 0.08, 0.05, 0.75), Color(GREEN, 0.85), 1, 2, 8)
 	elif dim:
-		normal = box(Color(0.03, 0.05, 0.1, 0.55), Color(SILVER, 0.18), 1, 4, 0)
+		normal = box(Color(0.03, 0.03, 0.035, 0.55), Color(SILVER, 0.18), 1, 2, 0)
 	else:
-		normal = box(Color(0.04, 0.08, 0.2, 0.6), Color(SILVER, 0.3), 1, 4, 0)
+		normal = box(Color(0.045, 0.045, 0.05, 0.65), Color(SILVER, 0.35), 1, 2, 0)
 	b.add_theme_stylebox_override("normal", normal)
-	b.add_theme_stylebox_override("hover", highlight_bar(0.65) if not selected else highlight_bar(1.0))
-	b.add_theme_stylebox_override("pressed", highlight_bar(1.0))
+	b.add_theme_stylebox_override("hover", highlight_bar(0.55) if not selected else highlight_bar(0.95))
+	b.add_theme_stylebox_override("pressed", highlight_bar(0.95))
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	b.add_theme_stylebox_override("disabled", box(Color(0.03, 0.05, 0.1, 0.5), Color(SILVER, 0.12), 1, 4, 0))
+	b.add_theme_stylebox_override("disabled", box(Color(0.025, 0.025, 0.03, 0.5), Color(SILVER, 0.12), 1, 2, 0))
 	b.add_theme_color_override("font_color", YELLOW if selected else (MUTED if dim else TEXT))
 	var p := b.get_node_or_null("Cursor") as CanvasItem
 	if p:
@@ -113,7 +114,7 @@ static func theme() -> Theme:
 	t.set_color("font_color", "Label", TEXT)
 	t.set_color("font_outline_color", "Label", OUTLINE)
 	t.set_constant("outline_size", "Label", 3)
-	t.set_color("font_shadow_color", "Label", Color(0, 0.05, 0.2, 0.6))
+	t.set_color("font_shadow_color", "Label", Color(0.0, 0.0, 0.0, 0.85))
 	t.set_constant("shadow_offset_y", "Label", 1)
 	t.set_font("font", "Button", body_font())
 	t.set_font_size("font_size", "Button", 19)
@@ -129,15 +130,15 @@ static func theme() -> Theme:
 	for st: String in ["normal", "hover", "pressed", "focus", "disabled"]:
 		t.set_stylebox(st, "Button", tb.get_theme_stylebox(st))
 	tb.free()
-	t.set_stylebox("panel", "PanelContainer", box(PANEL_BG, Color(SILVER, 0.55), 1, 4, 14))
-	t.set_stylebox("normal", "LineEdit", box(Color(0.02, 0.04, 0.12, 0.6), Color(SILVER, 0.35), 1, 3, 0))
+	t.set_stylebox("panel", "PanelContainer", box(PANEL_BG, Color(SILVER, 0.55), 1, 2, 12))
+	t.set_stylebox("normal", "LineEdit", box(Color(0.03, 0.03, 0.035, 0.7), Color(SILVER, 0.35), 1, 2, 0))
 	t.set_font("font", "LineEdit", display_font())
 	t.set_color("font_color", "LineEdit", TEXT)
-	var fill := box(CYAN, Color(0, 0, 0, 0), 0, 2, 0)
+	var fill := box(ORANGE, Color(0, 0, 0, 0), 0, 1, 0)
 	fill.content_margin_top = 0
 	fill.content_margin_bottom = 0
 	t.set_stylebox("fill", "ProgressBar", fill)
-	var bg := box(Color(0.0, 0.02, 0.08, 0.7), Color(SILVER, 0.4), 1, 2, 0)
+	var bg := box(Color(0.02, 0.02, 0.03, 0.8), Color(SILVER, 0.4), 1, 1, 0)
 	bg.content_margin_top = 0
 	bg.content_margin_bottom = 0
 	t.set_stylebox("background", "ProgressBar", bg)
@@ -151,16 +152,16 @@ static func theme() -> Theme:
 	_theme = t
 	return t
 
-## Título en Cinzel con brillo suave.
+## Título en Cinzel con resplandor dorado sobrio estilo Elden Ring.
 static func title(text: String, size: int, c: Color = TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_override("font", display_font())
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", c)
-	l.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.3, 0.8))
+	l.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.03, 0.95))
 	l.add_theme_constant_override("outline_size", maxi(3, size / 12))
-	l.add_theme_color_override("font_shadow_color", Color(0.3, 0.55, 1.0, 0.35)) # halo azul
+	l.add_theme_color_override("font_shadow_color", Color(0.85, 0.72, 0.40, 0.25)) # halo dorado
 	l.add_theme_constant_override("shadow_outline_size", maxi(4, size / 5))
 	l.add_theme_constant_override("shadow_offset_y", 0)
 	l.add_theme_constant_override("shadow_offset_x", 0)
@@ -204,15 +205,15 @@ static func juice(b: Button) -> void:
 			cur.visible = b.get_meta("selected", false))
 	b.pressed.connect(func() -> void: sfx("click"))
 
-## Botón principal: marco dorado fino con resplandor de cristal y un brillo lento.
+## Botón principal: marco de latón dorado bruñido y fondo de obsidiana.
 static func big_button(text: String, size: int = 40, c: Color = YELLOW) -> Button:
 	var b := button(text, size, BLUE)
 	b.add_theme_font_override("font", display_font())
-	var n := box(Color(0.05, 0.12, 0.3, 0.85), Color(ORANGE, 0.9), 1, 4, 18)
-	n.shadow_color = Color(0.3, 0.55, 1.0, 0.35)
-	var h := box(Color(0.1, 0.22, 0.48, 0.92), Color(YELLOW, 1.0), 1, 4, 24)
-	h.shadow_color = Color(0.4, 0.7, 1.0, 0.5)
-	var p := box(Color(0.16, 0.3, 0.6, 0.95), Color(YELLOW, 1.0), 2, 4, 10)
+	var n := box(Color(0.05, 0.05, 0.06, 0.92), Color(ORANGE, 0.8), 1, 2, 14)
+	n.shadow_color = Color(0.35, 0.25, 0.1, 0.3)
+	var h := box(Color(0.10, 0.09, 0.08, 0.95), Color(YELLOW, 0.95), 1, 2, 20)
+	h.shadow_color = Color(0.65, 0.52, 0.2, 0.4)
+	var p := box(Color(0.15, 0.12, 0.09, 0.98), Color(YELLOW, 1.0), 2, 2, 8)
 	b.add_theme_stylebox_override("normal", n)
 	b.add_theme_stylebox_override("hover", h)
 	b.add_theme_stylebox_override("pressed", p)
@@ -222,12 +223,12 @@ static func big_button(text: String, size: int = 40, c: Color = YELLOW) -> Butto
 	shine(b)
 	return b
 
-## Reflejo muy tenue que cruza el botón despacio.
+## Reflejo tenue y cálido que cruza el botón despacio.
 static func shine(b: Control) -> void:
 	b.clip_contents = true
 	var s := ColorRect.new()
 	s.name = "Shine"
-	s.color = Color(0.7, 0.85, 1.0, 0.12)
+	s.color = Color(1.0, 0.92, 0.75, 0.08)
 	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s.size = Vector2(60, 300)
 	s.rotation = 0.35
@@ -244,7 +245,7 @@ static func shine(b: Control) -> void:
 	else:
 		b.tree_entered.connect(start, CONNECT_ONE_SHOT)
 
-## Panel azul medianoche con filo plateado, línea dorada interior y cristales en las esquinas.
+## Panel de piedra oscura con filo de latón, línea dorada interior y runas en las esquinas.
 static func panel(_header: String = "") -> PanelContainer:
 	return CrystalPanel.new()
 
@@ -260,7 +261,7 @@ static func pop_in(c: CanvasItem, delay: float = 0.0, _from: float = 0.6) -> voi
 		c.create_tween().tween_property(ctl, "position:x", x, 0.4).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 ## Fila de estadística: etiqueta, barra fina y valor.
-static func stat_row(label_text: String, v: float, vmax: float, txt: String, w: float = 170, c: Color = CYAN) -> HBoxContainer:
+static func stat_row(label_text: String, v: float, vmax: float, txt: String, w: float = 170, c: Color = ORANGE) -> HBoxContainer:
 	var h := HBoxContainer.new()
 	var l := label(label_text, 16, MUTED)
 	l.custom_minimum_size = Vector2(118, 0)
@@ -288,7 +289,7 @@ static func stat_row(label_text: String, v: float, vmax: float, txt: String, w: 
 ## Moneda: icono + cantidad (sin "+": sin tienda).
 static func currency_pill(kind: String, amount_label: Label) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", box(Color(0.02, 0.05, 0.14, 0.55), Color(SILVER, 0.3), 1, 14, 0))
+	p.add_theme_stylebox_override("panel", box(Color(0.035, 0.035, 0.04, 0.75), Color(SILVER, 0.35), 1, 8, 0))
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
 	p.add_child(h)
@@ -300,7 +301,7 @@ static func currency_pill(kind: String, amount_label: Label) -> PanelContainer:
 	h.add_child(amount_label)
 	return p
 
-## Indicador de novedad: pequeño cristal azul que brilla.
+## Indicador de novedad: pequeña runa dorada que brilla.
 static func notify_dot(parent: Control) -> Control:
 	var d := NotifyDot.new()
 	d.name = "Dot"
@@ -312,7 +313,7 @@ static func notify_dot(parent: Control) -> Control:
 	place.call()
 	return d
 
-## Textura de esquirla de cristal (rombo alargado) generada en código.
+## Textura de esquirla/chispa de la Gracia generada en código.
 static func shard_texture() -> Texture2D:
 	if _shard_tex:
 		return _shard_tex
@@ -323,11 +324,11 @@ static func shard_texture() -> Texture2D:
 			var d := absf(x - 5.5)
 			if d <= w:
 				var a := 1.0 - d / maxf(w, 0.01) * 0.6
-				img.set_pixel(x, y, Color(0.8, 0.92, 1.0, a))
+				img.set_pixel(x, y, Color(1.0, 0.90, 0.72, a))
 	_shard_tex = ImageTexture.create_from_image(img)
 	return _shard_tex
 
-## Esquirlas de cristal 2D que suben y se desvanecen (CPUParticles2D, barato en móvil).
+## Chispas de la Gracia 2D que suben y se desvanecen (CPUParticles2D, barato en móvil).
 static func crystal_shards(parent: Node, amount: int = 24, area: Rect2 = Rect2(0, 740, 1280, 10)) -> CPUParticles2D:
 	var p := CPUParticles2D.new()
 	p.name = "Shards"
@@ -348,9 +349,9 @@ static func crystal_shards(parent: Node, amount: int = 24, area: Rect2 = Rect2(0
 	p.scale_amount_min = 0.35
 	p.scale_amount_max = 0.9
 	var g := Gradient.new()
-	g.set_color(0, Color(0.6, 0.85, 1.0, 0.0))
-	g.add_point(0.25, Color(0.7, 0.9, 1.0, 0.7))
-	g.set_color(g.get_point_count() - 1, Color(0.5, 0.7, 1.0, 0.0))
+	g.set_color(0, Color(0.95, 0.82, 0.5, 0.0))
+	g.add_point(0.25, Color(1.0, 0.90, 0.65, 0.65))
+	g.set_color(g.get_point_count() - 1, Color(0.85, 0.65, 0.3, 0.0))
 	p.color_ramp = g
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD

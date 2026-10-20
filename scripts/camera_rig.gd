@@ -9,16 +9,57 @@ extends Node
 static var sensitivity: float = 1.0
 static var invert_y: bool = false
 static var capture_mouse: bool = false
+static var distance_preset: String = "cerca" ## "cerca", "medio", "alejado"
+
+const PRESETS := {
+	"cerca": {
+		"name": "Cerca",
+		"dist": 3.6,
+		"lock_dist": 3.2,
+		"lock_k": 0.06,
+		"lock_extra": 1.6,
+		"pivot_y": 1.5,
+		"shoulder": 1.0
+	},
+	"medio": {
+		"name": "Medio",
+		"dist": 4.6,
+		"lock_dist": 4.2,
+		"lock_k": 0.08,
+		"lock_extra": 2.4,
+		"pivot_y": 1.6,
+		"shoulder": 1.3
+	},
+	"alejado": {
+		"name": "Alejado",
+		"dist": 6.2,
+		"lock_dist": 5.6,
+		"lock_k": 0.10,
+		"lock_extra": 3.2,
+		"pivot_y": 1.8,
+		"shoulder": 1.5
+	}
+}
+
+static func current_preset() -> Dictionary:
+	return PRESETS.get(distance_preset, PRESETS["cerca"])
+
+static func set_preset(p: String) -> void:
+	if PRESETS.has(p):
+		distance_preset = p
+
+static var DIST: float:
+	get: return float(current_preset()["dist"])
+static var LOCK_DIST: float:
+	get: return float(current_preset()["lock_dist"])
+static var LOCK_DIST_K: float:
+	get: return float(current_preset()["lock_k"])
+static var LOCK_DIST_EXTRA: float:
+	get: return float(current_preset()["lock_extra"])
+
 const PITCH_MIN := -0.15 ## rad (un poco por debajo del horizonte)
 const PITCH_MAX := 1.1 ## rad (~63°, casi cenital)
 const PITCH_DEFAULT := 0.5
-## Ronda p13: medido en la arena real (tests/print_camera.gd), la tanda anterior (−18 % en las
-## constantes) solo acercaba la cámara al jugador un 15,6 % (9,24 → 7,80 m a <9 m del rival): el
-## pivote (+2 m) y el hombro (1,6 m) no escalan. Ahora −19 % efectivo (9,24 → 7,50 m).
-const DIST := 7.4 ## libre (antes 9,5 → 7,8 → 7,4; mismo valor en PC y móvil)
-const LOCK_DIST := 6.3 ## fijado: base (antes 8,0 → 6,6)
-const LOCK_DIST_K := 0.12 ## fijado: + distancia al rival × K (antes 0,15 → 0,13)
-const LOCK_DIST_EXTRA := 4.0 ## fijado: tope del extra (antes 5,0 → 4,2) → máx. 10,3 m (antes 13)
 const MOUSE_K := 0.005
 const TOUCH_K := 0.008
 const FLICK_PX := 140.0 ## tirón horizontal (px en 0,25 s) que cambia de objetivo con lock-on
@@ -121,9 +162,10 @@ func update(delta: float) -> void:
 		var mode := Input.MOUSE_MODE_CAPTURED if want else Input.MOUSE_MODE_VISIBLE
 		if Input.mouse_mode != mode and (want or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED):
 			Input.mouse_mode = mode
-	var pivot := player.global_position + Vector3(0, 2.0, 0)
+	var pcfg := current_preset()
+	var pivot := player.global_position + Vector3(0, float(pcfg["pivot_y"]), 0)
 	var look := pivot
-	var dist := DIST
+	var dist := float(pcfg["dist"])
 	var tgt: Node3D = player.face_target if is_instance_valid(player.face_target) else null
 	if tgt:
 		# Lock-on: detrás del jugador, mirando al objetivo (sobre el hombro)
@@ -131,9 +173,9 @@ func update(delta: float) -> void:
 		var dl := d.length()
 		var dn := d.normalized() if dl > 0.1 else player.facing
 		yaw = lerp_angle(yaw, atan2(-dn.x, -dn.z), clampf(delta * 6.0, 0.0, 1.0))
-		dist = LOCK_DIST + clampf(dl * LOCK_DIST_K, 0.0, LOCK_DIST_EXTRA)
-		pivot += dn.cross(Vector3.UP) * 1.6
-		look = player.global_position.lerp(tgt.global_position, 0.5) + Vector3(0, 1.5, 0)
+		dist = float(pcfg["lock_dist"]) + clampf(dl * float(pcfg["lock_k"]), 0.0, float(pcfg["lock_extra"]))
+		pivot += dn.cross(Vector3.UP) * float(pcfg["shoulder"])
+		look = player.global_position.lerp(tgt.global_position, 0.5) + Vector3(0, float(pcfg["pivot_y"]) - 0.3, 0)
 	elif _idle_t > RECENTER_DELAY and player.planar_vel.length() > 2.0:
 		# Sin tocar la cámara y avanzando: vuelve poco a poco detrás (no al ir hacia la cámara)
 		var fwd := MeshUtil.flat(-camera.global_transform.basis.z).normalized()

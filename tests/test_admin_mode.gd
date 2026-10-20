@@ -82,8 +82,8 @@ func _run() -> void:
 	check(p_fighter.boss_ids.size() == 1, "Disabling AdminMode restores original 1 ability")
 	check(sim.params[0]["boss"].size() == 1, "Disabling AdminMode restores original compiled params")
 	
-	# 3. Test Combo Info on Abilities (Elden Ring / Hoja Escarlata)
-	# Equip an ability with branch: 'pisoton_telurico' (Godfrey) and 'danza_espirales' (Malenia)
+	# 3. Combo de habilidades (jefes mayores / Hoja Escarlata)
+	# Equip an ability with branch: 'pisoton_telurico' y 'danza_espirales'
 	p_fighter.boss_ids = ["pisoton_telurico", "danza_espirales"]
 	sim.params[0]["boss"] = SimAbilities.compile_all(p_fighter)
 	sim.params[0]["boss_n"] = p_fighter.boss_ids.size()

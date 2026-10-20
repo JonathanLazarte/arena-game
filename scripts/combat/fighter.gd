@@ -123,8 +123,8 @@ const MAX_COMBO := 3
 const FINISHER_EXTRA_RECOVERY := 0.3 ## el último golpe del combo deja más expuesto
 const CHAIN_MIN_RECOVERY := 0.3 ## un encadenado no se salta toda la recuperación
 const ROLL_CANCEL_FRACTION := 0.5 ## voltereta/dash permitido en la 2.ª mitad de la recuperación
-## Voltereta a pie estilo Dark Souls (frames a 30 fps; ver README "Ronda 9" para las fuentes).
-## DS1 fast roll (25 % de carga): 24 frames en total; 11-13 de invulnerabilidad.
+## Voltereta a pie (frames a 30 fps; los números están en el README, ronda 9).
+## 24 frames en total; el arranque vulnerable es de este juego.
 const ROLL_FPS := 30.0
 const ROLL_STARTUP_FRAMES := 2 ## vulnerable: el cuerpo aún no ha bajado
 const ROLL_IFRAMES := 12 ## invulnerable (DS1 fast 11-13, DS3 12-13)
@@ -376,6 +376,7 @@ var _stoneskin: Dictionary = {}
 var weapon_art_id: String = ""
 var art_cd: float = 0.0
 var eikon_seal_id: String = ""
+var eikon_gambits: Array = []
 var arts_used: int = 0
 var _art_mult: float = 1.0
 var incoming_element: String = "" ## lo fija el proyectil/hechizo justo antes de impactar
@@ -790,7 +791,10 @@ var sim_driven: bool = false
 
 ## Fase 8: la jugabilidad vive solo en net/sim; este nodo es la vista (SimView escribe su estado).
 func _physics_process(delta: float) -> void:
-	rotation.y = atan2(-facing.x, -facing.z)
+	if is_rolling() and dash_dir.length_squared() > 0.01:
+		rotation.y = atan2(-dash_dir.x, -dash_dir.z)
+	else:
+		rotation.y = atan2(-facing.x, -facing.z)
 	# El fénix anima el lomo lejos del suelo (y el grifo lo mueve al galopar). La cadera sigue ese
 	# punto; el nodo del luchador no se mueve.
 	if mounted and is_instance_valid(mount_node) and mount_node.seat_follows_bone():

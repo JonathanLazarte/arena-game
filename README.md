@@ -101,18 +101,14 @@ Animaciones y modelos reales, selector de montura y eikon, vuelo del grifo, camb
 - Pruebas nuevas: `tests/test_eikon_block.gd` y `tests/test_riding.gd`. Capturas: `tests/screenshot_mounted.gd -- <png> [still|gallop] [show|hide] [side|front]` y `tests/golem_preview.gd -- <png>` (necesitan pantalla, p. ej. `xvfb-run ... --rendering-driver opengl3`).
 - `test_match` devolvía código 1 aunque la partida terminara (comprobaba el estado después de reiniciar). Ya está corregido.
 
-## Ronda 9: respiros de la IA, voltereta estilo Dark Souls, eikon arreglado y dash + ataque
+## Ronda 9: respiros de la IA, voltereta con i-frames, eikon arreglado y dash + ataque
 - **Respiros de la IA** (`Phase.BREATHE` en `ai_controller.gd`, ajustes en `AIDifficulty`): tras un intercambio (con probabilidad `breather_chance`), o si lleva `breather_interval` s sin respirar, el rival se aleja a `breather_dist`, rodea despacio, recupera aguante o espera quieto mirándote durante un tiempo aleatorio entre `breather_min` y `breather_max`. En ese tiempo no ataca, pero sigue defendiéndose.
   | Perfil | Probabilidad | Duración | Distancia | Respiro forzado cada |
   |---|---|---|---|---|
   | easy | 65 % | 3,5–7 s | 13 m | 9 s |
   | normal | 35 % | 2–4,5 s | 11 m | 14 s |
   | hard | 15 % | 1,2–2,8 s | 9 m | 22 s |
-- **Voltereta a pie estilo Dark Souls** (el dash montado no cambia). A 30 fps: **2 frames de arranque vulnerable + 12 i-frames + 10 de recuperación vulnerable = 24 frames (0,8 s)**, recorre 4,5 m (+0,4 m al levantarse) y cuesta 20 de aguante. Durante la recuperación no se puede atacar, bloquear, hacer parry ni volver a rodar. Si ruedas demasiado pronto o demasiado tarde, te golpean. Animación: `Dodge_Forward/Backward/Left/Right` de KayKit (la voltereta del pack), con la velocidad ajustada para que dure exactamente 0,8 s.
-  - Datos de referencia (30 fps):
-    - **DS1:** fast roll de 13 i-frames y 21–24 frames en total; medium roll de 11 i-frames y 33 frames; fat roll de 9 i-frames y 46 frames (GameFAQs, "Rol/Flip iFrames and recovery info", https://gamefaqs.gamespot.com/boards/606312-dark-souls/63774400). La wiki de Fandom da 11 i-frames para todas las rolls y separa la recuperación: fast roll al 25 %, 11 i-frames + 3 de recuperación + 8 de "inestabilidad" + 2 = 24 frames (https://darksouls.fandom.com/wiki/Rolling).
-    - **DS3:** 12 i-frames (0,4 s; Carthus Bloodring +3), según https://github.com/gastevens/dark-souls-3-mechanics-cheat-sheet/blob/master/ds3mechanicscheatsheet.md. El fast roll tiene unos 13 i-frames y 21 frames en total (datos de 60 fps divididos entre 2: https://gamefaqs.gamespot.com/boards/168566-dark-souls-iii/74600300).
-  - En DS1 los i-frames empiezan en el primer frame. Los 2 frames de arranque vulnerable son una decisión de diseño de este juego, para castigar el roll de pánico tardío.
+- **Voltereta a pie** (el dash montado no cambia). A 30 fps: **2 frames de arranque vulnerable + 12 i-frames + 10 de recuperación vulnerable = 24 frames (0,8 s)**, recorre 4,5 m (+0,4 m al levantarse) y cuesta 20 de aguante. Durante la recuperación no se puede atacar, bloquear, hacer parry ni volver a rodar. Si ruedas demasiado pronto o demasiado tarde, te golpean. Animación: `Dodge_Forward/Backward/Left/Right` de KayKit (la voltereta del pack), con la velocidad ajustada para que dure exactamente 0,8 s. Los 2 frames de arranque vulnerable son de este juego, para castigar la voltereta tardía.
 - **Eikon (fénix):** la entrada, la aparición y los ataques funcionaban. El problema era que el medidor casi nunca se llenaba:
   - se ponía a 0 en cada ronda;
   - solo subía con golpes (unos 8 golpes acertados en 90 s);
@@ -343,18 +339,18 @@ Llamada del eikon (F a pie): viene corriendo desde cualquier distancia y te mont
 
 ## Ronda 18 — Atributos (8), escalado de armas y requisitos
 
-Inspirado en el sistema de 8 atributos de los «soulslike» (Elden Ring: Vigor, Mind, Endurance, Strength, Dexterity, Intelligence, Faith, Arcane), con **nombres y fórmulas propias**. Todo bono es *relativo al reparto inicial del rol*: a nivel 1 el combate es idéntico al de la ronda 17. Cada nivel de personaje da **2 puntos de atributo** (el árbol de habilidades conserva su punto por nivel: sistemas separados). Valores 6–60. Redistribuir es gratis por ahora. Las curvas son por tramos (umbral blando = baja la ganancia por punto).
+Ocho atributos, con **nombres y fórmulas propias**. Todo bono es *relativo al reparto inicial del rol*: a nivel 1 el combate es idéntico al de la ronda 17. Cada nivel de personaje da **2 puntos de atributo** (el árbol de habilidades conserva su punto por nivel: sistemas separados). Valores 6–60. Redistribuir es gratis por ahora. Las curvas son por tramos (umbral blando = baja la ganancia por punto).
 
-| Atributo (equivalente) | Efectos | Fórmula (por punto, por tramos) |
+| Atributo | Efectos | Fórmula (por punto, por tramos) |
 |---|---|---|
-| Vitalidad (Vigor) | Vida; defensa física | Vida +4 hasta 25, +2 hasta 40, +0,6 después · defensa +0,4 % hasta 30, +0,15 % hasta 50 (tope 15 %) |
-| Concentración (Mind) | Energía máx. y regeneración (Golpe sísmico cuesta 30) | Energía 50 +3 hasta 25, +1,5 hasta 40 · regen 5/s +0,25 hasta 30, +0,1 hasta 50 |
-| Aguante (Endurance + Robustness) | Estamina, poise, robustez (menos aturdimiento recibido), guardia más firme, carga | Estamina +2,5/+1,2/+0,4 (25/40) · poise +1,5/+0,6 (30/50) · aturdimiento recibido −1,2 %/−0,5 % (30/50, mín. 60 %) · coste de bloqueo −0,8 %/−0,3 % · carga 30 + 1,6/1,0/0,5 (25/60) |
-| Fuerza (Strength) | Daño de armas FUE; daño a poise y a la guardia; aturdimiento infligido | escala 2 %/1 %/0,4 % (20/40/60) × coef. del arma · poise/guardia +1,5 %/+0,6 % (30/50) · aturdimiento +1 %/+0,4 % (tope +35 %) |
-| Destreza (Dexterity) | Daño de armas DES; velocidad de ataque y disparo; voltereta más barata y con más i-frames | velocidad +0,6 %/+0,2 % (30/50, tope +16 %) · coste voltereta −0,8 %/−0,3 % · i-frames +0,07/+0,03 por punto (redondeado, tope +2) |
-| Sabiduría (Intelligence) | Poder mágico (futuros hechizos); escala armas SAB | 100 +4 hasta 30, +2 hasta 50 |
-| Devoción (Faith) | Curación (Luz sanadora), resistencia sagrada (eikon/área), daño de armas DEV | curación +3 %/+1,2 % (25/40) · resistencia +0,5 %/+0,2 % (30/50, tope 15 %) |
-| Vínculo (sustituye a Arcane) | Daño y vida del eikon, ganancia del medidor | eikon +2 %/+0,8 % (25/40) · medidor +1,5 %/+0,6 % |
+| Vitalidad | Vida; defensa física | Vida +4 hasta 25, +2 hasta 40, +0,6 después · defensa +0,4 % hasta 30, +0,15 % hasta 50 (tope 15 %) |
+| Concentración | Energía máx. y regeneración (Golpe sísmico cuesta 30) | Energía 50 +3 hasta 25, +1,5 hasta 40 · regen 5/s +0,25 hasta 30, +0,1 hasta 50 |
+| Aguante | Estamina, poise, robustez (menos aturdimiento recibido), guardia más firme, carga | Estamina +2,5/+1,2/+0,4 (25/40) · poise +1,5/+0,6 (30/50) · aturdimiento recibido −1,2 %/−0,5 % (30/50, mín. 60 %) · coste de bloqueo −0,8 %/−0,3 % · carga 30 + 1,6/1,0/0,5 (25/60) |
+| Fuerza | Daño de armas FUE; daño a poise y a la guardia; aturdimiento infligido | escala 2 %/1 %/0,4 % (20/40/60) × coef. del arma · poise/guardia +1,5 %/+0,6 % (30/50) · aturdimiento +1 %/+0,4 % (tope +35 %) |
+| Destreza | Daño de armas DES; velocidad de ataque y disparo; voltereta más barata y con más i-frames | velocidad +0,6 %/+0,2 % (30/50, tope +16 %) · coste voltereta −0,8 %/−0,3 % · i-frames +0,07/+0,03 por punto (redondeado, tope +2) |
+| Sabiduría | Poder mágico (futuros hechizos); escala armas SAB | 100 +4 hasta 30, +2 hasta 50 |
+| Devoción | Curación (Luz sanadora), resistencia sagrada (eikon/área), daño de armas DEV | curación +3 %/+1,2 % (25/40) · resistencia +0,5 %/+0,2 % (30/50, tope 15 %) |
+| Vínculo | Daño y vida del eikon, ganancia del medidor | eikon +2 %/+0,8 % (25/40) · medidor +1,5 %/+0,6 % |
 
 Escalado: letra según coeficiente (S > 1,7 · A ≥ 1,3 · B ≥ 0,9 · C ≥ 0,55 · D ≥ 0,25 · E). Daño del arma × (1 + Σ coef·escala(attr)) / (lo mismo con el reparto inicial). Bajo requisito: −30 % y aviso ⚠.
 
@@ -372,7 +368,7 @@ Guardado v5: atributos por ranura; las partidas v4 o anteriores reciben los punt
 
 Ronda 18 extra: disparar a pie *suspende* la carrera solo durante tensar/recuperar; si «Correr» sigue activo (o Mayús mantenida) se vuelve a correr solo.
 
-Fuentes: Bandai Namco, «ELDEN RING How-To Guide Part 2 – Advanced Stats»; Fextralife «Stats»; Eldenpedia (wiki.gg) «Stats and Attributes»; Fandom «Weapon Scaling»; Prima Games «Soft caps for each stat and attribute in Elden Ring».
+
 
 ## Ronda 19 — Ficha de personaje, armadura, carga de equipo y Tienda
 
@@ -401,21 +397,21 @@ Fórmulas (propias; todo relativo a la referencia del rol: nivel 1, reparto inic
 
 Elementos de los eikons: fénix fuego, lobo mágico, grifo rayo y gólem físico. Las armaduras son 9 conjuntos de 4 piezas: los 5 iniciales de cada rol y 4 a la venta (Seda del viento, ligera; Malla del vigía, media; Túnica de ceniza, ligera con absorción de fuego; Placas del bastión, pesada). La armadura se ve con piezas sencillas teñidas sobre los huesos del modelo de KayKit. Guardado v6: se regala el equipo inicial. El rival lleva el conjunto de su rol a partir del nivel 3.
 
-Fuentes: Fextralife «Calculating Damage», «Equip Load», «Damage Types», «Robustness»; Eldenpedia «Equip Load», «Immunity», «Vitality», «Poise»; Bandai Namco «ELDEN RING How-To Guide Part 1 – Stats».
+
 
 ## Ronda 20 — Audio, estados alterados, herrería e infusiones, botones de cierre
 
 **Audio provisional (CC0).** El autoload `Audio` (`scripts/audio_manager.gd`) crea los buses Master, Música, Efectos e UI. La música pasa de una pista a otra con un fundido cruzado: el lobby, dos temas de combate (uno al azar en cada partida) y las ráfagas de victoria y derrota. Los efectos suenan con un tono aleatorio de ±8 %; en la arena son posicionales (`AudioStreamPlayer3D`). Tienen sonido el tajo (ligero o pesado según el peso del arma), el golpe en carne o en armadura (según la absorción física), el bloqueo, la rotura de guardia, el parry, el fallo, la voltereta, los pasos, el salto y la caída, tensar y soltar el arco, disparar y recargar la ballesta, el impacto de la flecha, la invocación, los especiales de cada eikon (fuego, mordisco de hielo, vendaval, golpe del gólem y Golpe sísmico), el golpe a un eikon, el estallido de cada estado, la compra y la herrería. Los sonidos de interfaz de siempre van ahora por el bus UI. La pestaña **Ajustes** tiene un deslizador por bus y guarda los valores en `user://ajustes.cfg`. Las fuentes y licencias están en CREDITS.md.
 
-**Estados alterados (acumulación al estilo Elden Ring).** Cada golpe suma puntos a una barra. Al llenarse, se dispara el efecto y la barra vuelve a 0 (con 1,5 s de bloqueo). La barra empieza a bajar a 10 puntos/s tras 1,5 s sin acumular. El umbral es 10 + la resistencia de la ficha. Las barras se ven en el HUD (propias y del rival) y sobre la cabeza del rival. Cada estallido suelta partículas del color del estado y tiñe al personaje; con veneno o congelación hay un aura y un tinte que duran lo que dura el efecto.
+**Estados alterados (acumulación).** Cada golpe suma puntos a una barra. Al llenarse, se dispara el efecto y la barra vuelve a 0 (con 1,5 s de bloqueo). La barra empieza a bajar a 10 puntos/s tras 1,5 s sin acumular. El umbral es 10 + la resistencia de la ficha. Las barras se ven en el HUD (propias y del rival) y sobre la cabeza del rival. Cada estallido suelta partículas del color del estado y tiñe al personaje; con veneno o congelación hay un aura y un tinte que duran lo que dura el efecto.
 
-| Estado | Resiste | Efecto (valores propios) | Elden Ring (referencia) | Fuentes |
-|---|---|---|---|---|
-| Sangrado | Robustez | 12 % de la vida máx. + 6 de golpe | 15 % + 100/200 (jefes 70 %) | Dagas (18/golpe), infusión Sangrante (20) |
-| Veneno | Inmunidad | 2 de daño/s durante 14 s | 0,07 % + 7/s durante 90 s (mortal: 0,14 % + 14/s, 30 s) | Infusión Venenosa (22) |
-| Congelación | Robustez | 8 % + 4 de golpe; 12 s con +15 % de daño recibido y aguante al 60 % | 10 % + 30 de golpe; +20 % de daño recibido durante 30 s | Lobo de Hielo (30 por golpe de eikon), infusión Gélida (20) |
+| Estado | Resiste | Efecto | Origen del daño |
+|---|---|---|---|
+| Sangrado | Robustez | 12 % de la vida máx. + 6 de golpe | Dagas (18/golpe), infusión Sangrante (20) |
+| Veneno | Inmunidad | 2 de daño/s durante 14 s | Infusión Venenosa (22) |
+| Congelación | Robustez | 8 % + 4 de golpe; 12 s con +15 % de daño recibido y aguante al 60 % | Lobo de Hielo (30 por golpe de eikon), infusión Gélida (20) |
 
-A nivel 1, el umbral del rival es de unos 100 (6 golpes de dagas para sangrar). Más Aguante o armadura pesada lo suben: el Bastión lo deja en unos 140. Valores de referencia de Fextralife: «Hemorrhage», «Poison», «Frostbite» y «Robustness». En ER la acumulación tampoco tiene enfriamiento; la nuestra lleva un bloqueo corto para que el 1v1 no se vuelva una cadena de estallidos.
+A nivel 1, el umbral del rival es de unos 100 (6 golpes de dagas para sangrar). Más Aguante o armadura pesada lo suben: el Bastión lo deja en unos 140. La acumulación lleva un bloqueo corto para que el 1v1 no se vuelva una cadena de estallidos.
 
 **Herrería.** La pestaña **Herrero** tiene la lista de tus armas, el Ataque antes y después de mejorar, el escalado, el coste y el estado del arma; el botón Mejorar; y seis infusiones.
 
@@ -535,7 +531,7 @@ Prueba nueva: `test_exchange.gd`.
 
 ## Ronda 25 — Cámara orbital, 8 direcciones y la Estocada de jefe
 
-**Pilar de diseño nuevo** (arriba de `docs/ELDEN_RING_REFERENCIA.md`): mitad PvP, mitad jefe de Dark Souls; habilidades de jefe imparables e invulnerables, pero siempre telegrafiadas: el reto es el ritmo, no los reflejos.
+**Pilar de diseño nuevo** (arriba de `docs/referencia_combate.md`): mitad PvP, mitad jefe; habilidades de jefe imparables e invulnerables, pero siempre telegrafiadas: el reto es el ritmo, no los reflejos.
 
 ### Diagonal hacia atrás (arreglado)
 A pie (libre o fijado) y montado, las 8 direcciones andando y corriendo. Causa: con `dot < -0,6` el personaje retrocedía en vez de girar, y la cámara vieja seguía su orientación (giraba sin fin). Ahora sólo retrocede montado, sin correr y con atrás casi puro (`dot < -0,92`); si no, gira hacia la entrada. Nota: S+A+Shift en algunos teclados no registra las tres teclas (ghosting de hardware); **V** alterna correr.
@@ -572,7 +568,7 @@ Tiene un botón propio, no comparte hueco con Habilidad/Arte: es el hueco para f
 | Normal | 0,03 | 0,60 | 0,12 s |
 | Difícil | 0,05 | 0,85 | 0,05 s |
 
-### Paso adelante en los ataques (estilo ER)
+### Paso adelante en los ataques
 Cada ataque a pie avanza (en `WeaponDef.step_light` / `step_heavy`). El paso se reparte entre el 45 % final de la preparación y la ventana activa. El pesado cargado suma +0,8 m (no se mueve mientras carga). Tiene **magnetismo** hacia el objetivo fijado o cercano de delante: se detiene al contacto (radio + 0,8 m), no lo atraviesa y respeta las colisiones. El daño no cambia (el nivel 1 sigue igual).
 
 | Arma | ligeros 1/2/3 (m) | pesado (m) |
@@ -585,12 +581,7 @@ Cada ataque a pie avanza (en `WeaponDef.step_light` / `step_heavy`). El paso se 
 
 Las estocadas en carrera y los golpes con salto conservan su propia embestida (mayor).
 
-**Pruebas:** `tests/test_round25.gd` comprueba:
-- las 8 direcciones (a pie libre, a pie fijado, montado);
-- la órbita, el límite de inclinación, invertir Y, la colisión con pilar y muro, las zonas táctiles, la cámara en fijado, el tirón y que los ajustes se guardan;
-- la Estocada: carga, invulnerabilidad, que no se interrumpe, el seguimiento y luego la dirección fija, la esquiva lateral, los 7,5 m al aire, que para al impactar, la recuperación castigable y el enfriamiento;
-- que la IA la esquiva y la usa;
-- el paso por arma y el magnetismo.
+**Pruebas:** `tests/test_round25.gd` comprueba la cámara: un pilar la acerca, el muro la frena y las zonas táctiles (joystick, botón, mitad derecha). El recorrido de las 8 direcciones y la Estocada quedaron en la sim (`test_fight_sim`, `test_sim_rules`); ese recorrido dependía de la posición del personaje y se sacó de este archivo.
 
 ## Ronda 26 — Rendimiento (sin cambios de jugabilidad)
 
@@ -780,7 +771,7 @@ La contra de guardia usa los clips del combo de cada arma, igual que antes.
 - Revancha online: los dos eligen «Revancha», siguen conectados y empieza otra partida con los mismos ajustes y una semilla nueva acordada; si el rival vuelve al lobby, se avisa.
 
 ## Ronda 46 — Catálogo de jefe
-- 26 habilidades nuevas en la pestaña Jefe (45 en total). Reusan los ejecutores de la sim: golpe en línea de tiempo, ondas, lluvia, aliento, tajo que persigue, bufo y contragolpe. Nombres y números propios; el patrón de cada una está anotado en `docs/ELDEN_RING_REFERENCIA.md` §14.
+- 26 habilidades nuevas en la pestaña Jefe (45 en total). Reusan los ejecutores de la sim: golpe en línea de tiempo, ondas, lluvia, aliento, tajo que persigue, bufo y contragolpe. Nombres y números propios; el patrón de cada una está anotado en `docs/referencia_combate.md` §14.
 - El área de Flor Umbral y Picado de Alas sale aunque el cuerpo no conecte (`slam_always`). Lluvia de Lanzas, Columnas de Rayo y Lanza Celeste dibujan columna. Saeta Oscura y Orbe Lunar persiguen como la Ráfaga y se pueden repetir al terminar.
 - La IA las elige por distancia. No cambia el protocolo de red. Prueba: `tests/test_boss_roster.gd`.
 

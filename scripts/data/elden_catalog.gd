@@ -1,6 +1,6 @@
 class_name EldenCatalog
 extends RefCounted
-## Catálogo de jefes inspirados en Elden Ring (Radagon, Malenia, Godfrey)
+## Catálogo de Radagon, Malenia y Godfrey
 ## para el códice y la simulación por pasos determinista (T_CATALOG / SimCatalog).
 
 const PATH := "res://data/abilities/bosses_elden_catalog.json"

@@ -23,17 +23,65 @@ static func parse(text: String) -> Array[Dictionary]:
 	return out
 
 func start(text: String, timeout_ms: int = 1500) -> void:
+	_drop_lookups()
 	servers = parse(text)
 	udp.close(); udp.bind(0, "0.0.0.0")
 	for s in servers:
-		s["ip"] = s["host"] if String(s["host"]).is_valid_ip_address() else IP.resolve_hostname(s["host"], IP.TYPE_IPV4)
+		var host := String(s["host"])
+		if host.is_valid_ip_address():
+			s["ip"] = host
+		else:
+			s["ip"] = ""
+			s["dns"] = IP.resolve_hostname_queue_item(host, IP.TYPE_IPV4)
 	_sent = 0; done = servers.is_empty()
 	_until = Time.get_ticks_msec() + timeout_ms
 
-## Llamar cada fotograma hasta done.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_PREDELETE:
+		return
+	for s in servers:
+		if s.has("dns") and int(s["dns"]) >= 0:
+			IP.erase_resolve_item(int(s["dns"]))
+		s.erase("dns")
+
+func _drop_lookups() -> void:
+	for s in servers:
+		if s.has("dns") and int(s["dns"]) >= 0:
+			IP.erase_resolve_item(int(s["dns"]))
+		s.erase("dns")
+
+## true mientras algún nombre sigue en la cola.
+func _dns_pending() -> bool:
+	var waiting := false
+	for s in servers:
+		if not s.has("dns"):
+			continue
+		var id := int(s["dns"])
+		if id < 0:
+			s.erase("dns")
+			continue
+		var st := IP.get_resolve_item_status(id)
+		if st == IP.RESOLVER_STATUS_NONE or st == IP.RESOLVER_STATUS_WAITING:
+			waiting = true
+			continue
+		var addr := ""
+		if st == IP.RESOLVER_STATUS_DONE:
+			addr = IP.get_resolve_item_address(id)
+		IP.erase_resolve_item(id)
+		s.erase("dns")
+		s["ip"] = addr
+	return waiting
+
+## Llamar cada fotograma hasta done. No manda UDP hasta resolver el nombre.
 func poll() -> void:
 	if done: return
 	var t := Time.get_ticks_msec()
+	if _dns_pending():
+		if t >= _until:
+			_drop_lookups()
+			done = true
+			udp.close()
+		return
 	if _sent < ROUNDS and t >= _until - 1500 + _sent * 150:
 		_sent += 1
 		for s in servers:

@@ -68,6 +68,7 @@ var champion_mode: bool = false
 var champion_progress: int = 0 ## campeones derrotados en la escalera (0..5)
 var owned_eikon_seals: Array = []
 var equipped_eikon_seal: String = ""
+var eikon_gambits: Dictionary = {}
 
 ## Ronda 30: RECURSOS DE PRUEBA. true = al cargar, el perfil recibe (una sola vez por perfil)
 ## mucho oro, cristales, piedras de forja y todos los accesorios. PONER EN false ANTES DE PUBLICAR.
@@ -578,6 +579,48 @@ func set_eikon_seal(id: String) -> bool:
 	save_loadout()
 	return true
 
+## Gambits tácticos de Eikon estilo FFXII (3 ranuras por eikon).
+func eikon_gambits_for(eid: String = "") -> Array:
+	var id := eid if eid != "" else eikon_id
+	if not eikon_gambits.has(id) or not (eikon_gambits[id] is Array):
+		eikon_gambits[id] = EikonGambits.default_for(id)
+	eikon_gambits[id] = EikonGambits.sanitize(eikon_gambits[id], id)
+	return (eikon_gambits[id] as Array).duplicate(true)
+
+func cycle_gambit_condition(slot_idx: int, eid: String = "") -> void:
+	var id := eid if eid != "" else eikon_id
+	var g: Array = eikon_gambits_for(id)
+	if slot_idx < 0 or slot_idx >= g.size():
+		return
+	var cur_cond: String = String(g[slot_idx].get("cond", EikonGambits.COND_ALWAYS))
+	var idx := EikonGambits.COND_ORDER.find(cur_cond)
+	var next_cond: String = String(EikonGambits.COND_ORDER[(idx + 1) % EikonGambits.COND_ORDER.size()])
+	g[slot_idx]["cond"] = next_cond
+	eikon_gambits[id] = g
+	save_loadout()
+
+func cycle_gambit_action(slot_idx: int, eid: String = "") -> void:
+	var id := eid if eid != "" else eikon_id
+	var g: Array = eikon_gambits_for(id)
+	if slot_idx < 0 or slot_idx >= g.size():
+		return
+	var cur_act: String = String(g[slot_idx].get("act", EikonGambits.ACT_BASIC))
+	var idx := EikonGambits.ACT_ORDER.find(cur_act)
+	var next_act: String = String(EikonGambits.ACT_ORDER[(idx + 1) % EikonGambits.ACT_ORDER.size()])
+	g[slot_idx]["act"] = next_act
+	eikon_gambits[id] = g
+	save_loadout()
+
+func set_eikon_gambit(slot_idx: int, cond: String, act: String, eid: String = "") -> void:
+	var id := eid if eid != "" else eikon_id
+	var g: Array = eikon_gambits_for(id)
+	if slot_idx < 0 or slot_idx >= g.size():
+		return
+	g[slot_idx]["cond"] = cond
+	g[slot_idx]["act"] = act
+	eikon_gambits[id] = EikonGambits.sanitize(g, id)
+	save_loadout()
+
 func weapon_art(wid: String = "") -> String:
 	if wid == "": wid = weapon_id
 	if not WeaponArts.compatible(Catalog.weapon(wid)):
@@ -686,6 +729,7 @@ func save_loadout() -> void:
 	cfg.set_value("progreso", "champion_mode", champion_mode)
 	cfg.set_value("sellos", "owned", owned_eikon_seals)
 	cfg.set_value("sellos", "equipped", equipped_eikon_seal)
+	cfg.set_value("eikons", "gambits", eikon_gambits)
 	cfg.set_value("herreria", "niveles", weapon_up)
 	cfg.set_value("herreria", "infusiones", weapon_inf)
 	cfg.set_value("herreria", "materiales", materials)
@@ -759,6 +803,7 @@ func load_loadout() -> void:
 		champion_mode = bool(cfg.get_value("progreso", "champion_mode", false))
 		owned_eikon_seals = cfg.get_value("sellos", "owned", [])
 		equipped_eikon_seal = String(cfg.get_value("sellos", "equipped", ""))
+		eikon_gambits = cfg.get_value("eikons", "gambits", {})
 		owned_eikon_seals = owned_eikon_seals.filter(func(id: Variant) -> bool: return EikonSeals.DEFS.has(String(id)))
 		if equipped_eikon_seal != "" and not equipped_eikon_seal in owned_eikon_seals:
 			equipped_eikon_seal = ""
@@ -935,7 +980,9 @@ func reset_defaults() -> void:
 	champion_progress = 0
 	owned_eikon_seals = []
 	equipped_eikon_seal = ""
+	eikon_gambits = {}
 	char_titles = {}
+	char_boss = {}
 	owned_trinkets = []
 	rings_eq = ["", ""]
 	talismans_eq = ["", "", ""]
@@ -1073,7 +1120,7 @@ func boss_abilities(cid: String = "") -> Array:
 	var a: Array = char_boss.get(cid, BossAbilities.DEFAULT)
 	return a.duplicate()
 
-## Equipa/quita una habilidad (máx. 3, mínimo 1). Devuelve si cambió.
+## Equipa/quita una habilidad (máx. 4, mínimo 1). Devuelve si cambió.
 func toggle_boss_ability(id: String) -> bool:
 	if not BossAbilities.has(id):
 		return false
@@ -1083,20 +1130,26 @@ func toggle_boss_ability(id: String) -> bool:
 			return false
 		a.erase(id)
 	else:
-		if a.size() >= BossAbilities.MAX_EQUIPPED:
+		if not AdminMode.enabled and not BossAbilities.is_family_compatible(id, weapon_id, weapon2_id):
 			return false
+		if a.size() >= BossAbilities.MAX_EQUIPPED:
+			# Si ya están las 4 ranuras llenas, sustituye la última para que la elección del jugador siempre surta efecto
+			a.remove_at(a.size() - 1)
 		a.append(id)
 	char_boss[character_id] = a
+	save_loadout()
 	return true
 
-## Reemplaza las equipadas por un set (1 a 3 ids válidos).
+## Reemplaza las equipadas por un set (1 a 4 ids válidos).
 func set_boss_loadout(ids: Array) -> bool:
 	var a: Array = []
 	for id: Variant in ids:
 		var s := String(id)
 		if BossAbilities.has(s) and not s in a and a.size() < BossAbilities.MAX_EQUIPPED:
-			a.append(s)
+			if AdminMode.enabled or BossAbilities.is_family_compatible(s, weapon_id, weapon2_id):
+				a.append(s)
 	if a.is_empty():
 		return false
 	char_boss[character_id] = a
+	save_loadout()
 	return true

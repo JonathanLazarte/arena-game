@@ -664,10 +664,8 @@ static func combo_info(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
 		var fl: int = s[o + FightSim.AB_FL]
 		var queued := (fl & (FL_QUEUED | FL_VARIANT)) != 0
 		var active := true
-		var step_count: int = fired + (1 if queued else 0)
-		var prog := 1.0 - float(step_count) / maxf(float(hits.size()), 1.0)
-		if prog <= 0.05:
-			prog = 1.0 / maxf(float(hits.size()), 1.0)
+		var step_count: int = (fired + 1) + (1 if queued else 0)
+		var prog := clampf(1.0 - float(step_count) / maxf(float(hits.size()), 1.0), 0.0, 1.0)
 		return {"can_combo": can, "active": active, "progress": prog, "queued": queued, "label": "Estocada" if fired == hits.size() - 1 else ""}
 	return {"can_combo": false, "active": false, "progress": 0.0, "queued": false, "label": ""}
 
@@ -678,8 +676,15 @@ static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 	s[o + FightSim.BLOCKING] = 0
 	var dir := _tdir(s, i)
 	s[o + FightSim.FACE] = dir
-	var own_cd: int = 0 if AdminMode.enabled else int(ab.get("cd", GLOBAL_CD))
-	if slot < 64:
+	var is_rep: bool = int(ab.get("rep_free", 0)) != 0 and s[o + FightSim.AB_LAST] == int(ab.get("code", -1))
+	var own_cd: int = 0 if AdminMode.enabled else (0 if is_rep else maxi(GLOBAL_CD, int(ab.get("cd", GLOBAL_CD))))
+	if not AdminMode.enabled and not is_rep:
+		for k in 64:
+			if k == slot:
+				s[o + FightSim.BCD_BASE + k] = own_cd
+			else:
+				s[o + FightSim.BCD_BASE + k] = maxi(s[o + FightSim.BCD_BASE + k], GLOBAL_CD)
+	elif slot < 64:
 		s[o + FightSim.BCD_BASE + slot] = own_cd
 	s[o + FightSim.BOSS_CD] = own_cd
 	if kind_of(ab) == T_ESTOCADA:
@@ -715,6 +720,11 @@ static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 
 ## Fin de la habilidad (Fighter._end_ability): recarga individual por ranura.
 static func end_ability(s: PackedInt64Array, o: int, interrupted: bool) -> void:
+	if s[o + FightSim.BS_PH] != 0:
+		_end_boss(s, o)
+		if interrupted:
+			s[o + FightSim.AB_INTR] += 1
+		return
 	if s[o + FightSim.AB_SLOT] < 0:
 		return
 	var fl: int = s[o + FightSim.AB_FL]
@@ -840,7 +850,7 @@ static func _estocada(s: PackedInt64Array, P: Array, i: int) -> void:
 		_end_boss(s, o)
 		return
 	s[o + FightSim.BS_T] += 1
-	if s[o + FightSim.BS_PH] == 1 or s[o + FightSim.BS_PH] == 2:
+	if s[o + FightSim.BS_PH] == 2:
 		s[o + FightSim.INVULN] = maxi(s[o + FightSim.INVULN], 3)
 	match s[o + FightSim.BS_PH]:
 		1:

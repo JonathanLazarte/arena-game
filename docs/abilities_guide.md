@@ -210,7 +210,9 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 | `cost.stamina` / `.mana` / `.health` | number ≥ 0 | sí (al menos uno > 0) | `0` | puntos; se pueden combinar. El de aguante se multiplica por los modificadores de costo del luchador (talismanes) en `bake` |
 | `cooldown_ticks` | int ≥ 0 | sí | — | recarga propia; arranca al **terminar** la habilidad (o al interrumpirse si `on_interrupt.cooldown` = `full`) |
 | `uses_global_cd` | bool | no | `true` | respeta y dispara la recarga global de 84 ticks |
-| `global_cd_on_repeat` | bool | no | `true` | en `false`, repetir la misma habilidad se salta la recarga y una pulsación tras el disparo queda en cola (encadenado de la ráfaga) |
+| `spameable` | bool | no | `false` | en `true`, repetir la misma habilidad se salta la recarga global y una pulsación tras el disparo queda en cola. La ráfaga, la saeta oscura y el orbe lunar van en `true`. Se hornea en el mismo bit que `global_cd_on_repeat` (invertido): el protocolo no cambia |
+| `global_cd_on_repeat` | bool | no | `true` | nombre viejo del mismo bit. `false` equivale a `spameable: true`. Si los dos vienen y se contradicen, es error |
+| `familias` | array<enum> | no | `[]` | familia de animación, no el id del arma. `espada_ligera` · `espada_pesada` · `martillo` · `lanza` · `escudo` · `magia` · `bestia` · `arco` · `hacha` · `cualquiera`. Vacío = sin filtro (catálogos anteriores). `cualquiera` va sola |
 | `usable_while` | array<enum> | no | `["ground"]` | `ground` · `air` · `mounted` · `sprinting` · `blocking`. Fuera de esos estados la habilidad no arranca. Nunca: muerto, aturdido, bebiendo frasco, agotado |
 | `interruptible_by` | array<enum> | no | `[]` | `stun_lvl1` (tambaleo) · `stun_lvl2` (aturdido) · `knockdown` · `parry` · `guard_break` · `stance_break` · `grab`. **Lista vacía = no se corta** (solo se esquiva). Quien se corta lo declara, por ejemplo `["stun_lvl2","knockdown","parry"]` |
 | `interrupt_priority` | int | no | `0` | desempate determinista (§8.4) |
@@ -1122,7 +1124,7 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 
 ### 13.4 Decisiones (mandan sobre el esquema de arriba)
 
-1. **Recarga.** Solo la global de 85 ticks. El `cd` no se usa. La ráfaga se encadena y saltea la global. Más adelante: `max(global, propia)`.
+1. **Recarga.** Solo la global de 85 ticks. El `cd` no se usa. `spameable: true` (ráfaga, saeta oscura, orbe lunar) se encadena y saltea la global. Es el mismo bit que `global_cd_on_repeat: false`. Más adelante: `max(global, propia)`.
 2. **Interrupción.** `interruptible_by` vacío = no se corta (solo se esquiva). Cada habilidad declara lo que la corta. La base ya no es «cualquier aturdimiento». La Danza del Cisne lo declara (`parry`, `stun_lvl2`, `knockdown`); no hay un `if id == danza_cisne` en el motor nuevo.
 3. **Inmunidad total** en los i-frames de la Danza, el Paso Espectral, la Fase II y el escudo de maná. La Estocada se migra como hoy (inmunidad en la carga y la embestida) y queda pendiente de balance.
 4. **Derribo:** daño ×0,85 e inmune al aturdimiento. No es invulnerable.
@@ -1146,6 +1148,7 @@ Todas las ampliadas traen `cd` en segundos, que la sim no usa.
 16. **Origen.** `origin`: `boss` (default) o `weapon`. Las de arma llevan `requires_weapon` con ids que existen. El objeto `source` sigue siendo el programa de las 45. El HUD (catálogo admin) y la pestaña de loadout separan las dos listas. La sim no rechaza todavía una de arma si no llevás ese arma: lo hace el botón del loadout.
 17. **Spawns de suelo.** `ground_wave`, `ground_mark` y `zone` tienen `hits_airborne` (default false), por spawn. La sim no lo lee todavía.
 18. **Se esquiva.** Toda habilidad deja tiempo de ver el golpe y apartarse (§11.2). El piso de un tajo normal es el de la pausa falsa: 0,55 s. Un golpe pesado, un salto o una línea esperan más. `lock_at_tick` queda al menos 18 ticks antes del activo y una cadena deja hueco en el suelo entre golpes. `ground_wave` con `speed_mps: 0` es una línea quieta: se ve `warn_ticks` y pega una vez en toda la franja. Golpe de Fisura espera 1 s, mide 28 m × 2,1 m y, después del salto, el martillazo casi no se desplaza. Volteretas Cortantes se impulsa, permanece en el aire alrededor de 1 s y el tajo es el aterrizaje; sale y el segundo salto repite el golpe. El catálogo persigue hasta 24 ticks antes del activo y deja al menos 18. El alcance de los tajos de jefe, sus ondas y la vida de sus proyectiles suma 40 % (`REACH_PM`). Los básicos y las artes no cambian.
+19. **Familia de animación.** `familias` no es el id del arma ni `requires_weapon`. Las 45 la declaran. Vacío no filtra (Hoja, Elden, Artorias, Fisura). `cualquiera` va sola. `magia` es el foco, no el tipo de daño. `bestia` es el cuerpo sin arma. El loadout no filtra por familia todavía. `BossAbilities.weapon_families` devuelve la lista.
 
 ### 13.5 Hoja Escarlata (ronda 48)
 

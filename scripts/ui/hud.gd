@@ -48,12 +48,12 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UIKit.theme()
 	add_child(root)
-	p_health = _bar(root, Vector2(20, 20), UIKit.GREEN)
-	p_meter = _bar(root, Vector2(20, 52), UIKit.ORANGE, 14)
+	p_health = _bar(root, Vector2(20, 20), UIKit.RED)
+	p_meter = _bar(root, Vector2(20, 52), UIKit.CYAN, 14)
 	e_health = _bar(root, Vector2(1280 - 420, 20), UIKit.RED)
 	e_meter = _bar(root, Vector2(1280 - 420, 52), UIKit.CYAN, 14)
-	p_stamina = _bar(root, Vector2(20, 70), UIKit.YELLOW, 10)
-	e_stamina = _bar(root, Vector2(1280 - 420, 70), UIKit.YELLOW, 10)
+	p_stamina = _bar(root, Vector2(20, 70), UIKit.GREEN, 10)
+	e_stamina = _bar(root, Vector2(1280 - 420, 70), UIKit.GREEN, 10)
 	p_stance = _bar(root, Vector2(20, 82), Color(0.95, 0.9, 0.7), 6)
 	e_stance = _bar(root, Vector2(1280 - 420, 48), Color(1.0, 0.78, 0.34), 6)
 	p_stance.tooltip_text = "Postura · se agota al recibir golpes"
@@ -92,7 +92,7 @@ func _ready() -> void:
 	_touch_button("Arma\n3ª", "swap_weapon", Vector2(1180, 465), 48, Color(0.8, 0.65, 0.3))
 	_touch_button("Eikon", "summon", Vector2(150, 400), 48, Color(1.0, 0.5, 0.1))
 	_touch_button("Fijar", "lock_on", Vector2(1190, 345), 38, Color(1.0, 0.3, 0.3))
-	_touch_button("Objetivo", "target_next", Vector2(1190, 255), 34, Color(0.95, 0.8, 0.35))
+	_touch_button("⇄", "target_next", Vector2(1115, 345), 24, Color(0.95, 0.8, 0.35))
 	_touch_button("Montar", "mount", Vector2(1060, 360), 36, Color(0.7, 0.5, 0.3))
 	# Ronda 15: a pie es «Correr» (alternar); montado vuelve a ser «Galope» (mantener)
 	_touch_button("Correr", "run_toggle", Vector2(790, 650), 40, Color(0.95, 0.9, 0.3))
@@ -102,21 +102,42 @@ func _ready() -> void:
 	# Ronda 14: salto y habilidad del personaje
 	_touch_button("Saltar", "jump", Vector2(805, 535), 40, Color(0.75, 0.85, 1.0))
 	_touch_button("Habilidad", "special", Vector2(930, 415), 40, Color(1.0, 0.45, 0.25))
-	# Ronda 21: magia de eikon (a pie)
+	# Ronda 21: magia de eikon (a pie) - Retirado del HUD de combate a favor de Gambits
 	_touch_button("Hechizo", "spell", Vector2(800, 420), 40, Color(0.7, 0.5, 1.0))
 	_touch_button("↻", "spell_next", Vector2(722, 360), 24, Color(0.7, 0.5, 1.0))
-	# Ronda 25: habilidad de jefe
-	_touch_button("Jefe", "boss", Vector2(840, 300), 38, Color(1.0, 0.3, 0.15))
-	_touch_button("Estocada", "boss_variation", Vector2(840, 235), 32, Color(1.0, 0.58, 0.2))
-	# Ronda 32: flecha para cambiar de habilidad de jefe (botón normal: se ve en PC y en Android)
+	(btns["spell"] as TouchScreenButton).visible = false
+	(btns["spell_next"] as TouchScreenButton).visible = false
+	# Habilidades de jefe: 4 slots en fila horizontal
+	var boss_colors := [Color(1.0, 0.3, 0.15), Color(1.0, 0.4, 0.18), Color(1.0, 0.5, 0.22), Color(1.0, 0.6, 0.25)]
+	var boss_positions := [Vector2(705, 295), Vector2(775, 295), Vector2(845, 295), Vector2(915, 295)]
+	for k in 4:
+		var act := "boss" if k == 0 else "boss_%d" % k
+		_touch_button("Jefe %d" % (k + 1), act, boss_positions[k], 30, boss_colors[k])
+		var btb: TouchScreenButton = btns[act]
+		boss_slot_btns.append(btb)
+		var ic := BossIcon.make("", 22.0)
+		ic.name = "BossIcon"
+		ic.position = Vector2(-11, -26)
+		btb.add_child(ic)
+		boss_slot_icons.append(ic)
+		var lbl: Label = btn_labels[act]
+		lbl.position = Vector2(-30, 0)
+		lbl.size = Vector2(60, 24)
+		lbl.add_theme_font_size_override("font_size", 10)
+		boss_slot_labels.append(lbl)
+		btb.pressed.connect(_on_boss_slot_pressed.bind(k))
+	boss_icon = boss_slot_icons[0]
+
+	_touch_button("Estocada", "boss_variation", Vector2(845, 225), 30, Color(1.0, 0.58, 0.2))
+	# Ronda 32: selector y catálogo de habilidades
 	boss_prev_btn = Button.new()
 	boss_prev_btn.name = "BossPrev"
 	boss_prev_btn.text = "◀"
 	boss_prev_btn.tooltip_text = "Habilidad anterior de jefe"
 	boss_prev_btn.focus_mode = Control.FOCUS_NONE
-	boss_prev_btn.custom_minimum_size = Vector2(40, 40)
-	boss_prev_btn.position = Vector2(794, 280)
-	boss_prev_btn.add_theme_font_size_override("font_size", 18)
+	boss_prev_btn.custom_minimum_size = Vector2(32, 32)
+	boss_prev_btn.position = Vector2(665, 280)
+	boss_prev_btn.visible = false
 	boss_prev_btn.pressed.connect(_on_boss_prev)
 	add_child(boss_prev_btn)
 
@@ -125,9 +146,9 @@ func _ready() -> void:
 	boss_next_btn.text = "▶"
 	boss_next_btn.tooltip_text = "Siguiente habilidad de jefe (N)"
 	boss_next_btn.focus_mode = Control.FOCUS_NONE
-	boss_next_btn.custom_minimum_size = Vector2(40, 40)
-	boss_next_btn.position = Vector2(886, 280)
-	boss_next_btn.add_theme_font_size_override("font_size", 18)
+	boss_next_btn.custom_minimum_size = Vector2(32, 32)
+	boss_next_btn.position = Vector2(955, 280)
+	boss_next_btn.visible = false
 	boss_next_btn.pressed.connect(_on_boss_next)
 	add_child(boss_next_btn)
 
@@ -136,9 +157,9 @@ func _ready() -> void:
 	boss_list_btn.text = "☰"
 	boss_list_btn.tooltip_text = "Catálogo de habilidades (Admin)"
 	boss_list_btn.focus_mode = Control.FOCUS_NONE
-	boss_list_btn.custom_minimum_size = Vector2(32, 32)
-	boss_list_btn.position = Vector2(886, 238)
-	boss_list_btn.add_theme_font_size_override("font_size", 16)
+	boss_list_btn.custom_minimum_size = Vector2(30, 30)
+	boss_list_btn.position = Vector2(915, 235)
+	boss_list_btn.add_theme_font_size_override("font_size", 15)
 	boss_list_btn.pressed.connect(toggle_ability_picker)
 	add_child(boss_list_btn)
 
@@ -152,13 +173,6 @@ func _ready() -> void:
 	admin_toggle_btn.add_theme_font_size_override("font_size", 13)
 	admin_toggle_btn.pressed.connect(_on_admin_toggle)
 	add_child(admin_toggle_btn)
-	# fase 9: icono de la habilidad seleccionada dentro del botón «Jefe» (sin glifos de fuente)
-	var btb := btns["boss"] as TouchScreenButton
-	boss_icon = BossIcon.make("", 30.0)
-	boss_icon.name = "BossIcon"
-	boss_icon.position = Vector2(-15, -34)
-	btb.add_child(boss_icon)
-	(btn_labels["boss"] as Label).position = Vector2(-38, -2)
 	for l: Label in [round_label, timer_label, message]:
 		l.add_theme_font_override("font", UIKit.display_font())
 		l.add_theme_color_override("font_color", UIKit.TEXT)
@@ -210,10 +224,10 @@ func _bar(parent: Control, pos: Vector2, c: Color, h: float = 26) -> ProgressBar
 	b.position = pos
 	b.size = Vector2(400, h)
 	b.show_percentage = false
-	var fill := UIKit.box(c, Color(0, 0, 0, 0), 0, 2, 0)
+	var fill := UIKit.box(c, Color(0, 0, 0, 0), 0, 1, 0)
 	fill.content_margin_top = 0
 	fill.content_margin_bottom = 0
-	var bg := UIKit.box(Color(0.0, 0.03, 0.1, 0.6), Color(UIKit.SILVER, 0.7), 1, 2, 4)
+	var bg := UIKit.box(Color(0.02, 0.02, 0.025, 0.8), Color(UIKit.SILVER, 0.55), 1, 1, 2)
 	bg.content_margin_top = 0
 	bg.content_margin_bottom = 0
 	b.add_theme_stylebox_override("fill", fill)
@@ -249,7 +263,23 @@ var boss_list_btn: Button
 var admin_toggle_btn: Button
 var ability_picker_panel: Control
 var boss_icon: BossIcon
+var boss_slot_btns: Array[TouchScreenButton] = []
+var boss_slot_icons: Array = []
+var boss_slot_labels: Array = []
 var rematch_btn: Button
+
+func _on_boss_slot_pressed(k: int) -> void:
+	if _player == null:
+		return
+	if _player.boss_sel != k:
+		_player.boss_sel = k
+		if sim_match:
+			sim_match.select_boss_ability(k)
+	if sim_match:
+		sim_match.pulse(FightSim.IN_BOSS)
+	else:
+		Input.action_press("boss")
+		get_tree().create_timer(0.08).timeout.connect(func() -> void: Input.action_release("boss"))
 
 ## Fase 9: estado del botón de revancha online («Esperando al rival…», desactivado si se fue).
 func set_rematch(text: String, enabled: bool) -> void:
@@ -421,6 +451,7 @@ class _Circle extends Node2D:
 	var combo_prog: float = 0.0
 	var combo_queued: bool = false
 	var cooldown_active: bool = false
+	var total_segments: int = 4
 	func _draw() -> void:
 		draw_circle(Vector2.ZERO, r, Color(c, 0.35))
 		var border_color := Color(c, 0.8)
@@ -431,15 +462,21 @@ class _Circle extends Node2D:
 		draw_arc(Vector2.ZERO, r, 0, TAU, 48, border_color, 3.0)
 		if cooldown_active:
 			draw_circle(Vector2.ZERO, r - 1.0, Color(0.0, 0.0, 0.0, 0.45))
-		if combo_can:
-			if combo_active:
-				var arc_col := Color(0.2, 1.0, 0.45) if combo_queued else Color(1.0, 0.85, 0.15)
-				var arc_len := maxf(TAU * combo_prog, 0.03)
-				draw_arc(Vector2.ZERO, r + 3.0, -PI * 0.5, -PI * 0.5 + arc_len, 48, arc_col, 5.0)
-			elif combo_queued:
-				draw_arc(Vector2.ZERO, r + 3.0, 0, TAU, 48, Color(0.2, 1.0, 0.5, 0.95), 4.0)
-			else:
-				draw_arc(Vector2.ZERO, r + 2.0, 0, TAU, 40, Color(1.0, 0.82, 0.2, 0.35), 2.0)
+		if combo_can or combo_active:
+			var segs := maxi(total_segments, 4)
+			var gap := 0.10 # separación angular entre fragmentos de la circunferencia
+			var seg_rad := TAU / segs
+			var arc_col := Color(0.2, 1.0, 0.45) if combo_queued else Color(1.0, 0.85, 0.15)
+			for i in segs:
+				var a0 := -PI * 0.5 + i * seg_rad + gap * 0.5
+				var a1 := -PI * 0.5 + (i + 1) * seg_rad - gap * 0.5
+				var seg_frac := float(i + 1) / float(segs)
+				if combo_active and seg_frac <= combo_prog + 0.02:
+					draw_arc(Vector2.ZERO, r + 4.0, a0, a1, 16, arc_col, 5.0)
+				elif combo_queued:
+					draw_arc(Vector2.ZERO, r + 4.0, a0, a1, 16, Color(0.2, 1.0, 0.5, 0.8), 3.5)
+				else:
+					draw_arc(Vector2.ZERO, r + 4.0, a0, a1, 16, Color(1.0, 0.82, 0.2, 0.22), 2.0)
 
 ## Ronda 20: barras de acumulación de estados (HUD propio, del rival y sobre el rival).
 var status_p: Dictionary = {}
@@ -622,7 +659,6 @@ func _update_contextual_buttons() -> void:
 	var tv := joystick.visible
 	(btns["left_hand"] as TouchScreenButton).visible = tv and not _player.mounted
 	(btns["swap_weapon"] as TouchScreenButton).visible = tv and _player.secondary != null
-	(btns["boss"] as TouchScreenButton).visible = tv and not _player.mounted
 	var alt := btns["boss_variation"] as TouchScreenButton
 	var alt_open: bool = _player.ab_alt_open and _player.ab_alt_label != ""
 	alt.visible = tv and not _player.mounted and alt_open
@@ -630,19 +666,11 @@ func _update_contextual_buttons() -> void:
 	if alt.visible and _changed(btn_labels["boss_variation"], alt_lab):
 		(btn_labels["boss_variation"] as Label).text = alt_lab
 	if boss_next_btn:
-		boss_next_btn.visible = not _player.mounted and (_player.avail_boss_ids().size() > 1 or AdminMode.enabled)
+		boss_next_btn.visible = false
 	if boss_prev_btn:
-		boss_prev_btn.visible = not _player.mounted and (_player.avail_boss_ids().size() > 1 or AdminMode.enabled)
+		boss_prev_btn.visible = false
 	if boss_list_btn:
 		boss_list_btn.visible = not _player.mounted and (AdminMode.enabled or _player.avail_boss_ids().size() > 3)
-
-	var boss_c: _Circle = btn_circles.get("boss")
-	if boss_c:
-		boss_c.combo_can = _player.ab_combo_can
-		boss_c.combo_active = _player.ab_combo_active
-		boss_c.combo_prog = _player.ab_combo_prog
-		boss_c.combo_queued = _player.ab_combo_queued and not _player.ab_combo_variant
-		boss_c.queue_redraw()
 
 	var alt_c: _Circle = btn_circles.get("boss_variation")
 	if alt_c:
@@ -660,28 +688,53 @@ func _update_contextual_buttons() -> void:
 		sword_c.combo_queued = false
 		sword_c.queue_redraw()
 
-	# Habilidad de jefe seleccionada, coste y tiempo de recarga
+	# 4 habilidades de jefe en slots individuales
+	var avail: Array = _player.avail_boss_ids()
 	var bid := _player.selected_boss()
 	var cd_left: float = _player.boss_cd if not AdminMode.enabled and not _player.boss_repeat_ready else 0.0
 	var on_cd: bool = cd_left > 0.05
-	var can_afford: bool = bid != "" and _player.boss_cost_ok(bid)
-	var boss_btn := btns["boss"] as TouchScreenButton
-	var boss_lbl := btn_labels["boss"] as Label
-	if boss_c:
-		boss_c.cooldown_active = on_cd
-		boss_c.queue_redraw()
-	if on_cd:
-		boss_btn.modulate = Color(0.65, 0.65, 0.7, 0.55)
-		boss_lbl.text = "%.1fs" % cd_left
-	elif not can_afford:
-		boss_btn.modulate = Color(1, 1, 1, 0.45)
-		boss_lbl.text = BossAbilities.short_name(bid) if bid != "" else "Jefe"
-	else:
-		boss_btn.modulate = Color.WHITE
-		boss_lbl.text = BossAbilities.short_name(bid) if bid != "" else "Jefe"
-	if boss_icon and _changed(boss_icon, bid):
-		boss_icon.id = bid
-		boss_icon.visible = bid != ""
+
+	for k in mini(boss_slot_btns.size(), 4):
+		var slot_btn: TouchScreenButton = boss_slot_btns[k]
+		var slot_lbl: Label = boss_slot_labels[k]
+		var slot_ic: BossIcon = boss_slot_icons[k]
+		var slot_act := "boss" if k == 0 else "boss_%d" % k
+		var slot_c: _Circle = btn_circles.get(slot_act)
+		if k < avail.size():
+			slot_btn.visible = tv and not _player.mounted
+			var sk_id := String(avail[k])
+			if _changed(slot_ic, sk_id):
+				slot_ic.id = sk_id
+			slot_ic.visible = true
+			var is_selected := (_player.boss_sel == k)
+			if slot_c:
+				if is_selected:
+					slot_c.combo_can = _player.ab_combo_can
+					slot_c.combo_active = _player.ab_combo_active
+					slot_c.combo_prog = _player.ab_combo_prog
+					slot_c.combo_queued = _player.ab_combo_queued and not _player.ab_combo_variant
+					slot_c.cooldown_active = on_cd
+				else:
+					slot_c.combo_can = false
+					slot_c.combo_active = false
+					slot_c.combo_prog = 0.0
+					slot_c.combo_queued = false
+					slot_c.cooldown_active = false
+				slot_c.queue_redraw()
+			if is_selected and on_cd:
+				slot_btn.modulate = Color(0.65, 0.65, 0.7, 0.6)
+				slot_lbl.text = "%.1fs" % cd_left
+			elif not _player.boss_cost_ok(sk_id):
+				slot_btn.modulate = Color(1, 1, 1, 0.45)
+				slot_lbl.text = BossAbilities.short_name(sk_id)
+			elif is_selected:
+				slot_btn.modulate = Color(1.2, 1.2, 1.2, 1.0)
+				slot_lbl.text = BossAbilities.short_name(sk_id)
+			else:
+				slot_btn.modulate = Color(0.85, 0.85, 0.85, 0.85)
+				slot_lbl.text = BossAbilities.short_name(sk_id)
+		else:
+			slot_btn.visible = false
 	_update_enemy_strip()
 	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
 	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
@@ -691,16 +744,9 @@ func _update_contextual_buttons() -> void:
 	# Montar: solo con un eikon activo en la arena
 	(btns["mount"] as TouchScreenButton).visible = tv and _player.has_active_eikon()
 	(btns["target_next"] as TouchScreenButton).visible = tv and controller != null and controller.can_cycle_target()
-	var magic := _player.has_spells() and not _player.mounted
-	(btns["spell"] as TouchScreenButton).visible = tv and magic
-	(btns["spell_next"] as TouchScreenButton).visible = tv and magic and _player.spells.filter(func(x) -> bool: return String(x) != "").size() > 1
-	if magic:
-		var id := _player.current_spell()
-		var cd := _player.spell_cd_left()
-		var csec := ceilf(cd) if cd > 0.0 else -1.0
-		if _changed(btn_labels["spell"], [id, csec]):
-			(btn_labels["spell"] as Label).text = (EikonSpells.name_of(id).split(" ")[0] + ("\n%.0f" % csec if cd > 0.0 else ""))
-		(btns["spell"] as TouchScreenButton).modulate = Color.WHITE if _player.can_cast() else Color(1, 1, 1, 0.45)
+	# Botón "Chispa"/Hechizo retirado del HUD de combate
+	(btns["spell"] as TouchScreenButton).visible = false
+	(btns["spell_next"] as TouchScreenButton).visible = false
 
 func bind(player: Fighter, enemy: Fighter) -> void:
 	_player = player
@@ -950,6 +996,23 @@ func _build_pause_menu() -> void:
 		if au: au.save_settings())
 	row.add_child(cs)
 	pause_settings.add_child(row)
+	# Distancia de cámara: cerca, medio, alejado
+	var drow := HBoxContainer.new()
+	drow.add_theme_constant_override("separation", 8)
+	drow.add_child(UIKit.label("Distancia", 16))
+	var dbtns := {}
+	for opt in ["cerca", "medio", "alejado"]:
+		var is_cur: bool = (CameraRig.distance_preset == opt)
+		var b := UIKit.button(String(CameraRig.PRESETS[opt]["name"]), 14, UIKit.ORANGE if is_cur else UIKit.NAVY)
+		b.custom_minimum_size = Vector2(70, 30)
+		dbtns[opt] = b
+		b.pressed.connect(func() -> void:
+			CameraRig.set_preset(opt)
+			if au: au.save_settings()
+			for k in dbtns:
+				dbtns[k].modulate = Color(1.2, 1.2, 1.2) if k == opt else Color(0.7, 0.7, 0.7))
+		drow.add_child(b)
+	pause_settings.add_child(drow)
 	var vrow := HBoxContainer.new()
 	vrow.add_child(UIKit.label("Volumen", 16))
 	var vs := HSlider.new()

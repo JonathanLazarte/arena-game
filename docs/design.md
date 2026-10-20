@@ -3,9 +3,9 @@
 Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`, `scripts/data/attributes.gd`.
 
 ## Principios de balance
-- Inspiración souls (curvas tipo Elden Ring, números propios): ganancias por tramos con rendimientos decrecientes (primeros ~25–30 puntos rinden, luego cae).
+- Ganancias por tramos con rendimientos decrecientes (primeros ~25–30 puntos rinden, luego cae). Los números son de este juego.
 - Todo ataque fuerte o de jefe se telegrafía; al soltarse solo se evita con voltereta en la ventana justa (no caminando).
-- Ningún recurso gratis: las habilidades de jefe cuestan aguante, maná (= Energía) o vida. Hay recarga global de 1,4 s (85 ticks en la sim). La recarga propia de cada habilidad no se usa todavía; más adelante será `max(global, propia)`.
+- Ningún recurso gratis: las habilidades de jefe cuestan aguante, maná (= Energía) o vida. Hay recarga global de 1,4 s (85 ticks en la sim). La recarga propia corre como `max(global, propia)` respetando el bit `spameable` (`rep_free`).
 
 ## Aturdimiento (3 niveles acumulados)
 - Fuerza por golpe: `str_force(Fuerza) + fuerza del arma + fuerza del golpe` × `stun_dealt`. Mágico: `magia × 0,1 + fuerza asignada` (por impacto).
@@ -20,7 +20,7 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 ## Habilidades de jefe (máx. 3 equipadas por personaje, pestaña «Jefe»; B usa, N cambia)
 | id | coste | daño | fuerza | resist. | clave |
 |---|---|---|---|---|---|
-| estocada | 30 aguante | 1,6× fuerte | 60 | inmune | carga 1,6 s; deja de seguir 0,3 s antes de la embestida. Embestida 12 m a 30 m/s → solo voltereta |
+| estocada | 30 aguante | 1,6× fuerte | 60 | súper-arm. / inmune | carga 1,6 s (súper-armadura, recibe daño, cortable por stun nivel 2 / derribo); deja de seguir 0,3 s antes de la embestida. Embestida 12 m a 30 m/s (invulnerable) → solo voltereta |
 | carga_area | 35 maná | 1,4× (mágico) | 45+magia | ×5 | inmóvil 1,8 s, AoE 4,5 m; interrumpible |
 | rafaga | 30 maná | 0,55× ligero c/u | 14+magia c/u | ×1,5 | 3 espectros de tajo dorados en diagonal cada 0,9 s, radio 1,3, 16 m/s, persiguen siempre (600°/s): solo la voltereta esquiva cada uno; esquivado sigue de largo |
 | escudo_mana | 25 maná | — | — | inmune | 1,5 s invulnerable total, mitad de velocidad |
@@ -28,11 +28,12 @@ Datos en código: `scripts/data/stun_rules.gd`, `scripts/data/boss_abilities.gd`
 | salto_caida | 15 vida | 1,5× fuerte | 50 | inmune en el aire | sin marca: sigue al objetivo hasta 1,25 s, cae a 1,65 s, AoE 3,5 m; la pista es verle en el aire |
 - Coste de vida: no se puede usar si dejaría la vida ≤ 0. IA: elige por distancia/situación, huye de la carga, rueda la estocada y cada tajo de la ráfaga, y ante el salto se aparta/rueda al verle empezar a bajar.
 - Cambio de habilidad: tecla N o botón ▶ del HUD (PC y táctil).
+- Restricción de Loadout por familias de armas: el equipamiento valida la familia de animación (`familias` en catálogo vs `families_of_weapon`). Vacío, `cualquiera`, `magia` y `bestia` son universales. En AdminMode (`AdminMode.enabled`) se desactiva el filtro.
 
 ### Reglas comunes (Ronda 33)
 - Imbloqueable (`unblockable` en la definición; `BossAbilities.is_unblockable`): el escudo no la para y el parry tampoco (golpe tipo 3). Lo son la Estocada y las marcadas en la tabla (Tajo Retardado, Presa del Verdugo, Giro Devastador, Paso Espectral, Lanza Celeste, Cuerno, Daga Sagrada, Estocada Negra, Flor Umbral, Presa de Fauces, Rueda Noble, Danza Triple, Picado de Alas y Flecha Grave).
-- Estocada: sigue durante la carga y deja de girar 18 ticks (0,3 s) antes de la embestida. En la embestida solo corrige la dirección los primeros 0,15 s, después va recta. Durante la carga y la embestida es inmunidad total, igual que hoy; queda pendiente de balance.
-- Recarga global de 1,4 s (85 ticks, `tk(1,4)`) desde que acaba una habilidad de jefe (la Ráfaga puede encadenarse consigo misma). La recarga propia no corre. Más adelante, `max(global, propia)`.
+- Estocada: sigue durante la carga y deja de girar 18 ticks (0,3 s) antes de la embestida. En la carga tiene súper-armadura (+150 % robustez, recibe daño, cortable por aturdimiento nivel 2 o derribo). En la embestida corrige la dirección los primeros 0,15 s y es invulnerable.
+- Recarga: `max(global, propia)` con global de 1,4 s (85 ticks, `tk(1,4)`). `spameable: true` (Ráfaga, Saeta Oscura, Orbe Lunar) se salta la recarga al repetirse y una pulsación tras el disparo queda en cola.
 - Cada habilidad tiene un aviso propio (texto `tele`/`tele_txt` y color de brillo distintos), coste de recurso, fuerza de aturdimiento y recuperación castigable (≥ 0,3 s). Un coste de vida se rechaza si dejaría la vida en 0; si se paga, se recorta a 1.
 - Interrupción (`interruptible_by`, en el motor nuevo): lista vacía = no se corta con tambaleo, aturdimiento ni derribo; solo se esquiva. Quien se corta lo declara, por ejemplo `["stun_lvl2", "knockdown", "parry"]`. La Danza del Cisne declara parry, aturdimiento fuerte y derribo (ya no hay un corte cableado por id una vez migrada).
 - Invulnerabilidad total (el golpe cuenta como esquiva): i-frames de la Danza, el Paso Espectral, la transición a Fase II y el escudo de maná. Son esquivas. El derribo no es invulnerable: inmune al aturdimiento y daño ×0,85.
@@ -128,11 +129,25 @@ Antes (sincronización del proyecto del usuario): 36 / 30 / 46 m/s², carrera ex
 ## Frasco
 1 carga por ronda (H / botón «Frasco»): 1,1 s bebiendo (sin atacar ni bloquear, 25 % de velocidad), cura el 35 % de la vida máxima al terminar. No se bebe montado, en el aire ni atacando.
 
+## Gambits de Eikon (IA Táctica FFXII)
+Cada Eikon cuenta con 3 ranuras tácticas evaluadas en orden de prioridad (1 ➔ 2 ➔ 3).
+- **Estructura**: `[ Condición ] ➔ [ Habilidad ]`.
+- **Condiciones**:
+  - `Dueño: Vida < 50%` / `Dueño: Vida < 30%` (apoyo defensivo o curativo).
+  - `Rival: Vida < 35%` (ejecución y daño masivo).
+  - `Rival: Cargando ataque` (interrupción de ataques fuertes).
+  - `Rival: Lejos (> 8m)` / `Rival: Cerca (< 3m)` (control de distancia).
+  - `Siempre (por recarga)` (habilidad ofensiva recurrente).
+- **Habilidades disponibles**:
+  - `basic`: ataque estándar propio.
+  - `special`: habilidad insignia (Llamarada, Colmillo Glacial, etc.).
+  - `shield`: escudo protector para el dueño (-15% daño, +50% poise durante 5s).
+  - `disrupt`: rugido que corta cargas y tambalea al rival.
+  - `leap`: embestida rápida de cierre con +30% de daño.
+- **Cooldowns**: cada ranura gestiona su propio enfriamiento empaquetado en enteros de 16 bits sin alterar la estructura del estado de simulación.
+
 ## Duelo de Campeones: Fase II
 Al bajar del 50 % de vida: desbloquea su tercera habilidad de jefe, furia 9 s, invulnerable 0,85 s y, según el campeón, medidor de eikon lleno (invoca). La IA presiona más (habilidades ×2,5, especiales ×1,5).
 
 ## IA del rival
 Lee el estado de la partida y pulsa botones como un jugador. Fases: rodear, comprometerse (1–N golpes, a veces retrasa el primero), retirarse, descansar (poco aguante) y respiros periódicos. Perfiles fácil/normal/difícil (`resources/ai/*.tres`): reacción, esquiva, parry, castigo, uso de habilidades.
-
-## Pendiente
-- Erika: falta el FBX de Mixamo.

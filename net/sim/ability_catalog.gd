@@ -59,6 +59,9 @@ const HINT_DIR := ["side", "back", "forward", "any"]
 const REQUIRES := ["target_close", "target_far", "last_hit_landed", "phase2"]
 ## Origen de la habilidad. `source` ya es el programa numérico de las 45: no se reutiliza este nombre.
 const ORIGINS := ["boss", "weapon"]
+## Familia de animación (no es el id del arma). `cualquiera` va sola: no depende de un arma.
+## `arco` y `hacha` existen porque el juego ya tiene arco, ballesta y hacha a dos manos.
+const FAMILIAS := ["espada_ligera", "espada_pesada", "martillo", "lanza", "escudo", "magia", "bestia", "arco", "hacha", "cualquiera"]
 ## Alcance vertical (µm). ground_only: true es el atajo de 0,35 m. No hay campo air_reach.
 const REACH_NONE := -1
 const REACH_GROUND_UM := 350000
@@ -519,7 +522,7 @@ static func _names(c: Ctx, path: String, texts: Array) -> void:
 
 static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Dictionary:
 	_unknown(c, a, p, ["id", "name", "icon", "category", "tags", "unlock", "cost", "cooldown_ticks", "uses_global_cd",
-		"global_cd_on_repeat", "usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source",
+		"global_cd_on_repeat", "spameable", "familias", "usable_while", "interruptible_by", "interrupt_priority", "on_interrupt", "entry_step", "steps", "ai", "hint", "source",
 		"origin", "requires_weapon"])
 	if a.has("source") and not (a["source"] is Dictionary):
 		c.err(_p(p, "source"), "SCHEMA", "source debe ser un objeto (el programa numérico). El origen va en origin")
@@ -570,7 +573,17 @@ static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Di
 		c.err(_p(p, "cost"), "V10", "al menos un costo debe ser > 0")
 	var cd := _int(c, a, "cooldown_ticks", p, true, 0, 0, 36000)
 	var gcd := _bool(c, a, "uses_global_cd", p, true)
+	## spameable (autor) = se puede repetir sin la global y la pulsación tras el disparo queda en cola.
+	## Se hornea en el mismo bit que global_cd_on_repeat (invertido): la sim no cambia de protocolo.
+	var spam_set := a.has("spameable") and a["spameable"] != null
+	var spam := _bool(c, a, "spameable", p, false)
+	var gcd_set := a.has("global_cd_on_repeat") and a["global_cd_on_repeat"] != null
 	var gcd_rep := _bool(c, a, "global_cd_on_repeat", p, true)
+	if spam_set and gcd_set and spam == gcd_rep:
+		c.err(_p(p, "spameable"), "SCHEMA", "spameable y global_cd_on_repeat se contradicen")
+	if spam_set:
+		gcd_rep = not spam
+	var familias := _familias(c, a, p)
 	var usable := _mask(c, a, "usable_while", p, USABLE, ["ground"])
 	var intr := _mask(c, a, "interruptible_by", p, INTERRUPTS, DEFAULT_INTERRUPTS)
 	var iprio := _int(c, a, "interrupt_priority", p, false, 0, -100, 100)
@@ -650,9 +663,33 @@ static func _ability(c: Ctx, a: Dictionary, p: String, ai: int, tl: Array) -> Di
 		_graph(c, p, steps, entry, ssrc)
 		_ability_rules(c, p, a, steps, intr, ssrc)
 	return {"index": ai, "id": id, "name": name, "icon": icon, "category": cat, "tags": tags, "unlock_phase": phase,
-		"cost": cost, "cooldown": cd, "uses_global_cd": 1 if gcd else 0, "global_cd_on_repeat": 1 if gcd_rep else 0, "usable_mask": usable, "interrupt_mask": intr,
+		"cost": cost, "cooldown": cd, "uses_global_cd": 1 if gcd else 0, "global_cd_on_repeat": 1 if gcd_rep else 0,
+		"spameable": 1 if not gcd_rep else 0, "familias": familias, "usable_mask": usable, "interrupt_mask": intr,
 		"interrupt_priority": iprio, "on_interrupt": on_int, "entry": entry, "steps": steps, "ai": aiout,
 		"origin": origin, "requires_weapon": weapons}
+
+## Familias de animación. Vacío = sin filtro (catálogos viejos). `cualquiera` no se mezcla.
+static func _familias(c: Ctx, a: Dictionary, p: String) -> Array:
+	if not a.has("familias") or a["familias"] == null:
+		return []
+	var src := _arr(c, a, "familias", p, false)
+	var out: Array = []
+	var bad := 0
+	for i in src.size():
+		var v: Variant = src[i]
+		if not (v is String) or not (String(v) in FAMILIAS):
+			c.err("%s.familias[%d]" % [p, i], "SCHEMA", "familia inválida %s (una de %s)" % [str(v), ", ".join(PackedStringArray(FAMILIAS))])
+			bad += 1
+			continue
+		if out.has(String(v)):
+			c.err("%s.familias[%d]" % [p, i], "SCHEMA", "familia repetida «%s»" % String(v))
+			continue
+		out.append(String(v))
+	if out.is_empty() and bad == 0:
+		c.err(_p(p, "familias"), "SCHEMA", "la lista de familias no puede estar vacía")
+	elif out.has("cualquiera") and out.size() > 1:
+		c.err(_p(p, "familias"), "SCHEMA", "cualquiera va sola: no depende de un arma")
+	return out
 
 ## Grafo de pasos: alcanzabilidad (V05), ciclos con max_loops (V05), terminales con recuperación (V06).
 static func _graph(c: Ctx, p: String, steps: Array, entry: int, ssrc: Array) -> void:

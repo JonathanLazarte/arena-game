@@ -45,7 +45,7 @@ static func wrap(c: Dictionary, id: String) -> Dictionary:
 	c["imask"] = _mask(id)
 	c["graph"] = 0
 	c["evs"] = _events_of(id)
-	## global_cd_on_repeat=false (catálogo): repetir la misma habilidad se salta la recarga
+	## spameable (global_cd_on_repeat horneado en 0): repetir la misma habilidad se salta la recarga
 	## y una pulsación tras el disparo queda en cola para encadenar (ráfaga).
 	c["rep_free"] = 1 if int(catalog().get(id, {}).get("global_cd_on_repeat", 1)) == 0 else 0
 	return c
@@ -329,10 +329,8 @@ static func combo_info(s: PackedInt64Array, P: Array, i: int) -> Dictionary:
 	var total_st: int = maxi(steps_arr.size(), 1)
 	var fl := s[o + FightSim.AB_FL]
 	var queued := (fl & (SimAbilities.FL_QUEUED | SimAbilities.FL_VARIANT)) != 0
-	var step_count: int = fired + (1 if queued else 0)
-	var prog := 1.0 - float(step_count) / float(total_st)
-	if prog <= 0.05:
-		prog = 1.0 / float(total_st)
+	var step_count: int = (fired + 1) + (1 if queued else 0)
+	var prog := clampf(1.0 - float(step_count) / float(total_st), 0.0, 1.0)
 	return {
 		"can_combo": true,
 		"active": active,

@@ -1,21 +1,16 @@
-# Elden Ring: referencia de sistemas y hoja de ruta de diseño
+# Referencia de combate y hoja de ruta
 
 > Documento de diseño de **Arena de Eikons** (1v1 a caballo/eikon, móvil y Windows, Godot 4.7).
-> Resumen con palabras propias de las mecánicas de *Elden Ring* (ER), comparadas con el estado del juego al cierre de la **Ronda 20** (commit `0f40c48`), con propuestas adaptadas y prioridades.
+> Números y nombres de este juego, comparados con el estado al cierre de la **Ronda 20** (commit `0f40c48`).
 
 ## ⚑ Pilar de diseño principal (Ronda 25)
 
-**Cada duelo es mitad PvP, mitad combate contra un jefe de Dark Souls.** Los personajes tienen habilidades «de jefe»: **imparables e invulnerables mientras se ejecutan**, pero **siempre telegrafiadas** con una preparación inconfundible (pose, brillo/partículas, sonido creciente). El reto es el **ritmo** (leer y esquivar a tiempo), no los reflejos puros. Siempre dejan una **recuperación castigable**, tienen enfriamiento y una trayectoria fija y aprendible. Toda habilidad nueva se diseña contra este pilar. Primera: **Estocada de jefe** (Ronda 25).
-> Los números de ER son de las wikis citadas en cada sección (consultadas en octubre de 2026; parche 1.1x + *Shadow of the Erdtree*). Son **referencia**: en el juego usamos valores propios, normalizados para que el nivel 1 juegue igual.
+**Cada duelo es mitad PvP, mitad combate contra un jefe.** Los personajes tienen habilidades «de jefe»: **imparables e invulnerables mientras se ejecutan**, pero **siempre telegrafiadas** con una preparación inconfundible (pose, brillo/partículas, sonido creciente). El reto es el **ritmo** (leer y esquivar a tiempo), no los reflejos puros. Siempre dejan una **recuperación castigable**, tienen enfriamiento y una trayectoria fija y aprendible. Toda habilidad nueva se diseña contra este pilar. Primera: **Estocada de jefe** (Ronda 25).
+> Los números son de este juego, normalizados para que el nivel 1 juegue igual.
 
 **Leyenda de estado:** ✅ implementado · 🟡 parcial · ❌ falta.
 **Prioridad:** **P0** imprescindible/siguiente · **P1** alto impacto · **P2** deseable · **P3** opcional / largo plazo.
 
-**Fuentes generales**
-- Fextralife: https://eldenring.wiki.fextralife.com/
-- Eldenpedia (wiki.gg): https://eldenring.wiki.gg/
-- Fandom: https://eldenring.fandom.com/
-- Bandai Namco, *How-To Guides*: https://en.bandainamcoent.eu/elden-ring/news (Part 1: Stats; Part 2: Combate)
 
 ---
 
@@ -27,10 +22,10 @@
 5. [Armas](#5-armas)
 6. [Escudos y catalizadores](#6-escudos-y-catalizadores)
 7. [Magia](#7-magia)
-8. [Armadura, talismanes y Grandes Runas](#8-armadura-talismanes-y-grandes-runas)
+8. [Armadura, talismanes y sellos](#8-armadura-talismanes-y-sellos)
 9. [Consumibles](#9-consumibles)
 10. [Cenizas de espíritu → nuestros eikons](#10-cenizas-de-espíritu--nuestros-eikons)
-11. [Combate a caballo (Torrent)](#11-combate-a-caballo-torrent)
+11. [Combate a caballo](#11-combate-a-caballo)
 12. [Movimiento](#12-movimiento)
 13. [Reglas de aguante (estamina)](#13-reglas-de-aguante-estamina)
 14. [IA y patrones de jefes](#14-ia-y-patrones-de-jefes)
@@ -43,9 +38,8 @@
 
 ## 1. Atributos y estadísticas derivadas
 
-Fuentes: https://eldenring.wiki.fextralife.com/Stats · https://eldenring.wiki.fextralife.com/Vigor · https://eldenring.wiki.fextralife.com/Mind · https://eldenring.wiki.fextralife.com/Endurance · https://eldenring.wiki.gg/wiki/Stats · https://eldenring.wiki.fextralife.com/Equip+Load · https://eldenring.wiki.fextralife.com/Discovery · https://eldenring.wiki.fextralife.com/Poise
 
-### Cómo lo hace ER
+### Referencia
 Hay 8 atributos (de 1 a 99). Cada uno alimenta una o varias estadísticas derivadas, y todas tienen curvas por tramos con **topes blandos**: pasado cierto valor, cada punto rinde mucho menos.
 
 | Atributo | Afecta | Topes blandos (aprox.) |
@@ -92,9 +86,8 @@ Estadísticas derivadas:
 
 ## 2. Cálculo de daño
 
-Fuentes: https://eldenring.wiki.fextralife.com/Attack+Power · https://eldenring.wiki.fextralife.com/Calculating+Damage · https://eldenring.wiki.fextralife.com/Damage+Types · https://eldenring.wiki.gg/wiki/Damage_Calculation · https://eldenring.fandom.com/wiki/Weapon_Scaling
 
-### Cómo lo hace ER
+### Referencia
 - **AR (Ataque)** = base del arma (por tipo de daño) + bono de escalado. El bono es base × coeficiente del atributo × curva de ese atributo (la curva depende del arma y de la afinidad).
 - **Letras de escalado**: S (≥ 1,75), A (1,40-1,75), B (0,90-1,40), C (0,60-0,90), D (0,25-0,60), E (< 0,25).
 - **Requisitos**: si no cumplís alguno, el bono de escalado de ese tipo se anula y se aplica una penalización fuerte (en torno al 40 % del AR).
@@ -136,9 +129,8 @@ Los ataques de **estocada** (perforante) tienen bonus de contraataque (§3), y l
 
 ## 3. Golpes de contraataque, críticos, guardia y equilibrio
 
-Fuentes: https://eldenring.wiki.fextralife.com/Counter+Damage · https://eldenring.wiki.fextralife.com/Critical+Hits · https://eldenring.wiki.fextralife.com/Guard+Boost · https://eldenring.wiki.fextralife.com/Guard+Counter · https://eldenring.wiki.fextralife.com/Poise · https://eldenring.wiki.fextralife.com/Stance · https://eldenring.wiki.fextralife.com/Hyperarmor · https://eldenring.wiki.fextralife.com/Parry
 
-### Cómo lo hace ER
+### Referencia
 - **Contraataque (counter hit)**: golpear a alguien mientras está en la anticipación o la ejecución de su ataque. Da más daño (~+15 % en golpes normales; los perforantes y algunos ataques fuertes tienen un bono mayor) y más daño de equilibrio.
 - **Críticos**:
   - **Puñalada por la espalda (backstab)**: por detrás y a corta distancia.
@@ -148,7 +140,7 @@ Fuentes: https://eldenring.wiki.fextralife.com/Counter+Damage · https://eldenri
   - **Guard Boost** (estabilidad): un número del escudo que reduce el aguante gastado al bloquear (escudo grande ~ 70+, mediano ~ 50-60, pequeño ~ 30-40).
   - **Absorción de guardia**: el % de daño que el escudo bloquea por tipo (100 % físico en la mayoría de escudos medianos y grandes).
   - Si se te acaba el aguante, la guardia se rompe (*guard break*) y quedás tambaleando.
-- **Contra de guardia (guard counter)**: atacar fuerte justo después de bloquear. Es rápido, tiene mucho daño de equilibrio y no se puede cancelar. Es la herramienta defensiva clave de ER.
+- **Contra de guardia (guard counter)**: atacar fuerte justo después de bloquear. Es rápido, tiene mucho daño de equilibrio y no se puede cancelar. Es la herramienta defensiva clave al bloquear.
 - **Equilibrio (poise) del jugador**:
   - Es una barra invisible de "vida de equilibrio" (el valor que muestra la ficha). Cada golpe le resta daño de equilibrio; al llegar a 0 te tambaleás y se recarga entera.
   - El jugador recupera el equilibrio completo tras ~30 s sin recibir golpes.
@@ -184,12 +176,11 @@ Fuentes: https://eldenring.wiki.fextralife.com/Counter+Damage · https://eldenri
 
 ## 4. Estados alterados
 
-Fuentes: https://eldenring.wiki.fextralife.com/Hemorrhage · https://eldenring.wiki.fextralife.com/Frostbite · https://eldenring.wiki.fextralife.com/Poison · https://eldenring.wiki.fextralife.com/Scarlet+Rot · https://eldenring.wiki.fextralife.com/Sleep · https://eldenring.wiki.fextralife.com/Madness · https://eldenring.wiki.fextralife.com/Death+Blight · https://eldenring.wiki.fextralife.com/Status+Effects · https://eldenring.wiki.gg/wiki/Status_Effects
 
-### Cómo lo hace ER
+### Referencia
 Cada golpe con estado suma puntos a una barra oculta. Cuando la barra pasa el umbral (la resistencia del objetivo), el efecto se dispara. La acumulación **decae** con el tiempo. Tras dispararse, algunos estados no se pueden volver a acumular hasta que termina el efecto (congelación) y otros sí, enseguida (sangrado, sin enfriamiento).
 
-| Estado | Resiste | Efecto en ER | Acumulación típica por golpe |
+| Estado | Resiste | Efecto de referencia | Acumulación típica por golpe |
 |---|---|---|---|
 | Sangrado | Robustez | 15 % de la vida máx. + 100 (o 200) de golpe; jefes 70 % | 38-70 (dagas 38-50, katanas 45-50) |
 | Congelación | Robustez | 10 % + 30 de golpe; +20 % de daño recibido durante 30 s; no se reacumula mientras dura | 55-65 |
@@ -204,7 +195,7 @@ Cada golpe con estado suma puntos a una barra oculta. Cuando la barra pasa el um
 - ✅ Fuentes: dagas (sangrado), Lobo de Hielo (congelación), infusiones Sangrante / Venenosa / Gélida.
 - ❌ Podredumbre, Sueño, Locura y Perdición.
 - ❌ Curas (bolos) y talismanes de resistencia.
-- 🟡 Bloquear anula toda la acumulación (en ER el escudo deja pasar parte según su absorción).
+- 🟡 Bloquear anula toda la acumulación (en la referencia el escudo deja pasar parte según su absorción).
 
 ### Propuesta
 - **Bloqueo**: que pase un 30 % de la acumulación al bloquear (40 % sin escudo). Hace que el estado sea una amenaza también contra el que se tortuga.
@@ -220,9 +211,8 @@ Cada golpe con estado suma puntos a una barra oculta. Cuando la barra pasa el um
 
 ## 5. Armas
 
-Fuentes: https://eldenring.wiki.fextralife.com/Weapons · https://eldenring.wiki.fextralife.com/Moveset · https://eldenring.wiki.fextralife.com/Power+Stance · https://eldenring.wiki.fextralife.com/Ashes+of+War · https://eldenring.wiki.fextralife.com/Affinities · https://eldenring.wiki.fextralife.com/Upgrades · https://eldenring.wiki.fextralife.com/Smithing+Stones · https://eldenring.wiki.fextralife.com/Somber+Smithing+Stones
 
-### Cómo lo hace ER
+### Referencia
 - **Más de 30 clases** (dagas, espadas rectas, grandes espadas, colosales, curvas, katanas, estoques, hachas, martillos, lanzas, alabardas, guadañas, látigos, puños, garras, arcos, ballestas…). Cada clase comparte un **moveset**.
 - **Moveset** por arma:
   - **Ligero (R1)**: cadena de 3-6 golpes.
@@ -266,9 +256,8 @@ Fuentes: https://eldenring.wiki.fextralife.com/Weapons · https://eldenring.wiki
 
 ## 6. Escudos y catalizadores
 
-Fuentes: https://eldenring.wiki.fextralife.com/Shields · https://eldenring.wiki.fextralife.com/Greatshields · https://eldenring.wiki.fextralife.com/Glintstone+Staffs · https://eldenring.wiki.fextralife.com/Sacred+Seals
 
-### Cómo lo hace ER
+### Referencia
 - **Escudo pequeño** (para parry, estabilidad baja), **mediano** (100 % de absorción física, estabilidad media) y **grande** (estabilidad muy alta, poco movimiento, contra de guardia potente).
 - **Catalizadores**:
   - **Bastón** (hechicerías): su "Potencia de hechicería" escala con Inteligencia.
@@ -289,9 +278,8 @@ Fuentes: https://eldenring.wiki.fextralife.com/Shields · https://eldenring.wiki
 
 ## 7. Magia
 
-Fuentes: https://eldenring.wiki.fextralife.com/Sorceries · https://eldenring.wiki.fextralife.com/Incantations · https://eldenring.wiki.fextralife.com/Memory+Slots · https://eldenring.wiki.fextralife.com/Casting+Speed
 
-### Cómo lo hace ER
+### Referencia
 - **Hechicerías** (Int) y **encantamientos** (Fe; algunos Arcano). Cada hechizo tiene requisitos, coste de PM, coste de estamina y número de **ranuras de memoria** (2 iniciales, hasta 10 con las Piedras de memoria y el talismán).
 - **Velocidad de lanzamiento**: la Destreza acorta la animación (hasta un tope).
 - Algunos hechizos se pueden **cargar** para más daño.
@@ -313,26 +301,25 @@ Fuentes: https://eldenring.wiki.fextralife.com/Sorceries · https://eldenring.wi
 
 ---
 
-## 8. Armadura, talismanes y Grandes Runas
+## 8. Armadura, talismanes y sellos
 
-Fuentes: https://eldenring.wiki.fextralife.com/Armor · https://eldenring.wiki.fextralife.com/Talismans · https://eldenring.wiki.fextralife.com/Great+Runes · https://eldenring.wiki.fextralife.com/Equip+Load
 
-### Cómo lo hace ER
+### Referencia
 - **Armadura**: 4 piezas (casco, pecho, guantes, piernas). Cada una tiene peso, absorción por tipo, resistencias y equilibrio. Lo más pesado da más equilibrio. El conjunto con más equilibrio (Toro-Cabra) llega a ~100.
 - **Talismanes**: 1 ranura al empezar, hasta 4 (con las Medallas de talismanes). Son bonos pasivos: +% de daño en ciertas condiciones, −daño de equilibrio recibido (Talismán del Toro-Cabra: −25 %), estamina, carga, críticos, etc. Algunos tienen versiones mejores (+1, +2, +3).
-- **Grandes Runas**: se activan con un Arco rúnico y dan un bonus grande (por ejemplo, Godrick: +5 a todos los atributos; Radahn: +PV/PM/estamina; Morgott: +25 % de PV). Se pierden si morís.
+- **Bonus de jefe**: un objeto que da un bonus grande y se pierde al morir. No entra en este juego.
 
 ### Nuestro estado
 - ✅ Armadura de 4 ranuras, 9 conjuntos (5 iniciales y 4 a la venta) con peso, absorción, equilibrio y resistencias. Se ve en el personaje. El rival lleva armadura (Ronda 19).
 - ❌ Talismanes.
-- ❌ Grandes Runas.
+- ❌ Bonus de jefe suelto.
 
 ### Propuesta
 - **Talismanes = "Amuletos"** (P1):
   - 2 ranuras (la segunda se desbloquea en el nivel de cuenta 5) y 10-12 amuletos iniciales con un efecto claro y número visible.
   - Ejemplos: *Toro-Cabra* (−20 % de daño de equilibrio recibido), *Colmillo* (+12 % de daño en contraataque), *Daga maldita* (+20 % de daño crítico), *Cuerno firme* (+20 % de Robustez), *Escarabajo verde* (+8 % de regeneración de estamina), *Vínculo ardiente* (+15 % de duración del eikon), *Arquero errante* (+10 % de daño de flecha).
   - Se compran en la Tienda o se ganan como recompensa. Se equipan en la ficha (ranura nueva en `CharSheet`).
-- **"Grandes Runas" → "Sellos de eikon"** (P2): un bonus fuerte ligado a una victoria especial (por ejemplo, ganar en Difícil con cada eikon). Solo se lleva uno, y se activa al invocar al eikon (en lugar del Arco rúnico). Por ejemplo, *Sello del Fénix*: tras invocar, +10 % de PV máx. el resto de la ronda.
+- **Sellos de eikon** (P2): un bonus fuerte ligado a una victoria especial (por ejemplo, ganar en Difícil con cada eikon). Solo se lleva uno, y se activa al invocar al eikon. Por ejemplo, *Sello del Fénix*: tras invocar, +10 % de PV máx. el resto de la ronda.
 - Mostrar en la ficha los **umbrales de equilibrio** (por ejemplo: "aguanta 1 golpe ligero de hacha sin tambalearte").
 
 **Prioridad:** P1 (amuletos) · P2 (sellos de eikon).
@@ -341,9 +328,8 @@ Fuentes: https://eldenring.wiki.fextralife.com/Armor · https://eldenring.wiki.f
 
 ## 9. Consumibles
 
-Fuentes: https://eldenring.wiki.fextralife.com/Flask+of+Crimson+Tears · https://eldenring.wiki.fextralife.com/Flask+of+Wondrous+Physick · https://eldenring.wiki.fextralife.com/Consumables · https://eldenring.wiki.fextralife.com/Pots
 
-### Cómo lo hace ER
+### Referencia
 - **Frascos**: el Frasco de Lágrimas Carmesí (vida) y el de Lágrimas Cerúleas (PM) se reparten entre 4 y 14 cargas en total y se recargan en los lugares de gracia. La mejora del frasco (+0 → +12) sube la cantidad que cura. Beber cuesta una animación de ~1,1 s en la que te pueden castigar.
 - **Frasco de Físico Maravilloso**: mezclás 2 lágrimas cristalinas con efectos temporales (bufos, curas, equilibrio).
 - **Arrojables**: vasijas (fuego, veneno, sangre, sagradas), dardos, cuchillos.
@@ -369,9 +355,8 @@ Fuentes: https://eldenring.wiki.fextralife.com/Flask+of+Crimson+Tears · https:/
 
 ## 10. Cenizas de espíritu → nuestros eikons
 
-Fuentes: https://eldenring.wiki.fextralife.com/Spirit+Ashes · https://eldenring.wiki.fextralife.com/Spirit+Calling+Bell · https://eldenring.wiki.fextralife.com/Mimic+Tear+Ashes
 
-### Cómo lo hace ER
+### Referencia
 - Las **cenizas** se invocan con la Campana de invocación cerca de una piedra de renacimiento (sobre todo en jefes). Cuestan PM (y algunas, PV).
 - Cada una tiene una IA propia, se mejora con las Hierbas de tumba (+10) y se queda hasta morir o hasta que termina la pelea.
 - La **Lágrima mímica** copia tu equipo.
@@ -400,18 +385,17 @@ Fuentes: https://eldenring.wiki.fextralife.com/Spirit+Ashes · https://eldenring
 
 ---
 
-## 11. Combate a caballo (Torrent)
+## 11. Combate a caballo
 
-Fuentes: https://eldenring.wiki.fextralife.com/Torrent · https://eldenring.wiki.fextralife.com/Mounted+Combat · https://eldenring.wiki.gg/wiki/Torrent
 
-### Cómo lo hace ER
-- Torrent tiene **vida y postura propias**. Si se le rompe la postura, el jinete cae y queda aturdido varios segundos (muy castigable). Si Torrent muere, revivirlo cuesta un frasco.
+### Referencia
+- La montura tiene **vida y postura propias**. Si se le rompe la postura, el jinete cae y queda aturdido varios segundos (muy castigable). Si la montura muere, revivirla cuesta un frasco.
 - **Ataques montados**: ligero y "de arrastre" (fuerte) a izquierda o derecha. El de arrastre se carga arrastrando el arma por el suelo y con armas grandes puede lanzar al aire.
 - No se puede bloquear ni rodar montado: la defensa es el **dash** (sin i-frames) y el **doble salto**, que esquiva barridos.
 - Montado se usa una sola mano. Los arcos funcionan; la ballesta tiene un truco de recarga en el aire.
 - No se puede montar en PvP ni en mazmorras.
 
-### Nuestro estado (más profundo que ER en este eje)
+### Nuestro estado (más profundo que la referencia en este eje)
 - ✅ Monturas eikon, ataques a caballo con más alcance y arco, lanza con daño montado extra, dash montado con embestida y derribo, dash + ataque.
 - ✅ Disparo libre montado y **tiro parto**.
 - ✅ Brinco de lobo y grifo; el fénix vuela.
@@ -434,9 +418,8 @@ Fuentes: https://eldenring.wiki.fextralife.com/Torrent · https://eldenring.wiki
 
 ## 12. Movimiento
 
-Fuentes: https://eldenring.wiki.fextralife.com/Controls · https://eldenring.wiki.fextralife.com/Equip+Load · https://eldenring.wiki.fextralife.com/Stealth · https://eldenring.wiki.gg/wiki/Dodge
 
-### Cómo lo hace ER
+### Referencia
 - **Voltereta según la carga**:
 
 | Carga | Voltereta | I-frames aprox. (a 30 fps) | Recuperación |
@@ -469,9 +452,8 @@ Fuentes: https://eldenring.wiki.fextralife.com/Controls · https://eldenring.wik
 
 ## 13. Reglas de aguante (estamina)
 
-Fuentes: https://eldenring.wiki.fextralife.com/Stamina · https://eldenring.wiki.fextralife.com/Endurance · https://eldenring.wiki.gg/wiki/Stamina
 
-### Cómo lo hace ER
+### Referencia
 - Atacar, rodar, correr, saltar y bloquear gastan estamina; los costes dependen del arma (pesada = más).
 - Se regenera tras un breve retraso; **más lento mientras bloqueás**; a caballo, igual.
 - Quedarte sin estamina mientras bloqueás = **guardia rota**.
@@ -484,7 +466,7 @@ Fuentes: https://eldenring.wiki.fextralife.com/Stamina · https://eldenring.wiki
 
 ### Propuesta
 - **Regeneración más lenta con la guardia alzada** (P2): ×0,5 de regeneración mientras bloqueás (además del drenaje). Reduce la tortuga.
-- Dejar el agotamiento propio (el de ER no existe, pero nuestra versión es legible en móvil).
+- Dejar el agotamiento propio: la referencia no lo tiene, y la versión de este juego se lee en el móvil.
 - **Amuleto de regeneración** (§8).
 
 **Prioridad:** P2.
@@ -493,10 +475,9 @@ Fuentes: https://eldenring.wiki.fextralife.com/Stamina · https://eldenring.wiki
 
 ## 14. IA y patrones de jefes
 
-Fuentes: https://eldenring.wiki.fextralife.com/Bosses · https://eldenring.wiki.fextralife.com/Margit,+The+Fell+Omen · https://eldenring.wiki.fextralife.com/Malenia,+Blade+of+Miquella · https://eldenring.wiki.fextralife.com/Input+Reading
 
-### Cómo lo hace ER
-- **Ataques retrasados**: la anticipación es larga o variable (Margit, Morgott) para castigar a quien rueda por reflejo.
+### Referencia
+- **Ataques retrasados**: la anticipación es larga o variable para castigar a quien rueda por reflejo.
 - **Combos de longitud variable**: la misma apertura puede terminar en 2, 3 o 5 golpes; a veces con un golpe "retrasado" al final.
 - **Fases**: al 50-60 % de vida el jefe cambia el moveset, agrega elemento o área y acelera.
 - **Ventanas de castigo**: tras ciertos combos o áreas el jefe queda expuesto; las lee el jugador.
@@ -518,33 +499,32 @@ Fuentes: https://eldenring.wiki.fextralife.com/Bosses · https://eldenring.wiki.
 **Prioridad:** P1 (retrasos, combos variables, lectura de curación) · P2 (fases) · P3 (jefes).
 
 ### Catálogo adaptado (octubre 2026)
-26 habilidades nuevas en `BossAbilitiesExt`, con nombres y números propios. El patrón (aviso, trayectoria, castigo) sale de los movesets públicos; no se copian nombres, daño ni tiempos.
+26 habilidades nuevas en `BossAbilitiesExt`, con nombres y números propios. El patrón es el aviso, la trayectoria y el castigo.
 
-| Nuestra | Patrón leído | Fuente |
-|---|---|---|
-| Daga Sagrada, Tajo Cruzado | anticipación larga, amague y estocada que cierra distancia | [Margit](https://eldenring.fandom.com/wiki/Fell_Omen) |
-| Cuerno de Embiste, Picado de Alas | carga con cuerno y caída con alas | patrón de caballero del crisol, descrito en la ficha de Godfrey ([Eldenpedia](https://eldenring.wiki.gg/wiki/Godfrey,_First_Elden_Lord)) |
-| Pisotón, Grito de Guerra | pisotón que saca rocas; rugido que potencia los pisotones | [Godfrey](https://eldenring.wiki.gg/wiki/Godfrey,_First_Elden_Lord) (Stomp, Regal Roar) |
-| Zarpazo de Sangre, Lluvia de Sangre | tajo que deja una estela y explota; lluvia de sangre que prende al tocar el suelo | [Mohg](https://eldenring.wiki.gg/wiki/Mohg,_Lord_of_Blood) (Bloodflame Talons, Bloodboon) |
-| Danza Triple, Flor Umbral | ráfagas que se acercan en varios pulsos; flor que estalla al caer | [Malenia](https://eldenring.wiki.gg/wiki/Malenia,_Blade_of_Miquella) (Waterfowl Dance, Scarlet Aeonia) |
-| Garra de Suelo, Estocada Negra, Saeta Oscura | onda al sacar la garra del suelo; estoque y tajo de filo oscuro | [Maliketh](https://eldenring.wiki.gg/wiki/Maliketh,_the_Black_Blade) (Beast Claw, Stab, Plunge) |
-| Flecha Grave, Vendaval de Hacha | flecha que persigue y hay que rodar; ondas al final de un hachazo | [Starscourge Radahn](https://eldenring.wiki.fextralife.com/Starscourge_Radahn) (Gravity Arrow, Gravity Waves) |
-| Lluvia de Lanzas, Columnas de Rayo | lanzas o rayos que marcan el suelo antes de caer | lluvia de lanzas de omen / estacas de dragón antiguo ([Maliketh](https://eldenring.wiki.gg/wiki/Maliketh,_the_Black_Blade) lista el mismo idioma de «marca y cae») |
-| Barrido de Cola, Presa de Fauces, Aliento de Rayo, Aliento de Escarcha, Chorro de Lava | cola, mordisco y conos de aliento | dragones y sierpe (aliento ya existente, ahora con rayo, hielo y un chorro corto) |
-| Rueda Noble, Anillo de Fuego | rueda que persigue; círculo de fuego que sale del cuerpo | noble de la piel divina y ritual de llama negra (patrón de área circular ya usado por el Embate) |
-| Orbe Lunar | proyectil grande y lento, poco giro | luna de la reina del plenilunio, leída como un orbe que se rodea caminando |
-| Guardia Refleja | quedarse quieto y castigar si te atacan | misma idea que la Postura, con ventana más larga y menos alcance |
+| Nuestra | Patrón |
+|---|---|
+| Daga Sagrada, Tajo Cruzado | anticipación larga, amague y estocada que cierra distancia |
+| Cuerno de Embiste, Picado de Alas | carga con cuerno y caída con alas |
+| Pisotón, Grito de Guerra | pisotón que saca rocas; rugido que potencia los pisotones |
+| Zarpazo de Sangre, Lluvia de Sangre | tajo que deja una estela y explota; lluvia que prende al tocar el suelo |
+| Danza Triple, Flor Umbral | ráfagas que se acercan en varios pulsos; flor que estalla al caer |
+| Garra de Suelo, Estocada Negra, Saeta Oscura | onda al sacar la garra del suelo; estoque y tajo de filo oscuro |
+| Flecha Grave, Vendaval de Hacha | flecha que persigue y hay que rodar; ondas al final de un hachazo |
+| Lluvia de Lanzas, Columnas de Rayo | lanzas o rayos que marcan el suelo antes de caer |
+| Barrido de Cola, Presa de Fauces, Aliento de Rayo, Aliento de Escarcha, Chorro de Lava | cola, mordisco y conos de aliento |
+| Rueda Noble, Anillo de Fuego | rueda que persigue; círculo de fuego que sale del cuerpo |
+| Orbe Lunar | proyectil grande y lento, poco giro; se rodea caminando |
+| Guardia Refleja | quedarse quieto y castigar si te atacan; ventana más larga y menos alcance que la Postura |
 
 ---
 
 ## 15. Progresión y economía
 
-Fuentes: https://eldenring.wiki.fextralife.com/Level · https://eldenring.wiki.fextralife.com/Runes · https://eldenring.wiki.gg/wiki/Level · https://eldenring.wiki.fextralife.com/Soft+Caps
 
-### Cómo lo hace ER
-- **Costo del siguiente nivel en runas**, con x = ((nivel + 81) − 92) × 0,02 y x ≥ 0: `costo = ((x + 0,1) × (nivel + 81)² + 1)` redondeado. Los niveles bajos cuestan muy poco y la curva crece aproximadamente con el cuadrado del nivel. Referencias aproximadas:
+### Referencia
+- **Costo del siguiente nivel**, con x = ((nivel + 81) − 92) × 0,02 y x ≥ 0: `costo = ((x + 0,1) × (nivel + 81)² + 1)` redondeado. Los niveles bajos cuestan muy poco y la curva crece aproximadamente con el cuadrado del nivel. Referencias aproximadas:
 
-| Nivel | Runas para el siguiente |
+| Nivel | Costo para el siguiente |
 |---|---|
 | 10 | ~ 1 000 |
 | 50 | ~ 33 000 |
@@ -552,7 +532,7 @@ Fuentes: https://eldenring.wiki.fextralife.com/Level · https://eldenring.wiki.f
 | 150 | ~ 395 000 |
 
 - **Topes blandos** típicos (§1): Vigor 40/60, Mente 50-55, Aguante 50, ofensivos 55/80. El "meta" de PvP es el nivel 125-150 con +25.
-- Las runas también son moneda (tienda, mejoras); se pierden al morir y se recuperan una vez.
+- En la referencia la misma moneda paga la tienda y las mejoras; se pierde al morir y se recupera una vez.
 
 ### Nuestro estado
 - ✅ XP de cuenta y de personaje, niveles, 2 puntos de atributo por nivel y 1 de habilidad por nivel, árbol de habilidades por rol.
@@ -562,9 +542,9 @@ Fuentes: https://eldenring.wiki.fextralife.com/Level · https://eldenring.wiki.f
 - 🟡 La curva de XP es propia (`Progression.xp_at_level`); no hay techo de nivel competitivo ni emparejamiento por nivel (el rival es la IA a tu nivel).
 - ❌ No hay sumideros de oro recurrentes más allá de mejoras y compras únicas.
 
-### Propuesta (sin "runas")
+### Propuesta
 - **Separar XP y moneda** (ya está así): XP = progreso y oro = economía. **No** perder nada al morir (en un 1v1 por rondas sería punitivo).
-- **Curva de XP**: mantener el crecimiento cuadrático suave (estilo ER, pero comprimido): `xp(n) ≈ 100 × n^1,8`. Poner un **nivel máximo de 40** por personaje (80 puntos de atributo), así los topes blandos (20/40) son decisiones reales.
+- **Curva de XP**: mantener el crecimiento cuadrático suave y comprimido: `xp(n) ≈ 100 × n^1,8`. Poner un **nivel máximo de 40** por personaje (80 puntos de atributo), así los topes blandos (20/40) son decisiones reales.
 - **Sumideros recurrentes**: bolsa de ronda (§9), infusiones, mejoras de eikon, cosméticos. Los cristales, para cosméticos y no para poder (es la regla anti pay-to-win de cara a la publicación).
 - **Recompensas por desafío**: primera victoria del día (×2), victoria perfecta (ya existe), logros que dan piedras sombrías o esencias.
 
@@ -574,16 +554,15 @@ Fuentes: https://eldenring.wiki.fextralife.com/Level · https://eldenring.wiki.f
 
 ## 16. Balance PvP
 
-Fuentes: https://eldenring.wiki.fextralife.com/PvP · https://eldenring.wiki.fextralife.com/Invasions · https://eldenring.wiki.fextralife.com/Patch+Notes · https://eldenring.wiki.fextralife.com/Poise (tabla PvP)
 
-### Cómo lo hace ER
+### Referencia
 - En PvP se aplican **modificadores propios**:
   - el daño de los jugadores se escala distinto (~ por tipo de arma y hechizo);
   - el Frasco de Lágrimas Carmesí cura menos al invadir;
   - el anfitrión con aliados recibe menos;
   - el daño de equilibrio entre jugadores sigue una tabla propia (por ejemplo, ligero de daga ~40, de espada recta ~110, de colosal ~500).
 - Los parches ajustaron muchas veces la **superarmadura**, el **daño de equilibrio de los saltos** y la acumulación de **sangrado** en PvP (de ahí los valores menores de sangrado para jugadores).
-- No se puede montar a Torrent en PvP.
+- En el duelo de la referencia no se puede montar.
 
 ### Nuestro estado
 - El juego es 1v1 contra la IA; no hay multijugador. El balance está pensado para el jugador contra la IA.

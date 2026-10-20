@@ -44,11 +44,11 @@ func _run() -> void:
 		codex_ok = codex_ok and BossAbilities.codex(id).length() > 40 and d.has("cost_type") and d.has("resist") and d.has("tele")
 	check(codex_ok and BossAbilities.ORDER.size() == 6, "6 habilidades con coste, resistencia, aviso y ficha de enciclopedia")
 	check(gs.boss_abilities() == ["estocada"], "por defecto: estocada")
-	check(gs.toggle_boss_ability("rafaga") and gs.toggle_boss_ability("carga_area") and not gs.toggle_boss_ability("salto_caida"), "máx. 3 equipadas")
+	check(gs.toggle_boss_ability("rafaga") and gs.toggle_boss_ability("carga_area") and gs.toggle_boss_ability("salto_caida"), "máx. 4 equipadas")
 	gs.save_loadout()
 	gs.char_boss = {}
 	gs.load_loadout()
-	check(gs.boss_abilities().size() == 3 and "rafaga" in gs.boss_abilities(), "se guardan (v%d)" % gs.SAVE_VERSION)
+	check(gs.boss_abilities().size() == 4 and "rafaga" in gs.boss_abilities(), "se guardan (v%d)" % gs.SAVE_VERSION)
 	# [fase 8] retirado (jugabilidad del Fighter offline; cubierto en test_fight_sim/test_sim_rules): --- Arena ---
 	# [fase 8] retirado (jugabilidad del Fighter offline; cubierto en test_fight_sim/test_sim_rules): Costes
 	# [fase 8] retirado (jugabilidad del Fighter offline; cubierto en test_fight_sim/test_sim_rules): Salto con caída: cuesta vida y aterriza en la marca

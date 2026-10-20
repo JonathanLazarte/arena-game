@@ -66,7 +66,7 @@ extends Resource
 @export var heavy_stun_resist: float = 1.0 ## ronda 31: súper-armadura del fuerte en su anticipación
 @export var charged_shot: String = "" ## ronda 31 (arcos): "potente" o "triple" ("" = según el arma)
 @export var phys_type: String = "estandar" ## ronda 24: subtipo físico (PhysTypes)
-## Ronda 25: paso adelante de cada ataque (m), estilo ER: por arma y por golpe del combo.
+## Ronda 25: paso adelante de cada ataque (m), por arma y por golpe del combo.
 @export var step_light: Array[float] = [0.9, 0.9, 1.2]
 @export var step_heavy: float = 1.4
 @export var upgrade_level: int = 0

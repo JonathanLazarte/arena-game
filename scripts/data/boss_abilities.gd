@@ -1,9 +1,9 @@
 class_name BossAbilities
-## Fachada de las habilidades de jefe. Máx. 3 equipadas por personaje (pestaña «Jefe»).
+## Fachada de las habilidades de jefe. Máx. 4 equipadas por personaje (pestaña «Jefe»).
 ## Nombres, costes, códice y números de compilación salen de data/abilities/catalog.json
 ## (`source`). Hoja Escarlata y Elden siguen en sus catálogos.
 
-const MAX_EQUIPPED := 3
+const MAX_EQUIPPED := 4
 const EldenCatalog = preload("res://scripts/data/elden_catalog.gd")
 const ExtraCatalog = preload("res://scripts/data/extra_catalog.gd")
 const DEFAULT := ["estocada"]
@@ -26,6 +26,8 @@ const CATALOG_PATH := "res://data/abilities/catalog.json"
 static var _source: Dictionary = {}
 static var _origin: Dictionary = {}
 static var _weapons: Dictionary = {}
+static var _familias: Dictionary = {}
+static var _spam: Dictionary = {}
 static var _loaded := false
 
 ## Fase 9: nombre corto para botones/HUD y color propio de cada habilidad (icono BossIcon).
@@ -84,6 +86,43 @@ static func requires_weapon(id: String) -> Array:
 	var w: Variant = _weapons.get(id, [])
 	return (w as Array).duplicate() if w is Array else []
 
+## Familia de animación (no el id del arma). Vacío = sin filtro (Hoja, Elden, Artorias, Fisura).
+static func weapon_families(id: String) -> Array:
+	_ensure()
+	var f: Variant = _familias.get(id, [])
+	return (f as Array).duplicate() if f is Array else []
+
+## Familias de animación compatibles según el tipo de arma equipada.
+static func families_of_weapon(weapon_id: String) -> Array:
+	match weapon_id:
+		"espada_escudo": return ["espada_ligera", "escudo"]
+		"espada_larga": return ["espada_pesada"]
+		"hacha_2m": return ["hacha", "espada_pesada", "martillo"]
+		"dagas": return ["espada_ligera"]
+		"lanza": return ["lanza"]
+		"arco", "ballesta": return ["arco"]
+		_: return ["espada_ligera"]
+
+## Comprueba si una habilidad es compatible con las armas activas del personaje.
+## Habilidades de origen «boss» son universales; las de origen «weapon» respetan las familias de armas.
+static func is_family_compatible(ability_id: String, weapon_id: String, weapon2_id: String = "") -> bool:
+	if origin_of(ability_id) == "boss":
+		return true
+	var fams := weapon_families(ability_id)
+	if fams.is_empty() or "cualquiera" in fams or "magia" in fams or "bestia" in fams:
+		return true
+	var w1 := families_of_weapon(weapon_id)
+	var w2 := families_of_weapon(weapon2_id) if weapon2_id != "" else []
+	for f: String in fams:
+		if f in w1 or f in w2:
+			return true
+	return false
+
+## Repetir la misma habilidad se salta la recarga global. El bit de la sim sigue siendo rep_free.
+static func spameable(id: String) -> bool:
+	_ensure()
+	return bool(_spam.get(id, false))
+
 static func ids_of(origin: String) -> Array:
 	var out: Array = []
 	for id: String in all_ids():
@@ -130,6 +169,18 @@ static func _ensure() -> void:
 			if w is String and String(w) != "":
 				req.append(String(w))
 		_weapons[id] = req
+		var fams: Array = []
+		for fam: Variant in row.get("familias", []):
+			if fam is String and String(fam) != "":
+				fams.append(String(fam))
+		_familias[id] = fams
+		## spameable es el nombre de autor. global_cd_on_repeat=false es el mismo bit, invertido.
+		var spam := false
+		if row.has("spameable"):
+			spam = bool(row["spameable"])
+		elif row.has("global_cd_on_repeat"):
+			spam = not bool(row["global_cd_on_repeat"])
+		_spam[id] = spam
 		var src: Variant = row.get("source", null)
 		if src is Dictionary:
 			_source[id] = _restore(src)
@@ -195,6 +246,9 @@ static func codex(id: String) -> String:
 		t += "[color=#ff8040]IMBLOQUEABLE[/color] · "
 	if float(d.get("cd", 0.0)) > 0.0:
 		t += "Recarga propia opcional: %.0f s · " % float(d["cd"])
+	var fams := weapon_families(id)
+	if not fams.is_empty():
+		t += "Familias: %s · " % ", ".join(PackedStringArray(fams))
 	if telegraph_text(id) != "":
 		t += "Se reconoce: %s" % telegraph_text(id)
 	return t

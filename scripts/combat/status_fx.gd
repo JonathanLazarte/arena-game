@@ -1,9 +1,9 @@
 class_name StatusFx
 extends RefCounted
-## Ronda 20: estados alterados con acumulación al estilo Elden Ring. Cada golpe con estado suma
+## Ronda 20: estados alterados por acumulación. Cada golpe con estado suma
 ## puntos a una barra; al llenarse se dispara el efecto y la barra vuelve a 0. Las barras decaen
 ## solas tras un momento sin acumular. Umbral = 10 + resistencia (Robustez: sangrado y congelación;
-## Inmunidad: veneno). Números propios (ver README para los valores de ER citados).
+## Inmunidad: veneno). Los números son de este juego (README, ronda 20).
 
 const TYPES := ["sangrado", "veneno", "congelacion"]
 const NAMES := {"sangrado": "Sangrado", "veneno": "Veneno", "congelacion": "Congelación"}

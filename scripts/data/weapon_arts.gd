@@ -5,10 +5,10 @@ class_name WeaponArts
 ## el golpe sísmico). Cuesta Energía.
 
 const DEFS := {
-	"estocada_impulsada": {"name": "Estocada impulsada", "cost": 18.0, "cooldown": 5.0, "price": 0,
-		"mult": 1.5, "desc": "Embestida que cierra distancia y golpea con x1,5 de daño."},
+	"estocada_impulsada": {"name": "Estocada firme", "cost": 18.0, "cooldown": 5.0, "price": 0,
+		"mult": 1.5, "desc": "Tajo frontal potente y concentrado en el lugar (x1,5) sin desplazamiento."},
 	"torbellino": {"name": "Torbellino", "cost": 22.0, "cooldown": 7.0, "price": 300,
-		"mult": 1.2, "radius": 3.0, "desc": "Giro de 360° que golpea a todo lo cercano (x1,2)."},
+		"mult": 1.3, "radius": 3.0, "desc": "Giro de 360° estático que barre alrededor (x1,3) sin desplazamiento."},
 }
 const ORDER := ["estocada_impulsada", "torbellino"]
 const STARTER := ["estocada_impulsada"]

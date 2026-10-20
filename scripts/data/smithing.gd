@@ -1,8 +1,7 @@
 class_name Smithing
 ## Ronda 20: herrería. Mejora +0..+10 (daño base y escalado) con oro y Piedras de forja
 ## por niveles, e infusiones (Pesado, Afilado, Sangrante, Venenoso, Gélido).
-## Valores propios (inspirados en las Smithing Stones de Elden Ring: 3 piedras por nivel de
-## piedra y un nivel final con piedra antigua; ver README).
+## 3 piedras por nivel de piedra y un nivel final con piedra antigua (ver README).
 
 const MAX_LEVEL := 10
 ## Ronda 30: el nivel de mejora es el «grabado» del arma (+1, +2...). Desde +5 la hoja brilla.

@@ -806,6 +806,7 @@ func _refresh_all(rebuild: bool = true) -> void:
 				_stat("Alcance", e.attack_range, 12.0, "%.1f m" % e.attack_range)
 			_build_spell_slots()
 			_build_eikon_seals()
+			_build_eikon_gambits()
 		"Habilidades":
 			tree_view.build(gs.character_id, gs.char_skills(), gs.skill_points())
 			var cl := Progression.level_progress(int(gs.char_xp.get(gs.character_id, 0)))
@@ -881,6 +882,45 @@ func _build_eikon_seals() -> void:
 		list_box.add_child(b)
 		list_box.add_child(UIKit.label(String(d["desc"]), 12, UIKit.MUTED))
 	detail.text += "\n[color=#f2dc99]Sello equipado:[/color] %s" % (EikonSeals.name_of(gs.equipped_eikon_seal) if gs.equipped_eikon_seal != "" else "ninguno")
+
+## Fase 4: Gambits tácticos de Eikon estilo FFXII (3 ranuras prioritarias).
+func _build_eikon_gambits() -> void:
+	var eid: String = gs.eikon_id
+	var g: Array = gs.eikon_gambits_for(eid)
+	list_box.add_child(UIKit.label("Estrategia del Eikon (Gambits FFXII)", 16, Color(0.95, 0.86, 0.6)))
+	for i in g.size():
+		var row: Dictionary = g[i]
+		var cond_str: String = String(row.get("cond", EikonGambits.COND_ALWAYS))
+		var act_str: String = String(row.get("act", EikonGambits.ACT_BASIC))
+		var c_name := EikonGambits.condition_name(cond_str)
+		var a_name := EikonGambits.action_name(act_str)
+		
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 6)
+		list_box.add_child(hb)
+		
+		var btn_cond := UIKit.button("%d: %s ↻" % [i + 1, c_name], 14, UIKit.BLUE)
+		btn_cond.tooltip_text = "Toca para cambiar la condición del Gambit %d" % (i + 1)
+		btn_cond.custom_minimum_size = Vector2(205, 38)
+		btn_cond.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var slot_idx := i
+		btn_cond.pressed.connect(func() -> void:
+			gs.cycle_gambit_condition(slot_idx, eid)
+			_refresh_all(false))
+		hb.add_child(btn_cond)
+		
+		var btn_act := UIKit.button("➔ %s ↻" % a_name, 14, UIKit.ORANGE)
+		btn_act.tooltip_text = "Toca para cambiar la habilidad del Gambit %d" % (i + 1)
+		btn_act.custom_minimum_size = Vector2(175, 38)
+		btn_act.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn_act.pressed.connect(func() -> void:
+			gs.cycle_gambit_action(slot_idx, eid)
+			_refresh_all(false))
+		hb.add_child(btn_act)
+	detail.text += "\n\n[color=#f2dc99]Gambits del Eikon (Prioridad 1 ➔ 2 ➔ 3):[/color]\n"
+	for i in g.size():
+		var row: Dictionary = g[i]
+		detail.text += "• Ranura %d: [color=#e8d085]%s[/color] ➔ %s\n" % [i + 1, EikonGambits.condition_name(String(row["cond"])), EikonGambits.action_name(String(row["act"]))]
 
 func _card(text: String, selected: bool, locked: bool, cb: Callable, coin: bool = true) -> Button:
 	var b := UIKit.button(text, 18, UIKit.ORANGE if selected else (Color(0.3, 0.36, 0.48) if locked else UIKit.BLUE))
@@ -1179,6 +1219,24 @@ func _build_settings() -> void:
 	crow.add_child(cp)
 	list_box.add_child(crow)
 	list_box.move_child(crow, 2)
+	# Distancia de cámara: cerca, medio, alejado
+	var drow := HBoxContainer.new()
+	drow.name = "CamDistRow"
+	drow.add_theme_constant_override("separation", 10)
+	var dl := UIKit.label("Distancia", 18)
+	dl.custom_minimum_size = Vector2(100, 0)
+	drow.add_child(dl)
+	for opt in ["cerca", "medio", "alejado"]:
+		var is_cur: bool = (CameraRig.distance_preset == opt)
+		var b := UIKit.button(String(CameraRig.PRESETS[opt]["name"]), 16, UIKit.ORANGE if is_cur else UIKit.NAVY)
+		b.custom_minimum_size = Vector2(75, 32)
+		b.pressed.connect(func() -> void:
+			CameraRig.set_preset(opt)
+			if au: au.save_settings()
+			_refresh_all(false))
+		drow.add_child(b)
+	list_box.add_child(drow)
+	list_box.move_child(drow, 3)
 	var orow := HBoxContainer.new()
 	orow.add_theme_constant_override("separation", 14)
 	var inv := CheckBox.new()
@@ -1211,20 +1269,38 @@ func _build_settings() -> void:
 	detail.text = "[b]Ajustes[/b]\nBúfer: cuánto antes del final de una acción se guarda la siguiente pulsación (0,4 s por defecto).\nCámara: sensibilidad de la órbita, invertir Y y ratón capturado (por defecto se orbita con clic derecho arrastrando; Esc libera el ratón). En Android, arrastra en la mitad derecha.\nSe guardan en este dispositivo. Música y efectos provisionales (CC0, ver Créditos)."
 
 
-## Ronda 31: habilidades (máx. 3 equipadas). Se separan por origin: jefe y arma.
+## Ronda 31: habilidades (máx. 4 equipadas). Se separan por origin: jefe y arma.
 func _build_boss() -> void:
 	var eq: Array = gs.boss_abilities()
-	list_box.add_child(UIKit.label("Equipadas %d/%d · B usa · N cambia" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.MUTED))
+	list_box.add_child(UIKit.label("Ranuras equipadas (%d/%d):" % [eq.size(), BossAbilities.MAX_EQUIPPED], 16, UIKit.YELLOW))
+	var slots_row := HBoxContainer.new()
+	slots_row.add_theme_constant_override("separation", 6)
+	for s_idx in BossAbilities.MAX_EQUIPPED:
+		if s_idx < eq.size():
+			var ab_id := String(eq[s_idx])
+			var sbtn := UIKit.button("%d: %s" % [s_idx + 1, BossAbilities.short_name(ab_id)], 13, UIKit.ORANGE)
+			sbtn.custom_minimum_size = Vector2(88, 38)
+			sbtn.tooltip_text = "Ranura %d: toca para desequipar" % (s_idx + 1)
+			sbtn.pressed.connect(func() -> void:
+				gs.toggle_boss_ability(ab_id)
+				_refresh_all(false)
+			)
+			slots_row.add_child(sbtn)
+		else:
+			var ebtn := UIKit.button("%d: (Vacío)" % (s_idx + 1), 13, UIKit.NAVY)
+			ebtn.custom_minimum_size = Vector2(88, 38)
+			slots_row.add_child(ebtn)
+	list_box.add_child(slots_row)
 	_boss_presets()
 	_boss_group("De jefe", "boss", eq)
 	_boss_group("De arma", "weapon", eq)
-	detail.text = "[b]Habilidades[/b]\nLas de jefe y las de arma van aparte. Cuestan aguante, maná (Energía) o vida (nunca te dejan a 0). Recarga global de 1,4 s entre habilidades.\n\n" + BossAbilities.codex(String(eq[0]))
+	detail.text = "[b]Habilidades[/b]\nEquipa hasta 4 habilidades. Cuestan aguante, maná (Energía) o vida (nunca te dejan a 0). En combate cada ranura tiene su botón dedicado.\n\n" + (BossAbilities.codex(String(eq[0])) if not eq.is_empty() else "")
 
 func _boss_presets() -> void:
 	var shown := false
 	for row: Dictionary in ExtraCatalog.preset_rows():
 		var ids: Array = row.get("abilities", [])
-		if ids.size() != BossAbilities.MAX_EQUIPPED:
+		if ids.size() > BossAbilities.MAX_EQUIPPED:
 			continue
 		if not shown:
 			list_box.add_child(UIKit.label("Sets", 14, UIKit.YELLOW))
@@ -1252,23 +1328,28 @@ func _boss_group(title: String, origin: String, eq: Array) -> void:
 		var on: bool = id in eq
 		var need: Array = BossAbilities.requires_weapon(id)
 		var holds: bool = need.is_empty() or gs.weapon_id in need or gs.weapon2_id in need
+		var fams: Array = BossAbilities.weapon_families(id)
+		var fam_ok: bool = BossAbilities.is_family_compatible(id, gs.weapon_id, gs.weapon2_id)
 		var extra := ""
-		if not need.is_empty():
+		if not fams.is_empty() and not ("cualquiera" in fams):
+			extra = "  ·  " + "/".join(PackedStringArray(fams))
+		elif not need.is_empty():
 			extra = "  ·  " + ", ".join(PackedStringArray(need))
 		var ability_id := String(id)
 		var req := need.duplicate()
-		var b := UIKit.button("          %s  (%s)%s" % [BossAbilities.def(ability_id)["name"], BossAbilities.cost_text(ability_id), extra], 17, UIKit.ORANGE if on else UIKit.BLUE)
+		var can_equip := (holds if origin == "weapon" else true) and (fam_ok or AdminMode.enabled)
+		var b := UIKit.button("          %s  (%s)%s" % [BossAbilities.def(ability_id)["name"], BossAbilities.cost_text(ability_id), extra], 17, UIKit.ORANGE if on else (UIKit.BLUE if can_equip else UIKit.NAVY))
 		b.name = "Boss_" + ability_id
 		b.custom_minimum_size = Vector2(370, 42)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.disabled = origin == "weapon" and not on and not holds
+		b.disabled = not on and not can_equip
 		var ic := BossIcon.make(ability_id, 32.0)
 		ic.name = "Icon"
 		ic.active = on
 		ic.position = Vector2(10, 5)
 		b.add_child(ic)
 		b.pressed.connect(func() -> void:
-			if origin == "weapon" and not (ability_id in gs.boss_abilities()) and not (gs.weapon_id in req or gs.weapon2_id in req):
+			if not on and not can_equip:
 				return
 			gs.toggle_boss_ability(ability_id)
 			gs.save_loadout()

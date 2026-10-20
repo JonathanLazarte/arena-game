@@ -56,7 +56,8 @@ const LOCO_SPEEDS := {
 const MX_LIB := preload("res://assets/animations/mixamo/lib_kaykit.res")
 const MX := "mx/"
 ## Comunes a todos los personajes a pie.
-const MX_COMMON := {"dodge_f": "roll_f", "hit": "hit", "stun": "stun", "stance_break": "stance_break",
+const MX_COMMON := {"dodge_f": "roll_f", "dodge_b": "roll_f", "dodge_l": "roll_f", "dodge_r": "roll_f",
+	"hit": "hit", "stun": "stun", "stance_break": "stance_break",
 	"slam": "jump_slam", "boss_charge": "boss_charge", "boss_lunge": "boss_lunge", "cast": "cast"}
 ## Por arma: combos, pesado, guardia, reposo y muerte.
 const MX_WEAPON := {
@@ -1032,11 +1033,7 @@ func update(f: Fighter, delta: float) -> void:
 	elif f.parry_state != Fighter.Parry.NONE:
 		s = "parry"
 	elif f.is_rolling() and not f.mounted:
-		var rel := Vector2(f.dash_dir.dot(f.facing.cross(Vector3.UP)), f.dash_dir.dot(f.facing))
-		if absf(rel.x) > absf(rel.y):
-			s = "dodge_r" if rel.x > 0.0 else "dodge_l"
-		else:
-			s = "dodge_f" if rel.y >= 0.0 else "dodge_b"
+		s = "dodge_f"
 	elif f.airborne and not f.mounted:
 		s = "jump_up" if f.velocity.y > 1.5 else "jump_air"
 	elif f.land_t > 0.0 and not f.mounted:

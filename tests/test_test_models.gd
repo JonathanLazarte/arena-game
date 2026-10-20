@@ -35,7 +35,12 @@ func _dirs(v: KnightVisual, clip: String, t: float) -> Dictionary:
 
 func _run() -> void:
 	await process_frame
-	var ref := _vis(load("res://resources/characters/caballero.tres"))
+	var ref_def := CharacterDef.new()
+	ref_def.model_path = "res://assets/models/Knight.glb"
+	ref_def.texture_path = "res://assets/models/knight_texture.png"
+	ref_def.body_prefix = "Knight_"
+	ref_def.retarget_lib = ""
+	var ref := _vis(ref_def)
 	var ref_sword := ref.sword.global_transform.basis.get_scale().y
 	for id: String in IDS:
 		var cd := Catalog.character(id)

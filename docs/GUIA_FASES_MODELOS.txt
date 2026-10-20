@@ -1,0 +1,62 @@
+======================================================================
+GUÍA DE ELECCIÓN DE MODELOS Y NIVELES DE ESFUERZO (ARENA-GAME)
+======================================================================
+Criterio general de optimización de cuota:
+- Flash (Medium): La mejor relación costo/beneficio. Ideal para JSON, datos,
+  UI, animaciones, balances numéricos y tests automáticos.
+- Pro (Medium): Para cambios estructurales que involucran múltiples sistemas
+  de simulación o refactorizaciones moderadas.
+- Pro (High): Reservado para modificaciones en el layout de memoria binaria
+  (PackedInt64Array en FightSim), cambios de protocolo de red (GAME_PROTO),
+  o depuración de desincronías complejas de rollback tick a tick.
+
+----------------------------------------------------------------------
+FASE 1: UNIFICACIÓN Y BALANCE DEL MOTOR DE HABILIDADES [COMPLETADA]
+----------------------------------------------------------------------
+- Ajuste de balance de Estocada (súper-armadura en carga): Flash (Medium)
+- Semántica de recarga propia (max(global, propia)): Flash (Medium)
+- Modificación de catálogos JSON: Flash (Low/Medium)
+- Verificación con test_step_engine / rollback: Flash (Medium)
+* Si requiriese modificar el layout PackedInt64Array: Pro (High)
+
+----------------------------------------------------------------------
+FASE 2: COBERTURA VISUAL DE ANIMACIONES (AbilityAnims) [COMPLETADA]
+----------------------------------------------------------------------
+- Mapeo de clips y tramos en ability_anims.json: Flash (Medium)
+  (Razón: Es una tarea estructurada guiada por datos donde las claves
+  se verifican automáticamente con test_ability_anims.gd).
+- Alineación de curvas tick -> tiempo: Flash (Medium)
+- Pruebas en runtime con todos los personajes jugables: Flash (Medium)
+
+----------------------------------------------------------------------
+FASE 3: FILTRADO DE LOADOUT POR FAMILIA Y REDISEÑO UI ELDEN RING [COMPLETADA]
+----------------------------------------------------------------------
+- Restricción en la UI de equipamiento y GameState: Flash (Medium)
+- Validación de familias en BossAbilities (families_of_weapon): Flash (Medium)
+- Rediseño estético completo de UI estilo Elden Ring: Flash (Medium)
+  (UIKit: paneles de obsidiana translúcida, acentos de latón/oro rúnico,
+  chevrons dorados, barras HUD carmesí/azul/verde savia).
+- Pruebas de regresión y test_phase3_ui_loadout.gd: Flash (Low/Medium)
+
+----------------------------------------------------------------------
+FASE 4: EIKONS SCRIPTEABLES (GAMBITS FFXII) [COMPLETADA]
+----------------------------------------------------------------------
+- Modelo de Gambits Lite tácticos (3 ranuras prioritarias): Flash (Medium)
+- Integración en SimMagic con cooldowns empaquetados en 16-bit: Pro (Medium)
+  (Conserva determinismo estricto a 60 Hz y GAME_PROTO = 12 sin alterar layout).
+- UI de configuración en el lobby (pestaña Eikons): Flash (Medium)
+- Verificación completa con test_eikon_gambits.gd: Flash (Low/Medium)
+
+----------------------------------------------------------------------
+FASE 5: COMPAÑEROS Y DUELO DE CAMPEONES
+----------------------------------------------------------------------
+- Lógica de entidades auxiliares en simulación: Pro (High)
+- Rutinas de IA en SimAI (fase II y patrones): Flash (Medium)
+- Polish de HUD y menús: Flash (Medium)
+
+----------------------------------------------------------------------
+INFRAESTRUCTURA ONLINE (RELAY)
+----------------------------------------------------------------------
+- Despliegue en Oracle Cloud / Docker / Firewall: Flash (Low/Medium)
+- Pruebas de integración relay E2E: Flash (Medium)
+======================================================================

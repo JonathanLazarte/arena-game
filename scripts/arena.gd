@@ -51,6 +51,7 @@ func _ready() -> void:
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "left_hand": gs.left_hand(), "offhand": gs.offhand_weapon(), "shield": gs.weapon2_id == "escudo", "trinkets": gs.equipped_trinkets()})
 		player.set_magic(gs.equipped_spells(), gs.weapon_art(), gs.equipped_eikon_seal) # ronda 35
 		player.set_boss_abilities(gs.boss_abilities()) # ronda 31
+		player.eikon_gambits = gs.eikon_gambits_for(gs.eikon_id)
 	else:
 		player = _make_fighter("Jugador", 0, Color(0.2, 0.4, 1.0), EIKONS[0])
 	if gs and gs.from_lobby and gs.champion_mode:
@@ -81,6 +82,8 @@ func _ready() -> void:
 		# Ronda 35: rivales aleatorios equipan hechizo de Eikon y arte de arma.
 		var rival_arts: Array = WeaponArts.ORDER
 		enemy.set_magic(EikonSpells.default_for(enemy.eikon.id), String(rival_arts[randi() % rival_arts.size()]))
+	if enemy.eikon_gambits.is_empty():
+		enemy.eikon_gambits = EikonGambits.default_for(enemy.eikon.id if enemy.eikon else "lobo")
 	player.opponent = enemy
 	player.impact.connect(_on_impact)
 	enemy.impact.connect(func(_s: float) -> void: pass)

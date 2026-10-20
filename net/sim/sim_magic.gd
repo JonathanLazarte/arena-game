@@ -119,6 +119,22 @@ static func bake(f: Fighter, p: Dictionary) -> void:
 	ek["hr"] = SimParams.um(1.2 if ed.rideable else 0.9 * ed.size)
 	ek["fly"] = 1 if (ed.flying and not ed.rideable) else 0
 	ek["cy"] = SimParams.um(2.5 if int(ek["fly"]) != 0 else 0.9 * ed.size)
+	var raw_gambits: Array = f.eikon_gambits if ("eikon_gambits" in f and not f.eikon_gambits.is_empty()) else EikonGambits.default_for(ed.id)
+	raw_gambits = EikonGambits.sanitize(raw_gambits, ed.id)
+	var baked_gambits: Array = []
+	for g_var: Variant in raw_gambits:
+		if g_var is Dictionary:
+			var g: Dictionary = g_var
+			var c_str: String = String(g.get("cond", EikonGambits.COND_ALWAYS))
+			var a_str: String = String(g.get("act", EikonGambits.ACT_BASIC))
+			var act_def: Dictionary = EikonGambits.ACTIONS.get(a_str, EikonGambits.ACTIONS[EikonGambits.ACT_BASIC])
+			var cd_ticks := tk_down(float(act_def.get("cd", 1.0)))
+			baked_gambits.append({
+				"cond": EikonGambits.cond_to_int(c_str),
+				"act": EikonGambits.act_to_int(a_str),
+				"cd": cd_ticks
+			})
+	ek["gambits"] = baked_gambits
 	p["ek"] = ek
 
 # ---------------- Hechizos ----------------
@@ -276,11 +292,92 @@ static func _mount(s: PackedInt64Array, P: Array, i: int) -> void:
 	else:
 		s[o + FightSim.MSTANCE] = mini(s[o + FightSim.MSTANCE] + MOUNT_REGEN, MOUNT_STANCE)
 
+static func _slot_cd(packed: int, slot: int) -> int:
+	return (packed >> ((slot + 1) * 16)) & 0xFFFF
+
+static func _set_slot_cd(packed: int, slot: int, cd: int) -> int:
+	var shift := (slot + 1) * 16
+	var mask: int = ~(0xFFFF << shift)
+	return (packed & mask) | (clampi(cd, 0, 0xFFFF) << shift)
+
+static func _dec_all_cds(packed: int) -> int:
+	if packed == 0:
+		return 0
+	var out: int = 0
+	for k in 4:
+		var shift := k * 16
+		var val := (packed >> shift) & 0xFFFF
+		if val > 0:
+			out |= ((val - 1) << shift)
+	return out
+
+static func _eval_cond(cond: int, s: PackedInt64Array, P: Array, i: int, b_offset: int, dist: int) -> bool:
+	var o := i * FightSim.F_FIELDS
+	var opp_idx := 1 - i
+	match cond:
+		0: # always
+			return true
+		1: # owner hp < 50%
+			var max_hp: int = P[i].get("hp", 100000)
+			return s[o + FightSim.HP] * 100 < max_hp * 50
+		2: # owner hp < 30%
+			var max_hp: int = P[i].get("hp", 100000)
+			return s[o + FightSim.HP] * 100 < max_hp * 30
+		3: # enemy hp < 35%
+			var max_hp_opp: int = P[opp_idx].get("hp", 100000)
+			return s[b_offset + FightSim.HP] * 100 < max_hp_opp * 35
+		4: # enemy charging attack or casting
+			return s[b_offset + FightSim.BS_PH] == 1 or s[b_offset + FightSim.CAST_T] > 0
+		5: # enemy dist > 8m
+			return dist > 8000000
+		6: # enemy dist < 3m
+			return dist < 3000000
+		_:
+			return false
+
+static func _exec_gambit_action(act: int, s: PackedInt64Array, P: Array, i: int, b_offset: int, dx: int, dz: int, l: int, ek: Dictionary) -> void:
+	var o := i * FightSim.F_FIELDS
+	var opp_idx := 1 - i
+	var face := FxMath.dir_of(dx, dz, 0) if l > 0 else int(s[o + FightSim.FACE])
+	match act:
+		0: # ACT_BASIC
+			if l <= int(ek["range"]):
+				if int(ek["kind"]) == 1:
+					FightSim.spawn_proj(s, i, 3, s[o + FightSim.EK_X], s[o + FightSim.EK_Z], ek["y"], face, 366667, 150, 700000, ek["dmg"], -1, -1, 0, 0, 0, 0, true)
+				else:
+					if FightSim._take_hit(s, P, i, 4, ek["dmg"], 0, -1, 2000, 1000, 0) == 1:
+						s[o + FightSim.EK_HITS] += 1
+		1: # ACT_SPECIAL
+			s[o + FightSim.EK_SPECIALS] += 1
+			var sp_dmg: int = ek.get("sp_dmg", int(ek["dmg"] * 15 / 10))
+			if int(ek["special"]) == 1:
+				FightSim.spawn_proj(s, i, 2, s[o + FightSim.EK_X], s[o + FightSim.EK_Z], ek["y"], face, 400000, 150, 700000, sp_dmg, -1, -1, 0, 0, 0, 0, true)
+			else:
+				if l <= int(ek["range"]) * 14 / 10:
+					if FightSim._take_hit(s, P, i, 4, sp_dmg, 0, -1, 3000, 1500, 0) == 1:
+						FightSim._apply_stun(s, b_offset, 25)
+						s[o + FightSim.EK_HITS] += 1
+		2: # ACT_SHIELD
+			s[o + FightSim.SKIN_T] = tk_down(5.0)
+		3: # ACT_DISRUPT
+			if l <= 6000000:
+				FightSim._apply_stun(s, b_offset, 20)
+				if s[b_offset + FightSim.BS_PH] == 1:
+					s[b_offset + FightSim.BS_PH] = 0
+				SimAbilities.spawn_hz(s, i, 1, s[o + FightSim.EK_X], s[o + FightSim.EK_Z], 20, 3500000, ek["dmg"] / 2, 30000, 100000, 0)
+		4: # ACT_LEAP
+			if l > 0:
+				s[o + FightSim.EK_X] += dx * 65 / 100
+				s[o + FightSim.EK_Z] += dz * 65 / 100
+			if FightSim._take_hit(s, P, i, 4, int(ek["dmg"] * 13 / 10), 0, -1, 2000, 1000, 0) == 1:
+				s[o + FightSim.EK_HITS] += 1
+
 static func _special(s: PackedInt64Array, P: Array, i: int, ek: Dictionary) -> bool:
 	var o := i * FightSim.F_FIELDS
-	if s[o + FightSim.EK_SPC] > 0 or s[o + FightSim.STUN] > 0:
+	if (s[o + FightSim.EK_SPC] & 0xFFFF) > 0 or s[o + FightSim.STUN] > 0:
 		return false
-	s[o + FightSim.EK_SPC] = ek["sp_cd"]
+	var sp_cd: int = clampi(int(ek.get("sp_cd", 180)), 0, 0xFFFF)
+	s[o + FightSim.EK_SPC] = (s[o + FightSim.EK_SPC] & ~0xFFFF) | sp_cd
 	s[o + FightSim.EK_SPECIALS] += 1
 	var f: int = s[o + FightSim.FACE]
 	var b := FightSim._opp(i)
@@ -317,14 +414,13 @@ static func _special(s: PackedInt64Array, P: Array, i: int, ek: Dictionary) -> b
 							FightSim._apply_stun(s, b, 15)
 	return true
 
-## Vida de la invocación, especial en recarga y eikon compañero (persigue y ataca al rival).
+## Vida de la invocación, especial en recarga y eikon compañero con Gambits FFXII.
 static func _eikon(s: PackedInt64Array, P: Array, i: int) -> void:
 	var o := i * FightSim.F_FIELDS
 	if s[o + FightSim.EK_T] <= 0:
 		return
 	var ek: Dictionary = P[i].get("ek", {})
-	if s[o + FightSim.EK_SPC] > 0:
-		s[o + FightSim.EK_SPC] -= 1
+	s[o + FightSim.EK_SPC] = _dec_all_cds(s[o + FightSim.EK_SPC])
 	s[o + FightSim.EK_T] -= 1
 	if s[o + FightSim.EK_T] <= 0 or s[o + FightSim.ALIVE] == 0 or ek.is_empty():
 		s[o + FightSim.EK_T] = 0
@@ -348,7 +444,28 @@ static func _eikon(s: PackedInt64Array, P: Array, i: int) -> void:
 	if l > int(ek["range_in"]) and l > 0:
 		s[o + FightSim.EK_X] += dx * mv / l
 		s[o + FightSim.EK_Z] += dz * mv / l
-	if l <= int(ek["range"]) and s[o + FightSim.EK_CD] <= 0:
+	# Evaluación de Gambits tácticos de Eikon (Ranuras 0..2 evaluadas por prioridad)
+	var gambits: Array = ek.get("gambits", [])
+	var gambit_acted := false
+	if s[o + FightSim.EK_CD] <= 0 and not gambits.is_empty():
+		for g_idx in gambits.size():
+			var g: Dictionary = gambits[g_idx]
+			var c_code: int = int(g.get("cond", 0))
+			var a_code: int = int(g.get("act", 0))
+			var cd_val := _slot_cd(s[o + FightSim.EK_SPC], g_idx)
+			if cd_val > 0:
+				continue
+			if not _eval_cond(c_code, s, P, i, b, l):
+				continue
+			if (a_code == 0 or a_code == 1) and l > int(ek["range"]) * 14 / 10 and int(ek.get("kind", 0)) != 1:
+				continue
+			var cd_ticks: int = int(g.get("cd", 60))
+			s[o + FightSim.EK_SPC] = _set_slot_cd(s[o + FightSim.EK_SPC], g_idx, cd_ticks)
+			s[o + FightSim.EK_CD] = 40 # breve enfriamiento global entre acciones
+			gambit_acted = true
+			_exec_gambit_action(a_code, s, P, i, b, dx, dz, l, ek)
+			break
+	if not gambit_acted and l <= int(ek["range"]) and s[o + FightSim.EK_CD] <= 0:
 		s[o + FightSim.EK_CD] = ek["cd"]
 		var kind: int = int(ek["kind"])
 		if ride and kind != 1:
@@ -382,9 +499,9 @@ static func art(s: PackedInt64Array, P: Array, i: int) -> bool:
 	s[o + FightSim.BLOCKING] = 0
 	FightSim._spend(s, P, i, a["st"])
 	if int(a["type"]) == 1:
-		s[o + FightSim.DASH_DIR] = SimAbilities._tdir(s, i)
-		s[o + FightSim.FACE] = s[o + FightSim.DASH_DIR]
-		FightSim._start_attack(s, P, i, SimParams.A_DASH, false)
+		# Arte de arma estática: golpe potente concentrado en el lugar (sin desplazamiento)
+		s[o + FightSim.FACE] = SimAbilities._tdir(s, i)
+		FightSim._start_attack(s, P, i, SimParams.A_HEAVY, false)
 		s[o + FightSim.ART_K] = a["k"]
 	else:
 		s[o + FightSim.ART_T] = a["t"]

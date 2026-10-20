@@ -1,5 +1,5 @@
 extends SceneTree
-## Test de verificación de los jefes inspirados en Elden Ring (Radagon, Malenia, Godfrey)
+## Radagon, Malenia y Godfrey, y sus variaciones de combo.
 ## y de sus variaciones de combo (branch: skill vs alt / IN_BOSS_VAR).
 ## godot --headless --path . -s res://tests/test_elden_bosses.gd
 

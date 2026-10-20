@@ -38,7 +38,7 @@ func _run() -> void:
 	await process_frame
 	var P := SimParams.bake(a, b)
 	var ab: Dictionary = P[0]["boss"][0]
-	check(int(ab.get("rep_free", 0)) == 1, "catálogo: rafaga global_cd_on_repeat=false → rep_free")
+	check(int(ab.get("rep_free", 0)) == 1, "catálogo: rafaga spameable → rep_free")
 	var w := int(ab["w"]); var end := int(ab["end"])
 	# 1 pulsación + 1 en la ventana de encadenado (tras el disparo): arranca sola al terminar
 	var r: Array = _sim(P, [0, w + 4], 200)

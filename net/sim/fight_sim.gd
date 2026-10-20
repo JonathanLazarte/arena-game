@@ -629,8 +629,12 @@ static func _steps_ignores_stun(s: PackedInt64Array, P: Array, o: int, t: int) -
 	return SimSteps.ignores_stun(boss[slot], t)
 
 static func _apply_stun(s: PackedInt64Array, o: int, t: int, P: Array = []) -> void:
-	if s[o + BS_PH] == 1 or s[o + BS_PH] == 2:
-		return # la estocada de jefe no se interrumpe
+	if s[o + BS_PH] == 2:
+		return # en embestida sigue sin interrumpirse
+	if s[o + BS_PH] == 1:
+		if t <= T_STAGGER:
+			return # carga de estocada: súper-armadura contra tambaleo leve
+		SimAbilities.end_ability(s, o, true)
 	if s[o + STUN_IMM] > 0 or s[o + AB_IMM] != 0:
 		return
 	if s[o + AB_SLOT] >= 0:
@@ -651,7 +655,9 @@ static func _robust_eff(s: PackedInt64Array, P: Array, i: int) -> int:
 	var o := i * F_FIELDS
 	var r: int = P[i]["robust"]
 	var resist := 0
-	if s[o + AB_SLOT] >= 0:
+	if s[o + BS_PH] == 1:
+		resist = 1500
+	elif s[o + AB_SLOT] >= 0:
 		resist = SimAbilities.resist_pm(s, P, i) + (1000 if s[o + RAGE_T] > 0 else 0)
 	elif s[o + ATK_STATE] == Atk.WINDUP:
 		var a: Dictionary = _atk(P, i, s)
@@ -666,7 +672,7 @@ static func _add_stun_force(s: PackedInt64Array, P: Array, i: int, force: int) -
 	var o := i * F_FIELDS
 	if force <= 0 or s[o + ALIVE] == 0 or s[o + STUN_IMM] > 0 or s[o + INVULN] > 0 or s[o + AB_IMM] != 0:
 		return 0
-	if s[o + BS_PH] == 1 or s[o + BS_PH] == 2:
+	if s[o + BS_PH] == 2:
 		return 0
 	if SimCatalog.skip_stun(s, P, i):
 		return 0

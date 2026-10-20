@@ -175,6 +175,27 @@ func _run() -> void:
 	check((arma["baked"]["abilities"][3]["requires_weapon"] as Array) == ["espada_escudo", "lanza"], "requires_weapon se hornea")
 	check(BossAbilities.origin_of("estocada") == "boss" and BossAbilities.requires_weapon("estocada").is_empty(), "las 45 siguen siendo de jefe")
 	check(BossAbilities.ids_of("weapon").is_empty() and BossAbilities.ids_of("boss").size() == BossAbilities.all_ids().size(), "el loadout separa: hoy todo es de jefe")
+	check(BossAbilities.spameable("rafaga") and BossAbilities.spameable("saeta_oscura") and BossAbilities.spameable("orbe_lunar"), "ráfaga, saeta y orbe son spameables")
+	check(not BossAbilities.spameable("estocada") and not BossAbilities.spameable("golpe_fisura"), "el resto no se salta la global")
+	check(BossAbilities.weapon_families("flecha_grave") == ["arco"] and BossAbilities.weapon_families("vendaval_hacha") == ["hacha"], "arco y hacha tienen familia propia")
+	check(BossAbilities.weapon_families("paso_espectral") == ["cualquiera"] and BossAbilities.weapon_families("golpe_fisura").is_empty(), "cualquiera va sola; Fisura no filtra")
+	var sin_familia := 0
+	for id: String in BossAbilities.ORDER + BossAbilities.EXT_ORDER:
+		if BossAbilities.weapon_families(id).is_empty():
+			sin_familia += 1
+	check(sin_familia == 0, "las 45 declaran familia")
+	var fam := _mut(func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["spameable"] = true
+		_ab(d, "saeta_brasas")["familias"] = ["espada_ligera", "lanza"])
+	check(fam["ok"] and int(fam["baked"]["abilities"][3]["spameable"]) == 1 and int(fam["baked"]["abilities"][3]["global_cd_on_repeat"]) == 0, "spameable true hornea el bit invertido")
+	check((fam["baked"]["abilities"][3]["familias"] as Array) == ["espada_ligera", "lanza"], "familias se hornean")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["spameable"] = true
+		_ab(d, "saeta_brasas")["global_cd_on_repeat"] = true, "spameable contradice la global", "abilities[3].spameable")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["familias"] = ["cualquiera", "lanza"], "cualquiera mezclada", "abilities[3].familias")
+	_expect("SCHEMA", func(d: Dictionary) -> void:
+		_ab(d, "saeta_brasas")["familias"] = ["laser"], "familia inválida", "abilities[3].familias[0]")
 	_expect("SCHEMA", func(d: Dictionary) -> void: _ab(d, "saeta_brasas")["category"] = "laser", "categoría inválida", "abilities[3].category")
 	_expect("SCHEMA", func(d: Dictionary) -> void: _ab(d, "saeta_brasas").erase("ai"), "falta ai", "abilities[3].ai")
 	_expect("SCHEMA", func(d: Dictionary) -> void: _ab(d, "hachazo_penitente")["steps"][0]["hitboxes"][0]["shape"] = {"type": "circle"}, "forma sin radio", "abilities[1].steps[0].hitboxes[0].shape.radius_m")

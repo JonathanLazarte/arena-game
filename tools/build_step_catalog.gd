@@ -27,6 +27,7 @@ const CUTS := {
 	"aliento_escarcha": ["stun_lvl2", "knockdown"],
 	"chorro_lava": ["stun_lvl2", "knockdown"],
 	"carga_area": ["stun_lvl2", "knockdown"],
+	"estocada": ["stun_lvl2", "knockdown"],
 }
 
 func _initialize() -> void:

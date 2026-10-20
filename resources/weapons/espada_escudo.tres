@@ -43,8 +43,8 @@ hitstun = 0.85
 
 [resource]
 script = ExtResource("1")
-description = "Espada equilibrada de una mano. Puede combinarse con un arma ligera en la izquierda."
 display_name = "Espada"
+description = "Espada equilibrada de una mano. Puede combinarse con un arma ligera en la izquierda."
 allows_shield = false
 anim_light = null
 scaling = {
