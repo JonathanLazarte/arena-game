@@ -150,7 +150,10 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 		if has_tex:
 			mi.material_override = accent_mat if n.ends_with("Cape") else body_mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	if melee_w.procedural == "lanza":
+	sword = _data_weapon(sk, melee_w.id) # weapons.json (enabled) tiene prioridad; si no, camino clásico
+	if sword:
+		pass
+	elif melee_w.procedural == "lanza":
 		sword = _make_lance(sk)
 	else:
 		sword = _weapon_mesh(sk, melee_w.mesh_source, melee_w.mesh_right)
@@ -184,7 +187,11 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 	sk.add_child(att)
 	bow = MeshUtil.box(att, Vector3(0.1, 1.8, 0.14), Vector3.ZERO, Color(0.5, 0.3, 0.12))
 	MeshUtil.box(bow, Vector3(0.02, 1.7, 0.02), Vector3(0, 0, 0.25), Color(0.9, 0.9, 0.85)) # cuerda
-	if rw.procedural == "ballesta":
+	var data_bow := _data_weapon(sk, rw.id)
+	if data_bow:
+		bow.queue_free()
+		bow = data_bow
+	elif rw.procedural == "ballesta":
 		# Ronda 17: ballesta = malla «1H_Crossbow» del Rogue (KayKit Adventurers, CC0)
 		bow.queue_free()
 		bow = _weapon_mesh(sk, rw.mesh_source, rw.mesh_right)
@@ -298,7 +305,8 @@ func _compensate_attachments(sk: Skeleton3D) -> void:
 			att.set_meta("rt_comp", true)
 			var holder := Node3D.new()
 			holder.name = "rt_comp"
-			holder.scale = Vector3.ONE * _att_comp
+			# Armas de weapons.json: solo se compensa la escala del esqueleto (no el factor chibi)
+			holder.scale = Vector3.ONE * (_att_comp / TEST_WEAPON_K if att.has_meta("weapon_id") else _att_comp)
 			var kids := att.get_children()
 			att.add_child(holder)
 			for c: Node in kids:
@@ -464,6 +472,22 @@ func _weapon_mesh(sk: Skeleton3D, source: String, mesh_name: String, force_left:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	att.add_child(mi)
 	src.free()
+	return mi
+
+## Arma guiada por datos (data/weapons/weapons.json, ver docs/WEAPON_GUIDE.md). Devuelve la
+## primera malla del arma enganchada, o null si la entrada no existe / no está habilitada.
+func _data_weapon(sk: Skeleton3D, weapon_id: String) -> MeshInstance3D:
+	var e := WeaponAttacher.active_entry(weapon_id)
+	if e.is_empty():
+		return null
+	var att := WeaponAttacher.attach(sk, weapon_id, e, cdef.id if cdef else "")
+	if att == null:
+		return null
+	var mi := WeaponAttacher.first_mesh(att)
+	if mi == null:
+		att.queue_free()
+		return null
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	return mi
 
 ## Lanza procedimental: asta larga de madera y punta metálica.

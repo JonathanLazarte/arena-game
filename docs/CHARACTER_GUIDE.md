@@ -292,6 +292,8 @@ Lo que creás es un recurso `CharacterDef` (`scripts/data/character_def.gd`).
   lugar de la del juego, poné su nombre de malla en `WeaponDef.mesh_right` (se busca primero en
   el propio modelo con `find_child`).
 - Lanza (`procedural = "lanza"`) y arco son mallas generadas por código; se enganchan igual.
+- Mallas de armas propias (GLB/FBX estáticos) con offset y hueso por esqueleto: ver
+  [WEAPON_GUIDE.md](WEAPON_GUIDE.md) (`data/weapons/weapons.json`).
 
 ## 9. Probar (headless + chequeo rápido)
 

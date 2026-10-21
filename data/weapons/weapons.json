@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "_doc": "Ver docs/WEAPON_GUIDE.md. enabled=false: el juego usa el enganche clásico de knight_visual (malla KayKit/procedural); los datos quedan validados para cuando se cargue una malla propia.",
+  "weapons": {
+    "espada_escudo": {
+      "enabled": false,
+      "mesh": "res://assets/models/Knight.glb",
+      "mesh_node": "1H_Sword",
+      "hand": "right",
+      "bone": "handslot.r",
+      "bone_overrides": {"mixamo": "mixamorig_RightHand", "ue": "hand_r"},
+      "offset": {"position": [0, 0, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "notes": "Espada a una mano KayKit (CC0)."
+    },
+    "espada_larga": {
+      "enabled": false,
+      "mesh": "res://assets/models/Knight.glb",
+      "mesh_node": "2H_Sword",
+      "hand": "both",
+      "bone": "handslot.r",
+      "bone_overrides": {"mixamo": "mixamorig_RightHand", "ue": "hand_r"},
+      "offset": {"position": [0, 0, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "second_grip": {"position": [0, -0.25, 0]},
+      "notes": "Espada a dos manos KayKit (CC0)."
+    },
+    "hacha_2m": {
+      "enabled": false,
+      "mesh": "res://assets/models/Barbarian.glb",
+      "mesh_node": "2H_Axe",
+      "hand": "both",
+      "bone": "handslot.r",
+      "bone_overrides": {"mixamo": "mixamorig_RightHand", "ue": "hand_r"},
+      "offset": {"position": [0, 0, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "second_grip": {"position": [0, -0.3, 0]},
+      "notes": "Hacha a dos manos KayKit (CC0)."
+    },
+    "dagas": {
+      "enabled": false,
+      "mesh": "res://assets/models/Rogue.glb",
+      "mesh_node": "Knife",
+      "hand": "right",
+      "bone": "handslot.r",
+      "bone_overrides": {"mixamo": "mixamorig_RightHand", "ue": "hand_r"},
+      "offset": {"position": [0, 0, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "notes": "Daga derecha KayKit; la izquierda (Knife_Offhand) sigue en WeaponDef.mesh_left."
+    },
+    "lanza": {
+      "enabled": false,
+      "mesh": "",
+      "hand": "both",
+      "bone": "handslot.r",
+      "bone_overrides": {"mixamo": "mixamorig_RightHand", "ue": "hand_r"},
+      "offset": {"position": [0, 0.7, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "second_grip": {"position": [0, -0.5, 0]},
+      "notes": "Hoy es procedural (_make_lance). Falta malla."
+    },
+    "arco": {
+      "enabled": false,
+      "mesh": "",
+      "hand": "left",
+      "bone": "handslot.l",
+      "bone_overrides": {"mixamo": "mixamorig_LeftHand", "ue": "hand_l"},
+      "offset": {"position": [0, 0, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "notes": "Hoy es procedural (cajas en bow_slot). Falta malla."
+    },
+    "ballesta": {
+      "enabled": false,
+      "mesh": "res://assets/models/Rogue.glb",
+      "mesh_node": "1H_Crossbow",
+      "hand": "left",
+      "bone": "handslot.l",
+      "bone_overrides": {"mixamo": "mixamorig_LeftHand", "ue": "hand_l"},
+      "offset": {"position": [0, 0, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1]},
+      "notes": "Ballesta KayKit (CC0). Ojo: knight_visual hoy la engancha con _weapon_mesh (hueso del .glb de origen)."
+    }
+  }
+}
