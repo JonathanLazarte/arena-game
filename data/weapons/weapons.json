@@ -14,7 +14,7 @@
     },
     "espada_larga": {
       "enabled": false,
-      "mesh": "res://assets/models/Knight.glb",
+      "mesh": "res://assets/models/WP_A_0274.obj",
       "mesh_node": "2H_Sword",
       "hand": "both",
       "bone": "handslot.r",

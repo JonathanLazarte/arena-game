@@ -9,16 +9,7 @@ const ExtraCatalog = preload("res://scripts/data/extra_catalog.gd")
 const DEFAULT := ["estocada"]
 const ORDER := ["estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso", "salto_caida"]
 const EXT_ORDER := [
-	"tajo_retardado", "presa_verdugo", "giro_martillo", "danza_cisne", "paso_espectral",
-	"onda_rastrera", "rayos_trazadores", "lluvia_meteoros", "aliento_dragon", "furia_fase", "postura_contra",
-	"embate_sismico", "lanza_celeste",
-	"cuerno_embiste", "tajo_cruzado", "zarpazo_sangre", "barrido_cola", "daga_sagrada", "estocada_negra",
-	"flor_umbral", "presa_fauces", "giro_noble", "danza_triple", "alas_picado",
-	"garra_suelo", "vendaval_hacha", "anillo_fuego", "pisoton",
-	"lluvia_lanzas", "flecha_grave", "lluvia_sangre", "columnas_rayo",
-	"saeta_oscura", "orbe_lunar",
-	"aliento_rayo", "aliento_escarcha", "chorro_lava",
-	"grito_guerra", "guardia_reflejo",
+	"paso_espectral", "rayos_trazadores", "lluvia_meteoros", "aliento_dragon", "furia_fase", "postura_contra", "lanza_celeste", "zarpazo_sangre", "flor_umbral", "lluvia_lanzas", "flecha_grave", "lluvia_sangre", "columnas_rayo", "orbe_lunar", "aliento_rayo", "aliento_escarcha", "chorro_lava",
 ]
 const COST_NAMES := {"stamina": "aguante", "mana": "maná", "health": "vida"}
 const CATALOG_PATH := "res://data/abilities/catalog.json"

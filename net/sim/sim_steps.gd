@@ -13,16 +13,7 @@ extends RefCounted
 
 const PATH := "res://data/abilities/catalog.json"
 const IDS: Array[String] = [
-	"tajo_retardado", "estocada_negra", "pisoton", "flecha_grave",
-	"presa_verdugo", "giro_martillo", "danza_cisne", "paso_espectral",
-	"cuerno_embiste", "tajo_cruzado", "zarpazo_sangre", "barrido_cola", "daga_sagrada", "flor_umbral",
-	"presa_fauces", "giro_noble", "danza_triple", "alas_picado",
-	"onda_rastrera", "embate_sismico", "garra_suelo", "vendaval_hacha", "anillo_fuego",
-	"rayos_trazadores", "lluvia_meteoros", "lanza_celeste", "lluvia_lanzas", "lluvia_sangre", "columnas_rayo",
-	"aliento_dragon", "aliento_rayo", "aliento_escarcha", "chorro_lava",
-	"saeta_oscura", "orbe_lunar",
-	"furia_fase", "grito_guerra", "postura_contra", "guardia_reflejo",
-	"estocada", "carga_area", "rafaga", "escudo_mana", "combo_falso", "salto_caida",
+	"carga_area", "rafaga", "escudo_mana", "rayos_trazadores", "lluvia_meteoros", "aliento_dragon", "lanza_celeste", "zarpazo_sangre", "lluvia_lanzas", "flecha_grave", "lluvia_sangre", "columnas_rayo", "orbe_lunar", "aliento_rayo", "aliento_escarcha", "chorro_lava", "combo_falso", "paso_espectral", "estocada", "salto_caida", "postura_contra", "furia_fase", "flor_umbral",
 ]
 const EXEC_TIMELINE := 0
 const EXEC_WAVE := 1

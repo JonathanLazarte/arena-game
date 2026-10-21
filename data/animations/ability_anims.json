@@ -8,10 +8,43 @@
       "file": "res://data/abilities/golpe_fisura_skill.json",
       "steps": {
         "saltar": [
-          {"clip": "Jump_Start", "unit": "frac", "keys": [[0, 0.0], [31, 1.0]]}
+          {
+            "clip": "Jump_Start",
+            "unit": "frac",
+            "keys": [
+              [
+                0,
+                0
+              ],
+              [
+                31,
+                1
+              ]
+            ]
+          }
         ],
         "martillazo": [
-          {"clip": "2H_Melee_Attack_Chop", "keys": [[0, 0.45], [14, 0.85], [18, 0.95], [58, 1.63]]}
+          {
+            "clip": "2H_Melee_Attack_Chop",
+            "keys": [
+              [
+                0,
+                0.45
+              ],
+              [
+                14,
+                0.85
+              ],
+              [
+                18,
+                0.95
+              ],
+              [
+                58,
+                1.63
+              ]
+            ]
+          }
         ]
       }
     },
@@ -19,61 +52,97 @@
       "file": "res://data/abilities/artorias_caballero_umbral.json",
       "steps": {
         "salto_1": [
-          {"clip": "mx/roll_f", "unit": "frac", "keys": [[0, 0.0], [52, 1.0]]},
-          {"clip": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "keys": [[52, 0.10], [66, 0.42], [76, 0.60], [88, 1.0]]}
+          {
+            "clip": "mx/roll_f",
+            "unit": "frac",
+            "keys": [
+              [
+                0,
+                0
+              ],
+              [
+                52,
+                1
+              ]
+            ]
+          },
+          {
+            "clip": "1H_Melee_Attack_Slice_Horizontal",
+            "unit": "frac",
+            "keys": [
+              [
+                52,
+                0.1
+              ],
+              [
+                66,
+                0.42
+              ],
+              [
+                76,
+                0.6
+              ],
+              [
+                88,
+                1
+              ]
+            ]
+          }
         ],
         "salida": [
-          {"clip": "Dodge_Backward", "unit": "frac", "keys": [[0, 0.0], [37, 1.0]]}
+          {
+            "clip": "Dodge_Backward",
+            "unit": "frac",
+            "keys": [
+              [
+                0,
+                0
+              ],
+              [
+                37,
+                1
+              ]
+            ]
+          }
         ],
         "salto_2": [
-          {"clip": "mx/roll_f", "unit": "frac", "keys": [[0, 0.0], [52, 1.0]]},
-          {"clip": "1H_Melee_Attack_Slice_Horizontal_Reverse", "fallback": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "keys": [[52, 0.10], [66, 0.42], [76, 0.60], [118, 1.0]]}
-        ]
-      }
-    },
-    "cadena_mandobles": {
-      "file": "res://data/abilities/artorias_caballero_umbral.json",
-      "steps": {
-        "tajo_1": [
-          {"clip": "mx/gs_light0", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [40, 0.70]]}
-        ],
-        "tajo_2": [
-          {"clip": "mx/gs_light1", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [40, 0.70]]}
-        ],
-        "tajo_3": [
-          {"clip": "mx/gs_heavy", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [63, 1.0]]}
-        ]
-      }
-    },
-    "salto_estocada": {
-      "file": "res://data/abilities/artorias_caballero_umbral.json",
-      "steps": {
-        "impulso": [
-          {"clip": "Jump_Start", "unit": "frac", "keys": [[0, 0.0], [31, 1.0]]}
-        ],
-        "clavar": [
-          {"clip": "Jump_Idle", "unit": "frac", "keys": [[0, 0.0], [30, 1.0]]},
-          {"clip": "mx/jump_slam", "unit": "frac", "keys": [[30, 0.20], [48, 0.55], [52, 0.65], [100, 1.0]]}
-        ]
-      }
-    },
-    "trazos_hoja": {
-      "file": "res://data/abilities/hoja_escarlata_catalog.json",
-      "steps": {
-        "tajo_1": [
-          {"clip": "1H_Melee_Attack_Slice_Diagonal", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [41, 0.70]]}
-        ],
-        "tajo_2": [
-          {"clip": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [41, 0.70]]}
-        ],
-        "tajo_3": [
-          {"clip": "1H_Melee_Attack_Chop", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [49, 0.85]]}
-        ],
-        "estocada_final": [
-          {"clip": "Dash_Strike", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [36, 0.55], [72, 1.0]]}
-        ],
-        "patada_final": [
-          {"clip": "Block_Attack", "unit": "frac", "keys": [[0, 0.0], [33, 0.42], [37, 0.55], [67, 1.0]]}
+          {
+            "clip": "mx/roll_f",
+            "unit": "frac",
+            "keys": [
+              [
+                0,
+                0
+              ],
+              [
+                52,
+                1
+              ]
+            ]
+          },
+          {
+            "clip": "1H_Melee_Attack_Slice_Horizontal_Reverse",
+            "fallback": "1H_Melee_Attack_Slice_Horizontal",
+            "unit": "frac",
+            "keys": [
+              [
+                52,
+                0.1
+              ],
+              [
+                66,
+                0.42
+              ],
+              [
+                76,
+                0.6
+              ],
+              [
+                118,
+                1
+              ]
+            ]
+          }
         ]
       }
     }

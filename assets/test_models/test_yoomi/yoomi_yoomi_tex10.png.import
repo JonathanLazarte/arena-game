@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cqjrxmvk54pux"
-path="res://.godot/imported/yoomi_yoomi_tex10.png-0459a7dc478ec80ad20643d174da9af6.ctex"
+path.s3tc="res://.godot/imported/yoomi_yoomi_tex10.png-0459a7dc478ec80ad20643d174da9af6.s3tc.ctex"
+path.etc2="res://.godot/imported/yoomi_yoomi_tex10.png-0459a7dc478ec80ad20643d174da9af6.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "dbd117fa487c54af5aaf8c9c5852d615"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/test_models/test_yoomi/yoomi_yoomi_tex10.png"
-dest_files=["res://.godot/imported/yoomi_yoomi_tex10.png-0459a7dc478ec80ad20643d174da9af6.ctex"]
+dest_files=["res://.godot/imported/yoomi_yoomi_tex10.png-0459a7dc478ec80ad20643d174da9af6.s3tc.ctex", "res://.godot/imported/yoomi_yoomi_tex10.png-0459a7dc478ec80ad20643d174da9af6.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=256
-detect_3d/compress_to=1
+detect_3d/compress_to=0
