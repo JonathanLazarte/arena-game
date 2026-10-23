@@ -9,13 +9,26 @@
 		"h44_test_d": "74f106d1.json"
 	},
 	"targets": [
-		{"id": "test_knight", "model": "res://assets/test_models/test_knight/knight.glb",
+		{
+			"id": "test_knight",
+			"model": "res://assets/test_models/test_knight/knight.glb",
 			"retarget_lib": "res://assets/test_models/test_knight/test_knight_anims.res",
 			"map": "res://tools/rig/maps/biped_test_knight.json",
-			"out": "res://assets/test_models/test_knight/test_knight_h44.res"},
-		{"id": "test_mita", "model": "res://assets/test_models/test_mita/mita.glb",
+			"out": "res://assets/test_models/test_knight/test_knight_h44.res"
+		},
+		{
+			"id": "test_mita",
+			"model": "res://assets/test_models/test_mita/mita.glb",
 			"retarget_lib": "res://assets/test_models/test_mita/test_mita_anims.res",
 			"map": "res://tools/rig/maps/mmd_test_mita.json",
-			"out": "res://assets/test_models/test_mita/test_mita_h44.res"}
+			"out": "res://assets/test_models/test_mita/test_mita_h44.res"
+		},
+		{
+			"id": "test_knight_h44",
+			"model": "res://assets/test_models/test_knight_h44/knight_h44.glb",
+			"retarget_lib": "res://assets/test_models/test_knight_h44/test_knight_h44_anims.res",
+			"map": "res://tools/rig/maps/humanoid44.json",
+			"out": "res://assets/test_models/test_knight_h44/test_knight_h44_h44.res"
+		}
 	]
 }

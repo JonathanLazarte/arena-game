@@ -497,3 +497,7 @@ sin armas: esas ranuras siguen con los clips actuales. Los ataques duran 2–3 s
 guardia): al usarlos como combo conviene recortar o acelerar (ver `"contact"` en `tools/retarget_kaykit.gd`).
 Licencia: igual que el pack anterior (licencia por comprador de la tienda de assets); FBX fuera del repo,
 bibliotecas derivadas → repo privado recomendado.
+
+## Esqueleto humanoide44
+Para poner modelos sobre el esqueleto humanoide44 (mapeo, horneado, re-rig en Blender, armas):
+ver [SKELETON_GUIDE.md](SKELETON_GUIDE.md).

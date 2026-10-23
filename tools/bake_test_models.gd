@@ -54,6 +54,12 @@ func configs() -> Array:
 			["L UpperArm_39", "L Forearm_36", "L Hand_34", "L Thigh_133", "L Calf_128", "L Foot_124", "L Toe0_122"],
 			["R UpperArm_74", "R Forearm_71", "R Hand_69", "R Thigh_145", "R Calf_140", "R Foot_136", "R Toe0_134"]),
 			"hide_bone": "R_weapon_66"}, # su propia arma (el juego pone la suya)
+		# El mismo caballero re-rigueado a humanoide44 con tools/rig/rig_humanoid44.py (docs/SKELETON_GUIDE.md)
+		{"id": "test_knight_h44", "path": "res://assets/test_models/test_knight_h44/knight_h44.glb", "map": _lr(
+			{"hips": "Pelvis", "spine": "Spine", "chest": "Spine2", "head": "Head"},
+			["L_UpperArm", "L_Forearm", "L_Hand", "L_Thigh", "L_Calf", "L_Foot", "L_Toe0"],
+			["R_UpperArm", "R_Forearm", "R_Hand", "R_Thigh", "R_Calf", "R_Foot", "R_Toe0"]),
+			"hide_bone": "x_R_weapon_66"},
 	]
 
 static func rel_xf(nd: Node, top: Node) -> Transform3D:

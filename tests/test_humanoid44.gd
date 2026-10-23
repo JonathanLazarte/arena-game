@@ -8,7 +8,7 @@ func check(c: bool, m: String) -> void:
 	print(("PASS  " if c else "FAIL  ") + m)
 	if not c: fails += 1
 
-const IDS := ["caballero", "asesino"]
+const IDS := ["caballero", "asesino", "test_knight_h44"]  # el último: re-rig real (Blender), fuera del roster
 const CORE := ["Pelvis", "Spine", "Spine2", "Neck", "Head", "L_Clavicle", "L_UpperArm", "L_Forearm", "L_Hand",
 	"R_Clavicle", "R_UpperArm", "R_Forearm", "R_Hand", "L_Thigh", "L_Calf", "L_Foot", "L_Toe0",
 	"R_Thigh", "R_Calf", "R_Foot", "R_Toe0", "L_Finger1", "R_Finger1"]
@@ -26,7 +26,7 @@ func _run() -> void:
 	for t: Dictionary in cfg.targets:
 		maps[t.out] = t.map
 	for id: String in IDS:
-		var cd := Catalog.character(id)
+		var cd: CharacterDef = Catalog.character(id) if id != "test_knight_h44" else load("res://resources/characters/test_knight_h44.tres")
 		check(cd.id == id and cd.h44_lib != "" and ResourceLoader.exists(cd.h44_lib), "%s: h44_lib existe (%s)" % [id, cd.h44_lib])
 		var v := KnightVisual.new()
 		get_root().add_child(v)
@@ -35,6 +35,9 @@ func _run() -> void:
 		var sk := v.model.find_child("Skeleton3D", true, false) as Skeleton3D
 		check(v.ap.has_animation_library(&"h44"), "%s: biblioteca h44 en el AnimationPlayer" % id)
 		check(v.ap.has_animation("Idle") and v.ap.has_animation("mx/roll_f"), "%s: clips KayKit + mx siguen" % id)
+		if id == "test_knight_h44":
+			var miss := ["Spine1", "R_Elbow", "L_Elbow", "R_Hip", "face_root"].filter(func(b): return sk.find_bone(b) < 0)
+			check(miss.is_empty(), "%s: el esqueleto del modelo ES humanoide44 (faltan %s)" % [id, miss])
 		var lib := v.ap.get_animation_library(&"h44")
 		var clips := lib.get_animation_list()
 		check(clips.size() >= 1, "%s: %d clips humanoide44 %s" % [id, clips.size(), clips])
