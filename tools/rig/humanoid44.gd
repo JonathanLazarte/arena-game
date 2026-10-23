@@ -12,12 +12,16 @@ const BONES: PackedStringArray = ["Root", "Pelvis", "Spine", "Spine1", "Spine2",
 	"R_Finger0", "R_Finger1", "R_Finger2", "R_Finger3", "R_Finger4",
 	"L_Hip", "L_Thigh", "L_Calf", "L_Foot", "L_Toe0", "R_Hip", "R_Thigh", "R_Calf", "R_Foot", "R_Toe0"]
 
-## Huesos «ayudantes» (giro a media rotación) que en el JSON figuran como padres pero cuyos datos
-## están expresados respecto del abuelo: Collar, Shoulder, Elbow y Hip. Si se respeta el
-## parentIndices tal cual, las piernas quedan apuntando para arriba y los brazos estirados el
-## doble. Por eso el hijo se cuelga del abuelo (padre «efectivo»). Ver SKELETON_GUIDE §Problemas.
-const PARENT_FIX := {"Neck": "Spine2", "L_UpperArm": "L_Clavicle", "R_UpperArm": "R_Clavicle",
-	"L_Forearm": "L_UpperArm", "R_Forearm": "R_UpperArm", "L_Thigh": "Pelvis", "R_Thigh": "Pelvis"}
+## Los JSON viejos del conversor traen un parentIndices INVENTADO (encadena la lista de 44 huesos en
+## orden), pero las poses locales son las del esqueleto Havok original, donde Collar/Shoulder/Elbow/Hip
+## son HERMANOS del hueso siguiente, no sus padres. Hijo -> [padre falso, padre real]. Solo se corrige
+## si el JSON trae el padre falso, así los JSON del conversor corregido (tools/rig/converter_fixed.py)
+## cargan tal cual. Ver SKELETON_GUIDE §Problemas.
+const PARENT_FIX := {"Spine": ["Pelvis", "Root"], "Neck": ["Collar", "Spine2"], "Jaw": ["face_root", "Head"],
+	"L_Clavicle": ["Collar", "Spine2"], "R_Clavicle": ["Collar", "Spine2"],
+	"L_UpperArm": ["L_Shoulder", "L_Clavicle"], "R_UpperArm": ["R_Shoulder", "R_Clavicle"],
+	"L_Forearm": ["L_Elbow", "L_UpperArm"], "R_Forearm": ["R_Elbow", "R_UpperArm"],
+	"L_Thigh": ["L_Hip", "Pelvis"], "R_Thigh": ["R_Hip", "Pelvis"]}
 
 ## Segmentos usados para corregir la diferencia de pose de reposo (A/T) al reapuntar.
 const CHAIN := {"Pelvis": "Spine2", "Spine": "Spine1", "Spine1": "Spine2", "Spine2": "Neck", "Neck": "Head",
@@ -31,6 +35,7 @@ var parents: PackedInt32Array = []
 var rest: Array[Transform3D] = [] ## local (padre efectivo)
 var fps := 30.0
 var num_frames := 0
+var fixed_parents := 0 ## cuántos padres falsos se corrigieron al cargar
 var duration := 0.0
 var _rot := {} ## índice -> Array de [x,y,z,w]
 var _pos := {} ## índice -> Array de [x,y,z]
@@ -56,8 +61,9 @@ static func load_json(path: String, fix_parents := true) -> Humanoid44:
 	for i in h.names.size():
 		var p := int(sk.parentIndices[i])
 		var nm := h.names[i]
-		if fix_parents and PARENT_FIX.has(nm):
-			p = h.names.find(PARENT_FIX[nm])
+		if fix_parents and PARENT_FIX.has(nm) and p >= 0 and String(sk.bones[p]) == PARENT_FIX[nm][0]:
+			p = h.names.find(PARENT_FIX[nm][1])
+			h.fixed_parents += 1
 		h.parents.append(p)
 		var rp: Dictionary = sk.referencePose[i]
 		h.rest.append(Transform3D(Basis(_q(rp.rotation)), _v(rp.translation)))

@@ -88,10 +88,15 @@ Comprueba que la biblioteca carga, que siguen los clips viejos, que todas las pi
 que la pose sigue al JSON (< 30°) y que el arma sigue a la mano.
 
 ## Problemas comunes
-- **Piernas para arriba / brazos rotos**: el JSON lista `Collar/Shoulder/Elbow/Hip` como padres, pero los datos de
-  los hijos son relativos al abuelo. `Humanoid44.PARENT_FIX` lo corrige (Neck→Spine2, UpperArm→Clavicle,
-  Forearm→UpperArm, Thigh→Pelvis). Si el conversor se arregla, cargá con `fix_parents=false`.
-- **Izquierda/derecha cambiadas**: humanoide44 mira a +X con la izquierda en +Z; el horneado espeja (`MIRROR`).
+- **Piernas para arriba / brazos rotos (JSON viejos)**: el conversor viejo inventaba `parentIndices`
+  encadenando la lista de 44 huesos (Collar→Neck, Collar→Clavicle, Shoulder→UpperArm, Elbow→Forearm,
+  Hip→Thigh, Pelvis→Spine, face_root→Jaw), pero copiaba las poses locales del esqueleto Havok original, donde
+  esos huesos son *hermanos*. `Humanoid44.PARENT_FIX` corrige esos 11 padres, solo si el JSON trae el padre falso.
+  Lo correcto es regenerar con `tools/rig/converter_fixed.py` (usa el ancestro conservado más cercano y
+  recompone la transformación local; la raíz queda relativa a la pose de referencia de `Master`):
+  `python3 tools/rig/converter_fixed.py --skel <skel>.xml --anim <anim>.xml --out assets_raw/humanoid44/<x>.json`
+- **Izquierda/derecha cambiadas**: humanoide44 mira a +X con la izquierda en +Z: es un marco *zurdo* (viene así de Havok), por eso el horneado
+  espeja (`MIRROR`) y no alcanza con rotar.
   Mirá un clip asimétrico en el editor y confirmá que levanta la mano correcta.
 - **El FBX entra al APK**: nunca lo pongas fuera de `assets_raw/` (con `.gdignore`).
 - **Modelo sin rig**: camino B con `--auto-weights`, después revisá pesos a mano.
