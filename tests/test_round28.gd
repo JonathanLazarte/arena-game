@@ -38,12 +38,13 @@ func _run() -> void:
 		var kv := KnightVisual.new()
 		root.add_child(kv)
 		kv.setup(Color.WHITE, c, w)
-		var ok: bool = kv.states["dodge_f"] == "mx/roll_f" and kv.states["boss_charge"] == "mx/boss_charge" and kv.states["cast"] == "mx/cast"
+		var h44 := c.h44_anims != "" # slots humanoide44 (data/animations) pisan los clips mx/ a propósito
+		var ok: bool = (h44 or kv.states["dodge_f"] == "mx/roll_f") and kv.states["boss_charge"] == "mx/boss_charge" and kv.states["cast"] == "mx/cast"
 		for s: String in kv.states:
 			ok = ok and kv.ap.has_animation(kv.states[s])
 		var mw := w if not w.ranged else Catalog.weapon("dagas")
 		var t: Dictionary = KnightVisual.MX_WEAPON.get(mw.id, {})
-		if t.has("light0"):
+		if t.has("light0") and not h44:
 			ok = ok and kv.states["light0"] == "mx/" + t["light0"] and kv.states["heavy"] == "mx/" + t["heavy"]
 		if w.ranged:
 			ok = ok and kv.states["aim"] == w.anim_aim # el arquero conserva sus clips KayKit
