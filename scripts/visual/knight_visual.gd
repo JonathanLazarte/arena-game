@@ -213,9 +213,7 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 			var h := melee_w.combo_hit(i, cdef)
 			states["light%d" % i] = author_combo_clip(ap, h)
 	_apply_mixamo(melee_w)
-	for slot: String in cdef.h44_slots: # humanoide44: solo si el clip existe (si no, queda el de siempre)
-		if ap and ap.has_animation(cdef.h44_slots[slot]):
-			states[slot] = cdef.h44_slots[slot]
+	_apply_h44_slots()
 	_compensate_attachments(sk)
 	_setup_ability_anims()
 	_build_tree()
@@ -347,9 +345,10 @@ func _setup_ability_anims() -> void:
 ## Clip y tiempo de la habilidad actual según la sim (paso = ab_fired, tick = ab_tick - 1).
 ## {} = sin animación propia (o clip ausente sin «fallback»): sigue la pose genérica.
 func _ability_sample(f: Fighter) -> Dictionary:
-	if f.ab_id == "" or not AbilityAnims.has(f.ab_id):
+	var own: Dictionary = _h44_abilities.get(f.ab_id, {})
+	if f.ab_id == "" or (own.is_empty() and not AbilityAnims.has(f.ab_id)):
 		return {}
-	var smp := AbilityAnims.sample(f.ab_id, f.ab_fired, f.ab_tick - 1)
+	var smp := AbilityAnims.sample(f.ab_id, f.ab_fired, f.ab_tick - 1, own)
 	if smp.is_empty():
 		return {}
 	var seg: Dictionary = smp["seg"]
@@ -383,6 +382,36 @@ func _apply_mixamo(melee_w: WeaponDef) -> void:
 		if ap.has_animation(MX + String(MX_LOCO[k])):
 			_loco_clips[k] = MX + String(MX_LOCO[k])
 var _loco_clips: Dictionary = {}
+var walk_clip := "Walking_A"
+var _h44_abilities: Dictionary = {} ## id habilidad -> entrada estilo ability_anims.json (solo vista)
+
+## humanoide44 (docs/SKELETON_GUIDE.md): ranuras de CharacterDef.h44_slots + JSON h44_anims
+## {"slots": {ranura: clip}, "abilities": {id: {file, steps}}}. Ranuras especiales: "idle", "walk"
+## y las de LOCO_SPEEDS. Clip ausente = queda el de siempre. Solo vista: no toca la sim.
+func _apply_h44_slots() -> void:
+	if ap == null:
+		return
+	var slots: Dictionary = {}
+	if cdef.h44_anims != "" and FileAccess.file_exists(cdef.h44_anims):
+		var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(cdef.h44_anims))
+		if d is Dictionary:
+			slots.merge((d as Dictionary).get("slots", {}), true)
+			_h44_abilities = (d as Dictionary).get("abilities", {})
+	slots.merge(cdef.h44_slots, true)
+	for slot: String in slots:
+		var clip := String(slots[slot])
+		if not ap.has_animation(clip):
+			continue
+		if slot == "idle" or slot == "walk" or LOCO_SPEEDS.has(slot):
+			ap.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
+		if slot == "idle":
+			idle_clip = clip
+		elif slot == "walk":
+			walk_clip = clip
+		elif LOCO_SPEEDS.has(slot):
+			_loco_clips[slot] = clip
+		else:
+			states[slot] = clip
 var _loco_pts: Array = [] ## puntos con TimeScale presentes en el BlendSpace2D "loco"
 var _loco_dyn: Array = [] ## de esos, los que escalan su velocidad con |blend_position|
 var _loco_bp := Vector2.ZERO ## blend_position suavizada (solo vista)
@@ -679,7 +708,7 @@ func _build_tree() -> void:
 	var root := AnimationNodeBlendTree.new()
 	var loco := AnimationNodeBlendSpace2D.new()
 	loco.add_blend_point(AnimUtil.anim_node(idle_clip), Vector2(0, 0), -1, &"Idle")
-	loco.add_blend_point(AnimUtil.anim_node("Walking_A"), Vector2(0, 0.45), -1, &"Walking_A")
+	loco.add_blend_point(AnimUtil.anim_node(walk_clip), Vector2(0, 0.45), -1, &"Walking_A")
 	# Ronda 15: locomoción direccional para correr fijado (souls). KayKit no trae carrera hacia
 	# atrás ni strafe caminando: se reutilizan clips acelerados/ralentizados (ver LOCO_SPEEDS).
 	# Cada clip aparece UNA sola vez en el espacio: dos copias del mismo clip a distinta velocidad

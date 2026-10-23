@@ -101,7 +101,40 @@ func _run() -> void:
 			await process_frame
 			var hand := sk.to_global(sk.get_bone_global_pose(sk.find_bone((ba as BoneAttachment3D).bone_name)).origin)
 			check((ba as Node3D).global_position.distance_to(hand) < 0.05, "%s: el enganche sigue al hueso con el clip h44" % id)
+		if cd.h44_anims != "":
+			var hd: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(cd.h44_anims))
+			var ok_slots := true
+			for slot: String in hd.slots:
+				var want := String(hd.slots[slot])
+				var got: String = v.idle_clip if slot == "idle" else (v.walk_clip if slot == "walk" else String(v.states.get(slot, "")))
+				if v.ap.has_animation(want) and got != want:
+					ok_slots = false
+					print("   ranura %s = %s (esperado %s)" % [slot, got, want])
+			check(ok_slots, "%s: ranuras h44_anims aplicadas (%d)" % [id, hd.slots.size()])
+			var f := Fighter.new()
+			var ok_ab := true
+			for ab: String in hd.abilities:
+				var nsteps := AbilityAnims.step_ids(ab, hd.abilities[ab]).size()
+				for st in nsteps:
+					f.ab_id = ab; f.ab_fired = st; f.ab_tick = 10
+					var smp: Dictionary = v._ability_sample(f)
+					if not String(smp.get("clip", "")).begins_with("h44/"):
+						ok_ab = false
+						print("   %s paso %d -> %s" % [ab, st, smp.get("clip", "-")])
+			f.free()
+			check(ok_ab, "%s: habilidades con clip h44 (%s)" % [id, ", ".join(hd.abilities.keys())])
 		v.queue_free()
 		await process_frame
+	# Clips del conversor corregido: cargan sin corregir padres
+	var dir := String(cfg.get("src_dir", ""))
+	var nfix := 0
+	var nnew := 0
+	for c: String in cfg.clips:
+		var pth: String = dir.path_join(String(cfg.clips[c]))
+		if String(cfg.clips[c]).begins_with("n_") and FileAccess.file_exists(pth):
+			nnew += 1
+			nfix += Humanoid44.load_json(pth).fixed_parents
+	if nnew > 0:
+		check(nfix == 0, "clips nuevos (%d): cargan sin corregir padres (corregidos %d)" % [nnew, nfix])
 	print("FAILS: %d" % fails)
 	quit(1 if fails > 0 else 0)

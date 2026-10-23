@@ -36,6 +36,8 @@ extends Resource
 ## Opcional: ranuras de animación (claves de KnightVisual.states: "none", "light0", "heavy"…) que
 ## pasan a usar un clip humanoide44, p. ej. {"none": "h44/h44_test_a"}. Vacío = no cambia nada.
 @export var h44_slots: Dictionary = {}
+## JSON con {"slots": {...}, "abilities": {...}} de clips humanoide44 (vacío = nada). Ver SKELETON_GUIDE.
+@export var h44_anims: String = ""
 @export var tint: Color = Color(1, 1, 1)
 ## Ronda 14: habilidad especial (tecla G / botón "Habilidad"). "golpe_sismico" = área en el suelo.
 @export var special_id: String = ""

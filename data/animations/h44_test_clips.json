@@ -1,0 +1,253 @@
+{
+	"_doc": "Clips humanoide44 de prueba (tools/rig/h44_targets.json). Solo vista. Revertir: vaciar h44_anims en el .tres. Ver docs/SKELETON_GUIDE.md.",
+	"slots": {
+		"idle": "h44/h44_idle",
+		"walk": "h44/h44_walk",
+		"light0": "h44/h44_light0",
+		"light1": "h44/h44_light1",
+		"light2": "h44/h44_light2",
+		"heavy": "h44/h44_heavy",
+		"slam": "h44/h44_slam",
+		"dash_strike": "h44/h44_dash_strike",
+		"dodge_f": "h44/h44_dodge_f",
+		"dodge_b": "h44/h44_dodge_b",
+		"parry": "h44/h44_parry"
+	},
+	"abilities": {
+		"combo_falso": {
+			"file": "res://data/abilities/catalog.json",
+			"steps": {
+				"paso": [
+					{
+						"clip": "h44/h44_combo_falso",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								36,
+								0.28
+							],
+							[
+								111,
+								0.6
+							],
+							[
+								156,
+								1
+							]
+						]
+					}
+				]
+			}
+		},
+		"paso_espectral": {
+			"file": "res://data/abilities/catalog.json",
+			"steps": {
+				"paso": [
+					{
+						"clip": "h44/h44_paso_espectral",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								70,
+								0.31
+							],
+							[
+								125,
+								0.75
+							]
+						]
+					}
+				]
+			}
+		},
+		"rafaga": {
+			"file": "res://data/abilities/catalog.json",
+			"steps": {
+				"paso": [
+					{
+						"clip": "h44/h44_rafaga",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								24,
+								0.03
+							],
+							[
+								84,
+								0.45
+							],
+							[
+								115,
+								0.8
+							]
+						]
+					}
+				]
+			}
+		},
+		"estocada": {
+			"file": "res://data/abilities/catalog.json",
+			"steps": {
+				"paso": [
+					{
+						"clip": "h44/h44_estocada",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								67,
+								0.3
+							],
+							[
+								122,
+								0.85
+							]
+						]
+					}
+				]
+			}
+		},
+		"salto_caida": {
+			"file": "res://data/abilities/catalog.json",
+			"steps": {
+				"paso": [
+					{
+						"clip": "h44/h44_salto_caida",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								84,
+								0.59
+							],
+							[
+								103,
+								0.75
+							]
+						]
+					}
+				]
+			}
+		},
+		"golpe_fisura": {
+			"file": "res://data/abilities/golpe_fisura_skill.json",
+			"steps": {
+				"saltar": [
+					{
+						"clip": "h44/h44_golpe_fisura",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								31,
+								0.35
+							]
+						]
+					}
+				],
+				"martillazo": [
+					{
+						"clip": "h44/h44_golpe_fisura",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0.35
+							],
+							[
+								14,
+								0.47
+							],
+							[
+								58,
+								0.7
+							]
+						]
+					}
+				]
+			}
+		},
+		"voltereta_cuchilla": {
+			"file": "res://data/abilities/artorias_caballero_umbral.json",
+			"steps": {
+				"salto_1": [
+					{
+						"clip": "h44/h44_voltereta_1",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								66,
+								0.39
+							],
+							[
+								88,
+								0.6
+							]
+						]
+					}
+				],
+				"salida": [
+					{
+						"clip": "h44/h44_dodge_f",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0.1
+							],
+							[
+								37,
+								0.6
+							]
+						]
+					}
+				],
+				"salto_2": [
+					{
+						"clip": "h44/h44_voltereta_2",
+						"unit": "frac",
+						"keys": [
+							[
+								0,
+								0
+							],
+							[
+								66,
+								0.24
+							],
+							[
+								118,
+								0.45
+							]
+						]
+					}
+				]
+			}
+		}
+	}
+}

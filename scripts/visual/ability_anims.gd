@@ -25,11 +25,11 @@ static func has(ab_id: String) -> bool:
 	return (data().get("abilities", {}) as Dictionary).has(ab_id)
 
 ## Ids de los pasos en el orden del JSON de la habilidad (= índice AB_FIRED de SimCatalog).
-static func step_ids(ab_id: String) -> Array:
+static func step_ids(ab_id: String, entry: Dictionary = {}) -> Array:
 	if _step_ids.has(ab_id):
 		return _step_ids[ab_id]
 	var out: Array = []
-	var a: Dictionary = (data().get("abilities", {}) as Dictionary).get(ab_id, {})
+	var a: Dictionary = entry if not entry.is_empty() else (data().get("abilities", {}) as Dictionary).get(ab_id, {})
 	var raw: Variant = JSON.parse_string(FileAccess.get_file_as_string(String(a.get("file", ""))))
 	if raw is Dictionary:
 		for ab: Variant in (raw as Dictionary).get("abilities", []):
@@ -81,11 +81,12 @@ static func clip_time(seg: Dictionary, t: float, length: float) -> float:
 
 ## {seg, index} del tramo activo en (habilidad, paso, tick); {} si no hay animación propia.
 ## index sube con cada tramo/paso: KnightVisual alterna dos estados por paridad (fundido).
-static func sample(ab_id: String, step: int, t: int) -> Dictionary:
-	var a: Dictionary = (data().get("abilities", {}) as Dictionary).get(ab_id, {})
+## entry: entrada propia (p. ej. h44_anims de un personaje) en vez de la del JSON global.
+static func sample(ab_id: String, step: int, t: int, entry: Dictionary = {}) -> Dictionary:
+	var a: Dictionary = entry if not entry.is_empty() else (data().get("abilities", {}) as Dictionary).get(ab_id, {})
 	if a.is_empty():
 		return {}
-	var ids := step_ids(ab_id)
+	var ids := step_ids(ab_id, a)
 	if step < 0 or step >= ids.size():
 		return {}
 	var segs: Array = (a.get("steps", {}) as Dictionary).get(ids[step], [])

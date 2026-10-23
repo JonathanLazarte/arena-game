@@ -7,7 +7,27 @@
 		"h44_test_b": "f2367bfb.json",
 		"h44_test_c": "d943e7ea.json",
 		"h44_test_d": "74f106d1.json",
-		"h44_test_e": "88c729ec_fixed.json"
+		"h44_test_e": "88c729ec_fixed.json",
+		"h44_idle": "n_afc2462d.json",
+		"h44_walk": "n_9e7403a0.json",
+		"h44_light0": "n_732b5104.json",
+		"h44_light1": "n_2b6e296b.json",
+		"h44_light2": "n_5bfdb0da.json",
+		"h44_heavy": "n_2dcab7be.json",
+		"h44_slam": "n_83440940.json",
+		"h44_dash_strike": "n_16f5e34b.json",
+		"h44_dodge_f": "n_2acbdb8d.json",
+		"h44_dodge_b": "n_bd4ea6a7.json",
+		"h44_parry": "n_d0bcaa4e.json",
+		"h44_combo_falso": "n_9239c188.json",
+		"h44_paso_espectral": "n_07bd4798.json",
+		"h44_rafaga": "n_177acefb.json",
+		"h44_estocada": "n_f9396de9.json",
+		"h44_salto_caida": "n_224716c8.json",
+		"h44_golpe_fisura": "n_2e09655e.json",
+		"h44_voltereta_1": "n_74d201fb.json",
+		"h44_voltereta_2": "n_1f1f8317.json",
+		"h44_extra_doble": "n_26ac5c6b.json"
 	},
 	"targets": [
 		{
