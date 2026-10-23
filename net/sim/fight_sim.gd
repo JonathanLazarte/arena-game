@@ -98,7 +98,44 @@ const HZ_BASE := PROJ_BASE + PROJ_MAX * PR_FIELDS
 const HZ_MAX := 16
 enum { HZ_ON, HZ_TYPE, HZ_OWNER, HZ_X, HZ_Z, HZ_T, HZ_WARN, HZ_R, HZ_RAW, HZ_FORCE, HZ_KNOCK, HZ_DX, HZ_DZ,
 	HZ_SPD, HZ_RANGE, HZ_TRAV, HZ_W, HZ_DONE, HZ_UNBL, HZ_KIND, HZ_FIELDS }
-const SIZE := HZ_BASE + HZ_MAX * HZ_FIELDS
+## Extensión de estado por luchador para etapas 1–8 del catálogo de habilidades (SimCatalog).
+const EXT_BASE := HZ_BASE + HZ_MAX * HZ_FIELDS
+enum {
+	EX_MV_EVAL,      ## bitmask de tramos de movimiento ya evaluados en este paso
+	EX_MV_OK,        ## bitmask de tramos de movimiento que pasaron el gating de rango
+	EX_MV_SPD,       ## velocidad ajustada por fit_to_target (µm/tick) en el tramo activo
+	EX_MV_DIST,      ## distancia recorrida en el tramo actual (µm)
+	EX_MV_TX,        ## X de llegada bloqueada en lock_at_tick / gate_from_tick (µm)
+	EX_MV_TZ,        ## Z de llegada bloqueada en lock_at_tick / gate_from_tick (µm)
+	EX_MV_SCALE,     ## escala de distancia (‰) respecto a reference_distance_m (0 = 1000‰)
+	EX_MV_SEG,       ## índice del tramo de movimiento actual
+	EX_EXIT_ACT,     ## acción bufferizada para exit_windows (0=ninguna, 1=attack, 2=roll, 3=move, 4=combo)
+	EX_EXIT_TICK,    ## tick del paso en que se guardó EX_EXIT_ACT
+	EX_VOL_IDX,      ## índice del próximo sub-spawn de volley en el paso actual
+	EX_VOL_DIR,      ## rumbo bloqueado para volley con aim="lock" (0..255)
+	EX_HB_USED,      ## bitmask de hitboxes ya resueltas/conectadas en el paso actual
+	EX_INTANG,       ## 1 si está en ventana intangible (sin colisión de cuerpo ni recibir golpes)
+	EX_NOTURN,       ## 1 si está en ventana no_turn (sin girar)
+	EX_COST_PAID,    ## 1 si ya se cobró el costo de la habilidad (para cost_at_tick / opener_commit)
+	EX_CHARGE_TIER,  ## tramo de carga alcanzado en charge.tiers (0 = ninguno, 1..N = tier + 1)
+	EX_CHARGE_DMG,   ## multiplicador de daño por carga (‰, 0 = 1000‰)
+	EX_CHARGE_STUN,  ## multiplicador de aturdimiento por carga (‰, 0 = 1000‰)
+	EX_STATUS_MASK,  ## bitmask de self_status_at ya aplicados en el paso actual
+	EX_BUFF_KIND,    ## estado propio activo (0=ninguno, 1=attack_up, 2=defense_up, 3=poise_up, 4=haste, 5=regen, 6=rage, 7=custom)
+	EX_BUFF_T,       ## ticks restantes del estado propio activo
+	EX_BUFF_VAL,     ## valor (‰) del estado propio activo
+	EX_GUARD_ON,     ## 1 si está en ventana guard_windows activa
+	EX_PT_DONE,      ## 1 si ya disparó su habilidad de phase_transition en esta ronda
+	EX_CHAIN_LINKS,  ## cantidad de pasos link ejecutados en la cadena actual
+	EX_CHAIN_CD_DEF, ## recarga diferida hasta el fin de la cadena (cooldown_on="chain_end")
+	EX_COUNTER_HITS, ## contador de golpes recibidos en counter_window (para destello de vista)
+	EX_AI_ROLLED,    ## 1 si la IA ya tiró el dado de chain_continue_pct en este paso
+	EXT_FIELDS
+}
+const SIZE := EXT_BASE + 2 * EXT_FIELDS
+
+static func ext_of(i: int) -> int:
+	return EXT_BASE + i * EXT_FIELDS
 
 const ARENA_R := 40000000     # µm (muro circular)
 ## Pilares de la arena (Arena._build_arena: 6 en el anillo de 23,8 m, a 30° + i·60°), en µm. Constantes
@@ -219,11 +256,20 @@ static func rng_next(s: PackedInt64Array) -> int:
 
 static func checksum(s: PackedInt64Array) -> int:
 	var h := 2166136261
-	for v in s:
+	var base_n := mini(s.size(), EXT_BASE)
+	for idx in base_n:
+		var v: int = s[idx]
 		var x: int = v & 0xFFFFFFFF
 		var y: int = (v >> 32) & 0xFFFFFFFF
 		h = ((h ^ x) * 16777619) & 0xFFFFFFFF
 		h = ((h ^ y) * 16777619) & 0xFFFFFFFF
+	for idx in range(EXT_BASE, s.size()):
+		var v2: int = s[idx]
+		if v2 != 0:
+			var x2: int = (v2 ^ (idx * 2654435761)) & 0xFFFFFFFF
+			var y2: int = (v2 >> 32) & 0xFFFFFFFF
+			h = ((h ^ x2) * 16777619) & 0xFFFFFFFF
+			h = ((h ^ y2) * 16777619) & 0xFFFFFFFF
 	return h
 
 # ---------------- Paso ----------------
@@ -257,6 +303,8 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		for k in 4:
 			s[o + Q0 + k] = 0
 	s[o + PREV_STUN] = s[o + STUN]
+	if s[o + AB_SLOT] >= 0 and (s[o + AB_FL] & SimAbilities.FL_CATALOG) != 0:
+		SimCatalog.on_control(s, P, i, inp, pressed)
 	if pressed & IN_SWAP:
 		_try(s, P, i, Act.SWAP)
 	if s[o + LOADOUT] == Load.BOW:
@@ -294,8 +342,6 @@ static func _control(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		SimMagic.cast(s, P, i)
 	if pressed & IN_EIKON:
 		SimMagic.eikon_button(s, P, i)
-	if pressed & IN_MOUNT:
-		SimMagic.dismount(s, P, i, false)
 	if pressed & IN_BOSS_VAR:
 		SimAbilities.variation(s, P, i)
 	if pressed & IN_ART:
@@ -363,6 +409,9 @@ static func _flask(s: PackedInt64Array, P: Array, i: int) -> bool:
 ## invulnerabilidad breve y (según campeón) medidor lleno para invocar.
 static func _phase_two(s: PackedInt64Array, P: Array, i: int) -> void:
 	var o := i * F_FIELDS
+	if s[o + ALIVE] == 0:
+		return
+	SimCatalog.check_phase_transition(s, P, i)
 	var ph: Dictionary = P[i].get("ph2", {})
 	if ph.is_empty() or s[o + PH2] != 0 or s[o + ALIVE] == 0:
 		return
@@ -375,6 +424,7 @@ static func _phase_two(s: PackedInt64Array, P: Array, i: int) -> void:
 		s[o + METER] = METER_MAX
 	if s[P_BASE + G_HITSTOP_ON] != 0:
 		s[P_BASE + G_FREEZE] = maxi(s[P_BASE + G_FREEZE], 7)
+	SimCatalog.check_phase_transition(s, P, i)
 
 # ---------------- Utilidades ----------------
 static func _opp(i: int) -> int:
@@ -818,6 +868,9 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var b := d * F_FIELDS
 	if s[b + ALIVE] == 0:
 		return 0
+	var ext_d := EXT_BASE + d * EXT_FIELDS
+	if s[ext_d + EX_INTANG] != 0:
+		return 4
 	if s[b + INVULN] > 0:
 		if s[b + AB_IMM] != 0:
 			s[b + SHIELD_ABSORB] += 1
@@ -846,6 +899,8 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var ipm := SimCatalog.incoming_pm(s, P, d)
 	if s[b + PARRY_STATE] == Parry.RECOVERY:
 		mult = PARRY_EXPOSED_PM
+	if s[ext_d + EX_GUARD_ON] != 0 and frontal and kind != 2 and not unbl:
+		return SimCatalog.on_guard_hit(s, P, att, d, kind, raw, mult, ipm, st, block_cost)
 	if s[b + BLOCKING] != 0 and frontal and kind != 2 and kind != 3 and not unbl:
 		s[b + BLOCKS] += 1
 		if kind == 1:
@@ -874,6 +929,13 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 	var counter := kind <= 1 and (s[b + ATK_STATE] == Atk.WINDUP or s[b + ATK_STATE] == Atk.ACTIVE or s[b + CAST_T] > 0)
 	if counter:
 		mult = mult * counter_pm / 1000
+	var cw_stun_pm := 1000
+	if s[b + AB_SLOT] >= 0 and (s[b + AB_FL] & SimAbilities.FL_CATALOG) != 0:
+		var cw: Array = SimCatalog.counter_window_pm(s, P, d)
+		if int(cw[0]) != 1000 or int(cw[1]) != 1000:
+			mult = mult * int(cw[0]) / 1000
+			cw_stun_pm = int(cw[1])
+			s[ext_d + EX_COUNTER_HITS] += 1
 	var amount := raw * mult / 1000
 	var el: int = P[att].get("elem_arrow" if kind == 1 else "elem_melee", 0) if kind <= 1 else 0
 	if el > 0:
@@ -927,7 +989,7 @@ static func _take_hit(s: PackedInt64Array, P: Array, att: int, kind: int, raw: i
 		_apply_stun(s, b, STANCE_BREAK_T)
 		return 1
 	if kind != 2:
-		_add_stun_force(s, P, d, force)
+		_add_stun_force(s, P, d, force * cw_stun_pm / 1000)
 	if s[b + MOUNTED] != 0 and s[b + ALIVE] != 0:
 		SimMagic.mount_stance_hit(s, P, d, amount * (2400 if amount >= 14000 else 1400) / 1000)
 	return 1
@@ -1444,7 +1506,8 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	# fase 9: con el arco tensado (o al pulsar) y apuntado de ratón, se encara al punto de mira y se
 	# desplaza como fijado (strafe), en lugar de hacia el rival o la dirección de marcha
 	var aim_on := (inp & IN_AIM) != 0 and s[o + LOADOUT] == Load.BOW and s[o + ALIVE] != 0 and (s[o + SHOT_STATE] == Shot.DRAW or (inp & IN_ATK) != 0)
-	var turning_locked: bool = s[o + ATK_STATE] == Atk.ACTIVE or s[o + ATK_STATE] == Atk.RECOVERY or (s[o + AIR] != 0 and s[o + MOUNTED] == 0)
+	var ext_i := EXT_BASE + i * EXT_FIELDS
+	var turning_locked: bool = s[o + ATK_STATE] == Atk.ACTIVE or s[o + ATK_STATE] == Atk.RECOVERY or (s[o + AIR] != 0 and s[o + MOUNTED] == 0) or s[ext_i + EX_NOTURN] != 0
 	var turn: int = 0 if turning_locked else p["turn"]
 	var sprint_req: bool = (inp & IN_SPRINT) != 0 and amount_pm > 300 and s[o + EXH] <= 0 and not wb and s[o + ST] > 0 and s[o + SHOT_STATE] == Shot.NONE
 	var spd: int = p["speed"]
@@ -1453,6 +1516,8 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 		turn = 0 if turning_locked else p.get("m_turn", turn)
 	if s[o + RAGE_T] > 0:
 		spd = spd * 1150 / 1000
+	if s[ext_i + EX_BUFF_T] > 0 and s[ext_i + EX_BUFF_KIND] == 4:
+		spd = spd * maxi(1000 + s[ext_i + EX_BUFF_VAL], 100) / 1000
 	if not catalog_face and (locked or aim_on):
 		s[o + FACE] = FxMath.turn_toward(s[o + FACE], aim_heading(inp) if aim_on else _dir_to_opp(s, i), turn * 18 / 10)
 		if amount_pm > 0:
@@ -1498,6 +1563,7 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	if s[o + SINCE_SPEND] >= p["regen_delay"] and s[o + ST] < p["st_max"]:
 		var rg: int = p["regen_idle"] if amount_pm < 300 else p["regen"]
 		if wb: rg = rg * BLOCK_REGEN_PM / 1000
+		if s[ext_i + EX_GUARD_ON] != 0: rg = rg * SimCatalog.guard_stam_pct(s, P, i) / 100
 		if s[o + FROST_T] > 0: rg = rg * FROST_REGEN_PM / 1000
 		s[o + ST] = mini(s[o + ST] + rg, p["st_max"])
 	# aceleración: a pie, la velocidad GIRA hacia la deseada (Fighter._steer_velocity) y ajusta su
@@ -1590,7 +1656,8 @@ static func _move(s: PackedInt64Array, P: Array, i: int, inp: int) -> void:
 	var sz: int = s[o + Z] - s[b + Z]
 	var sl := FxMath.length(sx, sz)
 	var sep := SEP_MOUNT if (s[o + MOUNTED] != 0 or s[b + MOUNTED] != 0) else SEP_FOOT
-	if sl < sep:
+	var ext_b := EXT_BASE + (1 - i) * EXT_FIELDS
+	if sl < sep and s[ext_i + EX_INTANG] == 0 and s[ext_b + EX_INTANG] == 0:
 		var push := (sep - sl) * 8 / 60
 		if sl > 10000:
 			vx += sx * push / sl

@@ -40,6 +40,11 @@ var boss_phase: int = Boss.NONE
 var boss_t: float = 0.0
 var boss_dir: Vector3 = Vector3.FORWARD
 var boss_cd: float = 0.0
+var boss_cds: Array[float] = []
+
+func boss_cd_at(slot: int) -> float:
+	return boss_cds[slot] if slot >= 0 and slot < boss_cds.size() else 0.0
+
 ## Ronda 33: recarga global entre habilidades de jefe y recargas por habilidad (opcionales).
 const BOSS_GLOBAL_CD := 1.4
 static var per_ability_cd_enabled: bool = false
@@ -873,7 +878,7 @@ func can_summon() -> bool:
 
 ## Hay un eikon activo en la arena (el botón Montar solo tiene sentido entonces).
 func has_active_eikon() -> bool:
-	return is_instance_valid(active_eikon) or (mounted and mount_node != null and mount_node.eikon != null)
+	return is_instance_valid(active_eikon)
 
 ## Segundos que le quedan a la invocación activa (0 si no hay).
 func eikon_time_left() -> float:
@@ -1072,8 +1077,6 @@ func _clamp_world() -> void:
 
 ## Ronda 29: compromiso de orientación (frames activos/recuperación de un ataque a pie, o en el aire).
 func turning_locked() -> bool:
-	if mounted:
-		return false
 	return airborne or atk_state == Atk.ACTIVE or atk_state == Atk.RECOVERY
 
 
@@ -1199,7 +1202,8 @@ var ab_combo_variant: bool = false
 var boss_ids: Array = BossAbilities.DEFAULT.duplicate() ## equipadas (máx. 3)
 var boss_sel: int = 0 ## lo escribe SimView (AB_SEL); cambiar = flanco IN_BOSS_NEXT en la sim
 var boss_avail: int = 99 ## habilidades disponibles ahora (SimAbilities.boss_avail: la 3.ª del campeón llega en Fase II)
-var ab_id: String = "" ## habilidad en curso (la estocada usa boss_phase)
+var ab_id: String = ""
+var ab_slot: int = -1 ## habilidad en curso (la estocada usa boss_phase)
 var ab_t: float = 0.0
 var ab_vel: Vector3 = Vector3.ZERO
 var ab_air: bool = false

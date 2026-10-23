@@ -2,6 +2,7 @@ extends SceneTree
 ## Cargador/validador del catálogo de habilidades (net/sim/ability_catalog.gd, docs/abilities_guide.md).
 ## godot --headless --path . -s res://tests/test_ability_catalog.gd
 const AC := preload("res://net/sim/ability_catalog.gd")
+const EXT_TESTS := preload("res://tests/test_ability_ext.gd")
 const EXAMPLE := "res://data/abilities/catalog.example.json"
 var fails := 0
 var base: Dictionary
@@ -221,5 +222,7 @@ func _run() -> void:
 	check(not rp["ok"] and _has(rp, "PARSE"), "JSON roto → PARSE")
 	var rf: Dictionary = AC.load_file("res://data/abilities/no_existe.json")
 	check(not rf["ok"] and _has(rf, "PARSE"), "archivo inexistente → PARSE")
+	var ext_inst = EXT_TESTS.new()
+	ext_inst.run_all(self, base)
 	print("fails: %d" % fails)
 	quit(1 if fails > 0 else 0)

@@ -59,11 +59,9 @@ func _ready() -> void:
 	p_stance.tooltip_text = "Postura · se agota al recibir golpes"
 	e_stance.tooltip_text = "Postura del rival · puedes quebrarla con presión"
 	p_mount_stance = _bar(root, Vector2(20, 90), Color(0.8, 0.62, 0.28), 6)
-	p_mount_stance.max_value = Fighter.MOUNT_STANCE_MAX
-	p_mount_stance.tooltip_text = "Postura de la montura"
+	p_mount_stance.visible = false
 	e_mount_stance = _bar(root, Vector2(1280 - 420, 56), Color(0.8, 0.62, 0.28), 6)
-	e_mount_stance.max_value = Fighter.MOUNT_STANCE_MAX
-	e_mount_stance.tooltip_text = "Postura de la montura rival"
+	e_mount_stance.visible = false
 	# Ronda 29: del rival solo se ve la vida (y sus estados): ni aguante ni barra de eikon
 	e_meter.visible = false
 	e_stamina.visible = false
@@ -470,19 +468,11 @@ class _Circle extends Node2D:
 	func _draw() -> void:
 		draw_circle(Vector2.ZERO, r, Color(c, 0.35))
 		var border_color := Color(c, 0.8)
-		if combo_can:
-			border_color = Color(1.0, 0.85, 0.22, 0.95)
-		elif cooldown_active:
+		if cooldown_active:
 			border_color = Color(0.4, 0.4, 0.45, 0.7)
 		draw_arc(Vector2.ZERO, r, 0, TAU, 48, border_color, 3.0)
 		if cooldown_active:
 			draw_circle(Vector2.ZERO, r - 1.0, Color(0.0, 0.0, 0.0, 0.45))
-		if combo_can:
-			# Se LLENA con las fases del combo: cambia al pulsar y no varía hasta la siguiente pulsación.
-			var arc_col := Color(0.2, 1.0, 0.45) if combo_prog >= 0.999 else Color(1.0, 0.85, 0.15)
-			draw_arc(Vector2.ZERO, r + 4.0, 0, TAU, 48, Color(1, 1, 1, 0.15), 2.0)
-			if combo_prog > 0.0:
-				draw_arc(Vector2.ZERO, r + 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(combo_prog, 0.0, 1.0), 48, arc_col, 5.0)
 
 ## Ronda 20: barras de acumulación de estados (HUD propio, del rival y sobre el rival).
 var status_p: Dictionary = {}
@@ -553,23 +543,20 @@ func _process(_d: float) -> void:
 	_update_status(status_p, _player)
 	_update_status(status_e, _enemy)
 	_update_status(status_over, _enemy)
-	p_stance.visible = not _player.mounted
+	p_stance.visible = true
 	p_stance.max_value = maxf(_player.stance_max, 1.0)
 	p_stance.value = 0.0 if _player.stance_broken_t > 0.0 else _player.stance
 	p_stance.modulate = Color(1.0, 0.5, 0.28) if _player.stance_broken_t > 0.0 else (Color(1.0, 0.45, 0.3) if _player.stance_fraction() < 0.25 else Color.WHITE)
-	e_stance.visible = is_instance_valid(_enemy) and not _enemy.mounted
+	e_stance.visible = is_instance_valid(_enemy)
 	if is_instance_valid(_enemy):
 		e_stance.max_value = maxf(_enemy.stance_max, 1.0)
 		e_stance.value = 0.0 if _enemy.stance_broken_t > 0.0 else _enemy.stance
 		e_stance.modulate = Color(1.0, 0.5, 0.28) if _enemy.stance_broken_t > 0.0 else (Color(1.0, 0.45, 0.3) if _enemy.stance_fraction() < 0.25 else Color.WHITE)
-	p_mount_stance.visible = _player.mounted
-	p_mount_stance.value = _player.mount_stance
-	e_mount_stance.visible = is_instance_valid(_enemy) and _enemy.mounted
-	if is_instance_valid(_enemy):
-		e_mount_stance.value = _enemy.mount_stance
+	p_mount_stance.visible = false
+	e_mount_stance.visible = false
 	if status_over_box and is_instance_valid(_enemy):
 		var cam := get_viewport().get_camera_3d()
-		var head := _enemy.global_position + Vector3(0, 3.2 if _enemy.mounted else 2.5, 0)
+		var head := _enemy.global_position + Vector3(0, 2.5, 0)
 		status_over_box.visible = cam != null and not cam.is_position_behind(head)
 		if status_over_box.visible:
 			status_over_box.position = cam.unproject_position(head) - Vector2(70, 30)
@@ -587,21 +574,24 @@ func _process(_d: float) -> void:
 		# Eikon activo: tiempo restante; montado en él, el botón Eikon lanza su especial
 		if ek_on:
 			loadout_label.text += "   ·   %s %d s" % [_player.eikon.eikon_name, ceili(_player.eikon_time_left())]
-	var riding_eikon := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
+	var has_eikon := _player.has_active_eikon()
 	if _summon_label:
-		if _changed(_summon_label, riding_eikon):
-			_summon_label.text = "Especial" if riding_eikon else "Eikon"
-		if riding_eikon:
-			_summon_btn.modulate = Color(1.6, 1.4, 1.0) if _player.mount_node.special_cd <= 0.0 else Color(1, 1, 1, 0.55)
+		if _changed(_summon_label, has_eikon):
+			_summon_label.text = "Especial" if has_eikon else "Eikon"
+		if has_eikon:
+			_summon_btn.modulate = Color(1.6, 1.4, 1.0)
+		elif _player.can_summon():
+			_summon_btn.modulate = Color(1.4, 1.3, 0.9)
+		else:
+			_summon_btn.modulate = Color(1, 1, 1, 0.55)
 	if _run_btn:
 		var on: bool = controller != null and controller.run_toggled
-		_run_btn.action = "sprint" if _player.mounted else "run_toggle"
-		if _changed(_run_label, [_player.mounted, on]):
-			_run_label.text = "Galope" if _player.mounted else ("Correr ✔" if on else "Correr")
+		_run_btn.action = "run_toggle"
+		if _changed(_run_label, on):
+			_run_label.text = "Correr ✔" if on else "Correr"
 		_run_btn.modulate = Color(1.5, 1.4, 0.9) if (on or _player.sprinting) else Color.WHITE
 	if _special_btn:
-		# Ronda 22: Habilidad/Arte no se usan montado: se oculta
-		_special_btn.visible = (_player.has_special() or _player.weapon_art_id != "") and joystick.visible and not _player.mounted
+		_special_btn.visible = _player.has_special() and joystick.visible
 		var cd := _player.special_cd if _player.has_special() else _player.art_cd
 		_special_btn.modulate = Color.WHITE if cd <= 0.0 else Color(1, 1, 1, 0.45)
 		if not _player.has_special() and btn_labels.has("special") and _changed(btn_labels["special"], "Arte"):
@@ -663,11 +653,11 @@ func _update_combat_popups(delta: float) -> void:
 ## «Hechizo» solo a pie y con hechizos equipados.
 func _update_contextual_buttons() -> void:
 	var tv := joystick.visible
-	(btns["left_hand"] as TouchScreenButton).visible = tv and not _player.mounted
+	(btns["left_hand"] as TouchScreenButton).visible = tv
 	(btns["swap_weapon"] as TouchScreenButton).visible = tv and _player.secondary != null
 	var alt := btns["boss_variation"] as TouchScreenButton
 	var alt_open: bool = _player.ab_alt_open and _player.ab_alt_label != ""
-	alt.visible = tv and not _player.mounted and alt_open
+	alt.visible = tv and alt_open
 	var alt_lab := _player.ab_alt_label if _player.ab_alt_label != "" else "Variación"
 	if alt.visible and _changed(btn_labels["boss_variation"], alt_lab):
 		(btn_labels["boss_variation"] as Label).text = alt_lab
@@ -676,7 +666,7 @@ func _update_contextual_buttons() -> void:
 	if boss_prev_btn:
 		boss_prev_btn.visible = false
 	if boss_list_btn:
-		boss_list_btn.visible = not _player.mounted and _player.avail_boss_ids().size() > 4
+		boss_list_btn.visible = _player.avail_boss_ids().size() > 4
 
 	var alt_c: _Circle = btn_circles.get("boss_variation")
 	if alt_c:
@@ -709,34 +699,31 @@ func _update_contextual_buttons() -> void:
 		var slot_c: _Circle = btn_circles.get(slot_act)
 		var gk: int = boss_page * 4 + k
 		if gk < avail.size():
-			slot_btn.visible = tv and not _player.mounted
+			slot_btn.visible = tv
 			var sk_id := String(avail[gk])
 			if _changed(slot_ic, sk_id):
 				slot_ic.id = sk_id
 			slot_ic.visible = true
+			var is_running_this := (_player.ab_slot == gk)
 			var is_selected := (_player.boss_sel == gk)
+			var slot_cd: float = _player.boss_cd_at(gk)
+			if AdminMode.enabled:
+				slot_cd = 0.0
+			var slot_on_cd := slot_cd > 0.05 and not is_running_this
 			if slot_c:
-				if is_selected:
-					slot_c.combo_can = _player.ab_combo_can
-					slot_c.combo_active = _player.ab_combo_active
-					slot_c.combo_prog = _player.ab_combo_prog
-					slot_c.combo_queued = _player.ab_combo_queued and not _player.ab_combo_variant
-					slot_c.cooldown_active = on_cd
-				else:
-					slot_c.combo_can = false
-					slot_c.combo_active = false
-					slot_c.combo_prog = 0.0
-					slot_c.combo_queued = false
-					slot_c.cooldown_active = false
+				slot_c.cooldown_active = slot_on_cd
 				slot_c.queue_redraw()
-			if is_selected and on_cd:
+			if slot_on_cd:
 				slot_btn.modulate = Color(0.65, 0.65, 0.7, 0.6)
-				slot_lbl.text = "%.1fs" % cd_left
+				slot_lbl.text = "%.1fs" % slot_cd
 			elif not _player.boss_cost_ok(sk_id):
 				slot_btn.modulate = Color(1, 1, 1, 0.45)
 				slot_lbl.text = BossAbilities.short_name(sk_id)
+			elif is_running_this:
+				slot_btn.modulate = Color(1.3, 1.3, 0.8, 1.0)
+				slot_lbl.text = BossAbilities.short_name(sk_id)
 			elif is_selected:
-				slot_btn.modulate = Color(1.2, 1.2, 1.2, 1.0)
+				slot_btn.modulate = Color(1.15, 1.15, 1.15, 1.0)
 				slot_lbl.text = BossAbilities.short_name(sk_id)
 			else:
 				slot_btn.modulate = Color(0.85, 0.85, 0.85, 0.85)
@@ -744,13 +731,12 @@ func _update_contextual_buttons() -> void:
 		else:
 			slot_btn.visible = false
 	_update_enemy_strip()
-	# Eikon: solo cuando se puede invocar (o montado en tu eikon, para su especial)
-	var riding := _player.mounted and _player.mount_node != null and _player.mount_node.eikon != null
-	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or riding)
-	if not riding and _player.can_summon():
+	# Eikon: solo cuando se puede invocar o con eikon activo
+	var has_eikon := _player.has_active_eikon()
+	(btns["summon"] as TouchScreenButton).visible = tv and (_player.can_summon() or has_eikon)
+	if not has_eikon and _player.can_summon():
 		_summon_btn.modulate = Color(1.6, 1.4, 1.0)
-	# Montar: solo con un eikon activo en la arena
-	(btns["mount"] as TouchScreenButton).visible = tv and _player.has_active_eikon()
+	(btns["mount"] as TouchScreenButton).visible = false
 	(btns["target_next"] as TouchScreenButton).visible = tv and controller != null and controller.can_cycle_target()
 	# Botón "Chispa"/Hechizo retirado del HUD de combate
 	(btns["spell"] as TouchScreenButton).visible = false
@@ -813,7 +799,7 @@ func bind(player: Fighter, enemy: Fighter) -> void:
 			sb.modulate = Color(1, 0.4, 0.4) if ex else Color.WHITE)
 
 	# Ronda 18: barra de Energía (Concentración) para las habilidades (Golpe sísmico)
-	if player.has_special() or player.has_spells() or player.weapon_art_id != "":
+	if player.has_special() or player.has_spells():
 		energy_bar = _bar(root_control(), Vector2(20, 82), Color(0.62, 0.45, 1.0), 6)
 		energy_bar.name = "EnergyBar"
 		energy_bar.max_value = player.energy_max

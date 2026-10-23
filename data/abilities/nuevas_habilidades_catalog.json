@@ -1,0 +1,267 @@
+{
+  "version": 1,
+  "tick_rate": 60,
+  "abilities": [
+    {
+      "id": "danza_eclipse",
+      "name": "Danza del Eclipse",
+      "icon": "generic",
+      "category": "melee",
+      "tags": ["multi_hit", "tracking"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 24, "mana": 0, "health": 0 },
+      "cooldown_ticks": 480,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["stun_lvl2", "knockdown", "parry"],
+      "chain": { "cost_on": "start", "cooldown_on": "chain_end", "max_links": 3 },
+      "entry_step": "corte_lunar",
+      "steps": [
+        {
+          "id": "corte_lunar",
+          "chain_role": "opener",
+          "windup_ticks": 30, "active_ticks": 6, "recovery_ticks": 42,
+          "telegraph": { "id": "tg_eclipse_apertura", "style": "weapon_glow", "color": "#6CA0FF", "sound": "sfx_tele_eclipse_1", "ground_marker": null, "at_tick": 0, "text": "La hoja traza una media luna azulada." },
+          "tracking": { "deg_per_sec": 260, "lock_at_tick": 18, "post_lock_deg_per_sec": 0 },
+          "movement": {
+            "type": "dash", "from_tick": 14, "to_tick": 30, "speed_mps": 9, "max_distance_m": 4.5,
+            "target_mode": "lock_point", "stop_at_m": 1.4, "range_min_m": 1.5, "range_max_m": 6.5,
+            "fit_to_target": true, "reference_distance_m": 3.5, "arrive_angle_deg": 25
+          },
+          "weapon_trail": { "from_tick": 28, "to_tick": 40, "style": "crescent_blue" },
+          "hitboxes": [
+            { "id": "hb_e1", "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 115 }, "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 16, "blockable": true, "parryable": true, "stun_power": 18 }
+          ],
+          "combo_input_windows": [
+            { "from_tick": 42, "to_tick": 76, "buffer_ticks": 12, "commit": "immediate", "step": "giro_penumbra" }
+          ],
+          "buffer_ticks": 12,
+          "exit_windows": [
+            { "action": "combo", "from_tick": 42, "to_tick": 76 },
+            { "action": "roll",  "from_tick": 52, "to_tick": 74 },
+            { "action": "move",  "from_tick": 54, "to_tick": 78 }
+          ],
+          "next": { "default": null }
+        },
+        {
+          "id": "giro_penumbra",
+          "chain_role": "link",
+          "windup_ticks": 28, "active_ticks": 6, "recovery_ticks": 42,
+          "telegraph": { "id": "tg_eclipse_giro", "style": "body_pose", "color": "#8E7BFF", "sound": "sfx_tele_eclipse_2", "ground_marker": null, "at_tick": 0 },
+          "tracking": { "deg_per_sec": 300, "lock_at_tick": 16, "post_lock_deg_per_sec": 0 },
+          "movement": { "type": "dash", "from_tick": 12, "to_tick": 28, "speed_mps": 8.5, "max_distance_m": 3.4, "target_mode": "facing", "stop_at_m": 1.2 },
+          "weapon_trail": { "from_tick": 26, "to_tick": 38, "style": "crescent_violet" },
+          "hitboxes": [
+            { "id": "hb_e2", "shape": { "type": "arc", "radius_m": 2.9, "angle_deg": 140 }, "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 19, "blockable": true, "parryable": true, "stun_power": 22 }
+          ],
+          "combo_input_windows": [
+            { "from_tick": 40, "to_tick": 74, "buffer_ticks": 12, "commit": "immediate", "step": "hendidura_umbra" }
+          ],
+          "buffer_ticks": 12,
+          "exit_windows": [
+            { "action": "combo", "from_tick": 40, "to_tick": 74 },
+            { "action": "roll",  "from_tick": 50, "to_tick": 72 },
+            { "action": "move",  "from_tick": 52, "to_tick": 76 }
+          ],
+          "next": { "default": null }
+        },
+        {
+          "id": "hendidura_umbra",
+          "chain_role": "finisher",
+          "windup_ticks": 38, "active_ticks": 6, "recovery_ticks": 44,
+          "telegraph": { "id": "tg_eclipse_remate", "style": "weapon_flash", "color": "#D48CFF", "sound": "sfx_tele_eclipse_3", "ground_marker": null, "at_tick": 0 },
+          "tracking": { "deg_per_sec": 240, "lock_at_tick": 20, "post_lock_deg_per_sec": 0 },
+          "movement": { "type": "dash", "from_tick": 18, "to_tick": 36, "speed_mps": 10, "max_distance_m": 3.6, "target_mode": "facing", "stop_at_m": 1.2 },
+          "weapon_trail": { "from_tick": 36, "to_tick": 48, "style": "heavy_umbra" },
+          "hitboxes": [
+            { "id": "hb_e3", "shape": { "type": "arc", "radius_m": 3.2, "angle_deg": 120 }, "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 28, "blockable": false, "parryable": false, "stun_power": 36,
+              "on_hit": { "knockback": { "speed_mps": 7, "duration_ticks": 8 } } }
+          ],
+          "buffer_ticks": 8,
+          "exit_windows": [
+            { "action": "roll",   "from_tick": 66, "to_tick": 84 },
+            { "action": "attack", "from_tick": 68, "to_tick": 86 },
+            { "action": "move",   "from_tick": 68, "to_tick": 88 }
+          ],
+          "next": { "default": null }
+        }
+      ],
+      "ai": { "range_min": 1.5, "range_max": 6.5, "weight": 12, "use_when": ["target_in_range"], "chain_continue_pct": 75 },
+      "hint": { "dodge": "roll_late", "direction": "side", "text": "Podés rodar entre el segundo corte y la hendidura final." }
+    },
+    {
+      "id": "salva_velo_astral",
+      "name": "Salva del Velo Astral",
+      "icon": "generic",
+      "category": "ranged",
+      "tags": ["projectile", "tracking"],
+      "unlock": { "phase": 1 },
+      "cost": { "stamina": 12, "mana": 24, "health": 0 },
+      "cooldown_ticks": 360,
+      "uses_global_cd": true,
+      "usable_while": ["ground"],
+      "interruptible_by": ["knockdown"],
+      "chain": { "cost_on": "start", "cooldown_on": "chain_end", "max_links": 3 },
+      "entry_step": "paso_velo",
+      "steps": [
+        {
+          "id": "paso_velo",
+          "chain_role": "opener",
+          "windup_ticks": 28, "active_ticks": 6, "recovery_ticks": 42,
+          "cost_at_tick": 10,
+          "telegraph": { "id": "tg_velo_paso", "style": "vanish", "color": "#5CE1E6", "sound": "sfx_tele_velo_1", "ground_marker": null, "at_tick": 0, "text": "El cuerpo se envuelve en bruma turquesa y abre el primer sello." },
+          "tracking": { "deg_per_sec": 280, "lock_at_tick": 16, "post_lock_deg_per_sec": 0 },
+          "movement": {
+            "type": "dash", "from_tick": 6, "to_tick": 24, "speed_mps": 8.5, "max_distance_m": 3.6,
+            "target_mode": "lock_point", "stop_at_m": 1.4, "range_min_m": 1.5, "range_max_m": 7.0,
+            "fit_to_target": true, "reference_distance_m": 3.2
+          },
+          "self_windows": [
+            { "type": "intangible", "from_tick": 6,  "to_tick": 20 },
+            { "type": "fade",       "from_tick": 6,  "to_tick": 12, "opacity_from": 100, "opacity_to": 20 },
+            { "type": "fade",       "from_tick": 14, "to_tick": 22, "opacity_from": 20,  "opacity_to": 100 }
+          ],
+          "weapon_trail": { "from_tick": 26, "to_tick": 36, "style": "astral_cyan" },
+          "hitboxes": [
+            { "id": "hb_velo_1", "shape": { "type": "arc", "radius_m": 2.7, "angle_deg": 110 }, "from_tick": 0, "to_tick": 6,
+              "damage_per_hit": 12, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 14, "stun_scaling": "magic" }
+          ],
+          "spawns": [
+            {
+              "id": "sp_sello_1", "type": "projectile", "at_tick": 28, "anchor": "self",
+              "offset": { "forward_m": 0.8, "right_m": 0.0 }, "count": 1, "spread_deg": 0,
+              "speed_mps": 19, "homing_deg": 0, "homing_ticks": 0, "lifetime_ticks": 85, "radius_m": 0.35,
+              "pierce": false, "reflectable_by_parry": true,
+              "hitbox": { "damage_per_hit": 8, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 8, "stun_scaling": "magic" }
+            }
+          ],
+          "combo_input_windows": [
+            { "from_tick": 40, "to_tick": 74, "buffer_ticks": 12, "commit": "immediate", "step": "rafaga_sellos" }
+          ],
+          "buffer_ticks": 12,
+          "exit_windows": [
+            { "action": "combo", "from_tick": 40, "to_tick": 74 },
+            { "action": "roll",  "from_tick": 50, "to_tick": 72 },
+            { "action": "move",  "from_tick": 52, "to_tick": 76 }
+          ],
+          "events": [
+            { "id": "ev_velo_paso", "tick": 6, "duration_ticks": 16, "vfx": "vfx_mist_cyan", "sfx": "sfx_mist_hum", "sfx_loop": true, "attach": "self", "follow": true }
+          ],
+          "next": { "default": null }
+        },
+        {
+          "id": "rafaga_sellos",
+          "chain_role": "link",
+          "windup_ticks": 26, "active_ticks": 8, "recovery_ticks": 42,
+          "telegraph": { "id": "tg_velo_sellos", "style": "weapon_glow", "color": "#48C9E8", "sound": "sfx_tele_velo_2", "ground_marker": null, "at_tick": 0 },
+          "tracking": {
+            "lock_at_tick": 16,
+            "windows": [
+              { "from_tick": 0,  "to_tick": 16, "deg_per_sec": 540 },
+              { "from_tick": 16, "to_tick": 76, "deg_per_sec": 0 }
+            ]
+          },
+          "movement": { "type": "dash", "from_tick": 10, "to_tick": 24, "speed_mps": 7.0, "max_distance_m": 2.4, "target_mode": "facing", "stop_at_m": 1.4 },
+          "weapon_trail": { "from_tick": 24, "to_tick": 36, "style": "astral_cyan" },
+          "hitboxes": [
+            { "id": "hb_velo_2", "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 120 }, "from_tick": 0, "to_tick": 8,
+              "damage_per_hit": 14, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 16, "stun_scaling": "magic" }
+          ],
+          "spawns": [
+            {
+              "id": "sp_salva_3", "type": "projectile", "at_tick": 26, "anchor": "self",
+              "offset": { "forward_m": 0.7, "right_m": 0.0 }, "count": 1, "spread_deg": 0,
+              "speed_mps": 20, "homing_deg": 0, "homing_ticks": 0, "lifetime_ticks": 85, "radius_m": 0.35,
+              "pierce": false, "reflectable_by_parry": true,
+              "volley": {
+                "count": 3, "interval_ticks": 2, "spread_deg": 24, "aim": "lock",
+                "origin_offsets": [
+                  { "forward_m": 0.6, "right_m": -0.45 },
+                  { "forward_m": 0.75, "right_m": 0.0 },
+                  { "forward_m": 0.6, "right_m":  0.45 }
+                ]
+              },
+              "hitbox": { "damage_per_hit": 6, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 6, "stun_scaling": "magic" }
+            }
+          ],
+          "combo_input_windows": [
+            { "from_tick": 40, "to_tick": 74, "buffer_ticks": 12, "commit": "immediate", "step": "apertura_astral" }
+          ],
+          "buffer_ticks": 12,
+          "exit_windows": [
+            { "action": "combo", "from_tick": 40, "to_tick": 74 },
+            { "action": "roll",  "from_tick": 50, "to_tick": 72 },
+            { "action": "move",  "from_tick": 52, "to_tick": 76 }
+          ],
+          "next": { "default": null }
+        },
+        {
+          "id": "apertura_astral",
+          "chain_role": "finisher",
+          "windup_ticks": 36, "active_ticks": 16, "recovery_ticks": 40,
+          "telegraph": { "id": "tg_velo_astral", "style": "vanish", "color": "#38B6FF", "sound": "sfx_tele_velo_3", "ground_marker": null, "at_tick": 0, "text": "El cuerpo se desvanece en niebla turquesa y abre siete sellos." },
+          "tracking": {
+            "lock_at_tick": 30,
+            "windows": [
+              { "from_tick": 0,  "to_tick": 8,  "deg_per_sec": 180 },
+              { "from_tick": 8,  "to_tick": 22, "deg_per_sec": 0 },
+              { "from_tick": 22, "to_tick": 30, "deg_per_sec": 900 },
+              { "from_tick": 30, "to_tick": 92, "deg_per_sec": 0 }
+            ]
+          },
+          "self_windows": [
+            { "type": "intangible", "from_tick": 8,  "to_tick": 26 },
+            { "type": "fade",       "from_tick": 8,  "to_tick": 16, "opacity_from": 100, "opacity_to": 15 },
+            { "type": "fade",       "from_tick": 20, "to_tick": 28, "opacity_from": 15,  "opacity_to": 100 },
+            { "type": "no_turn",    "from_tick": 30, "to_tick": 72 }
+          ],
+          "spawns": [
+            {
+              "id": "sp_salva_7", "type": "projectile", "at_tick": 36, "anchor": "self",
+              "offset": { "forward_m": 0.8, "right_m": 0.0 }, "count": 1, "spread_deg": 0,
+              "speed_mps": 20, "homing_deg": 0, "homing_ticks": 0, "lifetime_ticks": 90, "radius_m": 0.35,
+              "pierce": false, "reflectable_by_parry": true,
+              "volley": {
+                "count": 7, "interval_ticks": 2, "spread_deg": 48, "aim": "lock",
+                "origin_offsets": [
+                  { "forward_m": 0.5, "right_m": -0.9 },
+                  { "forward_m": 0.6, "right_m": -0.6 },
+                  { "forward_m": 0.7, "right_m": -0.3 },
+                  { "forward_m": 0.8, "right_m":  0.0 },
+                  { "forward_m": 0.7, "right_m":  0.3 },
+                  { "forward_m": 0.6, "right_m":  0.6 },
+                  { "forward_m": 0.5, "right_m":  0.9 }
+                ]
+              },
+              "hitbox": { "damage_per_hit": 6, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 6, "stun_scaling": "magic" }
+            }
+          ],
+          "buffer_ticks": 8,
+          "exit_windows": [
+            { "action": "roll",   "from_tick": 68, "to_tick": 86 },
+            { "action": "attack", "from_tick": 70, "to_tick": 88 },
+            { "action": "move",   "from_tick": 70, "to_tick": 92 }
+          ],
+          "events": [
+            { "id": "ev_velo_loop", "tick": 8, "duration_ticks": 20, "vfx": "vfx_mist_cyan", "sfx": "sfx_mist_hum", "sfx_loop": true, "attach": "self", "follow": true },
+            { "id": "ev_salva_boom", "tick": 36, "vfx": "vfx_astral_burst", "sfx": "sfx_astral_cast", "attach": "hand",
+              "camera_shake": { "level": 2, "falloff_start_m": 8, "falloff_end_m": 24, "haptic": "medium" } }
+          ],
+          "next": { "default": null }
+        }
+      ],
+      "ai": { "range_min": 2.0, "range_max": 12.0, "weight": 10, "use_when": ["target_in_range", "target_far"], "chain_continue_pct": 80 },
+      "hint": { "dodge": "roll_through", "direction": "forward", "text": "Tras los dos cortes astrales, cuando se desvanezca en el velo, rodá hacia adelante a través del abanico de siete sellos." }
+    }
+  ],
+  "presets": [
+    {
+      "id": "combo_astral",
+      "name": "Combo Astral y Eclipse",
+      "abilities": ["danza_eclipse", "salva_velo_astral"]
+    }
+  ]
+}

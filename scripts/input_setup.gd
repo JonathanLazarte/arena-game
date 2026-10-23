@@ -14,8 +14,7 @@ const ACTIONS := {
 	"special": [KEY_G], ## habilidad del personaje
 	"lock_on": [KEY_TAB],
 	"target_next": [KEY_Z], ## Ronda 16: cambiar objetivo (también rueda del ratón y botón «Objetivo»)
-	"mount": [KEY_F],
-	"sprint": [KEY_SHIFT], ## mantener: correr a pie / galope montado
+	"sprint": [KEY_SHIFT], ## mantener: correr a pie
 	"run_toggle": [KEY_V, KEY_CAPSLOCK], ## Ronda 15: alternar correr a pie (táctil: «Correr»)
 	"swap_weapon": [KEY_R],
 	"spell": [KEY_X], ## Ronda 21: lanzar hechizo de eikon (a pie)

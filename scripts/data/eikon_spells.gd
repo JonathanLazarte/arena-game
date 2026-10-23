@@ -5,9 +5,6 @@ class_name EikonSpells
 ## Solo se lanzan a pie (montado se usan los especiales del eikon montado).
 
 const DEFS := {
-	"chispa": {"name": "Chispa ígnea", "eikon": "fenix", "type": "proyectil", "element": "fuego",
-		"damage": 9.0, "speed": 26.0, "cost": 14.0, "cooldown": 1.4, "cast": 0.35, "scale": "sabiduria",
-		"desc": "Proyectil de fuego rápido."},
 	"aliento_helado": {"name": "Aliento helado", "eikon": "lobo", "type": "cono", "element": "hielo",
 		"damage": 6.0, "range": 5.5, "arc": 60.0, "status": {"congelacion": 30.0}, "cost": 20.0, "cooldown": 4.0, "cast": 0.45, "scale": "sabiduria",
 		"desc": "Cono corto de escarcha que acumula Congelación."},
@@ -18,7 +15,7 @@ const DEFS := {
 		"duration": 6.0, "reduction": 0.15, "poise": 1.5, "cost": 24.0, "cooldown": 12.0, "cast": 0.5, "scale": "devocion",
 		"desc": "6 s: -15 % de daño recibido y +50 % de equilibrio."},
 }
-const ORDER := ["chispa", "aliento_helado", "saeta_vendaval", "piel_de_piedra"]
+const ORDER := ["aliento_helado", "saeta_vendaval", "piel_de_piedra"]
 const MAX_SLOTS := 4
 
 static func spell(id: String) -> Dictionary:

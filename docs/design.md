@@ -151,3 +151,16 @@ Al bajar del 50 % de vida: desbloquea su tercera habilidad de jefe, furia 9 s, i
 
 ## IA del rival
 Lee el estado de la partida y pulsa botones como un jugador. Fases: rodear, comprometerse (1–N golpes, a veces retrasa el primero), retirarse, descansar (poco aguante) y respiros periódicos. Perfiles fácil/normal/difícil (`resources/ai/*.tres`): reacción, esquiva, parry, castigo, uso de habilidades.
+
+
+## Habilidades encadenables de catálogo (`SimCatalog`, Protocolo 13)
+- **Integración y sincronización**: los catálogos adicionales en `data/abilities/*.json` se cargan mediante `ExtraCatalog` (`scripts/data/extra_catalog.gd`) y se sincronizan con `BossAbilities` usando `python tools/sync_abilities.py`.
+- **Recarga diferida en cadenas (`chain.cooldown_on: "chain_end"`)**: al iniciar el paso `opener`, la recarga de la ranura no bloquea los siguientes pasos; se guarda en `EX_CHAIN_CD_DEF` y se aplica recién en `SimCatalog.on_end` cuando termina el último eslabón ejecutado o se interrumpe la habilidad.
+- **Ritmo de 4 fases y ventanas permisivas**:
+  1. **Carga (`windup_ticks`)**: ~26–38 ticks de preparación y avance.
+  2. **Golpe e Impacto (`active_ticks`)**: ~6–16 ticks de golpe activo + estela (`weapon_trail`) o proyectiles (`volley`).
+  3. **Asentamiento (`+6 ticks`)**: margen mínimo tras el último tick activo antes de abrir `combo_input_windows` (regla V54).
+  4. **Espacio / Recuperación (`recovery_ticks` ~40–44 ticks ≈ 0,70 s)**: sirve tanto para **facilitar el encadenamiento** (`combo_input_windows` hasta casi el final del paso con `"commit": "immediate"`, `"buffer_ticks": 12` y encolado temprano durante el golpe en `SimCatalog.latch`/`on_control`) como de **ventana de castigo** si el jugador no encadena o falla.
+- **Ajuste de distancia sin cortar combos (`fit_to_target`, `reference_distance_m`, `range_min_m`, `range_max_m`)**: estos campos se conservan en el `movement` para ajustar la velocidad y la escala de avance hacia el objetivo; en pasos con `fit_to_target`, `reference_distance_m` o `chain`, `[range_min_m, range_max_m]` **acota (clamps)** la distancia efectiva en `SimCatalog._eval_mv_seg` sin cancelar nunca el desplazamiento ni cortar el encadenamiento cuando el rival está fuera de ese rango.
+- **HUD de botones de habilidad**: en `scripts/ui/hud.gd` (`_Circle._draw`), los botones de habilidad dibujan únicamente el círculo base, el borde normal y el sombreado de recarga (`cooldown_active`), sin circunferencia exterior de progreso/ventana de combo.
+- **Volteretas Cortantes (`voltereta_cuchilla`)**: adaptada en `data/abilities/artorias_caballero_umbral.json` y `data/animations/ability_anims.json` al nuevo esquema encadenable de 3 pasos (`salto_1` [opener] → `salida` [link] → `salto_2` [finisher]), con ritmo de 4 fases (118 ticks en cada salto con ventana permisiva de ticks 80 a 114 y búfer de 12 ticks, y retroceso táctico `salida` de 37 ticks con ventana de 18 a 36), `fit_to_target` y `cooldown_on: "chain_end"`.

@@ -81,27 +81,23 @@ func _apply_pet(s: PackedInt64Array, P: Array, i: int) -> void:
 		if au:
 			au.sfx3d("eikon_summon", f.global_position)
 	var n: Node3D = _pets[i]
-	var mounted := s[o + S.MOUNTED] != 0
+	var mounted := false
 	if n is Mount:
 		var m: Mount = n
 		m.life = s[o + S.EK_T] / 60.0
 		m.special_cd = s[o + S.EK_SPC] / 60.0
-		var x := (s[o + S.X] if mounted else s[o + S.EK_X]) / 1.0e6
-		var z := (s[o + S.Z] if mounted else s[o + S.EK_Z]) / 1.0e6
+		var x := s[o + S.EK_X] / 1.0e6
+		var z := s[o + S.EK_Z] / 1.0e6
 		m.global_position = Vector3(x, m.data.hover if m.data else 0.0, z)
-		if mounted:
-			m.rotation.y = atan2(-f.facing.x, -f.facing.z)
-		else:
-			var to := MeshUtil.flat(fighters[1 - i].global_position - m.global_position)
-			if to.length() > 0.1:
-				m.rotation.y = atan2(-to.x, -to.z)
-		if mounted != f.mounted:
-			f.mounted = mounted
-			f.mount_node = m if mounted else null
-			m.rider = f if mounted else null
+		var to := MeshUtil.flat(fighters[1 - i].global_position - m.global_position)
+		if to.length() > 0.1:
+			m.rotation.y = atan2(-to.x, -to.z)
+		if f.mounted:
+			f.mounted = false
+			f.mount_node = null
+			m.rider = null
 			f._apply_mount_visuals()
-			f.mount_changed.emit(mounted)
-		f.mount_stance = s[o + S.MSTANCE] / 1000.0
+			f.mount_changed.emit(false)
 	else:
 		var e: Eikon = n
 		e.life = s[o + S.EK_T] / 60.0

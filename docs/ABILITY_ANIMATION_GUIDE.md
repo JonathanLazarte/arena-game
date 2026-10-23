@@ -221,13 +221,41 @@ Cuentas:
 - Cuerpo entero: la sim mueve al personaje en los dos pasos.
 - Cada paso alterna `ab0`/`ab1`, así el salto funde con el martillazo.
 
-Volteretas Cortantes (`voltereta_cuchilla`) sigue el mismo patrón: en cada salto, `mx/roll_f`
-(voltereta) mientras la sim lo eleva (ticks 0–52) y después el tajo horizontal con contacto en el
-tick 66 (`windup_ticks`); en `salida` un `Dodge_Backward` que llena los 37 ticks del retroceso, y
-el segundo salto repite con el **revés** (`1H_Melee_Attack_Slice_Horizontal_Reverse`) para
-alternar lado sin cambiar el arma de mano. Pasado el último tick el clip queda en su último cuadro
-(la guardia) y funde con el reposo en ~0,1 s.
+Volteretas Cortantes (oltereta_cuchilla) sigue el esquema de combo encadenable (opener → link → inisher): en cada salto (salto_1 y salto_2), mx/roll_f (voltereta) mientras la sim lo eleva (ticks 0–52), tajo horizontal con contacto en el tick 66 (windup_ticks), impacto activo hasta tick 76, pausa de asentamiento (+8 ticks) y espacio de recuperación/encadenamiento hasta el tick 118 (keys: [[52, 0.1], [66, 0.42], [76, 0.6], [84, 0.75], [118, 1]]); en salida (link) un Dodge_Backward que llena los 37 ticks del retroceso para reubicarse; y el segundo salto repite con el **revés** (1H_Melee_Attack_Slice_Horizontal_Reverse) como remate (inisher) hasta el tick 118. Pasado el último tick el clip queda en su último cuadro (la guardia) y funde con el reposo en ~0,1 s.
 
 `tests/test_ability_anims_runtime.gd` lanza cada habilidad del JSON por la sim real con cada
 personaje jugable y comprueba que su `AnimationPlayer` resuelva todos los clips, que la vista
 entre en `ab0`/`ab1` y que la pose se mueva.
+
+
+## 13. Combos encadenables (`chain`): ritmo de 4 fases (Carga → Golpe → Impacto → Espacio)
+
+Para habilidades encadenables (`chain` con `opener` → `link` → `finisher`, como `danza_eclipse` y `salva_velo_astral` en `data/abilities/nuevas_habilidades_catalog.json`), las claves del clip deben reflejar los **4 tiempos del paso**:
+
+1. **Carga / Anticipación (`[0, c_ini]` → `[windup_ticks, c_contacto]`)**: preparación y avance hacia el objetivo.
+2. **Golpe e Impacto (`[windup_ticks, c_contacto]` → `[windup_ticks + active_ticks, c_post_golpe]`)**: tramo corto (~6–16 ticks) donde conecta el hitbox o salen los proyectiles.
+3. **Asentamiento (`+6 ticks` tras el activo)**: los primeros 6 ticks de la recuperación mantienen la lectura del impacto antes de abrir `combo_input_windows` (regla V54).
+4. **Espacio / Recuperación (`[windup_ticks + active_ticks, c_post_golpe]` → `[T, 1.0]`, ~40–44 ticks ≈ 0,70 s)**:
+   - Si el jugador encadena (`commit: "immediate"`, `buffer_ticks: 12`), el árbol corta este tramo de espacio en el tick de la pulsación (o en `from_tick` si pulsó en búfer durante el golpe) y funde (`0,08 s`) hacia el siguiente paso (`ab0` ↔ `ab1`).
+   - Si el jugador **no** encadena o falla y duda, el clip recorre todo el tramo hasta `T` (vuelta a la guardia), dando ventana clara de castigo al rival que esquivó.
+
+Ejemplo en `data/animations/ability_anims.json` (`danza_eclipse` y `salva_velo_astral`):
+
+```json
+"danza_eclipse": {
+  "file": "res://data/abilities/nuevas_habilidades_catalog.json",
+  "steps": {
+    "corte_lunar":      [ { "clip": "1H_Melee_Attack_Slice_Diagonal", "unit": "frac", "keys": [[0, 0.0], [30, 0.42], [36, 0.58], [78, 1.0]] } ],
+    "giro_penumbra":    [ { "clip": "1H_Melee_Attack_Slice_Horizontal_Reverse", "fallback": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "keys": [[0, 0.05], [28, 0.42], [34, 0.58], [76, 1.0]] } ],
+    "hendidura_umbra":  [ { "clip": "2H_Melee_Attack_Chop", "fallback": "1H_Melee_Attack_Chop", "unit": "frac", "keys": [[0, 0.0], [38, 0.48], [44, 0.62], [88, 1.0]] } ]
+  }
+},
+"salva_velo_astral": {
+  "file": "res://data/abilities/nuevas_habilidades_catalog.json",
+  "steps": {
+    "paso_velo":        [ { "clip": "1H_Melee_Attack_Slice_Horizontal", "unit": "frac", "keys": [[0, 0.05], [28, 0.42], [34, 0.58], [76, 1.0]] } ],
+    "rafaga_sellos":    [ { "clip": "1H_Melee_Attack_Slice_Diagonal", "unit": "frac", "keys": [[0, 0.05], [26, 0.42], [34, 0.60], [76, 1.0]] } ],
+    "apertura_astral":  [ { "clip": "mx/cast", "fallback": "1H_Melee_Attack_Chop", "unit": "frac", "keys": [[0, 0.0], [36, 0.45], [52, 0.68], [92, 1.0]] } ]
+  }
+}
+```

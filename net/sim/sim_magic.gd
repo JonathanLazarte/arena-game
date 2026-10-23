@@ -217,80 +217,31 @@ static func eikon_button(s: PackedInt64Array, P: Array, i: int) -> bool:
 	if ek.is_empty() or s[o + FightSim.ALIVE] == 0:
 		return false
 	if s[o + FightSim.EK_T] > 0:
-		if s[o + FightSim.MOUNTED] != 0:
-			return _special(s, P, i, ek)
-		if int(ek["ride"]) != 0:
-			return remount(s, P, i)
-		return false
+		return _special(s, P, i, ek)
 	if s[o + FightSim.METER] < FightSim.METER_MAX or s[o + FightSim.STUN] > 0:
 		return false
-	if int(ek["ride"]) != 0:
-		if s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.ROLL_T] >= 0 or s[o + FightSim.SWAP_T] > 0 or s[o + FightSim.AIR] != 0:
-			return false
-		s[o + FightSim.MOUNTED] = 1
-		s[o + FightSim.MSTANCE] = MOUNT_STANCE
-		s[o + FightSim.MDASH_T] = 0
-		s[o + FightSim.EK_X] = s[o + FightSim.X]
-		s[o + FightSim.EK_Z] = s[o + FightSim.Z]
-	else:
-		var side := (s[o + FightSim.FACE] - 64) & 255 # facing × UP = derecha
-		s[o + FightSim.EK_X] = s[o + FightSim.X] + FxMath.COS[side] * 3000000 / FxMath.ONE
-		s[o + FightSim.EK_Z] = s[o + FightSim.Z] + FxMath.SIN[side] * 3000000 / FxMath.ONE
+	var side := (s[o + FightSim.FACE] - 64) & 255 # facing × UP = derecha
+	s[o + FightSim.EK_X] = s[o + FightSim.X] + FxMath.COS[side] * 3000000 / FxMath.ONE
+	s[o + FightSim.EK_Z] = s[o + FightSim.Z] + FxMath.SIN[side] * 3000000 / FxMath.ONE
 	s[o + FightSim.EK_T] = ek["life"]
 	s[o + FightSim.EK_HP] = ek["hp"]
-	s[o + FightSim.EK_CD] = ek.get("cd_m0", ek["cd0"]) if int(ek["ride"]) != 0 else ek["cd0"]
+	s[o + FightSim.EK_CD] = ek.get("cd0", 60)
 	s[o + FightSim.EK_SPC] = 0
 	s[o + FightSim.METER] = 0
 	s[o + FightSim.SUMMONS] += 1
 	return true
 
-static func remount(s: PackedInt64Array, P: Array, i: int) -> bool:
-	var o := i * FightSim.F_FIELDS
-	if s[o + FightSim.MOUNTED] != 0 or s[o + FightSim.EK_T] <= 0 or s[o + FightSim.STUN] > 0 or s[o + FightSim.ATK_STATE] != FightSim.Atk.NONE or s[o + FightSim.ROLL_T] >= 0:
-		return false
-	if FxMath.length(s[o + FightSim.X] - s[o + FightSim.EK_X], s[o + FightSim.Z] - s[o + FightSim.EK_Z]) > MOUNT_REACH:
-		return false
-	s[o + FightSim.MOUNTED] = 1
-	s[o + FightSim.MSTANCE] = MOUNT_STANCE
-	s[o + FightSim.X] = s[o + FightSim.EK_X]
-	s[o + FightSim.Z] = s[o + FightSim.EK_Z]
-	return true
+static func remount(_s: PackedInt64Array, _P: Array, _i: int) -> bool:
+	return false
 
-static func dismount(s: PackedInt64Array, P: Array, i: int, forced: bool) -> void:
-	var o := i * FightSim.F_FIELDS
-	if s[o + FightSim.MOUNTED] == 0:
-		return
-	s[o + FightSim.MOUNTED] = 0
-	s[o + FightSim.EK_X] = s[o + FightSim.X]
-	s[o + FightSim.EK_Z] = s[o + FightSim.Z]
-	var side := (s[o + FightSim.FACE] - 64) & 255
-	s[o + FightSim.X] -= FxMath.COS[side] * DISMOUNT_SIDE / FxMath.ONE
-	s[o + FightSim.Z] -= FxMath.SIN[side] * DISMOUNT_SIDE / FxMath.ONE
-	s[o + FightSim.VX] = 0
-	s[o + FightSim.VZ] = 0
-	SimAbilities.clamp_world(s, P, o)
-	s[o + FightSim.DISMOUNTS] += 1
-	if forced:
-		FightSim._apply_stun(s, o, 36)
+static func dismount(_s: PackedInt64Array, _P: Array, _i: int, _forced: bool = false) -> void:
+	pass
 
-static func mount_stance_hit(s: PackedInt64Array, P: Array, i: int, amount: int) -> void:
-	var o := i * FightSim.F_FIELDS
-	if s[o + FightSim.MOUNTED] == 0 or amount <= 0:
-		return
-	s[o + FightSim.MSTANCE] = maxi(s[o + FightSim.MSTANCE] - amount, 0)
-	s[o + FightSim.MDASH_T] = MOUNT_REGEN_DELAY # (reutilizado: espera de regeneración de la postura de montura)
-	if s[o + FightSim.MSTANCE] <= 0:
-		s[o + FightSim.MSTANCE] = MOUNT_STANCE
-		dismount(s, P, i, true)
+static func mount_stance_hit(_s: PackedInt64Array, _P: Array, _i: int, _amount: int) -> void:
+	pass
 
-static func _mount(s: PackedInt64Array, P: Array, i: int) -> void:
-	var o := i * FightSim.F_FIELDS
-	if s[o + FightSim.MOUNTED] == 0:
-		return
-	if s[o + FightSim.MDASH_T] > 0:
-		s[o + FightSim.MDASH_T] -= 1
-	else:
-		s[o + FightSim.MSTANCE] = mini(s[o + FightSim.MSTANCE] + MOUNT_REGEN, MOUNT_STANCE)
+static func _mount(_s: PackedInt64Array, _P: Array, _i: int) -> void:
+	pass
 
 static func _slot_cd(packed: int, slot: int) -> int:
 	return (packed >> ((slot + 1) * 16)) & 0xFFFF

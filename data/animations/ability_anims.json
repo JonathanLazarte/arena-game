@@ -83,7 +83,11 @@
                 0.6
               ],
               [
-                88,
+                84,
+                0.75
+              ],
+              [
+                118,
                 1
               ]
             ]
@@ -141,6 +145,91 @@
                 118,
                 1
               ]
+            ]
+          }
+        ]
+      }
+    },
+    "danza_eclipse": {
+      "file": "res://data/abilities/nuevas_habilidades_catalog.json",
+      "steps": {
+        "corte_lunar": [
+          {
+            "clip": "1H_Melee_Attack_Slice_Diagonal",
+            "unit": "frac",
+            "keys": [
+              [0, 0.0],
+              [30, 0.42],
+              [36, 0.58],
+              [78, 1.0]
+            ]
+          }
+        ],
+        "giro_penumbra": [
+          {
+            "clip": "1H_Melee_Attack_Slice_Horizontal_Reverse",
+            "fallback": "1H_Melee_Attack_Slice_Horizontal",
+            "unit": "frac",
+            "keys": [
+              [0, 0.05],
+              [28, 0.42],
+              [34, 0.58],
+              [76, 1.0]
+            ]
+          }
+        ],
+        "hendidura_umbra": [
+          {
+            "clip": "2H_Melee_Attack_Chop",
+            "fallback": "1H_Melee_Attack_Chop",
+            "unit": "frac",
+            "keys": [
+              [0, 0.0],
+              [38, 0.48],
+              [44, 0.62],
+              [88, 1.0]
+            ]
+          }
+        ]
+      }
+    },
+    "salva_velo_astral": {
+      "file": "res://data/abilities/nuevas_habilidades_catalog.json",
+      "steps": {
+        "paso_velo": [
+          {
+            "clip": "1H_Melee_Attack_Slice_Horizontal",
+            "unit": "frac",
+            "keys": [
+              [0, 0.05],
+              [28, 0.42],
+              [34, 0.58],
+              [76, 1.0]
+            ]
+          }
+        ],
+        "rafaga_sellos": [
+          {
+            "clip": "1H_Melee_Attack_Slice_Diagonal",
+            "unit": "frac",
+            "keys": [
+              [0, 0.05],
+              [26, 0.42],
+              [34, 0.60],
+              [76, 1.0]
+            ]
+          }
+        ],
+        "apertura_astral": [
+          {
+            "clip": "mx/cast",
+            "fallback": "1H_Melee_Attack_Chop",
+            "unit": "frac",
+            "keys": [
+              [0, 0.0],
+              [36, 0.45],
+              [52, 0.68],
+              [92, 1.0]
             ]
           }
         ]

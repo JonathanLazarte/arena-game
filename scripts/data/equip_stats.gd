@@ -11,7 +11,8 @@ const RESISTS := ["robustez", "inmunidad", "concentracion", "vitalidad"]
 const RESIST_NAMES := {"robustez": "Robustez", "inmunidad": "Inmunidad", "concentracion": "Concentración", "vitalidad": "Vitalidad"}
 ## Elemento de cada eikon (su daño usa la absorción de ese tipo).
 const EIKON_ELEMENT := {"fenix": "fuego", "lobo": "magico", "grifo": "rayo", "golem": "fisico"}
-const WEAPON_WEIGHT := {"espada_escudo": 6.0, "espada_larga": 5.0, "hacha_2m": 9.0, "lanza": 6.0, "dagas": 2.0, "arco": 3.0, "ballesta": 5.0}
+const WEAPON_WEIGHT := {"espada_escudo": 6.0, "espada_larga": 5.0, "hacha_2m": 9.0, "lanza": 6.0, "dagas": 2.0, "arco": 3.0, "ballesta": 5.0,
+	"abyss_greatsword": 9.0, "dark_sword": 5.0, "demons_spear": 7.0, "estoc": 4.0, "gold_tracer": 3.0, "laito": 6.0}
 ## Umbrales de carga (fracción de la carga máxima).
 const LIGHT_MAX := 0.3
 const MEDIUM_MAX := 0.7

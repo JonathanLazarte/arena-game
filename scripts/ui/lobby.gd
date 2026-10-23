@@ -14,7 +14,7 @@ const TAB_GROUPS := [
 	{"title": "PROGRESO", "tabs": ["Herrero", "Tienda", "Reclutar"]},
 	{"title": "PERFIL", "tabs": ["Ajustes"]},
 ]
-const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Artes", "Accesorios"]
+const SHOP_CATS := ["Armas", "Armaduras", "Eikons", "Materiales", "Accesorios"]
 const BUS_NAMES := {"Master": "General", "Música": "Música", "Efectos": "Efectos", "UI": "Interfaz"}
 const STAT_MAX := {"vida": 160.0, "estamina": 140.0, "velocidad": 1.3, "poise": 110.0, "dano": 1.4}
 const KIND_NAME := {"weapon": "arma", "eikon": "eikon", "armor": "armadura", "trinket": "accesorio"}
@@ -747,16 +747,6 @@ func _refresh_all(rebuild: bool = true) -> void:
 					gs.set_weapon2("" if rw.id == gs.weapon2_id else rw.id)
 					gs.save_loadout()
 					_refresh_all())
-			# Ronda 21: arte de arma intercambiable (colección)
-			if WeaponArts.compatible(Catalog.weapon(gs.weapon_id)):
-				var ab := UIKit.button("Arte: %s  ↻" % WeaponArts.name_of(gs.weapon_art()), 17, UIKit.BLUE)
-				ab.name = "ArtBtn"
-				ab.custom_minimum_size = Vector2(370, 42)
-				ab.pressed.connect(func() -> void:
-					gs.cycle_weapon_art()
-					gs.save_loadout()
-					_refresh_all(false))
-				list_box.add_child(ab)
 			var cw: WeaponDef = gs.eff_weapon(gs.weapon_id)
 			var offhand_text := "dos manos" if cw.two_handed else (Catalog.weapon(gs.left_hand_id).display_name if gs.left_hand_id != "" else "vacía")
 			var tertiary_text: String = "Escudo" if gs.weapon2_id == "escudo" else (String(gs.weapon2().display_name) if gs.weapon2() else "vacío")
@@ -775,9 +765,6 @@ func _refresh_all(rebuild: bool = true) -> void:
 				_stat("Daño", cw.light_damage, 22.0, "%d / %d" % [cw.light_damage, cw.heavy_damage])
 				_stat("Velocidad", 1.0 / cw.light_windup, 1.0 / 0.25, "%.2f s" % cw.light_windup)
 				_stat("Coste aguante", cw.light_stamina, 22.0, "%d / %d" % [cw.light_stamina, cw.heavy_stamina])
-				var art := WeaponArts.art(gs.weapon_art())
-				if not art.is_empty():
-					detail.text += "\n[color=#f2dc99]Arte:[/color] %s — %s (%d Energía)%s" % [art["name"], art["desc"], int(art["cost"]), "" if cur.special_id == "" else " · tu Habilidad propia tiene prioridad"]
 		"Eikons":
 			for id: String in Catalog.EIKONS:
 				var ed: EikonData = load(Catalog.EIKONS[id])
@@ -995,17 +982,6 @@ func _build_shop(cur: CharacterDef) -> void:
 					b.tooltip_text = String(Trinkets.def(tid)["desc"])
 					b.disabled = own
 			detail.text = "[b]Tienda · Accesorios[/b]\nAnillos (2 ranuras) y talismanes (3 ranuras): se equipan en la ficha del personaje."
-		"Artes":
-			for aid: String in WeaponArts.ORDER:
-				var a := WeaponArts.art(aid)
-				var own: bool = aid in gs.owned_arts
-				var b := _card("%s%s" % [a["name"], "  ✔" if own else " — %d oro" % int(a["price"])], false, not own, func() -> void:
-					if gs.buy_art(aid):
-						UIKit.audio("purchase")
-					_refresh_all(false))
-				b.name = "Buy_art_" + aid
-				b.disabled = own
-			detail.text = "[b]Tienda · Artes de arma[/b]\nTu colección: cambia el arte del arma cuerpo a cuerpo desde la ficha de Personaje."
 
 ## Puntos rojos: hay habilidades por aprender o algo que ya se puede comprar.
 func _update_dots() -> void:

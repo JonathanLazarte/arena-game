@@ -10,7 +10,6 @@ const PROPS := "res://assets/props/"
 const WINS_NEEDED := 2
 const ROUND_TIME := 90.0
 const EIKONS := ["res://resources/eikons/phoenix.tres", "res://resources/eikons/ice_wolf.tres", "res://resources/eikons/stone_golem.tres"]
-const LEGACY_MOUNT := "res://resources/mounts/horse.tres"
 ## Ronda 14: los combates empiezan A PIE (las monturas son eikons que se invocan).
 ## Las pruebas antiguas de combate montado ponen esto a true antes de cargar la escena:
 ## cada luchador recibe entonces una montura neutral (caballo de pruebas) y empieza montado.
@@ -49,7 +48,7 @@ func _ready() -> void:
 		player = _make_fighter(gs.display_name_with_title(), 0, Color(0.2, 0.4, 1.0), Catalog.EIKONS[gs.eikon_id],
 			Catalog.character(gs.character_id), gs.eff_weapon(gs.weapon_id), gs.char_skills(), gs.char_attrs(),
 			{"level": gs.char_level(), "armor": gs.armor_eq, "w2": gs.weapon2(), "left_hand": gs.left_hand(), "offhand": gs.offhand_weapon(), "shield": gs.weapon2_id == "escudo", "trinkets": gs.equipped_trinkets()})
-		player.set_magic(gs.equipped_spells(), gs.weapon_art(), gs.equipped_eikon_seal) # ronda 35
+		player.set_magic(gs.equipped_spells(), "", gs.equipped_eikon_seal) # ronda 35
 		player.set_boss_abilities(gs.boss_abilities()) # ronda 31
 		player.eikon_gambits = gs.eikon_gambits_for(gs.eikon_id)
 	else:
@@ -64,7 +63,7 @@ func _ready() -> void:
 			Smithing.effective(wd, Smithing.rival_level(gs.char_level())), [], Attributes.auto_allocate(cd.id, gs.char_level()),
 			{"level": gs.char_level(), "armor": EquipStats.rival_armor(cd.id, gs.char_level())})
 		enemy.set_boss_abilities(ch["boss"]) # sim: la 3.ª se desbloquea en Fase II (P.boss_n)
-		enemy.set_magic([String(ch["spell"])], String(ch["art"]))
+		enemy.set_magic([String(ch["spell"])] if String(ch.get("spell", "")) != "" else [], "")
 	elif gs and gs.random_rival:
 		var r: Dictionary = gs.random_loadout()
 		var rc: CharacterDef = r["character"]
@@ -80,8 +79,7 @@ func _ready() -> void:
 		pool.shuffle()
 		enemy.set_boss_abilities(pool.slice(0, BossAbilities.MAX_EQUIPPED)) # ronda 31: el rival lleva 3 al azar
 		# Ronda 35: rivales aleatorios equipan hechizo de Eikon y arte de arma.
-		var rival_arts: Array = WeaponArts.ORDER
-		enemy.set_magic(EikonSpells.default_for(enemy.eikon.id), String(rival_arts[randi() % rival_arts.size()]))
+		enemy.set_magic(EikonSpells.default_for(enemy.eikon.id), "")
 	if enemy.eikon_gambits.is_empty():
 		enemy.eikon_gambits = EikonGambits.default_for(enemy.eikon.id if enemy.eikon else "lobo")
 	player.opponent = enemy
@@ -380,7 +378,7 @@ func _make_online_fighter(lo: Dictionary, fallback: String, team: int, c: Color)
 	if a.is_empty():
 		return _make_fighter(fallback, team, c, EIKONS[0])
 	var f := _make_fighter(String(a["name"]), team, c, String(a["eikon_path"]), a["cd"], a["wd"], a["skills"], a["attrs"], a["eqp"])
-	f.set_magic(a["spells"], String(a["art"]), String(a["seal"]))
+	f.set_magic(a["spells"], "", String(a["seal"]))
 	f.set_boss_abilities(a["boss"])
 	return f
 

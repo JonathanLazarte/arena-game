@@ -1,0 +1,76 @@
+[gd_resource type="Resource" script_class="WeaponDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/combo_hit.gd" id="ch"]
+
+[sub_resource type="Resource" id="combo_0"]
+script = ExtResource("ch")
+hitstun = 0.28
+name = "Tajo dorado"
+anim = "Dualwield_Melee_Attack_Slice"
+damage = 10.0
+reach = 2.0
+arc_deg = 80.0
+windup = 0.28
+active = 0.1
+recovery = 0.38
+stamina = 9.0
+
+[sub_resource type="Resource" id="combo_1"]
+script = ExtResource("ch")
+hitstun = 0.28
+name = "Destello curvo"
+anim = "Dualwield_Melee_Attack_Stab"
+damage = 10.0
+reach = 2.0
+arc_deg = 80.0
+windup = 0.25
+active = 0.1
+recovery = 0.38
+stamina = 9.0
+
+[sub_resource type="Resource" id="combo_2"]
+script = ExtResource("ch")
+hitstun = 0.7
+name = "Danza carmesí"
+anim = "Dualwield_Melee_Attack_Chop"
+damage = 16.0
+reach = 2.1
+arc_deg = 90.0
+windup = 0.38
+active = 0.14
+recovery = 0.5
+stamina = 13.0
+poise_mult = 1.6
+lunge = 3.5
+finisher = true
+
+[resource]
+script = ExtResource("1")
+scaling = {"destreza": 1.3}
+requirements = {"destreza": 10}
+id = "gold_tracer"
+display_name = "Trazador dorado"
+description = "Espada curva ligera grabada en oro. Corta en ráfagas veloces causando acumulación de sangrado."
+allows_shield = false
+two_handed = false
+reach_foot = 2.0
+reach_mounted = 3.2
+half_arc_foot_deg = 75.0
+phys_type = "cortante"
+light_damage = 10.0
+heavy_damage = 22.0
+light_windup = 0.3
+heavy_windup = 0.65
+light_recovery = 0.4
+heavy_recovery = 0.6
+light_stamina = 9.0
+heavy_stamina = 20.0
+status = {"sangrado": 35.0}
+anim_light = PackedStringArray("Dualwield_Melee_Attack_Slice", "Dualwield_Melee_Attack_Stab", "Dualwield_Melee_Attack_Chop")
+anim_heavy = "Dualwield_Melee_Attack_Slice"
+anim_idle = "Idle"
+mesh_right = ""
+max_combo = 3
+combo = Array[Resource]([SubResource("combo_0"), SubResource("combo_1"), SubResource("combo_2")])
+heavy_hitstun = 0.5

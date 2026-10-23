@@ -343,6 +343,9 @@ static func raw_live(s: PackedInt64Array, P: Array, i: int, raw: int) -> int:
 		raw = raw * (1000 + P[i]["furia_pm"]) / 1000
 	if s[o + FightSim.RAGE_T] > 0:
 		raw = raw * 1300 / 1000
+	var ext := FightSim.ext_of(i)
+	if s[ext + FightSim.EX_BUFF_T] > 0 and s[ext + FightSim.EX_BUFF_KIND] == 1:
+		raw = raw * maxi(1000 + s[ext + FightSim.EX_BUFF_VAL], 0) / 1000
 	return raw
 
 static func _tdir(s: PackedInt64Array, i: int) -> int:
@@ -566,13 +569,30 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 	var boss: Array = P[i].get("boss", [])
 	if boss.is_empty():
 		return false
-	if s[o + FightSim.AB_SLOT] >= 0 and s[o + FightSim.AB_SLOT] < boss.size():
-		var cur: Dictionary = boss[s[o + FightSim.AB_SLOT]]
-		if int(cur.get("type", -1)) == T_CATALOG:
-			return SimCatalog.latch(s, P, i, false)
-		if int(cur.get("type", -1)) == T_STEPS and SimSteps.latch(s, P, i, false):
-			return true
-	var slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
+	var sel_slot: int = clampi(s[o + FightSim.AB_SEL], 0, maxi(boss_avail(s, P, i) - 1, 0))
+	var running_slot: int = s[o + FightSim.AB_SLOT]
+	if running_slot >= 0 and running_slot < boss.size():
+		if sel_slot == running_slot:
+			var cur: Dictionary = boss[running_slot]
+			if int(cur.get("type", -1)) == T_CATALOG:
+				return SimCatalog.latch(s, P, i, false)
+			if int(cur.get("type", -1)) == T_STEPS and SimSteps.latch(s, P, i, false):
+				return true
+			return false
+		else:
+			if not AdminMode.enabled and sel_slot < 64 and s[o + FightSim.BCD_BASE + sel_slot] > 0:
+				return false
+			var ab_next: Dictionary = boss[sel_slot]
+			if not _cost_ok(s, i, ab_next):
+				return false
+			var cur_ab: Dictionary = boss[running_slot]
+			if int(cur_ab.get("type", -1)) == T_CATALOG:
+				if not SimCatalog.can_exit_combo(s, P, i):
+					return false
+			elif int(cur_ab.get("type", -1)) == T_STEPS:
+				return false
+			end_ability(s, o, false)
+	var slot: int = sel_slot
 	var ab: Dictionary = boss[slot]
 	if int(ab.get("rep_free", 0)) != 0 and s[o + FightSim.AB_SLOT] == slot and s[o + FightSim.AB_T] >= int(ab.get("w", 0)) \
 			and kind_of(ab) == T_RAFAGA and s[o + FightSim.AB_FIRED] >= int(ab.get("count", 1)):
@@ -590,7 +610,8 @@ static func press(s: PackedInt64Array, P: Array, i: int) -> bool:
 		return true
 	if not can_use(s, P, i, slot):
 		return false
-	_pay(s, P, i, ab)
+	if int(ab.get("cost_at", 0)) <= 0:
+		_pay(s, P, i, ab)
 	s[o + FightSim.AB_LAST] = ab["code"]
 	s[o + FightSim.AB_STARTS] += 1
 	_start(s, P, i, slot)
@@ -715,6 +736,7 @@ static func _start(s: PackedInt64Array, P: Array, i: int, slot: int) -> void:
 		s[o + FightSim.AB_FL] = FL_CATALOG
 		s[o + FightSim.AB_FIRED] = int(ab.get("entry", 0))
 		s[o + FightSim.AB_WAIT] = own_cd | (int(ab.get("imask", 0)) << 16)
+		SimCatalog.on_start(s, P, i, slot, ab, own_cd)
 	elif kind_of(ab) == T_CARGA:
 		s[o + FightSim.AB_HZ] = spawn_hz(s, i, 1, s[o + FightSim.X], s[o + FightSim.Z], ab["warn"], ab["r"], raw_live(s, P, i, ab["raw"]), ab["force"], 150000, 0)
 
@@ -728,8 +750,11 @@ static func end_ability(s: PackedInt64Array, o: int, interrupted: bool) -> void:
 	if s[o + FightSim.AB_SLOT] < 0:
 		return
 	var fl: int = s[o + FightSim.AB_FL]
+	var slot_prev: int = s[o + FightSim.AB_SLOT]
 	if (fl & FL_CATALOG) != 0 and interrupted:
 		SimCatalog.cancel_zones(s, o / FightSim.F_FIELDS)
+	if (fl & FL_CATALOG) != 0:
+		SimCatalog.on_end(s, o / FightSim.F_FIELDS, o, slot_prev, interrupted)
 	if interrupted:
 		s[o + FightSim.AB_INTR] += 1
 		var hz: int = s[o + FightSim.AB_HZ]
@@ -813,6 +838,15 @@ static func update(s: PackedInt64Array, P: Array, i: int) -> void:
 		s[o + FightSim.BOSS_CD] = s[o + FightSim.BCD_BASE + sel]
 	if s[o + FightSim.RAGE_T] > 0: s[o + FightSim.RAGE_T] -= 1
 	if s[o + FightSim.GRAB_T] > 0: s[o + FightSim.GRAB_T] -= 1
+	var ext := FightSim.ext_of(i)
+	if s[ext + FightSim.EX_BUFF_T] > 0:
+		s[ext + FightSim.EX_BUFF_T] -= 1
+		if s[ext + FightSim.EX_BUFF_KIND] == 5 and s[o + FightSim.ALIVE] != 0:
+			var hp_max := int(P[i].get("hp", 100000)) if i < P.size() else 100000
+			s[o + FightSim.HP] = mini(s[o + FightSim.HP] + maxi(s[ext + FightSim.EX_BUFF_VAL] / 60, 1), hp_max)
+		if s[ext + FightSim.EX_BUFF_T] <= 0:
+			s[ext + FightSim.EX_BUFF_KIND] = 0
+			s[ext + FightSim.EX_BUFF_VAL] = 0
 	if s[o + FightSim.BS_PH] != 0:
 		_estocada(s, P, i)
 	if s[o + FightSim.AB_SLOT] < 0:

@@ -5,7 +5,10 @@ extends RefCounted
 
 const PATHS := [
 	"res://data/abilities/artorias_caballero_umbral.json",
+	"res://data/abilities/bosses_elden_catalog.json",
 	"res://data/abilities/golpe_fisura_skill.json",
+	"res://data/abilities/hoja_escarlata_catalog.json",
+	"res://data/abilities/nuevas_habilidades_catalog.json",
 ]
 static var _baked: Dictionary = {}
 static var _raw_abilities: Array = []

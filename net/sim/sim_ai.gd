@@ -150,7 +150,7 @@ func opp_facing() -> Vector3: return head_vec(og(S.FACE))
 func stamina() -> float: return g(S.ST) / 1000.0
 func health() -> float: return g(S.HP) / 1000.0
 func max_health() -> float: return int(_P[me]["hp"]) / 1000.0
-func mounted() -> bool: return g(S.MOUNTED) != 0
+func mounted() -> bool: return false
 func sword_mode() -> bool: return g(S.LOADOUT) == S.Load.SWORD
 func idle_atk() -> bool: return g(S.ATK_STATE) == S.Atk.NONE
 func reach_of(o_i: int) -> float:
@@ -300,19 +300,6 @@ func _decide() -> void:
 			boss_used += 1
 			return
 		if not sword_mode() and shoot():
-			return
-	# A pie: volver a montar su eikon
-	var ek: Dictionary = _P[me].get("ek", {})
-	if not mounted() and not ek.is_empty() and int(ek.get("ride", 0)) != 0 and g(S.EK_T) > 0:
-		var mpos := Vector3(g(S.EK_X) / 1.0e6, 0, g(S.EK_Z) / 1.0e6)
-		var md := mp.distance_to(mpos)
-		if md <= SimMagic.MOUNT_REACH / 1.0e6 - 0.3:
-			tap(S.IN_EIKON)
-			return
-		if dist > 6.0 or md < 6.0 or og(S.EXH) > 0:
-			_lock = false
-			_sprint = stamina() > 40.0
-			_move = (mpos - mp).normalized()
 			return
 	var sm := sword_mode()
 	var reach := reach_of(me)
@@ -652,12 +639,9 @@ func _avoid_aoe(mp: Vector3) -> bool:
 func _try_specials(dist: float, dir: Vector3) -> void:
 	if randf_() > minf(profile.special_chance * float(champion_style.get("special", 1.0)), 0.9):
 		return
-	var art: Dictionary = _P[me].get("art", {})
-	if int(art.get("type", 0)) == 3 and g(S.ART_CD) <= 0 and not mounted() and dist < int(art["r"]) / 1.0e6 - 1.0 and stamina() > 35.0 and g(S.MANA) >= int(art["cost"]):
-		tap(S.IN_ART)
-		return
+
 	var ek: Dictionary = _P[me].get("ek", {})
-	if mounted() and not ek.is_empty() and g(S.EK_SPC) <= 0:
+	if not ek.is_empty() and g(S.EK_T) > 0 and g(S.EK_SPC) <= 0:
 		match String(SimMagic.SPECIALS[int(ek.get("special", 0))]):
 			"llamarada":
 				if dist > 4.0 and dist < 18.0: tap(S.IN_EIKON)
@@ -670,6 +654,8 @@ func _try_magic(dist: float, dir: Vector3) -> bool:
 	var sc := minf(profile.special_chance * (1.5 if champion_phase_two else 1.0) * float(champion_style.get("special", 1.0)), 0.8)
 	if randf_() < sc and can_cast():
 		var d := current_spell()
+		if d.is_empty() or String(d.get("name", "")) == "" or String(d.get("id", "")) == "chispa":
+			return false
 		var safe := dist > 5.0 or (og(S.ATK_STATE) != S.Atk.WINDUP and og(S.BS_PH) == 0)
 		var useful := false
 		match int(d.get("type", -1)):
@@ -678,15 +664,6 @@ func _try_magic(dist: float, dir: Vector3) -> bool:
 			2: useful = health() < max_health() * 0.72 and dist < 9.0
 		if safe and useful:
 			tap(S.IN_SPELL)
-			return true
-	var art: Dictionary = _P[me].get("art", {})
-	if not art.is_empty() and int(art["type"]) != 3 and randf_() < sc and g(S.ART_CD) <= 0 and g(S.MANA) >= int(art["cost"]) and can_act() and idle_atk():
-		var ok := false
-		match int(art["type"]):
-			1: ok = dist > reach_of(me) + 0.8 and dist < 9.0 and facing().dot(dir) > 0.55
-			2: ok = dist < 3.3
-		if ok:
-			tap(S.IN_ART)
 			return true
 	return false
 
@@ -776,9 +753,17 @@ func _catalog_alt() -> void:
 	if si < 0 or si >= steps.size():
 		return
 	var step: Dictionary = steps[si]
+	var t := g(S.AB_T) - 1
+	if ab.has("chain_cont_pct"):
+		var wf := int(step.get("br0", -1))
+		if wf < 0 and step.has("combo_win") and not (step["combo_win"] as Array).is_empty():
+			wf = int((step["combo_win"][0] as Dictionary).get("from", -1))
+		if wf >= 0 and t == wf:
+			if (S.rng_next(_s) % 100) < int(ab["chain_cont_pct"]):
+				tap(S.IN_BOSS)
 	if int(step.get("br0", -1)) < 0:
 		return
-	if g(S.AB_T) - 1 != int(step["br0"]):
+	if t != int(step["br0"]):
 		return
 	if ri(100) < int(ab.get("balt", 0)):
 		tap(S.IN_BOSS_VAR)

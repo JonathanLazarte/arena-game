@@ -44,9 +44,9 @@ const SHORT := {"estocada": "Estocada", "carga_area": "Carga", "rafaga": "Ráfag
 	"floracion_escarlata": "Floración",
 	"martillo_alba": "Alba", "lanza_veredicto": "Veredicto", "triptico_sagrado": "Tríptico",
 	"danza_espirales": "Espirales", "estocada_penetrante": "Penetrante", "floracion_purpurea": "Purpúrea",
-	"pisoton_telurico": "Telúrico", "presa_del_coloso": "Coloso", "hendedura_cataclismica": "Hendedura"}
+	"pisoton_telurico": "Telúrico", "presa_del_coloso": "Coloso", "hendedura_cataclismica": "Hendedura", "danza_eclipse": "Eclipse", "salva_velo_astral": "Velo Astral"}
 const BASE_COLORS := {"estocada": Color(1.0, 0.3, 0.12), "carga_area": Color(0.3, 0.6, 1.0), "rafaga": Color(1.0, 0.82, 0.3),
-	"escudo_mana": Color(0.3, 1.0, 1.0), "combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15)}
+	"escudo_mana": Color(0.3, 1.0, 1.0), "combo_falso": Color(1.0, 0.8, 0.25), "salto_caida": Color(1.0, 0.25, 0.15), "danza_eclipse": Color(0.42, 0.62, 1.0), "salva_velo_astral": Color(0.36, 0.88, 0.9)}
 
 static func short_name(id: String) -> String:
 	if SHORT.has(id):

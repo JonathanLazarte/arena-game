@@ -36,7 +36,11 @@ var _pr: Array = [] ## Dictionary por ranura: root, slash, orb, core, trail, r
 ## Para pruebas: lo que se ha disparado (bursts, trails) por luchador.
 var bursts: Array[int] = [0, 0]
 var trails: Array[int] = [0, 0]
+var opacities: Array[int] = [100, 100]
+var fx_quality: String = "high"
 var _swing: Array[int] = [-1, -1]
+var _cw_hits: Array[int] = [0, 0]
+var _ch_tier: Array[int] = [0, 0]
 
 func _init(a: Fighter, b: Fighter, p: Node3D) -> void:
 	fighters = [a, b]
@@ -134,12 +138,33 @@ func _fighter_fx(s: PackedInt64Array, P: Array, i: int) -> void:
 		var steps: Array = ab.get("steps", [])
 		var si: int = s[o + S.AB_FIRED]
 		if si >= 0 and si < steps.size():
-			var wu := int(steps[si].get("w", 0))
+			var st_d: Dictionary = steps[si]
+			var wu := int(st_d.get("w", 0))
 			var ts := t - 1
-			if wu > 0 and ts >= wu and _swing[i] < wu:
+			if st_d.has("weapon_trail") and fx_quality != "low":
+				var wt_d: Dictionary = st_d["weapon_trail"]
+				var wtf := int(wt_d.get("from", 0))
+				if ts >= wtf and _swing[i] < wtf:
+					f._kv.flash_sword_trail(ab_color(id))
+					trails[i] += 1
+			elif wu > 0 and ts >= wu and _swing[i] < wu:
 				f._kv.flash_sword_trail(ab_color(id))
 				trails[i] += 1
 			_swing[i] = ts
+	var op_pct := SimCatalog.step_opacity(s, P, i) if typ == A.T_CATALOG and slot >= 0 else 100
+	opacities[i] = op_pct
+	if f._rider_root and not _vanished[i]:
+		f._rider_root.visible = op_pct > 5
+	var ext := S.ext_of(i)
+	if s.size() > ext + S.EX_COUNTER_HITS:
+		var cwh := int(s[ext + S.EX_COUNTER_HITS])
+		if cwh > _cw_hits[i]:
+			_burst(f, i, Color(1.0, 0.9, 0.3))
+		_cw_hits[i] = cwh
+		var cht := int(s[ext + S.EX_CHARGE_TIER])
+		if cht > _ch_tier[i] and fx_quality != "low":
+			_burst(f, i, Color(1.0, 0.75, 0.25))
+		_ch_tier[i] = cht
 	_fired[i] = fired if slot >= 0 else 0
 	_breath_cone(s, ab, f, i)
 	# --- contragolpe: destello azul al activarse ---

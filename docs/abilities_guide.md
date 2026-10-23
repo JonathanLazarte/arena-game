@@ -226,6 +226,8 @@ Los jefes **no definen habilidades**: solo referencian ids. Una misma habilidad 
 | `hint` | objeto | no | — | **solo para IA y tutorial**, la sim lo ignora (§5.7) |
 | `origin` | enum | no | `"boss"` | `boss` · `weapon`. Quién otorga la habilidad. El HUD y el loadout agrupan por este campo |
 | `requires_weapon` | array<string> | si `origin` es `weapon` | `[]` | ids de armas que ya existen (`espada_escudo`, `espada_larga`, `hacha_2m`, `dagas`, `lanza`, `arco`, `ballesta`). Vacío u omitido en las de jefe. Un id que no existe es error |
+| `phase_transition` | objeto o null | no | `null` | §10.2. `{on_phase, entry_step, self_invuln, skip_global_cd}`: dispara el paso indicado una sola vez por ronda al entrar en Fase II (`on_phase = 2`) |
+| `chain` | objeto o null | no | `null` | §8.5. `{cost_on, cooldown_on, max_links}`: semántica de combo encadenable de jefe |
 | `source` | objeto | no | — | **programa numérico de las 45**. No es el origen. No entra al horneado. No lo uses para `"boss"` / `"weapon"`: eso es `origin` |
 
 No existe `air_reach`. El validador (`AbilityCatalog.air_reach_um`) y la IA (`SimAI.air_reach_um`) lo calculan como el `reach_height_m` más alto de las cajas de la habilidad. `ground_only: true` cuenta como 0,35 m. Una caja sin tope declarado (ni `ground_only` ni `reach_height_m`) sigue sin tope: la sim de hoy pega a cualquier altura.
@@ -239,6 +241,7 @@ No existe `air_reach`. El validador (`AbilityCatalog.air_reach_um`) y la IA (`Si
 | `weight` | int 1..100 | `10` | peso relativo frente a las otras habilidades disponibles |
 | `use_when` | array<enum> | `["target_in_range"]` | `target_in_range` · `target_recovering` (rival castigable) · `target_far` · `target_close` · `target_blocking` · `target_healing` (bebiendo frasco, estado visible) · `target_downed` · `self_low_hp` · `self_phase2` · `opener` |
 | `branch_weights` | objeto | — | pesos por paso destino de un `branch` (§8.3), p. ej. `{"remate_normal": 60, "remate_alt": 40}` |
+| `chain_continue_pct` | int 0..100 | `100` | probabilidad (0..100 %) de que la IA continúe la cadena en cada `branch`/`combo_input_windows`, usando el RNG determinista de la sim (`FightSim.rng_next`) |
 
 La IA (`net/sim/sim_ai.gd`) **lee estado**, nunca las entradas crudas del rival en el mismo tick, y decide con su
 propio RNG sembrado. Hoy solo juega offline, pero igual no debe hacer trampa. El alcance aéreo no es un campo
@@ -290,11 +293,22 @@ Una habilidad es una lista de **1..N pasos** (sin cantidad fija). Cada paso es u
 | `armor` | objeto o null | no | `null` | §5.2 |
 | `self_invuln` | objeto o null | no | `null` | §5.3 |
 | `tracking` | objeto o null | no | sin giro | §5.4 |
-| `movement` | objeto o null | no | `null` | §7.1 |
+| `movement` | objeto, array o null | no | `null` | §7.1 (admite 1 segmento como objeto o múltiples segmentos sin solaparse como array `movement[]`) |
 | `hitboxes` | array | no | `[]` | §6 |
 | `spawns` | array | no | `[]` | §10 |
 | `cancel_into` | objeto o null | no | `null` | §8.2 |
 | `branch` | objeto o null | no | `null` | §8.3 |
+| `combo_input_windows` | array | no | `[]` | §8.3. Azúcar que se hornea a la semántica de `branch` (permite varias ventanas por paso) |
+| `exit_windows` | array | no | `[]` | §8.5. Ventanas de salida/cancelación por acción (`attack`, `roll`, `move`, `combo`) |
+| `buffer_ticks` | int 0..12 | no | `0` | §8.5. Ventana de búfer previo para `exit_windows` |
+| `self_windows` | array | no | `[]` | §5.8. Ventanas de estado propio (`intangible`, `no_turn`, `fade`) |
+| `cost_at_tick` | int o null | no | `0` | §5.8. Tick en el que se cobra el costo (si se interrumpe antes, no gasta) |
+| `charge` | objeto o null | no | `null` | §10.1. Carga con escalones discretos (`tiers[]`) |
+| `self_status_at` | array | no | `[]` | §10.1. Auto-estados/buffs aplicados en un tick del paso |
+| `counter_window` | objeto o null | no | `null` | §10.1. Ventana de contra-golpe por perforación recibida |
+| `guard_windows` | array | no | `[]` | §10.2. Ventanas de bloqueo activo durante el ataque |
+| `weapon_trail` | objeto o null | no | `null` | §9.1. `{from_tick, to_tick, style}` estela del arma (solo vista) |
+| `chain_role` | enum o null | no | `null` | §8.5. `"opener"` · `"link"` · `"finisher"` |
 | `next` | objeto | no | `{"default": null}` | §8.1. `null` = la habilidad termina |
 | `max_loops` | int 1..5 | no | — | obligatorio si el paso puede volver a sí mismo (ciclo) |
 | `extra_cost` | objeto `{stamina,mana,health}` | no | `null` | costo adicional al **entrar** en el paso (p. ej. un remate). Si no se puede pagar, se sigue `next.default` del paso anterior o se termina |
@@ -341,9 +355,21 @@ rollback lo corrija sin duplicarlo.
 | `deg_per_sec` | number 0..1080 | `0` | giro máximo hacia el objetivo antes del bloqueo |
 | `lock_at_tick` | int (`t_step`) | `windup_ticks` | desde acá deja de seguir (o sigue a `post_lock_deg_per_sec`); también fija el `lock_point` |
 | `post_lock_deg_per_sec` | number | `0` | giro residual tras el bloqueo; recomendado ≤ 60 |
+| `windows` | array o null | `null` | curva de giro por tramos `[{from_tick, to_tick, deg_per_sec}]` (0..2000°/s). Ordenadas y sin solaparse dentro del paso (V24); aviso si hay giro > 0 después de `lock_at_tick` (V25). Fuera de las ventanas aplica `deg_per_sec`/`post_lock_deg_per_sec` |
+
+```json
+"tracking": { "lock_at_tick": 66, "windows": [
+  { "from_tick": 0,  "to_tick": 6,  "deg_per_sec": 180 },
+  { "from_tick": 6,  "to_tick": 35, "deg_per_sec": 0 },
+  { "from_tick": 35, "to_tick": 49, "deg_per_sec": 720 },
+  { "from_tick": 49, "to_tick": 100, "deg_per_sec": 0 }
+]}
+```
 
 **El tick de bloqueo define la ventana de esquiva**: entre `lock_at_tick` y el primer tick activo está el tiempo
-que tiene el defensor para apartarse sin que el golpe lo corrija. Más corto = más difícil.
+que tiene el defensor para apartarse sin que el golpe lo corrija. Más corto = más difícil. En `tracking.windows` es
+válido un giro lento (~120°/s) en la recuperación o un giro «snap» rápido (hasta 1800–2000°/s) pocos ticks antes del
+activo, siempre antes de `lock_at_tick`.
 
 ### 5.5 Daño por golpe (sin totales ambiguos)
 
@@ -371,6 +397,22 @@ contradecir lo que la sim realmente hace. Lo único permitido es un `hint` **opc
 ```
 `hint.dodge` ∈ `roll_early` · `roll_late` · `roll_through` · `sidestep` · `jump` · `distance` · `parry` · `block`;
 `hint.direction` ∈ `side` · `back` · `forward` · `any`. La sim nunca lo lee.
+
+### 5.8 Ventanas de estado propio (`self_windows[]`) y `cost_at_tick`
+
+```json
+"self_windows": [
+  { "type": "intangible", "from_tick": 50, "to_tick": 104 },
+  { "type": "no_turn",    "from_tick": 21, "to_tick": 150 },
+  { "type": "fade",       "from_tick": 50, "to_tick": 70, "opacity_from": 100, "opacity_to": 0 }
+],
+"cost_at_tick": 18
+```
+
+- `intangible`: desactiva colisión de cuerpo (empuje de separación) y evita recibir golpes. Distinto de `self_invuln`. Entra al snapshot de la sim.
+- `no_turn`: congela el giro durante el tramo, incluso si `tracking` tiene velocidad > 0.
+- `fade`: **solo vista** (`SimCatalog.step_opacity`); interpola linealmente la opacidad entre `opacity_from` y `opacity_to` (0..100, V35). No entra al hash ni al estado de la sim.
+- `cost_at_tick` (default `null`/`0` = cobra al iniciar el paso, como hoy): cobra el costo del paso en ese tick (`0 <= cost_at_tick <= windup_ticks`, V36). Si la habilidad se interrumpe antes de `cost_at_tick`, no se descuenta el recurso.
 
 ---
 
@@ -420,6 +462,7 @@ contradecir lo que la sim realmente hace. Lo único permitido es un `hint` **opc
 | `on_hit.force` | objeto o null | `null` | §7.2 (pull/push/launch/root) |
 | `consumes_mark` | bool | `false` | detona una `mark` del objetivo (§7.3) |
 | `lifesteal_pct` | int 0..50 | `0` | % del daño **efectivamente infligido** que se cura el atacante |
+| `variant` | objeto o null | `null` | `{ "when": "<tag>" }`: activa la caja solo si se cumple el estado en el tick de activación (`phase1`, `phase2`, `rage`, `buff`, `shield`, `grounded`, `airborne`, `full_hp`, `low_hp`). Dos cajas con el mismo `from_tick` y distinto `when` representan dos versiones del mismo golpe (V41) |
 
 Un objetivo nunca recibe dos impactos del mismo hitbox en el mismo tick. Hitboxes distintos del mismo paso sí
 pueden pegar en el mismo tick (se suman, y cada uno aporta a la acumulación de aturdimiento con su tope de 0,95).
@@ -428,20 +471,30 @@ pueden pegar en el mismo tick (se suman, y cada uno aporta a la acumulación de 
 
 ## 7. Bloques de construcción
 
-### 7.1 Movimiento (`movement`)
+### 7.1 Movimiento (`movement` / `movement[]`)
+
+`movement` acepta un objeto único (como hoy) o un **array de tramos** `movement[]` ordenados y sin solaparse (V49).
 
 | Campo | Tipo | Default | Notas |
 |---|---|---|---|
-| `type` | enum | — | `none` · `dash` · `leap` · `slam` · `teleport_behind` · `orbit` · `retreat` |
+| `type` | enum | — | `none` · `dash` · `leap` · `slam` · `teleport_behind` · `orbit` · `retreat` · `blink_to_target` |
 | `from_tick`, `to_tick` | int (`t_step`) | — | tramo del movimiento |
 | `target_mode` | enum | `"facing"` | `facing` (rumbo actual, sujeto a `tracking`) · `target` (hacia el objetivo) · `lock_point` (punto fijado) · `away_from_target` |
 | `speed_mps` | number 0..40 | — | `dash`, `retreat`, `orbit` |
-| `max_distance_m` | number ≤ 14 | — | **tope obligatorio** de recorrido |
+| `max_distance_m` | number ≤ 14 | — | **tope obligatorio** de recorrido (V13) |
 | `stop_at_m` | number | `0` | se detiene a esta distancia del objetivo (no lo atraviesa) |
+| `range_min_m`, `range_max_m` | number o null | `null` | rango evaluado **una sola vez** en `lock_at_tick` (o en `gate_from_tick` si no hay lock) (V21). Con `fit_to_target: true`, `reference_distance_m` o en pasos de cadena (`chain_role` / `combo_input_windows`), `[range_min_m, range_max_m]` **acota (clamps)** la distancia efectiva y el factor de escala sin cancelar el movimiento ni cortar el combo cuando el rival está fuera de ese rango. Solo si `fit_to_target` es `false`, `reference_distance_m` es `null` y el paso no es parte de una cadena, fuera de `[range_min_m, range_max_m]` el desplazamiento se omite (pero el paso y sus ventanas siguen corriendo) |
+| `gate_from_tick`, `gate_to_tick` | int (`t_step`) | `from_tick`, `to_tick` | ventana de evaluación del rango y ajuste de llegada |
+| `fit_to_target` | bool | `false` | ajusta la velocidad para llegar exactamente a `stop_at_m` del rival en `to_tick` sin superar `max_distance_m`, acotando la distancia efectiva a `[range_min_m, range_max_m]`. Requiere `stop_at_m > 0` y `target_mode` hacia el rival (`target` o `lock_point`, V22) |
+| `arrive_angle_deg` | number | `0` | ángulo de llegada relativo a la línea rival→atacante (p. ej. `90` llega por el costado más cercano, calculado en el lock; aviso V23 si sale de `[-180, 180]`) |
+| `reference_distance_m` | number o null | `null` | distancia de referencia (> 0 y dentro de `[range_min_m, range_max_m]`, V37). Escala la velocidad/desplazamiento como `clamp(dist_efectiva, range_min_m, range_max_m) * 1000 / reference_distance_m` en enteros (‰) |
+| `distance_scale_windows` | array | `[]` | `[{from_tick, to_tick, pct}]` (pct 0..400, sin solapes, V38): multiplicador de velocidad por tramo |
 | `height_m` | number 0..8 | — | `leap`: altura del arco; durante `leap` el luchador está en el aire |
 | `impulse` | bool | `false` | `leap`: el despegue es un impulso y la gravedad hace el arco. Sin esto, la altura va escrita tick a tick |
 | `distance_m` | number 0..4 | — | `teleport_behind`: distancia detrás del objetivo |
 | `orbit_deg` | number | — | `orbit`: grados a rodear (signo = sentido) |
+
+- `blink_to_target`: desaparece en `from_tick` (requiere ventana `intangible` que cubra `[from_tick, to_tick]`, V47) y reaparece en `to_tick` a `stop_at_m` y `arrive_angle_deg` del punto fijado en `lock_at_tick`. No mueve el cuerpo durante los ticks intermedios.
 
 - `leap` en pasos encadenados = **combo aéreo**: el luchador sigue en el aire mientras los pasos usen `leap`;
   `slam` lo baja con caída rápida.
@@ -583,23 +636,70 @@ Entre los dos luchadores la sim procesa en orden de índice fijo (0 y luego 1), 
 reproducibles. `interrupt_priority` (mayor gana) solo desempata cuando dos habilidades de **distinto dueño** se
 resuelven en el mismo tick con la misma regla.
 
+### 8.5 Ventanas de salida (`exit_windows[]`), `combo_input_windows[]` y cadenas (`chain`)
+
+`exit_windows[]` en el paso (default `[]` = no se puede salir antes de terminar, como hoy):
+
+```json
+"buffer_ticks": 6,
+"exit_windows": [
+  { "action": "combo",  "from_tick": 82,  "to_tick": 120 },
+  { "action": "roll",   "from_tick": 104, "to_tick": 152 },
+  { "action": "attack", "from_tick": 106, "to_tick": 154 },
+  { "action": "move",   "from_tick": 106, "to_tick": 161 }
+]
+```
+
+- Acciones válidas: `"attack"` · `"roll"` · `"move"` · `"combo"`.
+- `"combo"` permite encadenar al siguiente paso vía `next`, `cancel_into` o `branch` (V39).
+- `buffer_ticks` (0..12, default `0` para no cambiar el comportamiento actual): una entrada recibida hasta N ticks antes de abrir la ventana se guarda en el estado de la sim y se ejecuta al abrirse.
+- `combo_input_windows[]` (default `[]`): azúcar que reutiliza la semántica de `branch` (`window_from_tick`/`window_to_tick`, `buffer_ticks` 0..12 default 6, `commit`, `options`). Permite definir **varias** ventanas ordenadas y sin solaparse en un mismo paso (V40). En pasos con una única ventana de continuación, `SimCatalog.latch` y `SimCatalog.on_control` aceptan y encolan (`FL_QUEUED`) pulsaciones tempranas realizadas durante la carga o el golpe (`t_step >= 0`), disparando la transición apenas se alcanza `from_tick`.
+- `chain` en la habilidad (`{cost_on, cooldown_on, max_links}`) + `chain_role` en cada paso (`"opener"|"link"|"finisher"`):
+  - `cost_on`: `"start"` · `"opener_commit"` (V50).
+  - `cooldown_on`: `"end"` · `"chain_end"` (difiere la recarga en `EX_CHAIN_CD_DEF` mientras la cadena sigue en curso y la aplica recién al finalizar el último paso ejecutado o al interrumpirse, V50).
+  - `max_links`: 1..3 (V52). Todo paso `link`/`finisher` solo es alcanzable dentro de la cadena y nunca es `entry_step` (V51); el `opener` tiene como máximo 2 golpes activos (V53), y la ventana de combo abre ≥ 6 ticks después del último tick activo (aviso V54).
+- **Regla de diseño para el ritmo de pasos en cadenas (`chain`)**:
+  Cada paso encadenable se estructura en **4 tramos** claros:
+  1. **Carga / Anticipación (`windup_ticks`)**: ~26–38 ticks (preparación y avance hacia el objetivo).
+  2. **Golpe e Impacto (`active_ticks`)**: ~6–16 ticks (contacto de hitbox o disparo de proyectiles + estela `weapon_trail`).
+  3. **Asentamiento del impacto (`+6 ticks` tras el último tick activo, V54)**: pausa breve para que el impacto se lea antes de cortar la pose hacia el siguiente paso.
+  4. **Espacio / Recuperación post-impacto (`recovery_ticks` amplio, ~40–44 ticks ≈ 0,70 s)**: cumple **doble función**:
+     - **Facilitar el encadenamiento**: `combo_input_windows` abarca desde `windup + active + 6` hasta casi el final de la recuperación (`total - 2`), con `"buffer_ticks": 12` y **`"commit": "immediate"`**. Si el jugador pulsa temprano durante el golpe, queda en búfer y encadena en `from_tick`; si pulsa en cualquier momento durante esos ~0,70 s de espacio post-golpe, encadena **en ese mismo tick**.
+     - **Ventana de castigo (whiff punish)**: si el jugador no encadena (o falla y duda), el personaje completa toda la animación de recuperación hasta `total`, dejando hueco para que el defensor que esquivó pueda castigar.
+  - **Sin bloqueo por distancia**: nunca debe cortarse la cadena ni bloquearse el avance por estar cerca o lejos; `range_min_m`, `range_max_m`, `reference_distance_m` y `fit_to_target` se mantienen en el `movement` para ajustar y acotar la velocidad/escala del dash dentro de `[range_min_m, range_max_m]`.
+
 ---
 
 ## 9. Eventos visuales y de sonido (rollback-safe)
 
 ```json
+"weapon_trail": { "from_tick": 68, "to_tick": 82, "style": "slash_heavy" },
 "events": [
-  { "id": "ev_salto", "tick": 0, "vfx": "vfx_dust_ring", "sfx": "sfx_leap" },
-  { "id": "ev_impacto", "tick": 48, "vfx": "vfx_crack", "sfx": "sfx_slam", "camera_shake": 2, "on": "always" }
+  { "id": "ev_paso", "tick": 12, "footstep": true, "attach": "foot" },
+  { "id": "ev_carga", "tick": 0, "duration_ticks": 60, "vfx": "vfx_aura_fire", "sfx": "sfx_charge_loop", "sfx_loop": true, "stop_on_interrupt": true, "attach": "weapon", "follow": true },
+  { "id": "ev_impacto", "tick": 48, "vfx": "vfx_crack", "sfx": "sfx_slam", "camera_shake": { "level": 2, "falloff_start_m": 10, "falloff_end_m": 30, "haptic": "medium" }, "on": "always" }
 ]
 ```
 | Campo | Tipo | Default | Notas |
 |---|---|---|---|
 | `id` | string | — | único en la habilidad |
 | `tick` | int (`t_step`) | — | cuándo dispara |
+| `duration_ticks` | int ≥ 0 | `0` | `0` = instantáneo. Si > 0, `tick + duration_ticks ≤ duración del paso` salvo `outlive_step: true` (V29) |
+| `outlive_step` | bool | `false` | permite que el evento dure más allá del fin del paso |
 | `vfx`, `sfx` | string o null | `null` | ids de efecto/sonido |
-| `camera_shake` | int 0..3 | `0` | |
+| `attach`, `sfx_attach` | enum | `"self"` | `"self"` · `"weapon"` · `"hand"` · `"foot"` · `"ground"` (V30) |
+| `follow` | bool | `true` | `false` = queda fijo en la posición del mundo donde nació |
+| `sfx_loop` | bool | `false` | con `duration_ticks > 0`, reproduce el sonido en loop y lo corta al terminar, al interrumpirse (`stop_on_interrupt: true`) o si un rollback lo deshace |
+| `stop_on_interrupt` | bool | `true` | corta el evento/loop si la habilidad se interrumpe |
+| `footstep` | bool | `false` | atajo para pisada (se desactiva en `fx_quality = "low"`) |
+| `camera_shake` | int 0..3 u objeto | `0` | entero `0..3` o `{level: 0..3, falloff_start_m, falloff_end_m, haptic: "none"\|"light"\|"medium"\|"heavy"}` (`falloff_start_m <= falloff_end_m`, V31) |
 | `on` | enum | `"always"` | `always` · `hit` · `whiff` |
+
+### 9.1 Estela de arma (`weapon_trail`) y ajustes mobile
+
+- `weapon_trail`: `{from_tick, to_tick, style}` en el paso (default `null`, solo vista). En pasos `melee` con cajas activas se recomienda cubrir la ventana activa con `weapon_trail` (aviso V28).
+- **Idempotencia ante rollback**: `SimEvents` + `SimFx` deduplican por `(entity, ability, step, event_id, start_tick)` y cancelan los loops activos (`sfx_loop`) cuya ventana desaparece tras un rollback.
+- **Mobile**: `GameState.fx_quality` (`"low"|"med"|"high"`) reduce partículas y omite `footstep` en `"low"`; `GameState.haptics_enabled` permite apagar la vibración.
 
 **Clave estable**: el evento se deduce del estado (habilidad, paso, `t_step`) y su clave es
 `frame:ab_ev:<jugador>:<ability_code>:<step_id>:<event_id>`. Si tras un rollback ese estado ya no ocurre, el
@@ -624,6 +724,51 @@ ocupen más de **6 proyectiles** u **8 peligros** a la vez.
 `hits_airborne` es de cada spawn (`ground_wave`, `ground_mark`, `zone`), no de la habilidad. Por defecto el spawn no golpea a quien está en el aire. Ponerlo en true no sube el `reach_height_m`: el alcance aéreo de la habilidad sigue saliendo de las cajas. La sim todavía no lee este bit.
 | `beam` (rayo / aliento) | `length_m`, `width_m` o `angle_deg`, `duration_ticks`, `tick_interval`, `sweep_deg_per_sec` | hoy existe como cono («aliento») |
 | `summon` | `entity`, `hp`, `lifetime_ticks`, `cap` (1..2) | el invocado vive en el estado de la sim (cuesta tamaño de estado y checksum): tope 1–2 |
+
+En cada elemento de `spawns[]` se admiten además:
+- `volley` (default `null` = un spawn como hoy):
+  ```json
+  "volley": { "count": 7, "interval_ticks": 2, "origin_offsets": [ {"forward_m": 0.5, "right_m": -0.6} ], "spread_deg": 60, "aim": "lock" }
+  ```
+  Dispara `count` sub-spawns en `at_tick + i * interval_ticks` (último sub-spawn dentro del paso, V32; si `origin_offsets` está presente debe tener longitud `count`, V33). `aim`: `"lock"` (dirección fijada en `lock_at_tick`) o `"facing"` (dirección actual al nacer).
+- `paired_hitbox` (string o null, default `null`): id de una caja del mismo paso para sincronizar golpe melee + onda/proyectil en el mismo tick.
+
+### 10.1 Carga por escalones (`charge`), auto-estados (`self_status_at`) y contra-golpe (`counter_window`)
+
+- **`charge`** en el paso (default `null`):
+  ```json
+  "charge": {
+    "from_tick": 10, "max_ticks": 60, "release_step": "golpe_cargado",
+    "tiers": [
+      { "at_tick": 20, "damage_pct": 120, "stun_pct": 110, "vfx": "vfx_charge_1", "sfx": "sfx_charge_1" },
+      { "at_tick": 45, "damage_pct": 150, "stun_pct": 130, "vfx": "vfx_charge_2", "sfx": "sfx_charge_2" }
+    ]
+  }
+  ```
+  Mientras se mantiene pulsado el botón de la habilidad entre `from_tick` y `max_ticks`, avanza de escalón en cada `at_tick` (`tiers` ordenados, dentro de `[from_tick, max_ticks]` y con al menos `vfx`, `sfx` o `sfx_loop`, V42). Al soltar o llegar a `max_ticks` salta a `release_step` aplicando los multiplicadores del último escalón alcanzado.
+- **`self_status_at[]`** en el paso (default `[]`):
+  ```json
+  "self_status_at": [ { "tick": 20, "status": "rage", "duration_ticks": 240, "on": "always" } ]
+  ```
+  Aplica un estado/buff propio (`rage`, `furia`, `potenciar_filo`, `mana_shield`, `skin`, `haste`, `poise_up`, `sangrado`, `slow`, `silence`, `mark`, V43) en `tick`, condicionado a `on` (`"always"|"hit"|"blocked"|"whiff"`, V48).
+- **`counter_window`** en el paso (default `null`):
+  ```json
+  "counter_window": { "from_tick": 0, "to_tick": 24, "damage_taken_pct": 130, "stun_taken_pct": 120 }
+  ```
+  Ventana de vulnerabilidad a contra-golpe por perforación recibida (`damage_taken_pct` en `100..200`, aviso si dura > 40 ticks, V44).
+
+### 10.2 Guardia activa (`guard_windows[]`) y transición de fase (`phase_transition`)
+
+- **`guard_windows[]`** en el paso (default `[]`):
+  ```json
+  "guard_windows": [ { "from_tick": 12, "to_tick": 42, "block_dmg_pct": 80, "knockback_pct": 50, "stamina_regen_pct": 40 } ]
+  ```
+  Bloqueo con arma durante el paso (dentro del paso y porcentajes en `0..100`, V47).
+- **`phase_transition`** en la habilidad (default `null`):
+  ```json
+  "phase_transition": { "on_phase": 2, "entry_step": "explosion_fase2", "self_invuln": true, "skip_global_cd": true }
+  ```
+  Se dispara automáticamente **una sola vez por ronda** al entrar en Fase II (`on_phase = 2`, `entry_step` válido; aviso si la secuencia dura > 600 ticks, V49).
 
 Extensiones previstas de paso/habilidad:
 - **Agarres** (`category: grab`): siempre `blockable: false`, **rodables**, windup ≥ 24. Al conectar, los dos
@@ -667,6 +812,40 @@ Extensiones previstas de paso/habilidad:
 | V18 | `interruptible_by` vacío es válido: la habilidad no se corta (solo se esquiva). No exige hiperarmadura |
 | V19 | nombres propios: nada de nombres de otras franquicias |
 | V20 | aviso: cada preset tiene al menos una habilidad que alcanza 2,5 m, por proyectil, rayo o `reach_height_m` (una caja sin tope declarado también cuenta, porque la sim de hoy pega en el aire) |
+| V21 | `movement`: `range_min_m <= range_max_m` |
+| V22 | `movement.fit_to_target` requiere `stop_at_m > 0` y `target_mode` que apunte al rival (`target` o `lock_point`) |
+| V23 | aviso: `movement.arrive_angle_deg` fuera de `[-180, 180]` |
+| V24 | `tracking.windows`: ventanas ordenadas, sin solaparse, dentro de la duración del paso y con `0 <= deg_per_sec <= 2000` |
+| V25 | aviso: `tracking.windows` tiene una ventana con `deg_per_sec > 0` después de `lock_at_tick` |
+| V26 | `exit_windows`: ventanas dentro del paso (`0 <= from_tick < to_tick <= duración`) y `buffer_ticks` en `0..12` |
+| V27 | aviso: en `exit_windows`, la ventana `move` cierra antes que `roll` |
+| V28 | aviso: un paso de habilidad `melee` con `hitboxes` activos no tiene `weapon_trail` que cubra la ventana activa |
+| V29 | `events`: `duration_ticks >= 0` y `tick + duration_ticks <= duración del paso` (salvo `outlive_step: true`) |
+| V30 | `events`: `attach` y `sfx_attach` pertenecen a `self \| weapon \| hand \| foot \| ground` |
+| V31 | `events.camera_shake`: `falloff_start_m <= falloff_end_m` y `haptic` válido (`none \| light \| medium \| heavy`) |
+| V32 | `spawns[].volley`: `count >= 1`, `interval_ticks >= 0` y el último sub-spawn (`at_tick + (count - 1) * interval_ticks`) cae dentro del paso |
+| V33 | `spawns[].volley.origin_offsets`: si se define, su longitud es exactamente `count`; `paired_hitbox` debe existir en el mismo paso |
+| V34 | `self_windows` (`fade` a opacidad < 30) y `blink_to_target` exigen `telegraph` o evento con `sfx` en el tick de reaparición |
+| V35 | `self_windows`: `type` en `intangible \| no_turn \| fade`, `0 <= from_tick < to_tick <= duración del paso`, opacidad en `0..100`; `cost_at_tick` dentro del paso |
+| V36 | aviso: ventana `intangible` de más de 60 ticks |
+| V37 | `movement.reference_distance_m`: `> 0` y dentro de `[range_min_m, range_max_m]` si hay gating de rango |
+| V38 | `movement.distance_scale_windows`: ventanas ordenadas, sin solaparse, dentro del paso y `pct` en `0..400` |
+| V39 | `exit_windows` con `action = "combo"` o `combo_input_windows` requiere `next`, `cancel_into` o `branch` no nulo en el paso |
+| V40 | `combo_input_windows`: ventanas dentro del paso, ordenadas, sin solaparse y `buffer_ticks` en `0..12` |
+| V41 | `hitboxes[].variant.when`: tag conocido; aviso si dos variantes del mismo tick pueden estar activas a la vez |
+| V42 | `charge`: `0 <= from_tick < max_ticks <= duración`, `tiers` no vacío, ordenados por `at_tick` en `[from_tick, max_ticks]` y con al menos `vfx`, `sfx` o `sfx_loop` |
+| V43 | `self_status_at`: `status` conocido, `tick` dentro del paso y `duration_ticks >= 1` |
+| V44 | `counter_window`: `0 <= from_tick < to_tick <= duración del paso` y `damage_taken_pct` en `100..200` (aviso si dura > 40 ticks) |
+| V45 | `movement[]` (multi-segmento): lista no vacía, tramos ordenados, sin solaparse y dentro del paso |
+| V46 | `movement` con `type = "blink_to_target"`: `>= 18` ticks entre desaparición y primer activo, y `telegraph` o `sfx` al reaparecer |
+| V47 | `guard_windows`: ventanas dentro del paso y porcentajes (`block_dmg_pct`, `knockback_pct`, `stamina_regen_pct`) en `0..100` |
+| V48 | `self_status_at.on` pertenece a `always \| hit \| blocked \| whiff` |
+| V49 | `phase_transition`: `on_phase = 2` y `entry_step` existente en `steps` (aviso si la secuencia dura > 600 ticks) |
+| V50 | `chain`: `cost_on` (`start \| opener_commit`), `cooldown_on` (`end \| chain_end`), y `entry_step` con `chain_role = "opener"` y `combo_input_windows` o `branch` |
+| V51 | `chain_role`: `opener \| link \| finisher`; `link` y `finisher` no pueden ser `entry_step` y deben pertenecer a una habilidad con `chain` |
+| V52 | `chain`: `max_links` en `1..3`, sin ciclos y el largo máximo alcanzable `<= max_links` |
+| V53 | `chain`: el abridor (`opener`) tiene como máximo 2 golpes activos (aviso si `windup_ticks + active_ticks > 90`) |
+| V54 | aviso: en `chain`, una ventana de combo abre `< 6` ticks después del último tick activo, o una continuación imbloqueable no tiene `telegraph` propio |
 
 ### 11.1 Vuelo alto del Eikon (diseño futuro, no simulado)
 
@@ -1042,15 +1221,283 @@ Cada remate tiene aviso propio (círculo verde vs línea naranja) para que el de
 la adivine. El remate imbloqueable tiene 30 ticks de anticipación (≥ 18). En el HUD, el botón «Embestida» aparece
 junto al de la habilidad solo entre los ticks 32 y 66 del segundo golpe (según el estado de la sim).
 
+### 12.6 «Danza del Eclipse» — cadena de jefe (`chain`: opener + 2 continuaciones)
+
+Habilidad de jefe con `chain` (`opener` → `link` → `finisher`), movimiento con gating y `fit_to_target`, `combo_input_windows` y `exit_windows` para que tanto atacante como defensor tengan lecturas y salidas claras.
+
+```json
+{
+  "id": "danza_eclipse",
+  "name": "Danza del Eclipse",
+  "icon": "generic",
+  "category": "melee",
+  "tags": ["multi_hit", "tracking"],
+  "unlock": { "phase": 1 },
+  "cost": { "stamina": 24, "mana": 0, "health": 0 },
+  "cooldown_ticks": 480,
+  "uses_global_cd": true,
+  "usable_while": ["ground"],
+  "interruptible_by": ["stun_lvl2", "knockdown", "parry"],
+  "chain": { "cost_on": "start", "cooldown_on": "chain_end", "max_links": 3 },
+  "entry_step": "corte_lunar",
+  "steps": [
+    {
+      "id": "corte_lunar",
+      "chain_role": "opener",
+      "windup_ticks": 30, "active_ticks": 6, "recovery_ticks": 42,
+      "telegraph": { "id": "tg_eclipse_apertura", "style": "weapon_glow", "color": "#6CA0FF", "sound": "sfx_tele_eclipse_1", "ground_marker": null, "at_tick": 0, "text": "La hoja traza una media luna azulada." },
+      "tracking": { "deg_per_sec": 260, "lock_at_tick": 18, "post_lock_deg_per_sec": 0 },
+      "movement": {
+        "type": "dash", "from_tick": 14, "to_tick": 30, "speed_mps": 9, "max_distance_m": 4.5,
+        "target_mode": "lock_point", "stop_at_m": 1.4, "range_min_m": 1.5, "range_max_m": 6.5,
+        "fit_to_target": true, "reference_distance_m": 3.5, "arrive_angle_deg": 25
+      },
+      "weapon_trail": { "from_tick": 28, "to_tick": 40, "style": "crescent_blue" },
+      "hitboxes": [
+        { "id": "hb_e1", "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 115 }, "from_tick": 0, "to_tick": 6,
+          "damage_per_hit": 16, "blockable": true, "parryable": true, "stun_power": 18 }
+      ],
+      "combo_input_windows": [
+        { "from_tick": 42, "to_tick": 76, "buffer_ticks": 12, "commit": "immediate", "step": "giro_penumbra" }
+      ],
+      "buffer_ticks": 12,
+      "exit_windows": [
+        { "action": "combo", "from_tick": 42, "to_tick": 76 },
+        { "action": "roll",  "from_tick": 52, "to_tick": 74 },
+        { "action": "move",  "from_tick": 54, "to_tick": 78 }
+      ],
+      "next": { "default": null }
+    },
+    {
+      "id": "giro_penumbra",
+      "chain_role": "link",
+      "windup_ticks": 28, "active_ticks": 6, "recovery_ticks": 42,
+      "telegraph": { "id": "tg_eclipse_giro", "style": "body_pose", "color": "#8E7BFF", "sound": "sfx_tele_eclipse_2", "ground_marker": null, "at_tick": 0 },
+      "tracking": { "deg_per_sec": 300, "lock_at_tick": 16, "post_lock_deg_per_sec": 0 },
+      "movement": { "type": "dash", "from_tick": 12, "to_tick": 28, "speed_mps": 8.5, "max_distance_m": 3.4, "target_mode": "facing", "stop_at_m": 1.2 },
+      "weapon_trail": { "from_tick": 26, "to_tick": 38, "style": "crescent_violet" },
+      "hitboxes": [
+        { "id": "hb_e2", "shape": { "type": "arc", "radius_m": 2.9, "angle_deg": 140 }, "from_tick": 0, "to_tick": 6,
+          "damage_per_hit": 19, "blockable": true, "parryable": true, "stun_power": 22 }
+      ],
+      "combo_input_windows": [
+        { "from_tick": 40, "to_tick": 74, "buffer_ticks": 12, "commit": "immediate", "step": "hendidura_umbra" }
+      ],
+      "buffer_ticks": 12,
+      "exit_windows": [
+        { "action": "combo", "from_tick": 40, "to_tick": 74 },
+        { "action": "roll",  "from_tick": 50, "to_tick": 72 },
+        { "action": "move",  "from_tick": 52, "to_tick": 76 }
+      ],
+      "next": { "default": null }
+    },
+    {
+      "id": "hendidura_umbra",
+      "chain_role": "finisher",
+      "windup_ticks": 38, "active_ticks": 6, "recovery_ticks": 44,
+      "telegraph": { "id": "tg_eclipse_remate", "style": "weapon_flash", "color": "#D48CFF", "sound": "sfx_tele_eclipse_3", "ground_marker": null, "at_tick": 0 },
+      "tracking": { "deg_per_sec": 240, "lock_at_tick": 20, "post_lock_deg_per_sec": 0 },
+      "movement": { "type": "dash", "from_tick": 18, "to_tick": 36, "speed_mps": 10, "max_distance_m": 3.6, "target_mode": "facing", "stop_at_m": 1.2 },
+      "weapon_trail": { "from_tick": 36, "to_tick": 48, "style": "heavy_umbra" },
+      "hitboxes": [
+        { "id": "hb_e3", "shape": { "type": "arc", "radius_m": 3.2, "angle_deg": 120 }, "from_tick": 0, "to_tick": 6,
+          "damage_per_hit": 28, "blockable": false, "parryable": false, "stun_power": 36,
+          "on_hit": { "knockback": { "speed_mps": 7, "duration_ticks": 8 } } }
+      ],
+      "buffer_ticks": 8,
+      "exit_windows": [
+        { "action": "roll",   "from_tick": 66, "to_tick": 84 },
+        { "action": "attack", "from_tick": 68, "to_tick": 86 },
+        { "action": "move",   "from_tick": 68, "to_tick": 88 }
+      ],
+      "next": { "default": null }
+    }
+  ],
+  "ai": { "range_min": 1.5, "range_max": 6.5, "weight": 12, "use_when": ["target_in_range"], "chain_continue_pct": 75 },
+  "hint": { "dodge": "roll_late", "direction": "side", "text": "Podés rodar entre el segundo corte y la hendidura final." }
+}
+```
+
+### 12.7 «Salva del Velo Astral» — habilidad encadenable de 3 pasos (Etapas 1–7d)
+
+Combina `chain` de 3 eslabones (`paso_velo` → `rafaga_sellos` → `apertura_astral`), `fit_to_target` con `range_min_m`/`range_max_m` y `reference_distance_m`, `tracking.windows`, `combo_input_windows` permisivas (`commit: "immediate"`, `buffer_ticks: 12`), `exit_windows`, `self_windows` (`fade` + `intangible` + `no_turn`), `volley` progresivo (1 → 3 → 7 proyectiles secuenciados con `origin_offsets`) y `camera_shake` con atenuación por distancia (`falloff_start_m` / `falloff_end_m` + `haptic`).
+
+```json
+{
+  "id": "salva_velo_astral",
+  "name": "Salva del Velo Astral",
+  "icon": "generic",
+  "category": "ranged",
+  "tags": ["projectile", "tracking"],
+  "unlock": { "phase": 1 },
+  "cost": { "stamina": 12, "mana": 24, "health": 0 },
+  "cooldown_ticks": 360,
+  "uses_global_cd": true,
+  "usable_while": ["ground"],
+  "interruptible_by": ["knockdown"],
+  "chain": { "cost_on": "start", "cooldown_on": "chain_end", "max_links": 3 },
+  "entry_step": "paso_velo",
+  "steps": [
+    {
+      "id": "paso_velo",
+      "chain_role": "opener",
+      "windup_ticks": 28, "active_ticks": 6, "recovery_ticks": 42,
+      "cost_at_tick": 10,
+      "telegraph": { "id": "tg_velo_paso", "style": "vanish", "color": "#5CE1E6", "sound": "sfx_tele_velo_1", "ground_marker": null, "at_tick": 0, "text": "El cuerpo se envuelve en bruma turquesa y abre el primer sello." },
+      "tracking": { "deg_per_sec": 280, "lock_at_tick": 16, "post_lock_deg_per_sec": 0 },
+      "movement": {
+        "type": "dash", "from_tick": 6, "to_tick": 24, "speed_mps": 8.5, "max_distance_m": 3.6,
+        "target_mode": "lock_point", "stop_at_m": 1.4, "range_min_m": 1.5, "range_max_m": 7.0,
+        "fit_to_target": true, "reference_distance_m": 3.2
+      },
+      "self_windows": [
+        { "type": "intangible", "from_tick": 6,  "to_tick": 20 },
+        { "type": "fade",       "from_tick": 6,  "to_tick": 12, "opacity_from": 100, "opacity_to": 20 },
+        { "type": "fade",       "from_tick": 14, "to_tick": 22, "opacity_from": 20,  "opacity_to": 100 }
+      ],
+      "weapon_trail": { "from_tick": 26, "to_tick": 36, "style": "astral_cyan" },
+      "hitboxes": [
+        { "id": "hb_velo_1", "shape": { "type": "arc", "radius_m": 2.7, "angle_deg": 110 }, "from_tick": 0, "to_tick": 6,
+          "damage_per_hit": 12, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 14, "stun_scaling": "magic" }
+      ],
+      "spawns": [
+        {
+          "id": "sp_sello_1", "type": "projectile", "at_tick": 28, "anchor": "self",
+          "offset": { "forward_m": 0.8, "right_m": 0.0 }, "count": 1, "spread_deg": 0,
+          "speed_mps": 19, "homing_deg": 0, "homing_ticks": 0, "lifetime_ticks": 85, "radius_m": 0.35,
+          "pierce": false, "reflectable_by_parry": true,
+          "hitbox": { "damage_per_hit": 8, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 8, "stun_scaling": "magic" }
+        }
+      ],
+      "combo_input_windows": [
+        { "from_tick": 40, "to_tick": 74, "buffer_ticks": 12, "commit": "immediate", "step": "rafaga_sellos" }
+      ],
+      "buffer_ticks": 12,
+      "exit_windows": [
+        { "action": "combo", "from_tick": 40, "to_tick": 74 },
+        { "action": "roll",  "from_tick": 50, "to_tick": 72 },
+        { "action": "move",  "from_tick": 52, "to_tick": 76 }
+      ],
+      "events": [
+        { "id": "ev_velo_paso", "tick": 6, "duration_ticks": 16, "vfx": "vfx_mist_cyan", "sfx": "sfx_mist_hum", "sfx_loop": true, "attach": "self", "follow": true }
+      ],
+      "next": { "default": null }
+    },
+    {
+      "id": "rafaga_sellos",
+      "chain_role": "link",
+      "windup_ticks": 26, "active_ticks": 8, "recovery_ticks": 42,
+      "telegraph": { "id": "tg_velo_sellos", "style": "weapon_glow", "color": "#48C9E8", "sound": "sfx_tele_velo_2", "ground_marker": null, "at_tick": 0 },
+      "tracking": {
+        "lock_at_tick": 16,
+        "windows": [
+          { "from_tick": 0,  "to_tick": 16, "deg_per_sec": 540 },
+          { "from_tick": 16, "to_tick": 76, "deg_per_sec": 0 }
+        ]
+      },
+      "movement": { "type": "dash", "from_tick": 10, "to_tick": 24, "speed_mps": 7.0, "max_distance_m": 2.4, "target_mode": "facing", "stop_at_m": 1.4 },
+      "weapon_trail": { "from_tick": 24, "to_tick": 36, "style": "astral_cyan" },
+      "hitboxes": [
+        { "id": "hb_velo_2", "shape": { "type": "arc", "radius_m": 2.8, "angle_deg": 120 }, "from_tick": 0, "to_tick": 8,
+          "damage_per_hit": 14, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 16, "stun_scaling": "magic" }
+      ],
+      "spawns": [
+        {
+          "id": "sp_salva_3", "type": "projectile", "at_tick": 26, "anchor": "self",
+          "offset": { "forward_m": 0.7, "right_m": 0.0 }, "count": 1, "spread_deg": 0,
+          "speed_mps": 20, "homing_deg": 0, "homing_ticks": 0, "lifetime_ticks": 85, "radius_m": 0.35,
+          "pierce": false, "reflectable_by_parry": true,
+          "volley": {
+            "count": 3, "interval_ticks": 2, "spread_deg": 24, "aim": "lock",
+            "origin_offsets": [
+              { "forward_m": 0.6, "right_m": -0.45 },
+              { "forward_m": 0.75, "right_m": 0.0 },
+              { "forward_m": 0.6, "right_m":  0.45 }
+            ]
+          },
+          "hitbox": { "damage_per_hit": 6, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 6, "stun_scaling": "magic" }
+        }
+      ],
+      "combo_input_windows": [
+        { "from_tick": 40, "to_tick": 74, "buffer_ticks": 12, "commit": "immediate", "step": "apertura_astral" }
+      ],
+      "buffer_ticks": 12,
+      "exit_windows": [
+        { "action": "combo", "from_tick": 40, "to_tick": 74 },
+        { "action": "roll",  "from_tick": 50, "to_tick": 72 },
+        { "action": "move",  "from_tick": 52, "to_tick": 76 }
+      ],
+      "next": { "default": null }
+    },
+    {
+      "id": "apertura_astral",
+      "chain_role": "finisher",
+      "windup_ticks": 36, "active_ticks": 16, "recovery_ticks": 40,
+      "telegraph": { "id": "tg_velo_astral", "style": "vanish", "color": "#38B6FF", "sound": "sfx_tele_velo_3", "ground_marker": null, "at_tick": 0, "text": "El cuerpo se desvanece en niebla turquesa y abre siete sellos." },
+      "tracking": {
+        "lock_at_tick": 30,
+        "windows": [
+          { "from_tick": 0,  "to_tick": 8,  "deg_per_sec": 180 },
+          { "from_tick": 8,  "to_tick": 22, "deg_per_sec": 0 },
+          { "from_tick": 22, "to_tick": 30, "deg_per_sec": 900 },
+          { "from_tick": 30, "to_tick": 92, "deg_per_sec": 0 }
+        ]
+      },
+      "self_windows": [
+        { "type": "intangible", "from_tick": 8,  "to_tick": 26 },
+        { "type": "fade",       "from_tick": 8,  "to_tick": 16, "opacity_from": 100, "opacity_to": 15 },
+        { "type": "fade",       "from_tick": 20, "to_tick": 28, "opacity_from": 15,  "opacity_to": 100 },
+        { "type": "no_turn",    "from_tick": 30, "to_tick": 72 }
+      ],
+      "spawns": [
+        {
+          "id": "sp_salva_7", "type": "projectile", "at_tick": 36, "anchor": "self",
+          "offset": { "forward_m": 0.8, "right_m": 0.0 }, "count": 1, "spread_deg": 0,
+          "speed_mps": 20, "homing_deg": 0, "homing_ticks": 0, "lifetime_ticks": 90, "radius_m": 0.35,
+          "pierce": false, "reflectable_by_parry": true,
+          "volley": {
+            "count": 7, "interval_ticks": 2, "spread_deg": 48, "aim": "lock",
+            "origin_offsets": [
+              { "forward_m": 0.5, "right_m": -0.9 },
+              { "forward_m": 0.6, "right_m": -0.6 },
+              { "forward_m": 0.7, "right_m": -0.3 },
+              { "forward_m": 0.8, "right_m":  0.0 },
+              { "forward_m": 0.7, "right_m":  0.3 },
+              { "forward_m": 0.6, "right_m":  0.6 },
+              { "forward_m": 0.5, "right_m":  0.9 }
+            ]
+          },
+          "hitbox": { "damage_per_hit": 6, "damage_type": "magico", "damage_scaling": "magic", "blockable": true, "parryable": true, "stun_power": 6, "stun_scaling": "magic" }
+        }
+      ],
+      "buffer_ticks": 8,
+      "exit_windows": [
+        { "action": "roll",   "from_tick": 68, "to_tick": 86 },
+        { "action": "attack", "from_tick": 70, "to_tick": 88 },
+        { "action": "move",   "from_tick": 70, "to_tick": 92 }
+      ],
+      "events": [
+        { "id": "ev_velo_loop", "tick": 8, "duration_ticks": 20, "vfx": "vfx_mist_cyan", "sfx": "sfx_mist_hum", "sfx_loop": true, "attach": "self", "follow": true },
+        { "id": "ev_salva_boom", "tick": 36, "vfx": "vfx_astral_burst", "sfx": "sfx_astral_cast", "attach": "hand",
+          "camera_shake": { "level": 2, "falloff_start_m": 8, "falloff_end_m": 24, "haptic": "medium" } }
+      ],
+      "next": { "default": null }
+    }
+  ],
+  "ai": { "range_min": 2.0, "range_max": 12.0, "weight": 10, "use_when": ["target_in_range", "target_far"], "chain_continue_pct": 80 },
+  "hint": { "dodge": "roll_through", "direction": "forward", "text": "Tras los dos cortes astrales, cuando se desvanezca en el velo, rodá hacia adelante a través del abanico de siete sellos." }
+}
+```
+
 ---
 
 ## 13. Estado actual vs esquema objetivo
 
 ### 13.1 Dónde vive hoy
 
-- **Datos**: `data/abilities/catalog.json`. Cada una de las 45 tiene el paso del esquema y un objeto `source`
-  con los tiempos en segundos que compila la sim. `BossAbilities` solo lee ese archivo (nombres, costes, códice, HUD).
-  Hoja Escarlata y Elden siguen en sus catálogos. La copia vieja de las 45 está en `docs/backup/habilidades_ronda46/`.
+- **Datos**: `data/abilities/catalog.json` (las 45 base con `source` + paso), `data/abilities/hoja_escarlata_catalog.json` (`HojaCatalog`), `data/abilities/bosses_elden_catalog.json` (`EldenCatalog`) y los catálogos adicionales en `ExtraCatalog` (`scripts/data/extra_catalog.gd`, incluyendo `data/abilities/nuevas_habilidades_catalog.json` con `danza_eclipse` y `salva_velo_astral`, y `data/abilities/artorias_caballero_umbral.json` con `voltereta_cuchilla` adaptada a `chain` de 3 pasos).
+- **Sincronización automática**: `python tools/sync_abilities.py` escanea todos los JSON de `data/abilities/` y actualiza automáticamente `ExtraCatalog.PATHS` y los nombres/colores en `BossAbilities`.
+- **Protocolo y estado**: versión de protocolo `13` (`net/online/net_link.gd` y servidor relay), que incluye el bloque extendido `EX_*` por luchador en `FightSim` (19 enteros para ajuste/escala de movimiento en el lock, salidas bufferizadas, volleys, carga por tiers, ventanas propias y recarga diferida de cadenas `chain_end`).
 - **Compilación a enteros**: `SimAbilities.compile()` lee `source` y `SimSteps.wrap` pone el tipo en pasos.
   `SimParams.bake` arma `p["boss"]` con `SimParams.tk()` (0,4 s = 25 ticks, no 24).
 - **Ejecución**: `SimAbilities.update()` solo despacha `T_STEPS` (`SimSteps.tick`) y `T_CATALOG` (`SimCatalog`).

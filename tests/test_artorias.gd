@@ -42,6 +42,9 @@ func _play(id: String, gap: int, ticks: int) -> Dictionary:
 		var ia := FightSim.IN_LOCK
 		if t == 8:
 			ia |= FightSim.IN_BOSS
+		var ci: Dictionary = SimCatalog.combo_info(s, p, 0)
+		if bool(ci.get('can_combo', false)) and not bool(ci.get('queued', false)) and t % 6 == 0:
+			ia |= FightSim.IN_BOSS
 		prev = s.duplicate()
 		e.step(s, ia, FightSim.IN_LOCK)
 		var gap_now := FxMath.length(s[FightSim.X] - s[FightSim.F_FIELDS + FightSim.X], s[FightSim.Z] - s[FightSim.F_FIELDS + FightSim.Z])

@@ -23,7 +23,6 @@ var item_details: RichTextLabel
 var detail_slot: String = "arma"
 var attr_button: Button
 var attr_dot: Control
-var weapon_art_button: Button
 var slot_buttons: Dictionary = {}
 var slot_labels: Dictionary = {}
 var slot_icons: Dictionary = {}
@@ -78,14 +77,6 @@ func build(game_state: Node) -> void:
 			tb.pressed.connect(open_picker.bind(ts))
 			row.add_child(tb)
 			slot_buttons[ts] = tb
-	weapon_art_button = UIKit.button("Arte de arma", 12, UIKit.BLUE)
-	weapon_art_button.custom_minimum_size = Vector2(320, 32)
-	weapon_art_button.pressed.connect(func() -> void:
-		gs.cycle_weapon_art()
-		gs.save_loadout()
-		refresh()
-		changed.emit())
-	slot_box.add_child(weapon_art_button)
 	# Centro: detalles del objeto seleccionado.
 	item_details = RichTextLabel.new()
 	item_details.name = "ItemDetails"
@@ -477,8 +468,6 @@ func refresh() -> void:
 	attr_button.text = "ATRIBUTOS  +%d" % pts if pts > 0 else "ATRIBUTOS"
 	attr_dot.visible = pts > 0
 	var current_weapon: WeaponDef = Catalog.weapon(gs.weapon_id)
-	weapon_art_button.visible = WeaponArts.compatible(current_weapon)
-	weapon_art_button.text = "Arte: %s  ↻" % WeaponArts.name_of(gs.weapon_art())
 	var cs: Dictionary = gs.char_stat()
 	var t := "[b]%s[/b]\n%s · %s\n" % [c.display_name, gs.display_name_with_title(), c.role]
 	t += "[color=#f2dc99]Nivel %d[/color] · %d victorias\n" % [gs.char_level(), cs["wins"]]

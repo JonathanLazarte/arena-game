@@ -103,9 +103,15 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.boss_phase = s[o + S.BS_PH]
 	f.boss_dir = Vector3(FxMath.COS[s[o + S.BS_DIR] & 255] / 4096.0, 0.0, FxMath.SIN[s[o + S.BS_DIR] & 255] / 4096.0)
 	f.boss_cd = s[o + S.BOSS_CD] / hz
-	f.boss_sel = s[o + S.AB_SEL]
 	if not params.is_empty():
 		f.boss_avail = SimAbilities.boss_avail(s, params, 0 if o == 0 else 1)
+	var n_b := f.boss_ids.size()
+	if f.boss_cds.size() != n_b:
+		f.boss_cds.resize(n_b)
+	for k in n_b:
+		f.boss_cds[k] = s[o + S.BCD_BASE + k] / hz
+	f.boss_sel = s[o + S.AB_SEL]
+	if not params.is_empty():
 		var bl: Array = params[0 if o == 0 else 1].get("boss", [])
 		var sel: int = s[o + S.AB_SEL]
 		f.boss_repeat_ready = sel >= 0 and sel < bl.size() and int((bl[sel] as Dictionary).get("rep_free", 0)) != 0 \
@@ -115,6 +121,7 @@ func _apply_fighter(f: Fighter, s: PackedInt64Array, o: int) -> void:
 	f.ab_air = s[o + S.AB_AIR] != 0
 	f.ab_locked = (s[o + S.AB_FL] & SimAbilities.FL_LOCKED) != 0
 	var abk: int = s[o + S.AB_SLOT]
+	f.ab_slot = abk
 	f.ab_id = String(f.boss_ids[abk]) if abk >= 0 and abk < f.boss_ids.size() else ""
 	## nº de arranque (estado de la sim): alterna los tajos encadenados de la ráfaga, etc.
 	f.ab_seq = s[o + S.AB_STARTS]

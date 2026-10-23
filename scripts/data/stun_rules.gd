@@ -25,7 +25,8 @@ const EIKON_K := 1.2 ## golpes de eikon: daño x 1,2
 const COUNTER_K := 1.3 ## contraataque (golpeado mientras atacas)
 ## Fuerza propia de cada arma.
 const WEAPON_FORCE := {"dagas": 4.0, "espada_escudo": 8.0, "espada_larga": 11.0, "lanza": 9.0, "hacha_2m": 14.0,
-	"arco": 3.0, "ballesta": 6.0}
+	"arco": 3.0, "ballesta": 6.0, "abyss_greatsword": 13.0, "dark_sword": 8.0, "demons_spear": 10.0,
+	"estoc": 7.0, "gold_tracer": 5.0, "laito": 10.0}
 ## Súper-armadura por defecto: el fuerte en su anticipación multiplica la robustez por (1 + x).
 const HEAVY_RESIST := 1.0
 const CHARGE_RESIST := 1.0 ## + hasta esto con la carga completa del fuerte

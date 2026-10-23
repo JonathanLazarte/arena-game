@@ -42,6 +42,28 @@ static func diff(prev: PackedInt64Array, cur: PackedInt64Array, P: Array = []) -
 			out.append(_ev(fr, "phase2", i))
 		if prev[o + FightSim.ALIVE] != 0 and cur[o + FightSim.ALIVE] == 0:
 			out.append(_ev(fr, "death", i))
+		var ext := FightSim.ext_of(i)
+		if prev.size() > ext + FightSim.EX_COUNTER_HITS and cur.size() > ext + FightSim.EX_COUNTER_HITS:
+			if cur[ext + FightSim.EX_COUNTER_HITS] > prev[ext + FightSim.EX_COUNTER_HITS]:
+				out.append(_ev(fr, "counter_hit", i))
+			if cur[ext + FightSim.EX_CHARGE_TIER] > prev[ext + FightSim.EX_CHARGE_TIER]:
+				var tier_idx := int(cur[ext + FightSim.EX_CHARGE_TIER]) - 1
+				var code_c := int(cur[o + FightSim.AB_LAST])
+				var step_c := int(cur[o + FightSim.AB_FIRED])
+				var start_c := fr - maxi(int(cur[o + FightSim.AB_T]) - 1, 0)
+				var cev := {
+					"key": "%d:charge_tier:%d:%d:%d:%d" % [fr, i, code_c, step_c, tier_idx],
+					"dedup_key": "%d:%d:%d:tier_%d:%d" % [i, code_c, step_c, tier_idx, start_c],
+					"frame": fr, "kind": "charge_tier", "player": i, "tier": tier_idx + 1,
+				}
+				var st_c := SimCatalog._step_of(cur, P, i)
+				if st_c.has("charge"):
+					var tiers_arr: Array = (st_c["charge"] as Dictionary).get("tiers", [])
+					if tier_idx >= 0 and tier_idx < tiers_arr.size() and tiers_arr[tier_idx] is Dictionary:
+						var td: Dictionary = tiers_arr[tier_idx]
+						cev["vfx"] = String(td.get("vfx", ""))
+						cev["sfx"] = String(td.get("sfx", ""))
+				out.append(cev)
 		_ab_events(prev, cur, P, out, fr, i)
 	_ground_booms(prev, cur, out, fr)
 	return out
@@ -79,15 +101,67 @@ static func _ab_events(prev: PackedInt64Array, cur: PackedInt64Array, P: Array, 
 	var ts_prev := prev[o + FightSim.AB_T] - 1 if same else -1
 	var ts := cur[o + FightSim.AB_T] - 1
 	var code := int(cur[o + FightSim.AB_LAST])
+	var step_start_fr := fr - maxi(ts, 0)
 	for ev: Dictionary in evs:
 		var tick := int(ev.get("tick", 0))
 		if ts_prev < tick and ts >= tick:
 			var id := String(ev.get("id", ""))
 			var step := step_i if typ == SimAbilities.T_CATALOG else int(ev.get("step", 0))
-			out.append({
+			var shake_lvl := int(ev.get("shake", 0))
+			var item := {
 				"key": "%d:ab_ev:%d:%d:%d:%s" % [fr, i, code, step, id],
-				"frame": fr, "kind": "ab_ev", "player": i, "shake": int(ev.get("shake", 0)),
-			})
+				"dedup_key": "%d:%d:%d:%s:%d" % [i, code, step, id, step_start_fr],
+				"frame": fr, "kind": "ab_ev", "player": i, "shake": shake_lvl,
+				"ability": code, "step": step, "event_id": id, "start_tick": step_start_fr,
+			}
+			if ev.has("dur"): item["duration_ticks"] = int(ev["dur"])
+			if ev.has("outlive"): item["outlive_step"] = int(ev["outlive"]) != 0
+			if ev.has("attach"): item["attach"] = AbilityCatalog.ATTACH_POINTS[clampi(int(ev["attach"]), 0, AbilityCatalog.ATTACH_POINTS.size() - 1)]
+			if ev.has("sfx_attach"): item["sfx_attach"] = AbilityCatalog.ATTACH_POINTS[clampi(int(ev["sfx_attach"]), 0, AbilityCatalog.ATTACH_POINTS.size() - 1)]
+			if ev.has("follow"): item["follow"] = int(ev["follow"]) != 0
+			if ev.has("sfx_loop"): item["sfx_loop"] = int(ev["sfx_loop"]) != 0
+			if ev.has("stop_int"): item["stop_on_interrupt"] = int(ev["stop_int"]) != 0
+			if ev.has("footstep"): item["footstep"] = int(ev["footstep"]) != 0
+			if ev.has("vfx"): item["vfx"] = String(ev["vfx"])
+			if ev.has("sfx"): item["sfx"] = String(ev["sfx"])
+			if ev.has("shake_obj") and ev["shake_obj"] is Dictionary:
+				var so: Dictionary = ev["shake_obj"]
+				item["falloff_start_um"] = int(so.get("falloff_start", 0))
+				item["falloff_end_um"] = int(so.get("falloff_end", 0))
+				item["haptic"] = AbilityCatalog.HAPTIC_LEVELS[clampi(int(so.get("haptic", shake_lvl)), 0, 3)]
+				item["origin_x"] = int(cur[o + FightSim.X])
+				item["origin_z"] = int(cur[o + FightSim.Z])
+			elif shake_lvl > 0:
+				item["haptic"] = AbilityCatalog.HAPTIC_LEVELS[clampi(shake_lvl, 0, 3)]
+				item["origin_x"] = int(cur[o + FightSim.X])
+				item["origin_z"] = int(cur[o + FightSim.Z])
+			out.append(item)
+
+## Calcula la intensidad de sacudida de cámara según la distancia al origen (falloff_start_m..falloff_end_m).
+static func shake_intensity(ev: Dictionary, listener_x_um: int, listener_z_um: int) -> float:
+	var lvl := float(ev.get("shake", 0))
+	if lvl <= 0.0 or not ev.has("falloff_end_um"):
+		return lvl
+	var f_start := int(ev.get("falloff_start_um", 0))
+	var f_end := int(ev.get("falloff_end_um", 0))
+	if f_end <= 0:
+		return lvl
+	var dx := listener_x_um - int(ev.get("origin_x", 0))
+	var dz := listener_z_um - int(ev.get("origin_z", 0))
+	var d := FxMath.length(dx, dz)
+	if d <= f_start:
+		return lvl
+	if d >= f_end:
+		return 0.0
+	return lvl * float(f_end - d) / float(maxi(f_end - f_start, 1))
+
+static func effective_haptic(ev: Dictionary, haptics_on: bool = true) -> String:
+	if not haptics_on:
+		return "none"
+	if ev.has("haptic"):
+		return String(ev["haptic"])
+	var lvl := clampi(int(ev.get("shake", 0)), 0, 3)
+	return AbilityCatalog.HAPTIC_LEVELS[lvl]
 
 ## La línea quieta estalla entera. La sacudida sale del cambio de estado, no de un tick suelto.
 static func _ground_booms(prev: PackedInt64Array, cur: PackedInt64Array, out: Array, fr: int) -> void:

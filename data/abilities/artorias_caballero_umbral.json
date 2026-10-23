@@ -8,7 +8,8 @@
       "icon": "generic",
       "category": "movement",
       "tags": [
-        "multi_hit"
+        "multi_hit",
+        "tracking"
       ],
       "unlock": {
         "phase": 1
@@ -33,12 +34,19 @@
         "cancel_spawns": true,
         "cooldown": "full"
       },
+      "chain": {
+        "cost_on": "start",
+        "cooldown_on": "chain_end",
+        "max_links": 3
+      },
+      "entry_step": "salto_1",
       "steps": [
         {
           "id": "salto_1",
+          "chain_role": "opener",
           "windup_ticks": 66,
           "active_ticks": 10,
-          "recovery_ticks": 12,
+          "recovery_ticks": 42,
           "telegraph": {
             "id": "tg_salto_1",
             "style": "body_pose",
@@ -60,9 +68,13 @@
             "to_tick": 66,
             "height_m": 2.4,
             "speed_mps": 12,
-            "max_distance_m": 5,
+            "max_distance_m": 5.5,
             "target_mode": "lock_point",
-            "stop_at_m": 1.2
+            "stop_at_m": 1.2,
+            "range_min_m": 1.5,
+            "range_max_m": 6.5,
+            "fit_to_target": true,
+            "reference_distance_m": 3.5
           },
           "hitboxes": [
             {
@@ -81,8 +93,23 @@
               "stun_power": 16
             }
           ],
+          "combo_input_windows": [
+            {
+              "from_tick": 80,
+              "to_tick": 114,
+              "buffer_ticks": 12,
+              "commit": "immediate",
+              "step": "salida"
+            }
+          ],
+          "buffer_ticks": 12,
+          "exit_windows": [
+            { "action": "combo", "from_tick": 80, "to_tick": 114 },
+            { "action": "roll",  "from_tick": 90, "to_tick": 112 },
+            { "action": "move",  "from_tick": 94, "to_tick": 116 }
+          ],
           "next": {
-            "default": "salida"
+            "default": null
           },
           "events": [
             {
@@ -95,6 +122,7 @@
         },
         {
           "id": "salida",
+          "chain_role": "link",
           "windup_ticks": 18,
           "active_ticks": 1,
           "recovery_ticks": 18,
@@ -103,15 +131,31 @@
             "from_tick": 0,
             "to_tick": 37,
             "speed_mps": 10,
-            "max_distance_m": 3,
+            "max_distance_m": 3.0,
             "target_mode": "away_from_target"
           },
+          "combo_input_windows": [
+            {
+              "from_tick": 18,
+              "to_tick": 36,
+              "buffer_ticks": 12,
+              "commit": "immediate",
+              "step": "salto_2"
+            }
+          ],
+          "buffer_ticks": 12,
+          "exit_windows": [
+            { "action": "combo", "from_tick": 18, "to_tick": 36 },
+            { "action": "roll",  "from_tick": 24, "to_tick": 36 },
+            { "action": "move",  "from_tick": 26, "to_tick": 37 }
+          ],
           "next": {
-            "default": "salto_2"
+            "default": null
           }
         },
         {
           "id": "salto_2",
+          "chain_role": "finisher",
           "windup_ticks": 66,
           "active_ticks": 10,
           "recovery_ticks": 42,
@@ -136,9 +180,13 @@
             "to_tick": 66,
             "height_m": 2.4,
             "speed_mps": 12,
-            "max_distance_m": 5,
+            "max_distance_m": 5.5,
             "target_mode": "lock_point",
-            "stop_at_m": 1.2
+            "stop_at_m": 1.2,
+            "range_min_m": 1.5,
+            "range_max_m": 6.5,
+            "fit_to_target": true,
+            "reference_distance_m": 3.5
           },
           "hitboxes": [
             {
@@ -157,6 +205,12 @@
               "stun_power": 22
             }
           ],
+          "buffer_ticks": 8,
+          "exit_windows": [
+            { "action": "roll",   "from_tick": 90, "to_tick": 112 },
+            { "action": "attack", "from_tick": 94, "to_tick": 114 },
+            { "action": "move",   "from_tick": 94, "to_tick": 116 }
+          ],
           "next": {
             "default": null
           },
@@ -172,12 +226,13 @@
       ],
       "ai": {
         "range_min": 1.5,
-        "range_max": 5,
+        "range_max": 6.5,
         "weight": 10,
         "use_when": [
           "target_in_range",
           "target_blocking"
-        ]
+        ],
+        "chain_continue_pct": 75
       },
       "hint": {
         "dodge": "roll_late",

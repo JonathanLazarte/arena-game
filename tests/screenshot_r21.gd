@@ -12,7 +12,7 @@ func _run() -> void:
 	gs.reset_defaults()
 	gs.choose_first_character("caballero")
 	gs.owned_eikons = ["fenix", "lobo"]
-	gs.spells = ["chispa", "aliento_helado"]
+	gs.spells = ["saeta_vendaval", "aliento_helado"]
 	gs.from_lobby = true
 	gs.random_rival = false
 	change_scene_to_file("res://scenes/arena.tscn")

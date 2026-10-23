@@ -67,6 +67,12 @@ const MX_WEAPON := {
 	"lanza": {"death": "death_2h"},
 	# Ronda 29: dagas = tajos a una mano (Mixamo no trae cuchilladas dobles) (asesino y arquero: su arma cuerpo a cuerpo)
 	"dagas": {"light0": "sns_light0", "light1": "sns_light2", "light2": "sns_light1", "heavy": "sns_heavy", "idle": "light_idle", "death": "death_1h"},
+	"abyss_greatsword": {"light0": "gs_light0", "light1": "gs_light1", "light2": "gs_light2", "heavy": "gs_heavy", "block": "gs_block", "idle": "gs_idle", "death": "death_2h"},
+	"dark_sword": {"light0": "sns_light0", "light1": "sns_light1", "light2": "sns_light2", "heavy": "sns_heavy", "idle": "sns_idle", "death": "death_1h"},
+	"demons_spear": {"death": "death_2h"},
+	"estoc": {"light0": "sns_light0", "light1": "sns_light1", "light2": "sns_light2", "heavy": "sns_heavy", "idle": "sns_idle", "death": "death_1h"},
+	"gold_tracer": {"light0": "sns_light0", "light1": "sns_light2", "light2": "sns_light1", "heavy": "sns_heavy", "idle": "light_idle", "death": "death_1h"},
+	"laito": {"light0": "gs_light0", "light1": "gs_light1", "light2": "gs_light2", "heavy": "gs_heavy", "block": "gs_block", "idle": "gs_idle", "death": "death_2h"},
 }
 ## Strafe caminando (KayKit solo trae strafe corriendo): clips Mixamo de espadón.
 const MX_LOCO := {"Walk_Strafe_L": "strafe_a", "Walk_Strafe_R": "strafe_b"}

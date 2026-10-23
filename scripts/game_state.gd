@@ -69,6 +69,8 @@ var champion_progress: int = 0 ## campeones derrotados en la escalera (0..5)
 var owned_eikon_seals: Array = []
 var equipped_eikon_seal: String = ""
 var eikon_gambits: Dictionary = {}
+var fx_quality: String = "high" ## "low" | "med" | "high" (calidad de efectos visuales para mobile)
+var haptics_enabled: bool = true ## vibración / respuesta háptica activada
 
 ## Ronda 30: RECURSOS DE PRUEBA. true = al cargar, el perfil recibe (una sola vez por perfil)
 ## mucho oro, cristales, piedras de forja y todos los accesorios. PONER EN false ANTES DE PUBLICAR.

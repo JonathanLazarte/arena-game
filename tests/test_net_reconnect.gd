@@ -47,7 +47,17 @@ func _same(ms: Array[NetMatch], from: int) -> Array[int]:
 
 func _run() -> void:
 	rng.seed = 9
-	check(NetMatch.PROTO == 12 and NetLink.GAME_PROTO == 12, "protocolo 12 (relay rechaza versiones distintas)")
+	check(NetMatch.PROTO == 13 and NetLink.GAME_PROTO == 13, "protocolo 13 (relay rechaza versiones distintas)")
+	var s0 := FightSim.new_state(SimParams.defaults(), 77)
+	var ck0 := FightSim.checksum(s0)
+	s0[FightSim.eb(0) + FightSim.EX_MV_OK] = 1
+	s0[FightSim.eb(0) + FightSim.EX_EXIT_ACT] = 3
+	s0[FightSim.eb(1) + FightSim.EX_VOL_IDX] = 5
+	s0[FightSim.eb(1) + FightSim.EX_INTANG] = 1
+	s0[FightSim.eb(0) + FightSim.EX_CHAIN_LINKS] = 2
+	var raw_snap := var_to_bytes(s0)
+	var s1: PackedInt64Array = bytes_to_var(raw_snap)
+	check(s1.size() == FightSim.SIZE and FightSim.checksum(s1) == FightSim.checksum(s0) and FightSim.checksum(s0) != ck0, "roundtrip de snapshot serializado incluye campos nuevos EXT_BASE y altera checksum")
 	var ms := _pair(47661)
 	_play(ms, 3000)
 	check(ms[0].phase == NetMatch.Ph.PLAY and ms[1].phase == NetMatch.Ph.PLAY, "partida en curso")

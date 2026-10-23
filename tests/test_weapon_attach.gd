@@ -24,9 +24,13 @@ func _run() -> void:
 		check((db["weapons"] as Dictionary).has(w.id), "entrada para %s" % w.id)
 	var r := WeaponAttacher.validate(db, ids)
 	check((r["errors"] as Array).is_empty(), "weapons.json sin errores %s" % [r["errors"]])
-	# Todas deshabilitadas: el juego sigue con el camino clásico
+	# Entradas activas vs deshabilitadas
 	for id: String in ids:
-		check(WeaponAttacher.active_entry(id).is_empty(), "%s sin enganche por datos (comportamiento actual)" % id)
+		var ent: Dictionary = (db["weapons"] as Dictionary).get(id, {})
+		if bool(ent.get("enabled", false)):
+			check(not WeaponAttacher.active_entry(id).is_empty(), "%s con enganche por datos activo" % id)
+		else:
+			check(WeaponAttacher.active_entry(id).is_empty(), "%s sin enganche por datos (camino clásico)" % id)
 
 	# Validador detecta errores
 	var bad := {"weapons": {"x": {"mesh": "res://no/existe.glb", "hand": "middle",
@@ -92,7 +96,8 @@ func _run() -> void:
 		p = p.get_parent()
 	check(p != null and p.has_meta("weapon_id") and p.get_meta("weapon_id") == "espada_larga", "KnightVisual usa weapons.json si enabled")
 	kv.free()
-	kd["weapons"]["espada_larga"] = orig
+	kd["weapons"]["espada_larga"] = orig.duplicate(true)
+	kd["weapons"]["espada_larga"]["enabled"] = false
 	var kv2 := KnightVisual.new()
 	root.add_child(kv2)
 	kv2.setup(Color.BLUE, Catalog.character("caballero"), Catalog.weapon("espada_larga"))
