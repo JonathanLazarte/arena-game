@@ -1,0 +1,24 @@
+{
+	"_doc": "KayKit Adventurers (~20 huesos). Sin clavícula, cuello ni dedos: esos huesos humanoide44 se ignoran.",
+	"match": "exact_or_numbered",
+	"map": {
+		"Pelvis": "hips",
+		"Spine": "spine",
+		"Spine2": "chest",
+		"Head": "head",
+		"L_UpperArm": "upperarm.l",
+		"L_Forearm": "lowerarm.l",
+		"L_Hand": "hand.l",
+		"L_Thigh": "upperleg.l",
+		"L_Calf": "lowerleg.l",
+		"L_Foot": "foot.l",
+		"L_Toe0": "toes.l",
+		"R_UpperArm": "upperarm.r",
+		"R_Forearm": "lowerarm.r",
+		"R_Hand": "hand.r",
+		"R_Thigh": "upperleg.r",
+		"R_Calf": "lowerleg.r",
+		"R_Foot": "foot.r",
+		"R_Toe0": "toes.r"
+	}
+}

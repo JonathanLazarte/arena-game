@@ -30,6 +30,12 @@ extends Resource
 ## Rama test-models: biblioteca de animaciones horneada (tools/bake_test_models.gd) para modelos
 ## humanoides no KayKit. Vacío = flujo KayKit normal. Solo visual.
 @export var retarget_lib: String = "res://assets/test_models/test_knight/test_knight_anims.res"
+## Esqueleto humanoide44 (docs/SKELETON_GUIDE.md): biblioteca horneada por
+## tools/rig/bake_humanoid44.gd. Se carga en el AnimationPlayer como "h44/<clip>". Vacío = nada.
+@export var h44_lib: String = ""
+## Opcional: ranuras de animación (claves de KnightVisual.states: "none", "light0", "heavy"…) que
+## pasan a usar un clip humanoide44, p. ej. {"none": "h44/h44_test_a"}. Vacío = no cambia nada.
+@export var h44_slots: Dictionary = {}
 @export var tint: Color = Color(1, 1, 1)
 ## Ronda 14: habilidad especial (tecla G / botón "Habilidad"). "golpe_sismico" = área en el suelo.
 @export var special_id: String = ""

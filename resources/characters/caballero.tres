@@ -37,5 +37,6 @@ model_path = "res://assets/test_models/test_knight/knight.glb"
 texture_path = ""
 body_prefix = ""
 retarget_lib = "res://assets/test_models/test_knight/test_knight_anims.res"
+h44_lib = "res://assets/test_models/test_knight/test_knight_h44.res"
 combo_finisher = SubResource("combo_9")
 combo_finisher_weapon = "espada_escudo"

@@ -213,6 +213,9 @@ func setup(c: Color, cd: CharacterDef = null, wd: WeaponDef = null, offhand_def:
 			var h := melee_w.combo_hit(i, cdef)
 			states["light%d" % i] = author_combo_clip(ap, h)
 	_apply_mixamo(melee_w)
+	for slot: String in cdef.h44_slots: # humanoide44: solo si el clip existe (si no, queda el de siempre)
+		if ap and ap.has_animation(cdef.h44_slots[slot]):
+			states[slot] = cdef.h44_slots[slot]
 	_compensate_attachments(sk)
 	_setup_ability_anims()
 	_build_tree()
@@ -296,6 +299,8 @@ func _prepare_retarget(lib: AnimationLibrary) -> void:
 	var mx_lib := lib.get_meta("mx", null) as AnimationLibrary
 	if mx_lib:
 		player.add_animation_library(&"mx", mx_lib)
+	if cdef.h44_lib != "" and ResourceLoader.exists(cdef.h44_lib):
+		player.add_animation_library(&"h44", load(cdef.h44_lib) as AnimationLibrary)
 
 func _compensate_attachments(sk: Skeleton3D) -> void:
 	if sk == null or is_equal_approx(_att_comp, 1.0):
